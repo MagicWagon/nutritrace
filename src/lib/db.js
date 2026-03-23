@@ -234,6 +234,69 @@ const DB = (() => {
         }
       }
     },
+    /** Import from a Waistline Android app JSON export */
+    async importWaistline(data) {
+      // Nutrition key mapping: Waistline key → our key
+      const NUTR_MAP = {
+        'Added Sugars': 'added-sugars',
+        'vitamin-b1':   'b1',
+        'vitamin-b2':   'b2',
+        'vitamin-b6':   'b6',
+        'vitamin-b9':   'b9',
+        'vitamin-b12':  'b12',
+        'vitamin-pp':   'b3',
+      };
+
+      function mapFood(food) {
+        const { image_url, nutrition, ...rest } = food;
+        const mappedNutr = {};
+        if (nutrition && typeof nutrition === 'object') {
+          for (const [k, v] of Object.entries(nutrition)) {
+            mappedNutr[NUTR_MAP[k] || k] = parseFloat(v) || 0;
+          }
+        }
+        return { ...rest, imgUrl: image_url || null, nutrition: mappedNutr };
+      }
+
+      // Clear and import food list, preserving original IDs
+      const foods = data.foodList || [];
+      await this.clear('foodList');
+      const foodMap = {};
+      for (const food of foods) {
+        const mapped = mapFood(food);
+        await this.put('foodList', mapped);
+        foodMap[food.id] = mapped;
+      }
+
+      // Convert diary: Waistline has one entry per meal log event; group by date
+      const waistlineDiary = data.diary || [];
+      const byDate = {};
+      for (const entry of waistlineDiary) {
+        if (!entry.dateTime) continue;
+        const date = entry.dateTime.slice(0, 10);
+        if (!byDate[date]) byDate[date] = { date, items: [], bodyStats: {} };
+        // Map weight stat
+        if (entry.stats && entry.stats.weight != null) {
+          byDate[date].bodyStats.weight = entry.stats.weight;
+        }
+        for (const item of (entry.items || [])) {
+          const food = foodMap[item.id];
+          if (!food) continue;
+          const meal = item.category != null ? Number(item.category) : 0;
+          byDate[date].items.push({
+            ...food,
+            portion: parseFloat(item.portion) || food.portion || 100,
+            quantity: parseFloat(item.quantity) || 1,
+            meal: isNaN(meal) ? 0 : meal,
+            addedAt: item.dateTime || entry.dateTime,
+          });
+        }
+      }
+      await this.clear('diary');
+      for (const entry of Object.values(byDate)) {
+        await this.put('diary', entry);
+      }
+    },
     /** Wipe all IndexedDB stores and localStorage settings */
     async clearAll() {
       await Promise.all([

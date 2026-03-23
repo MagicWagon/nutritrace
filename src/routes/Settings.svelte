@@ -391,7 +391,7 @@
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = `waistline-backup-${new Date().toISOString().slice(0,10)}.json`;
+      a.download = `nutritrace-backup-${new Date().toISOString().slice(0,10)}.json`;
       a.click();
       URL.revokeObjectURL(a.href);
       showSuccess('Backup exported');
@@ -407,6 +407,25 @@
         const data = JSON.parse(text);
         await DB.importAll(data);
         showSuccess('Backup restored — reloading...');
+        setTimeout(() => location.reload(), 1500);
+      } catch(err) { showError('Import failed: ' + err.message); }
+    };
+    input.click();
+  }
+  async function importWaistline() {
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = '.json';
+    input.onchange = async (e) => {
+      const file = e.target.files[0]; if (!file) return;
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        if (!data.foodList && !data.diary) {
+          showError('Not a valid Waistline export file');
+          return;
+        }
+        await DB.importWaistline(data);
+        showSuccess('Waistline data imported — reloading...');
         setTimeout(() => location.reload(), 1500);
       } catch(err) { showError('Import failed: ' + err.message); }
     };
@@ -1203,6 +1222,15 @@
           <button class="setting-row setting-action" on:click={importBackup}>
             <span class="material-symbols-rounded si" style="color:var(--accent)">upload</span>
             <span class="setting-label">Import JSON backup</span>
+            <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
+          </button>
+          <div class="setting-divider"></div>
+          <button class="setting-row setting-action" on:click={importWaistline}>
+            <span class="material-symbols-rounded si" style="color:var(--accent)">swap_horiz</span>
+            <div>
+              <span class="setting-label">Import from Waistline</span>
+              <div class="setting-desc">Import foods &amp; diary from Waistline Android app</div>
+            </div>
             <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
           </button>
           <div class="setting-divider"></div>
