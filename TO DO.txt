@@ -1,0 +1,17 @@
+Multiple photos, 1 main, then addition if desired - all areas
+
+Food banner?
+-> can maybe be just in menu for foods, meals and recipes, different from eatch… possibly randomly rotating pics or a collage of them of actuall items there? If non present use preset?
+
+Camera for scanner not position right
+
+Database so data becomes persistant?
+
+User management? Login screen
+
+placement of nutrition summary and body stats.... not sure i like what happens with side bar
+
+floating add buttons instead of at top?
+
+
+maybe change ai bot a bit, to be a muscular robot or something
