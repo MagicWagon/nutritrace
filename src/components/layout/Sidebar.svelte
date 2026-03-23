@@ -84,7 +84,7 @@
     </nav>
 
     <div class="sidebar-footer">
-      <span class="sidebar-version">v1.0</span>
+      <span class="sidebar-version">v0.8.0-alpha</span>
     </div>
   </aside>
 {/if}

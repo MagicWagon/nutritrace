@@ -1234,7 +1234,7 @@
             <span class="material-symbols-rounded about-icon">monitor_weight</span>
             <div>
               <div class="about-name">NutriTrace</div>
-              <div class="about-version text-3 text-sm">Version 1.0</div>
+              <div class="about-version text-3 text-sm">Version 0.8.0 Alpha</div>
             </div>
           </div>
           <div class="setting-divider"></div>
