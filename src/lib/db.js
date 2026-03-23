@@ -247,15 +247,36 @@ const DB = (() => {
         'vitamin-pp':   'b3',
       };
 
-      function mapFood(food) {
-        const { image_url, nutrition, ...rest } = food;
-        const mappedNutr = {};
+      function cleanImgUrl(url) {
+        return (url && url !== 'undefined') ? url : null;
+      }
+
+      function mapNutrition(nutrition) {
+        const out = {};
         if (nutrition && typeof nutrition === 'object') {
           for (const [k, v] of Object.entries(nutrition)) {
-            mappedNutr[NUTR_MAP[k] || k] = parseFloat(v) || 0;
+            out[NUTR_MAP[k] || k] = parseFloat(v) || 0;
           }
         }
-        return { ...rest, imgUrl: image_url || null, nutrition: mappedNutr };
+        return out;
+      }
+
+      function calcNutrition(items) {
+        const totals = {};
+        for (const item of items) {
+          const portion = parseFloat(item.portion) || 100;
+          const quantity = parseFloat(item.quantity) || 1;
+          const factor = (portion * quantity) / 100;
+          for (const [k, v] of Object.entries(item.nutrition || {})) {
+            totals[k] = (totals[k] || 0) + (parseFloat(v) || 0) * factor;
+          }
+        }
+        return totals;
+      }
+
+      function mapFood(food) {
+        const { image_url, nutrition, ...rest } = food;
+        return { ...rest, imgUrl: cleanImgUrl(image_url), nutrition: mapNutrition(nutrition) };
       }
 
       // Clear and import food list, preserving original IDs
@@ -282,7 +303,8 @@ const DB = (() => {
             quantity: parseFloat(item.quantity) || 1,
           };
         }).filter(Boolean);
-        await this.put('meals', { ...rest, imgUrl: image_url || null, items: resolvedItems });
+        const nutrition = calcNutrition(resolvedItems);
+        await this.put('meals', { ...rest, imgUrl: cleanImgUrl(image_url), nutrition, items: resolvedItems });
       }
 
       // Import recipes — resolve ingredient references
@@ -290,12 +312,6 @@ const DB = (() => {
       await this.clear('recipes');
       for (const recipe of waistlineRecipes) {
         const { image_url, nutrition, ...rest } = recipe;
-        const mappedNutr = {};
-        if (nutrition && typeof nutrition === 'object') {
-          for (const [k, v] of Object.entries(nutrition)) {
-            mappedNutr[NUTR_MAP[k] || k] = parseFloat(v) || 0;
-          }
-        }
         const resolvedItems = (recipe.items || []).map(item => {
           const food = foodMap[item.id];
           if (!food) return null;
@@ -305,7 +321,7 @@ const DB = (() => {
             quantity: parseFloat(item.quantity) || 1,
           };
         }).filter(Boolean);
-        await this.put('recipes', { ...rest, imgUrl: image_url || null, nutrition: mappedNutr, items: resolvedItems });
+        await this.put('recipes', { ...rest, imgUrl: cleanImgUrl(image_url), nutrition: mapNutrition(nutrition), items: resolvedItems });
       }
 
       // Convert diary: Waistline has one entry per meal log event; group by date
