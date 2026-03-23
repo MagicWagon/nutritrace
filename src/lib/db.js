@@ -268,6 +268,46 @@ const DB = (() => {
         foodMap[food.id] = mapped;
       }
 
+      // Import meals (saved meal templates) — resolve ingredient references
+      const waistlineMeals = data.meals || [];
+      await this.clear('meals');
+      for (const meal of waistlineMeals) {
+        const { image_url, ...rest } = meal;
+        const resolvedItems = (meal.items || []).map(item => {
+          const food = foodMap[item.id];
+          if (!food) return null;
+          return {
+            ...food,
+            portion: parseFloat(item.portion) || food.portion || 100,
+            quantity: parseFloat(item.quantity) || 1,
+          };
+        }).filter(Boolean);
+        await this.put('meals', { ...rest, imgUrl: image_url || null, items: resolvedItems });
+      }
+
+      // Import recipes — resolve ingredient references
+      const waistlineRecipes = data.recipes || [];
+      await this.clear('recipes');
+      for (const recipe of waistlineRecipes) {
+        const { image_url, nutrition, ...rest } = recipe;
+        const mappedNutr = {};
+        if (nutrition && typeof nutrition === 'object') {
+          for (const [k, v] of Object.entries(nutrition)) {
+            mappedNutr[NUTR_MAP[k] || k] = parseFloat(v) || 0;
+          }
+        }
+        const resolvedItems = (recipe.items || []).map(item => {
+          const food = foodMap[item.id];
+          if (!food) return null;
+          return {
+            ...food,
+            portion: parseFloat(item.portion) || food.portion || 100,
+            quantity: parseFloat(item.quantity) || 1,
+          };
+        }).filter(Boolean);
+        await this.put('recipes', { ...rest, imgUrl: image_url || null, nutrition: mappedNutr, items: resolvedItems });
+      }
+
       // Convert diary: Waistline has one entry per meal log event; group by date
       const waistlineDiary = data.diary || [];
       const byDate = {};
