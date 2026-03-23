@@ -1231,7 +1231,7 @@
       <div class="section-body" transition:slide={{ duration: 180 }}>
         <div class="card settings-card">
           <div class="about-hero">
-            <span class="material-symbols-rounded about-icon">monitor_weight</span>
+            <img src="/icons/logo.png" alt="NutriTrace" class="about-icon" />
             <div>
               <div class="about-name">NutriTrace</div>
               <div class="about-version text-3 text-sm">Version 0.8.0 Alpha</div>
@@ -1536,7 +1536,7 @@
   .about-hero {
     display: flex; align-items: center; gap: 16px; padding: 16px;
   }
-  .about-icon { font-size: 40px; color: var(--accent); }
+  .about-icon { width: 56px; height: 56px; border-radius: 12px; }
   .about-name { font-size: 18px; font-weight: 700; color: var(--text-1); }
   .about-version { margin-top: 2px; }
   .about-desc {
