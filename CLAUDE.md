@@ -1,9 +1,11 @@
-# Waistline Web v2 — Project Reference
+# NutriTrace — Project Reference
 
-# Waistline Web v2
-
-**Location**: `C:\Users\JL1146\OneDrive - Eisner Advisory Group LLC\claude_code\waistline-web-v2\`
+**App name**: NutriTrace
+**Version**: 0.8.0-alpha
+**Location**: `/home/papa/Documents/claude_code/nutritrace/`
+**GitHub**: `git@github.com:thebigjoe1/nutritrace.git`
 **Stack**: Svelte 4, svelte-spa-router v4 (hash routing), Vite, IndexedDB, PWA (service worker)
+**Docker**: `docker compose up -d` → serves on port 3000
 
 ## Architecture
 
@@ -68,6 +70,3 @@
 - **Function calls in templates**: Svelte only tracks reactive dependencies that appear DIRECTLY in template expressions. Functions that close over reactive variables are NOT tracked. Always pass reactive values as explicit function parameters.
 - **`$:` reactive statements**: fire on mount AND on dependency change. Don't add redundant `onMount` calls for the same function.
 - **Async race guards**: for async loads keyed to a value (e.g. date), capture the key before the await and check it still matches after. Use the store value itself as the guard, not a separate counter.
-
-## File Locations for Edits
-Source files are in OneDrive paths with spaces. Edit/Write tools work directly; use Python file writes as fallback if EEXIST errors occur.
