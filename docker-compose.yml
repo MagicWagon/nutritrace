@@ -1,7 +1,6 @@
 services:
   nutritrace:
-    build: .
-    image: nutritrace:latest
+    image: ghcr.io/thebigjoe1/nutritrace:latest
     container_name: nutritrace
     ports:
       - "3000:80"
