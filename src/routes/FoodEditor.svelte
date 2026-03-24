@@ -143,7 +143,7 @@
   let contributing = false;
   let offSuccess = false;
   let linked = true;          // scale all fields proportionally on change
-  let _focusVal = null;       // value when a field was focused (for ratio)
+  let _snapshot = null;       // snapshot of all values when a field was focused
   let downloading = false;
   let downloadSuccess = false;
   $: isNewFood = !(params && params.id);
@@ -173,27 +173,30 @@
     } finally { contributing = false; }
   }
 
-  function onFieldFocus(e) {
-    _focusVal = parseFloat(e.target.value) || 0;
+  function onFieldFocus() {
+    const allNuts = [...NUTRIMENTS, ...($customNutriments || [])];
+    _snapshot = { portion: parseFloat(food.portion) || 0 };
+    for (const n of allNuts) _snapshot[n.id] = parseFloat(food[n.id]) || 0;
   }
 
   function applyProportional(changedId, newVal) {
-    if (!linked || !_focusVal || _focusVal <= 0 || newVal <= 0 || newVal === _focusVal) return;
-    const ratio = newVal / _focusVal;
+    if (!linked || !_snapshot) return;
+    const origVal = changedId === '__portion__' ? _snapshot.portion : _snapshot[changedId];
+    if (!origVal || origVal <= 0 || newVal <= 0 || newVal === origVal) return;
+    const ratio = newVal / origVal;
     const allNuts = [...NUTRIMENTS, ...($customNutriments || [])];
     for (const n of allNuts) {
       if (n.id === changedId) continue;
-      const v = parseFloat(food[n.id]);
-      if (!isNaN(v) && v > 0) food[n.id] = Math.round(v * ratio * 10000) / 10000;
+      const v = _snapshot[n.id];
+      if (v > 0) food[n.id] = Math.round(v * ratio * 10000) / 10000;
     }
     if (changedId !== '__portion__') {
-      const p = parseFloat(food.portion);
-      if (!isNaN(p) && p > 0) food.portion = Math.round(p * ratio * 100) / 100;
+      if (_snapshot.portion > 0) food.portion = Math.round(_snapshot.portion * ratio * 100) / 100;
     }
     food = { ...food };
   }
 
-  function onFieldBlur() { _focusVal = null; }
+  function onFieldBlur() { _snapshot = null; }
 
   function onPortionInput() {
     applyProportional('__portion__', parseFloat(food.portion) || 0);

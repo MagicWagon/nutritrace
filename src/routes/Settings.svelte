@@ -1706,8 +1706,26 @@
     padding: 13px 16px;
     min-height: 50px;
   }
-  .drag-row.dragging  { opacity: 0.4; }
-  .drag-row.drag-over { background: var(--accent-dim); }
+  .drag-row {
+    position: relative;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
+  }
+  .drag-row.dragging {
+    opacity: 0.85;
+    transform: scale(1.02);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.22);
+    background: var(--surface-2);
+    border-radius: 8px;
+    z-index: 10;
+  }
+  .drag-row.drag-over::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 8px; right: 8px;
+    height: 2px;
+    background: var(--accent);
+    border-radius: 2px;
+  }
   .drag-handle {
     font-size: 20px;
     color: var(--text-3);
