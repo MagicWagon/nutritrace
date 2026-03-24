@@ -5,3 +5,14 @@ services:
     ports:
       - "3000:80"
     restart: unless-stopped
+
+  nutritrace-api:
+    build: ./server
+    container_name: nutritrace-api
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./data/db:/data/db
+      - ./data/uploads:/data/uploads
+    env_file: ./server/.env
+    restart: unless-stopped

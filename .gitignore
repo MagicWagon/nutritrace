@@ -25,6 +25,9 @@ Thumbs.db
 # Local backups (not needed in repo)
 .backup-polish/
 
+# Bind mount data (DB + uploads live on the host, not in git)
+data/
+
 # Editor
 .vscode/
 .idea/
