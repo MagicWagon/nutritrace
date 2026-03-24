@@ -262,25 +262,16 @@ const USDA = {
 
 // ── NutriTrace Server API ──────────────────────────────────────────────────
 
-const KEY_TOKEN = 'nt:apiToken';
-
 export const NtApi = {
-  // Config
-  getToken()      { return localStorage.getItem(KEY_TOKEN) || ''; },
-  setToken(token) { localStorage.setItem(KEY_TOKEN, token); },
-  clearToken()    { localStorage.removeItem(KEY_TOKEN); },
-  isConfigured()  { return !!this.getToken(); },
-
   // Core fetch — uses relative URLs (same origin as frontend)
   async _fetch(method, path, body, isUpload = false) {
-    const headers = { Authorization: `Bearer ${this.getToken()}` };
+    const headers = {};
     if (!isUpload) headers['Content-Type'] = 'application/json';
     const res = await fetch(path, {
       method,
       headers,
       body: isUpload ? body : body != null ? JSON.stringify(body) : undefined,
     });
-    if (res.status === 401) { this.clearToken(); throw new Error('Session expired — please log in again'); }
     if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `API error ${res.status}`); }
     return res.json();
   },
@@ -289,21 +280,6 @@ export const NtApi = {
   post(path, body) { return this._fetch('POST',   path, body); },
   put(path, body)  { return this._fetch('PUT',    path, body); },
   del(path)        { return this._fetch('DELETE', path); },
-
-  // Auth
-  async login(email, password) {
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
-    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Login failed'); }
-    const { token } = await res.json();
-    this.setToken(token);
-    return token;
-  },
-
-  logout() { this.clearToken(); },
 
   // Foods
   getFoods()           { return this.get('/api/foods'); },

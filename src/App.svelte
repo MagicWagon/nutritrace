@@ -7,7 +7,6 @@
   import Sidebar   from './components/layout/Sidebar.svelte';
   import Toast     from './components/ui/Toast.svelte';
   import { DB }    from './lib/db.js';
-  import { NtApi } from './lib/api.js';
   import { navStyle, applyAccentColor, accentColor, disableAnimations, sidebarPersistent } from './stores/settings.js';
 
   import Diary      from './routes/Diary.svelte';
@@ -55,28 +54,6 @@
       sidebarPinned ? '280px' : '0px'
     );
   }
-
-  // ── Login ──────────────────────────────────────────────────────────────────
-  let isLoggedIn   = NtApi.isConfigured();
-  let loginEmail   = '';
-  let loginPass    = '';
-  let loginLoading = false;
-  let loginError   = '';
-
-  async function doLogin() {
-    loginError   = '';
-    loginLoading = true;
-    try {
-      await NtApi.login(loginEmail, loginPass);
-      isLoggedIn = true;
-    } catch(e) {
-      loginError = e.message || 'Login failed';
-    } finally {
-      loginLoading = false;
-    }
-  }
-
-  function onLoginKey(e) { if (e.key === 'Enter') doLogin(); }
 
   let sidebarOpen = false;
 
@@ -128,26 +105,6 @@
   });
 </script>
 
-{#if !isLoggedIn}
-  <div class="login-overlay">
-    <div class="login-card">
-      <img src="/icons/logo.png" alt="NutriTrace" class="login-logo" />
-      <h1 class="login-title">NutriTrace</h1>
-      <p class="login-sub">Sign in to continue</p>
-      <input class="input login-input" type="email" placeholder="Email"
-        bind:value={loginEmail} on:keydown={onLoginKey} />
-      <input class="input login-input" type="password" placeholder="Password"
-        bind:value={loginPass} on:keydown={onLoginKey} />
-      {#if loginError}
-        <p class="login-error">{loginError}</p>
-      {/if}
-      <button class="btn btn-primary login-btn" on:click={doLogin} disabled={loginLoading}>
-        {loginLoading ? 'Signing in…' : 'Sign in'}
-      </button>
-    </div>
-  </div>
-{:else}
-
 <!-- Sidebar (hamburger menu) -->
 <Sidebar bind:open={sidebarOpen} persistent={sidebarPinned} on:close={() => { if (!sidebarPinned) sidebarOpen = false; }} />
 
@@ -182,35 +139,7 @@
 <Toast />
 <AIBuddy />
 
-{/if}
-
 <style>
-  /* Login overlay */
-  .login-overlay {
-    position: fixed;
-    inset: 0;
-    background: var(--bg);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 9999;
-    padding: 24px;
-  }
-  .login-card {
-    width: 100%;
-    max-width: 360px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 12px;
-  }
-  .login-logo { width: 72px; height: 72px; border-radius: 16px; margin-bottom: 4px; }
-  .login-title { font-size: 24px; font-weight: 700; margin: 0; }
-  .login-sub { font-size: 14px; color: var(--text-3); margin: 0 0 8px; }
-  .login-input { width: 100%; }
-  .login-error { color: var(--error, #f44); font-size: 13px; margin: 0; }
-  .login-btn { width: 100%; margin-top: 4px; }
-
   :global(body) { overflow-x: hidden; }
 
   /* Kill all transitions & animations when user enables "Disable animations" */

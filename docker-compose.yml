@@ -11,8 +11,4 @@ services:
       # Do not change — container-internal paths tied to volume mounts above
       - DB_PATH=/data/db/nutritrace.db
       - UPLOADS_PATH=/data/uploads
-      # Change these in your .env
-      - JWT_SECRET=${JWT_SECRET}
-      - ADMIN_EMAIL=${ADMIN_EMAIL}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
     restart: unless-stopped
