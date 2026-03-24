@@ -16,7 +16,7 @@
   import { API, USDA, NtApi } from '../lib/api.js';
   import { Nutrition } from '../lib/nutrition.js';
   import { Mealie } from '../lib/mealieApi.js';
-  import { foodsShowThumbnails, foodsShowCategories, foodsShowNotes, foodsSort, foodCategories, foodsShowYesterdayMeals, mealNames } from '../stores/settings.js';
+  import { foodsShowThumbnails, foodsShowCategories, foodsShowNotes, foodsSort, foodCategories, foodsShowYesterdayMeals, mealNames, usdaEnabled, usdaApiKey } from '../stores/settings.js';
 
   // Query string params
   function qs() {
@@ -43,12 +43,11 @@
 
   let search = '';
   let searchSource = 'local';
-  const _usdaEnabled   = DB.getSetting('usdaEnabled',   false);
   const _mealieEnabled = DB.getSetting('mealieEnabled',  false);
   $: availableSources = [
     { value: 'local',  label: 'Local'  },
     { value: 'off',    label: 'OFF'    },
-    ...(_usdaEnabled   ? [{ value: 'usda',   label: 'USDA'   }] : []),
+    ...($usdaEnabled   ? [{ value: 'usda',   label: 'USDA'   }] : []),
     ...(_mealieEnabled ? [{ value: 'mealie', label: 'Mealie' }] : []),
   ];
   $: _sourceLabel = availableSources.find(s => s.value === searchSource)?.label || '';
@@ -121,7 +120,7 @@
       } else if (src === 'usda') {
         try {
           loading = true;
-          const key = DB.getSetting('usdaApiKey', '');
+          const key = usdaApiKey.get();
           apiResults = await USDA.searchByName(search, 1, key) || [];
         } catch { apiResults = []; }
         finally { loading = false; }

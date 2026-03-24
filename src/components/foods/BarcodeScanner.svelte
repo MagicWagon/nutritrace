@@ -2,7 +2,6 @@
   import { onMount, onDestroy, createEventDispatcher } from 'svelte';
   import { fly } from 'svelte/transition';
   import { barcodeBeep, barcodeFlashlight } from '../../stores/settings.js';
-  import { DB } from '../../lib/db.js';
 
   export let open = false;
 
@@ -74,7 +73,7 @@
 
   async function onCode(code) {
     if (detected) return;
-    if (DB.getSetting('barcodeBeep', false)) playBeep();
+    if ($barcodeBeep) playBeep();
     scanlineVisible = true;
     setTimeout(() => scanlineVisible = false, 500);
     if (!continuousMode) {
@@ -112,7 +111,7 @@
               const caps = t.getCapabilities ? t.getCapabilities() : {};
               if ('torch' in caps) {
                 torchVisible = true;
-                if (DB.getSetting('barcodeFlashlight', false)) {
+                if ($barcodeFlashlight) {
                   torchOn = true; engine.torchOn = true;
                   t.applyConstraints({ advanced: [{ torch: true }] }).catch(() => {});
                 }
@@ -187,7 +186,7 @@
             const tf = caps.torchFeature();
             if (tf.isSupported()) {
               torchVisible = true;
-              if (DB.getSetting('barcodeFlashlight', false)) {
+              if ($barcodeFlashlight) {
                 torchOn = true; engine.torchOn = true;
                 tf.apply(true).catch(() => {});
               }
@@ -214,7 +213,7 @@
               const caps = t.getCapabilities ? t.getCapabilities() : {};
               if ('torch' in caps) {
                 torchVisible = true;
-                if (DB.getSetting('barcodeFlashlight', false)) {
+                if ($barcodeFlashlight) {
                   torchOn = true; engine.torchOn = true;
                   t.applyConstraints({ advanced: [{ torch: true }] }).catch(() => {});
                 }

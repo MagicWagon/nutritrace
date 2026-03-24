@@ -2,11 +2,10 @@
   import { onMount, tick } from 'svelte';
   import { fly, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
-  import { DB }        from '../../lib/db.js';
   import { NtApi }     from '../../lib/api.js';
   import { Nutrition } from '../../lib/nutrition.js';
   import { callAI }    from '../../lib/aiChat.js';
-  import { aiEnabled } from '../../stores/settings.js';
+  import { aiEnabled, aiAssistantName, aiApiKey, aiProvider, aiModel, goals, mealNames, energyUnit } from '../../stores/settings.js';
   import { showError } from '../../stores/toast.js';
 
   // ── State ──────────────────────────────────────────────────────────────────
@@ -23,8 +22,8 @@
 
   $: if (panelOpen) {
     hasUnread     = false;
-    assistantName = DB.getSetting('aiAssistantName', 'FitBot');
-    apiKey        = DB.getSetting('aiApiKey', '');
+    assistantName = $aiAssistantName;
+    apiKey        = $aiApiKey;
   }
 
   onMount(() => {
@@ -81,9 +80,9 @@
   async function buildContext() {
     const today  = new Date().toISOString().slice(0, 10);
     const entry  = await NtApi.getDiaryDate(today).catch(() => null);
-    const g      = DB.getSetting('goals', {});
-    const mNames = DB.getSetting('mealNames', ['Breakfast','Lunch','Dinner','Snacks']);
-    const eUnit  = DB.getSetting('energyUnit', 'kcal');
+    const g      = goals.get();
+    const mNames = mealNames.get();
+    const eUnit  = energyUnit.get();
 
     let diaryText = 'No food logged today yet.';
     if (entry && entry.items?.length) {
@@ -130,7 +129,7 @@
   }
 
   function buildSystemPrompt(ctx) {
-    const name = DB.getSetting('aiAssistantName', 'FitBot');
+    const name = $aiAssistantName;
     return `You are ${name}, a friendly AI nutrition and fitness coach built into the NutriTrace app. `
          + `You help users make healthy food choices, understand their nutrition, and reach their fitness goals. `
          + `Be warm, encouraging, and concise. Give practical, evidence-based advice. Keep responses focused.\n\n`
@@ -148,9 +147,9 @@
     const content = input.trim();
     if (!content || loading) return;
 
-    const key      = DB.getSetting('aiApiKey',        '');
-    const provider = DB.getSetting('aiProvider',      'claude');
-    const model    = DB.getSetting('aiModel',         '') || undefined;
+    const key      = $aiApiKey;
+    const provider = aiProvider.get() || 'claude';
+    const model    = aiModel.get()    || undefined;
 
     if (!key) { showError('Add your API key in Settings → FitBot AI'); return; }
 

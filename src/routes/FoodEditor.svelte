@@ -143,7 +143,7 @@
   let contributing = false;
   let offSuccess = false;
   let linked = true;          // scale all fields proportionally on change
-  let _snapshot = null;       // snapshot of all values when a field was focused
+  let _snapshot = null;       // snapshot of all values when editor was opened (never changes during edit)
   let downloading = false;
   let downloadSuccess = false;
   $: isNewFood = !(params && params.id);
@@ -173,7 +173,7 @@
     } finally { contributing = false; }
   }
 
-  function onFieldFocus() {
+  function takeSnapshot() {
     const allNuts = [...NUTRIMENTS, ...($customNutriments || [])];
     _snapshot = { portion: parseFloat(food.portion) || 0 };
     for (const n of allNuts) _snapshot[n.id] = parseFloat(food[n.id]) || 0;
@@ -195,8 +195,6 @@
     }
     food = { ...food };
   }
-
-  function onFieldBlur() { _snapshot = null; }
 
   function onPortionInput() {
     applyProportional('__portion__', parseFloat(food.portion) || 0);
@@ -248,6 +246,7 @@
         food = { ...food, ...existing, ...flatNutrition };
       }
     }
+    takeSnapshot();
   });
 
   async function save() {
@@ -434,7 +433,7 @@
         <div class="form-group" style="flex:1">
           <label class="form-label">Serving Size</label>
           <input class="input" type="number" min="0" bind:value={food.portion}
-            on:focus={onFieldFocus} on:input={onPortionInput} on:blur={onFieldBlur} />
+            on:input={onPortionInput} />
         </div>
         <div class="form-group" style="width:100px">
           <label class="form-label">Unit</label>
@@ -487,9 +486,7 @@
           <label class="form-label">{n.label} ({n.unit})</label>
           <input class="input" type="number" min="0" step="0.1" placeholder="0"
             bind:value={food[n.id]}
-            on:focus={onFieldFocus}
-            on:input={() => onNutInput(n.id)}
-            on:blur={onFieldBlur} />
+            on:input={() => onNutInput(n.id)} />
         </div>
       {/each}
       <button class="btn btn-ghost w-full" style="margin-top:8px"
