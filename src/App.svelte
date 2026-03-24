@@ -8,6 +8,7 @@
   import Toast     from './components/ui/Toast.svelte';
   import { DB }    from './lib/db.js';
   import { navStyle, applyAccentColor, accentColor, disableAnimations, sidebarPersistent } from './stores/settings.js';
+  import { currentUser, userMgmtActive, loadAuthState } from './stores/auth.js';
 
   import Diary      from './routes/Diary.svelte';
   import Foods      from './routes/Foods.svelte';
@@ -18,6 +19,8 @@
   import Settings   from './routes/Settings.svelte';
   import Wizard     from './routes/Wizard.svelte';
   import Water      from './routes/Water.svelte';
+  import Login      from './routes/Login.svelte';
+  import Profile    from './routes/Profile.svelte';
   import AIBuddy    from './components/ai/AIBuddy.svelte';
 
   const routes = {
@@ -32,10 +35,11 @@
     '/goals':           Goals,
     '/settings':        Settings,
     '/wizard':          Wizard,
+    '/profile':         Profile,
     '*':                Diary,
   };
 
-  const NAV_HIDDEN = ['/wizard', '/foods/edit', '/meal-editor'];
+  const NAV_HIDDEN = ['/wizard', '/foods/edit', '/meal-editor', '/profile'];
   $: showNav       = !NAV_HIDDEN.some(p => $location.startsWith(p));
   $: isEditor      = NAV_HIDDEN.some(p => $location.startsWith(p));
   $: _hasSidebar   = showNav && ($navStyle === 'sidebar' || $navStyle === 'both');
@@ -82,7 +86,10 @@
     document.documentElement.classList.toggle('no-animations', !!$disableAnimations);
   }
 
-  onMount(() => {
+  onMount(async () => {
+    // Load auth state first (sets $currentUser and $userMgmtActive)
+    await loadAuthState();
+
     if (!DB.getSetting('setupComplete', false)) {
       window.location.hash = '#/wizard';
     }
@@ -103,7 +110,15 @@
       ]);
     }
   });
+
+  // Auth gate: when user management is active and no user is logged in, show Login
+  $: needsLogin = $userMgmtActive && !$currentUser;
 </script>
+
+<!-- Login gate (when user management active and not authenticated) -->
+{#if needsLogin}
+  <Login />
+{:else}
 
 <!-- Sidebar (hamburger menu) -->
 <Sidebar bind:open={sidebarOpen} persistent={sidebarPinned} on:close={() => { if (!sidebarPinned) sidebarOpen = false; }} />
@@ -138,6 +153,8 @@
 
 <Toast />
 <AIBuddy />
+
+{/if}
 
 <style>
   :global(body) { overflow-x: hidden; }

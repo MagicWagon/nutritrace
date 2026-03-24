@@ -272,6 +272,7 @@ export const NtApi = {
     const res = await fetch(path, {
       method,
       headers,
+      credentials: 'include',
       body: isUpload ? body : body != null ? JSON.stringify(body) : undefined,
     });
     if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `API error ${res.status}`); }

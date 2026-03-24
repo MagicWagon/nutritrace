@@ -24,12 +24,14 @@
   import { DB } from '../lib/db.js';
   import { NtApi } from '../lib/api.js';
   import { NUTRIMENTS, Nutrition } from '../lib/nutrition.js';
+  import { currentUser, userMgmtActive, loadAuthState, logout } from '../stores/auth.js';
+  import { push } from 'svelte-spa-router';
   // ── Collapsible section state ──────────────────────────────────────────────
   $: isDark = $appearance === 'dark' || ($appearance === 'system' && (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches));
   let openSections = { appearance: true, diary: false, water: false, foods: false, nutrients: false,
                        bodyStats: false, statistics: false, goals: false, categories: false,
                        units: false, integration: false, api: false, backup: false,
-                       ai: false, about: false };
+                       ai: false, users: false, about: false };
 
   function toggleSection(key) {
     openSections = { ...openSections, [key]: !openSections[key] };
@@ -54,6 +56,7 @@
     ai:          ['ai','fitbot','assistant','provider','model','api key','artificial intelligence','chat'],
     api:         ['api','open food facts','username','password','credentials'],
     backup:      ['backup','export','import','restore','waistline','csv','clear data','json'],
+    users:       ['users','user management','accounts','login','password','admin','register','profile'],
     about:       ['about','version','nutritrace'],
   };
 
@@ -599,6 +602,66 @@
       showSuccess('CSV exported');
     } catch(e) { showError('Export failed: ' + e.message); }
   }
+
+  // ── User Management ────────────────────────────────────────────────────────
+  let umUsers        = [];
+  let umLoading      = false;
+  let showAddUser    = false;
+  let newUsername    = '';
+  let newPassword    = '';
+  let newFullName    = '';
+  let newRole        = 'user';
+  let umError        = '';
+  let showDisableUmDialog = false;
+
+  async function loadUsers() {
+    try {
+      umUsers = await NtApi.get('/api/auth/users');
+    } catch(e) { umError = e.message; }
+  }
+
+  async function addUser() {
+    umError = '';
+    if (!newUsername.trim() || !newPassword.trim()) { umError = 'Username and password required'; return; }
+    umLoading = true;
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: newUsername.trim(), password: newPassword, full_name: newFullName.trim() || undefined, role: newRole }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { umError = data.error || 'Failed to add user'; } else {
+        newUsername = ''; newPassword = ''; newFullName = ''; newRole = 'user';
+        showAddUser = false;
+        await loadUsers();
+        showSuccess('User added');
+      }
+    } catch(e) { umError = e.message; }
+    umLoading = false;
+  }
+
+  async function deleteUser(id) {
+    try {
+      await NtApi.del(`/api/auth/users/${id}`);
+      await loadUsers();
+      showSuccess('User deleted');
+    } catch(e) { showError(e.message); }
+  }
+
+  async function disableUserManagement() {
+    try {
+      await NtApi.del('/api/auth/management');
+      localStorage.removeItem('wl:userId');
+      await loadAuthState();
+      showDisableUmDialog = false;
+      showSuccess('User management disabled');
+      await loadUsers();
+    } catch(e) { showError(e.message); }
+  }
+
+  // Load users when section opens
+  $: if (openSections.users && $userMgmtActive) loadUsers();
 
   let showClearDialog = false;
   async function clearAllData() {
@@ -1410,6 +1473,107 @@
       </div>
     {/if}
 
+    <!-- ── User Management ──────────────────────────────────────────────────── -->
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'users')} on:click={() => toggleSection('users')}>
+      <span class="material-symbols-rounded si">group</span>
+      <span>User Management</span>
+      <span class="material-symbols-rounded chevron" class:rotated={openSections.users}>expand_more</span>
+    </button>
+    {#if sectionOpen(openSections, settingsQuery, 'users') && sectionVisible(settingsQuery, 'users')}
+      <div class="section-body" transition:slide={{ duration: 180 }}>
+        <div class="card settings-card">
+          {#if $userMgmtActive}
+            <!-- Current user row -->
+            <button class="setting-row setting-action" on:click={() => push('/profile')}>
+              <span class="material-symbols-rounded si" style="color:var(--accent)">manage_accounts</span>
+              <div>
+                <span class="setting-label">My Profile</span>
+                <div class="setting-desc">{$currentUser?.nickname || $currentUser?.full_name || $currentUser?.username || ''}</div>
+              </div>
+              <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
+            </button>
+            <div class="setting-divider"></div>
+
+            <!-- User list (admin only) -->
+            {#if $currentUser?.role === 'admin'}
+              <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px;padding:12px 16px">
+                <div style="display:flex;justify-content:space-between;align-items:center;width:100%">
+                  <span class="setting-label">Users</span>
+                  <button class="btn btn-secondary" style="height:30px;font-size:12px;padding:0 10px"
+                    on:click={() => { showAddUser = !showAddUser; umError = ''; }}>
+                    {showAddUser ? 'Cancel' : '+ Add User'}
+                  </button>
+                </div>
+
+                {#if showAddUser}
+                  <div class="um-add-form" transition:slide={{ duration: 160 }}>
+                    <div class="um-form-row">
+                      <input class="input" type="text" bind:value={newUsername} placeholder="Username *" autocomplete="off" />
+                      <input class="input" type="password" bind:value={newPassword} placeholder="Password *" autocomplete="new-password" />
+                    </div>
+                    <div class="um-form-row">
+                      <input class="input" type="text" bind:value={newFullName} placeholder="Full name (optional)" />
+                      <select class="input" bind:value={newRole}>
+                        <option value="user">User</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                    </div>
+                    {#if umError}<p class="um-error">{umError}</p>{/if}
+                    <button class="btn btn-primary" style="width:100%" on:click={addUser} disabled={umLoading}>
+                      {umLoading ? 'Adding...' : 'Create User'}
+                    </button>
+                  </div>
+                {/if}
+
+                <div class="um-user-list">
+                  {#each umUsers as u}
+                    <div class="um-user-row">
+                      <div class="um-user-avatar">
+                        {#if u.avatar_url}
+                          <img src={u.avatar_url} alt={u.username} />
+                        {:else}
+                          <span class="material-symbols-rounded">person</span>
+                        {/if}
+                      </div>
+                      <div class="um-user-info">
+                        <div class="um-user-name">{u.nickname || u.full_name || u.username}</div>
+                        <div class="um-user-sub">@{u.username}{u.role === 'admin' ? ' · admin' : ''}</div>
+                      </div>
+                      {#if u.id !== $currentUser?.id}
+                        <button class="btn btn-ghost um-del-btn" title="Delete user"
+                          on:click={() => deleteUser(u.id)}>
+                          <span class="material-symbols-rounded" style="font-size:18px;color:var(--danger)">person_remove</span>
+                        </button>
+                      {/if}
+                    </div>
+                  {/each}
+                </div>
+              </div>
+              <div class="setting-divider"></div>
+              <button class="setting-row setting-action danger" on:click={() => showDisableUmDialog = true}>
+                <span class="material-symbols-rounded si" style="color:var(--danger)">no_accounts</span>
+                <div>
+                  <span class="setting-label" style="color:var(--danger)">Disable user management</span>
+                  <div class="setting-desc">Removes all user accounts and returns to single-user mode</div>
+                </div>
+              </button>
+            {/if}
+
+            <div class="setting-divider"></div>
+            <button class="setting-row setting-action" on:click={logout}>
+              <span class="material-symbols-rounded si" style="color:var(--text-3)">logout</span>
+              <span class="setting-label">Sign out</span>
+            </button>
+          {:else}
+            <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px;padding:16px">
+              <span class="setting-label">Single-user mode</span>
+              <div class="setting-desc">User management is not enabled. To add multiple user accounts, enable it from the first-run wizard or visit <strong>/wizard</strong>.</div>
+            </div>
+          {/if}
+        </div>
+      </div>
+    {/if}
+
     <!-- About -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'about')} on:click={() => toggleSection('about')}>
       <span class="material-symbols-rounded si">info</span>
@@ -1476,6 +1640,15 @@
   cancelText="Cancel"
   dangerous
   on:confirm={clearAllData}
+/>
+
+<Dialog bind:open={showDisableUmDialog}
+  title="Disable user management"
+  message="This will remove all user accounts and their data cannot be recovered. The app will return to single-user mode."
+  confirmText="Disable & delete all users"
+  cancelText="Cancel"
+  dangerous
+  on:confirm={disableUserManagement}
 />
 
 <!-- Custom color picker sheet -->
@@ -1799,4 +1972,27 @@
   .about-feat-icon { font-size: 20px; color: var(--accent); flex-shrink: 0; }
   .about-link { color: var(--accent); text-decoration: underline; }
   .about-link:hover { opacity: 0.8; }
+
+  /* ── User Management ── */
+  .um-add-form { display: flex; flex-direction: column; gap: 8px; width: 100%; padding-top: 4px; }
+  .um-form-row { display: flex; gap: 8px; }
+  .um-form-row > .input { flex: 1; min-width: 0; }
+  .um-error { font-size: 12px; color: var(--danger, #ff6b6b); background: rgba(255,107,107,0.1); border-radius: var(--radius-sm); padding: 6px 10px; }
+  .um-user-list { display: flex; flex-direction: column; gap: 4px; width: 100%; }
+  .um-user-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px; border-radius: var(--radius-md);
+    background: var(--surface-2);
+  }
+  .um-user-avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--surface-3); display: flex; align-items: center; justify-content: center;
+    overflow: hidden; flex-shrink: 0;
+  }
+  .um-user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .um-user-avatar .material-symbols-rounded { font-size: 20px; color: var(--text-3); }
+  .um-user-info { flex: 1; min-width: 0; }
+  .um-user-name { font-size: 14px; font-weight: 600; }
+  .um-user-sub  { font-size: 12px; color: var(--text-3); }
+  .um-del-btn { padding: 4px; min-width: 0; }
 </style>

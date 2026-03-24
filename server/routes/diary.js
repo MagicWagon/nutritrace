@@ -1,18 +1,28 @@
 import { Router } from 'express';
 import db from '../db.js';
 import { wrap } from '../logger.js';
+import { requireAuth, userMgmtActive } from '../middleware/auth.js';
 
 const router = Router();
+router.use(requireAuth);
+
+const uid = req => userMgmtActive() ? req.user.id : null;
 
 // Get all diary dates (for statistics)
 router.get('/', wrap((req, res) => {
-  const rows = db.prepare('SELECT * FROM diary ORDER BY date ASC').all();
+  const u = uid(req);
+  const rows = u == null
+    ? db.prepare('SELECT * FROM diary ORDER BY date ASC').all()
+    : db.prepare('SELECT * FROM diary WHERE user_id = ? ORDER BY date ASC').all(u);
   res.json(rows.map(parse));
 }));
 
 // Get single date
 router.get('/:date', wrap((req, res) => {
-  const row = db.prepare('SELECT * FROM diary WHERE date = ?').get(req.params.date);
+  const u = uid(req);
+  const row = u == null
+    ? db.prepare('SELECT * FROM diary WHERE date = ?').get(req.params.date)
+    : db.prepare('SELECT * FROM diary WHERE date = ? AND user_id = ?').get(req.params.date, u);
   if (!row) return res.json({ date: req.params.date, items: [], body_stats: {}, water: [] });
   res.json(parse(row));
 }));
@@ -20,20 +30,34 @@ router.get('/:date', wrap((req, res) => {
 // Save/replace entire diary entry for a date
 router.put('/:date', wrap((req, res) => {
   const { items, body_stats, water } = req.body;
-  db.prepare(
-    `INSERT INTO diary (date, items, body_stats, water, updated_at)
-     VALUES (?, ?, ?, ?, datetime('now'))
-     ON CONFLICT(date) DO UPDATE SET
-       items      = excluded.items,
-       body_stats = excluded.body_stats,
-       water      = excluded.water,
-       updated_at = excluded.updated_at`
-  ).run(req.params.date, JSON.stringify(items || []), JSON.stringify(body_stats || {}), JSON.stringify(water || []));
-  res.json(parse(db.prepare('SELECT * FROM diary WHERE date = ?').get(req.params.date)));
+  const u = uid(req);
+  if (u == null) {
+    db.prepare(
+      `INSERT INTO diary (date, items, body_stats, water, updated_at)
+       VALUES (?, ?, ?, ?, datetime('now'))
+       ON CONFLICT(date, user_id) DO UPDATE SET
+         items=excluded.items, body_stats=excluded.body_stats,
+         water=excluded.water, updated_at=excluded.updated_at`
+    ).run(req.params.date, JSON.stringify(items || []), JSON.stringify(body_stats || {}), JSON.stringify(water || []));
+  } else {
+    db.prepare(
+      `INSERT INTO diary (user_id, date, items, body_stats, water, updated_at)
+       VALUES (?, ?, ?, ?, ?, datetime('now'))
+       ON CONFLICT(date, user_id) DO UPDATE SET
+         items=excluded.items, body_stats=excluded.body_stats,
+         water=excluded.water, updated_at=excluded.updated_at`
+    ).run(u, req.params.date, JSON.stringify(items || []), JSON.stringify(body_stats || {}), JSON.stringify(water || []));
+  }
+  const row = u == null
+    ? db.prepare('SELECT * FROM diary WHERE date = ? AND user_id IS NULL').get(req.params.date)
+    : db.prepare('SELECT * FROM diary WHERE date = ? AND user_id = ?').get(req.params.date, u);
+  res.json(parse(row));
 }));
 
 router.delete('/:date', wrap((req, res) => {
-  db.prepare('DELETE FROM diary WHERE date = ?').run(req.params.date);
+  const u = uid(req);
+  if (u == null) db.prepare('DELETE FROM diary WHERE date = ?').run(req.params.date);
+  else db.prepare('DELETE FROM diary WHERE date = ? AND user_id = ?').run(req.params.date, u);
   res.json({ ok: true });
 }));
 

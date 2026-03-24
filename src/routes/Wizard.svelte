@@ -5,13 +5,29 @@
   import { DB } from '../lib/db.js';
   import { Nutrition } from '../lib/nutrition.js';
   import { mealNames, energyUnit, goals, weightUnit, heightUnit } from '../stores/settings.js';
+  import { currentUser, userMgmtActive, loadAuthState } from '../stores/auth.js';
+  import { showError } from '../stores/toast.js';
 
-  const STEPS = ['welcome','gender','dob','height','weight','target','activity','summary'];
+  // Steps: usermgmt (optional), welcome, gender, dob, height, weight, target, activity, summary
+  const BASE_STEPS = ['welcome','gender','dob','height','weight','target','activity','summary'];
+  const ALL_STEPS  = ['usermgmt', ...BASE_STEPS];
 
   let step = 0;
-  let dir  = 1; // 1 = forward, -1 = back (for transition direction)
+  let dir  = 1;
 
-  // Profile data
+  // ── User management step ─────────────────────────────────────────────────
+  let enableUserMgmt  = false;
+  let adminUsername   = '';
+  let adminPassword   = '';
+  let adminConfirm    = '';
+  let adminFullName   = '';
+  let adminNickname   = '';
+  let adminBirthday   = '';
+  let adminGender     = '';
+  let umError         = '';
+  let umLoading       = false;
+
+  // ── Profile data ─────────────────────────────────────────────────────────
   let gender   = '';
   let dob      = (new Date().getFullYear() - 25) + '-01-01';
   let heightCm = 170;
@@ -35,6 +51,11 @@
 
   $: wUnit = $weightUnit || 'kg';
   $: hUnit = $heightUnit || 'cm';
+
+  // Sync gender from user mgmt step when user picks there
+  $: if (adminGender && !gender) gender = adminGender;
+  // Sync dob from user mgmt step
+  $: if (adminBirthday && dob === (new Date().getFullYear() - 25) + '-01-01') dob = adminBirthday;
 
   function toKg(v) {
     if (wUnit === 'lb') return v * 0.453592;
@@ -65,15 +86,64 @@
     else                         goalKcal = tdee;
   }
 
-  function next() {
-    if (step === STEPS.length - 1) { finish(); return; }
+  $: currentStepName = ALL_STEPS[step];
+
+  // Validation per step
+  $: canProceed = !(currentStepName === 'usermgmt' && enableUserMgmt && (!adminUsername.trim() || !adminPassword.trim() || adminPassword !== adminConfirm))
+               && !(currentStepName === 'gender'   && !gender)
+               && !(currentStepName === 'activity' && !activity);
+
+  $: btnLabel = step === ALL_STEPS.length - 1 ? 'Finish'
+    : step === 0 ? 'Get Started' : 'Next';
+
+  async function next() {
+    if (currentStepName === 'usermgmt') {
+      if (enableUserMgmt) {
+        umError = '';
+        if (!adminUsername.trim()) { umError = 'Username is required'; return; }
+        if (adminPassword.length < 6) { umError = 'Password must be at least 6 characters'; return; }
+        if (adminPassword !== adminConfirm) { umError = 'Passwords do not match'; return; }
+        // Register the admin account
+        umLoading = true;
+        try {
+          const res = await fetch('/api/auth/register', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              username:   adminUsername.trim(),
+              password:   adminPassword,
+              full_name:  adminFullName.trim() || undefined,
+              nickname:   adminNickname.trim() || undefined,
+              birthday:   adminBirthday || undefined,
+              gender:     adminGender   || undefined,
+            }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) { umError = data.error || 'Registration failed'; umLoading = false; return; }
+          localStorage.setItem('wl:userId', data.user.id);
+          await loadAuthState();
+        } catch(e) {
+          umError = 'Could not connect to server';
+          umLoading = false;
+          return;
+        }
+        umLoading = false;
+      }
+      dir = 1; step++;
+      return;
+    }
+
+    if (currentStepName === 'summary') { finish(); return; }
+    if (step === ALL_STEPS.length - 1) { finish(); return; }
+
     // Validation
-    if (STEPS[step] === 'gender' && !gender) return;
-    if (STEPS[step] === 'activity' && !activity) return;
-    if (STEPS[step] === 'summary') { finish(); return; }
+    if (currentStepName === 'gender'   && !gender)   return;
+    if (currentStepName === 'activity' && !activity) return;
+
     dir = 1;
     step++;
-    if (STEPS[step] === 'summary') calcSummary();
+    if (ALL_STEPS[step] === 'summary') calcSummary();
   }
 
   function prev() {
@@ -105,18 +175,12 @@
     DB.setSetting('setupComplete', true);
     push('/');
   }
-
-  $: btnLabel = step === STEPS.length - 1 ? 'Finish'
-    : step === 0 ? 'Get Started' : 'Next';
-
-  $: canProceed = !(STEPS[step] === 'gender' && !gender)
-               && !(STEPS[step] === 'activity' && !activity);
 </script>
 
 <div class="wizard-shell">
   <!-- Skip button -->
   <div class="wizard-topbar">
-    {#if step > 0 && step < STEPS.length - 1}
+    {#if step > 0 && step < ALL_STEPS.length - 1}
       <button class="btn btn-ghost wizard-skip" on:click={skip}>Skip</button>
     {:else}
       <div></div>
@@ -125,7 +189,7 @@
 
   <!-- Progress dots -->
   <div class="progress-dots">
-    {#each STEPS as _, i}
+    {#each ALL_STEPS as _, i}
       <div class="dot" class:active={i <= step} class:current={i === step}></div>
     {/each}
   </div>
@@ -135,8 +199,81 @@
       in:fly={{ x: dir * 40, duration: 260, easing: cubicOut, opacity: 0 }}
       out:fade={{ duration: 100 }}>
 
+      <!-- ── User Management ── -->
+      {#if currentStepName === 'usermgmt'}
+        <div class="step-hero compact">
+          <span class="material-symbols-rounded hero-icon">group</span>
+          <h1 class="step-title">Multi-User Support</h1>
+          <p class="step-desc">NutriTrace can run in single-user mode (default) or multi-user mode with separate logins. You can always enable this later in Settings.</p>
+        </div>
+
+        <div class="toggle-row" on:click={() => enableUserMgmt = !enableUserMgmt} role="button" tabindex="0">
+          <div>
+            <div class="toggle-label">Enable user accounts</div>
+            <div class="toggle-hint">Each user gets their own food diary, settings, and profile</div>
+          </div>
+          <div class="fake-toggle" class:on={enableUserMgmt}>
+            <div class="fake-thumb"></div>
+          </div>
+        </div>
+
+        {#if enableUserMgmt}
+          <div class="um-form" transition:fly={{ y: 10, duration: 200 }}>
+            <p class="um-section-label">Admin Account</p>
+
+            <div class="form-row-2">
+              <div class="form-group">
+                <label class="form-label">Username *</label>
+                <input class="input" type="text" bind:value={adminUsername} placeholder="admin" autocomplete="username" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Nickname</label>
+                <input class="input" type="text" bind:value={adminNickname} placeholder="Optional" />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Full name</label>
+              <input class="input" type="text" bind:value={adminFullName} placeholder="Optional" />
+            </div>
+
+            <div class="form-row-2">
+              <div class="form-group">
+                <label class="form-label">Birthday</label>
+                <input class="input" type="date" bind:value={adminBirthday}
+                  max={new Date().toISOString().slice(0,10)} />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Gender</label>
+                <select class="input" bind:value={adminGender}>
+                  <option value="">— skip —</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                  <option value="prefer_not">Prefer not to say</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-row-2">
+              <div class="form-group">
+                <label class="form-label">Password *</label>
+                <input class="input" type="password" bind:value={adminPassword} autocomplete="new-password" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Confirm *</label>
+                <input class="input" type="password" bind:value={adminConfirm} autocomplete="new-password" />
+              </div>
+            </div>
+
+            {#if umError}
+              <p class="um-error">{umError}</p>
+            {/if}
+          </div>
+        {/if}
+
       <!-- ── Welcome ── -->
-      {#if STEPS[step] === 'welcome'}
+      {:else if currentStepName === 'welcome'}
         <div class="step-hero">
           <div class="logo-icon">🥗</div>
           <h1 class="step-title">Welcome to NutriTrace</h1>
@@ -144,7 +281,7 @@
         </div>
 
       <!-- ── Gender ── -->
-      {:else if STEPS[step] === 'gender'}
+      {:else if currentStepName === 'gender'}
         <h2 class="step-title">What is your gender?</h2>
         <p class="step-desc">Used to calculate your calorie needs.</p>
         <div class="gender-cards">
@@ -161,7 +298,7 @@
         </div>
 
       <!-- ── Date of Birth ── -->
-      {:else if STEPS[step] === 'dob'}
+      {:else if currentStepName === 'dob'}
         <h2 class="step-title">When were you born?</h2>
         <p class="step-desc">Your age affects your metabolic rate.</p>
         <input class="input" type="date" bind:value={dob}
@@ -169,7 +306,7 @@
           style="margin-top:24px;font-size:16px" />
 
       <!-- ── Height ── -->
-      {:else if STEPS[step] === 'height'}
+      {:else if currentStepName === 'height'}
         <h2 class="step-title">What is your height?</h2>
         <p class="step-desc">Used to estimate your calorie needs.</p>
         <div style="margin-top:24px;display:flex;flex-direction:column;gap:12px">
@@ -192,21 +329,21 @@
         </div>
 
       <!-- ── Current Weight ── -->
-      {:else if STEPS[step] === 'weight'}
+      {:else if currentStepName === 'weight'}
         <h2 class="step-title">What is your weight?</h2>
         <p class="step-desc">Your current body weight ({wUnit}).</p>
         <input class="input" type="number" min="20" max="500" step="0.1"
           bind:value={weight} style="margin-top:24px;font-size:16px" />
 
       <!-- ── Target Weight ── -->
-      {:else if STEPS[step] === 'target'}
+      {:else if currentStepName === 'target'}
         <h2 class="step-title">What is your target weight?</h2>
         <p class="step-desc">Your goal weight ({wUnit}). Leave same as current to maintain.</p>
         <input class="input" type="number" min="20" max="500" step="0.1"
           bind:value={targetW} style="margin-top:24px;font-size:16px" />
 
       <!-- ── Activity Level ── -->
-      {:else if STEPS[step] === 'activity'}
+      {:else if currentStepName === 'activity'}
         <h2 class="step-title">How active are you?</h2>
         <p class="step-desc">Affects your daily calorie needs.</p>
         <div class="activity-list">
@@ -223,7 +360,7 @@
         </div>
 
       <!-- ── Summary ── -->
-      {:else if STEPS[step] === 'summary'}
+      {:else if currentStepName === 'summary'}
         <h2 class="step-title">Your Daily Calorie Goal</h2>
         <p class="step-desc">Based on your stats using the Mifflin-St Jeor formula.</p>
         <div class="summary-card">
@@ -267,8 +404,12 @@
     {:else}
       <div></div>
     {/if}
-    <button class="btn btn-primary" on:click={next} disabled={!canProceed}>
-      {btnLabel}
+    <button class="btn btn-primary" on:click={next} disabled={!canProceed || umLoading}>
+      {#if umLoading}
+        <span class="material-symbols-rounded spin">autorenew</span>
+      {:else}
+        {btnLabel}
+      {/if}
     </button>
   </div>
 </div>
@@ -301,9 +442,48 @@
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     gap: 20px; text-align: center; padding: 24px 0;
   }
+  .step-hero.compact { flex: 0; padding: 8px 0 0; }
   .logo-icon { font-size: 72px; line-height: 1; }
+  .hero-icon { font-size: 48px; color: var(--accent); }
   .step-title { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
   .step-desc  { font-size: 16px; color: var(--text-2); line-height: 1.6; max-width: 320px; }
+
+  /* User management toggle */
+  .toggle-row {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; padding: 14px 16px;
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); cursor: pointer;
+  }
+  .toggle-label { font-size: 15px; font-weight: 600; }
+  .toggle-hint  { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+  .fake-toggle {
+    width: 44px; height: 26px; border-radius: 13px;
+    background: var(--surface-3); position: relative; flex-shrink: 0;
+    transition: background var(--dur-fast);
+  }
+  .fake-toggle.on { background: var(--accent); }
+  .fake-thumb {
+    position: absolute; top: 3px; left: 3px;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: white; transition: transform var(--dur-fast);
+  }
+  .fake-toggle.on .fake-thumb { transform: translateX(18px); }
+
+  /* User mgmt form */
+  .um-form { display: flex; flex-direction: column; gap: 12px; }
+  .um-section-label {
+    font-size: 12px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--text-3); margin-bottom: -4px;
+  }
+  .form-row-2 { display: flex; gap: 10px; }
+  .form-row-2 > .form-group { flex: 1; }
+  .form-group { display: flex; flex-direction: column; gap: 4px; }
+  .um-error {
+    font-size: 13px; color: var(--error, #ff6b6b);
+    background: rgba(255,107,107,0.1); border-radius: var(--radius-sm);
+    padding: 8px 12px;
+  }
 
   /* Gender cards */
   .gender-cards { display: flex; gap: 16px; margin-top: 16px; }
@@ -354,4 +534,7 @@
     display: flex; justify-content: space-between; gap: 12px;
   }
   .wizard-nav .btn { flex: 1; }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spin { animation: spin 0.8s linear infinite; }
 </style>

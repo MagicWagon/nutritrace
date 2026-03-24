@@ -1,39 +1,50 @@
 import { Router } from 'express';
 import db from '../db.js';
 import { wrap } from '../logger.js';
+import { requireAuth, userMgmtActive } from '../middleware/auth.js';
 
 const router = Router();
+router.use(requireAuth);
 
-// Clear all app data from SQLite
+const uid = req => userMgmtActive() ? req.user.id : null;
+
+// Clear all app data (scoped to current user)
 router.delete('/', wrap((req, res) => {
-  db.prepare('DELETE FROM foods').run();
-  db.prepare('DELETE FROM meals').run();
-  db.prepare('DELETE FROM diary').run();
+  const u = uid(req);
+  if (u == null) {
+    db.prepare('DELETE FROM foods').run();
+    db.prepare('DELETE FROM meals').run();
+    db.prepare('DELETE FROM diary').run();
+  } else {
+    db.prepare('DELETE FROM foods WHERE user_id = ?').run(u);
+    db.prepare('DELETE FROM meals WHERE user_id = ?').run(u);
+    db.prepare('DELETE FROM diary WHERE user_id = ?').run(u);
+  }
   res.json({ ok: true });
 }));
 
 // Bulk import — accepts NutriTrace backup format (foodList/meals/recipes/diary)
-// Also handles camelCase fields (imgUrl, categories) from frontend objects
-router.post('/import', (req, res) => {
+router.post('/import', wrap((req, res) => {
   const { foodList = [], meals = [], recipes = [], diary = [] } = req.body;
+  const u = uid(req);
 
   const insFood = db.prepare(
-    `INSERT OR IGNORE INTO foods (name, brand, nutrition, portion, unit, img_url, notes, category, barcode)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT OR IGNORE INTO foods (user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   const insMeal = db.prepare(
-    `INSERT OR IGNORE INTO meals (name, nutrition, items, img_url, notes, is_recipe, portion, unit)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT OR IGNORE INTO meals (user_id, name, nutrition, items, img_url, notes, is_recipe, portion, unit)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   const insDiary = db.prepare(
-    `INSERT OR REPLACE INTO diary (date, items, body_stats, water)
-     VALUES (?, ?, ?, ?)`
+    `INSERT OR REPLACE INTO diary (user_id, date, items, body_stats, water)
+     VALUES (?, ?, ?, ?, ?)`
   );
 
   const run = db.transaction(() => {
     for (const f of foodList) {
       insFood.run(
-        f.name || '', f.brand || null,
+        u, f.name || '', f.brand || null,
         JSON.stringify(f.nutrition || {}),
         f.portion ?? 100, f.unit || 'g',
         f.imgUrl || f.img_url || null,
@@ -44,7 +55,7 @@ router.post('/import', (req, res) => {
     }
     for (const m of [...meals, ...recipes]) {
       insMeal.run(
-        m.name || '', JSON.stringify(m.nutrition || {}),
+        u, m.name || '', JSON.stringify(m.nutrition || {}),
         JSON.stringify(m.items || []),
         m.imgUrl || m.img_url || null,
         m.notes || null,
@@ -55,7 +66,7 @@ router.post('/import', (req, res) => {
     for (const e of diary) {
       if (!e.date) continue;
       insDiary.run(
-        e.date,
+        u, e.date,
         JSON.stringify(e.items || []),
         JSON.stringify(e.bodyStats || e.body_stats || {}),
         JSON.stringify(e.water || [])
@@ -63,13 +74,8 @@ router.post('/import', (req, res) => {
     }
   });
 
-  try {
-    run();
-    res.json({ ok: true });
-  } catch(e) {
-    logger.error('[data/import]', e.message);
-    res.status(500).json({ error: e.message });
-  }
-});
+  run();
+  res.json({ ok: true });
+}));
 
 export default router;

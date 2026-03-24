@@ -131,28 +131,34 @@ const DB = (() => {
     count(store) {
       return _p(_getStore(store).count());
     },
+    _settingKey(key) {
+      const userId = localStorage.getItem('wl:userId');
+      return userId ? `wl_u${userId}_${key}` : `wl_${key}`;
+    },
     getSetting(key, def) {
-      const raw = localStorage.getItem('wl_' + key);
+      const raw = localStorage.getItem(this._settingKey(key));
       if (raw === null) return (def !== undefined ? def : null);
       try { return JSON.parse(raw); } catch(e) { return raw; }
     },
     setSetting(key, value) {
-      localStorage.setItem('wl_' + key, JSON.stringify(value));
+      localStorage.setItem(this._settingKey(key), JSON.stringify(value));
       window.dispatchEvent(new CustomEvent('wl:setting', { detail: { key } }));
     },
     getAllSettings() {
+      const prefix = this._settingKey('').replace(/[^_]*$/, ''); // e.g. 'wl_u3_' or 'wl_'
       const s = {};
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
-        if (k && k.startsWith('wl_')) {
-          try { s[k.slice(3)] = JSON.parse(localStorage.getItem(k)); }
-          catch(e) { s[k.slice(3)] = localStorage.getItem(k); }
+        if (k && k.startsWith(prefix)) {
+          const bare = k.slice(prefix.length);
+          try { s[bare] = JSON.parse(localStorage.getItem(k)); }
+          catch(e) { s[bare] = localStorage.getItem(k); }
         }
       }
       return s;
     },
     removeSetting(key) {
-      localStorage.removeItem('wl_' + key);
+      localStorage.removeItem(this._settingKey(key));
     },
     async searchFoods(query) {
       const all = await this.getAll('foodList');

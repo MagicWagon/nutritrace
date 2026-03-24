@@ -1,15 +1,18 @@
 import 'dotenv/config';
 import express from 'express';
+import cookieParser from 'cookie-parser';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 import proxyRoutes  from './routes/proxy.js';
+import authRoutes   from './routes/auth.js';
 import dataRoutes   from './routes/data.js';
 import foodsRoutes  from './routes/foods.js';
 import mealsRoutes  from './routes/meals.js';
 import diaryRoutes  from './routes/diary.js';
 import uploadRoutes from './routes/upload.js';
 import { logger }   from './logger.js';
+import { authenticate } from './middleware/auth.js';
 
 // Initialise DB (runs schema)
 import './db.js';
@@ -19,6 +22,8 @@ const PORT = process.env.PORT || 3001;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 app.use(express.json({ limit: '50mb' }));
+app.use(cookieParser());
+app.use(authenticate); // attach req.user on every request
 
 // ── Request logging ────────────────────────────────────────────────────────
 app.use((req, res, next) => {
@@ -36,6 +41,7 @@ const uploadsPath = process.env.UPLOADS_PATH || './uploads';
 app.use('/uploads', express.static(uploadsPath));
 
 // API routes
+app.use('/api/auth',   authRoutes);
 app.use('/api/proxy',  proxyRoutes);
 app.use('/api/data',   dataRoutes);
 app.use('/api/foods',  foodsRoutes);
