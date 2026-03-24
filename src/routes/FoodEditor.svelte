@@ -323,13 +323,13 @@
         {/if}
       </div>
       <div class="photo-btn-row">
-        <button class="btn btn-ghost photo-action-btn" on:click={openGallery}>
-          <span class="material-symbols-rounded">photo_library</span>
-          Upload
-        </button>
         <button class="btn btn-ghost photo-action-btn" on:click={openCamera}>
           <span class="material-symbols-rounded">camera_alt</span>
           Camera
+        </button>
+        <button class="btn btn-ghost photo-action-btn" on:click={openGallery}>
+          <span class="material-symbols-rounded">photo_library</span>
+          Upload
         </button>
         <button class="btn btn-ghost photo-action-btn" on:click={() => { showUrlInput = !showUrlInput; photoUrl = ''; }}>
           <span class="material-symbols-rounded">link</span>
@@ -449,6 +449,14 @@
       </div>
     </div>
 
+    <!-- Notes -->
+    {#if $foodsShowNotes}
+      <div class="card editor-card">
+        <div class="editor-card-title">Notes</div>
+        <textarea class="input textarea" placeholder="Optional notes" bind:value={food.notes}></textarea>
+      </div>
+    {/if}
+
     <!-- Nutrition per 100g -->
     <div class="card editor-card">
       <div class="editor-card-title">Nutrition per 100{food.unit || 'g'}</div>
@@ -483,14 +491,6 @@
       </div>
     {/if}
 
-    <!-- Notes -->
-    {#if $foodsShowNotes}
-      <div class="card editor-card">
-        <div class="editor-card-title">Notes</div>
-        <textarea class="input textarea" placeholder="Optional notes" bind:value={food.notes}></textarea>
-      </div>
-    {/if}
-
     <div style="height:16px"></div>
   </div>
 </div>
@@ -520,9 +520,8 @@
   .photo-card { gap: 10px; }
   .photo-preview-wrap {
     position: relative;
-    width: 280px;
-    height: 280px;
-    margin: 0 auto;
+    width: 100%;
+    aspect-ratio: 1 / 1;
     background: var(--surface-2);
     border-radius: var(--radius-lg);
     overflow: hidden;

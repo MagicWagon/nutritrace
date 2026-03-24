@@ -58,7 +58,7 @@ export const foodsShowCategories    = createSettingStore('foodsShowCategories', 
 export const foodsShowNotes         = createSettingStore('foodsShowNotes',         false);
 export const foodsShowThumbnails    = createSettingStore('foodsShowThumbnails',    true);
 export const foodsShowYesterdayMeals= createSettingStore('foodsShowYesterdayMeals',true);
-export const foodsSort              = createSettingStore('foodsSort',              'date');
+export const foodsSort              = createSettingStore('foodsSort',              'alpha');
 
 export const barcodeBeep            = createSettingStore('barcodeBeep',            false);
 export const barcodeFlashlight      = createSettingStore('barcodeFlashlight',      false);

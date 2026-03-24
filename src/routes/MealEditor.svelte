@@ -194,6 +194,42 @@
     meal = { ...meal, items };
   }
 
+  // Drag-to-reorder state
+  let dragFrom = null;
+  let dragOver = null;
+
+  function onDragHandleDown(e, i) {
+    dragFrom = i;
+    dragOver = i;
+    e.currentTarget.closest('.ingredient-row').setPointerCapture(e.pointerId);
+  }
+
+  function onDragPointerMove(e, i) {
+    if (dragFrom === null) return;
+    // Find which row the pointer is over by hit-testing sibling rows
+    const list = e.currentTarget.closest('.ingredient-list');
+    if (!list) return;
+    const rows = [...list.querySelectorAll('.ingredient-row')];
+    const y = e.clientY;
+    let target = dragFrom;
+    for (let idx = 0; idx < rows.length; idx++) {
+      const rect = rows[idx].getBoundingClientRect();
+      if (y >= rect.top && y <= rect.bottom) { target = idx; break; }
+    }
+    dragOver = target;
+  }
+
+  function onDragPointerUp(e) {
+    if (dragFrom !== null && dragOver !== null && dragFrom !== dragOver) {
+      const items = [...meal.items];
+      const [removed] = items.splice(dragFrom, 1);
+      items.splice(dragOver, 0, removed);
+      meal = { ...meal, items };
+    }
+    dragFrom = null;
+    dragOver = null;
+  }
+
   function removeIngredient(i) {
     meal = { ...meal, items: meal.items.filter((_,idx) => idx !== i) };
     if (isRecipe) autoUpdateRecipeAmount();
@@ -278,15 +314,15 @@
         {/if}
       </div>
       <div class="photo-actions">
-        <label class="btn btn-ghost photo-btn" style="cursor:pointer">
-          <span class="material-symbols-rounded" style="font-size:18px">photo_library</span>
-          Gallery
-          <input type="file" accept="image/*" style="display:none" on:change={handleFileChange} />
-        </label>
         <button class="btn btn-ghost photo-btn" on:click={openCamera}>
           <span class="material-symbols-rounded" style="font-size:18px">camera_alt</span>
           Camera
         </button>
+        <label class="btn btn-ghost photo-btn" style="cursor:pointer">
+          <span class="material-symbols-rounded" style="font-size:18px">photo_library</span>
+          Upload
+          <input type="file" accept="image/*" style="display:none" on:change={handleFileChange} />
+        </label>
         <button class="btn btn-ghost photo-btn" on:click={() => { showUrlInput = !showUrlInput; photoUrl = ''; }}>
           <span class="material-symbols-rounded" style="font-size:18px">link</span>
           URL
@@ -373,34 +409,38 @@
       {#if meal.items.length === 0}
         <p class="text-3 text-sm" style="padding:4px 0">No foods or recipes yet. Tap + to add.</p>
       {:else}
-        {#each meal.items as item, i}
-          <div class="ingredient-row">
-            {#if item.imgUrl}
-              <img src={item.imgUrl} alt={item.name} class="ing-thumb" />
-            {:else}
-              <div class="ing-thumb ing-thumb-placeholder">
-                <span class="material-symbols-rounded" style="font-size:20px;opacity:0.3">fastfood</span>
+        <div class="ingredient-list"
+          on:pointermove={e => onDragPointerMove(e, dragOver)}
+          on:pointerup={onDragPointerUp}
+          on:pointercancel={onDragPointerUp}>
+          {#each meal.items as item, i}
+            <div class="ingredient-row"
+              class:drag-over={dragOver === i && dragFrom !== null && dragFrom !== i}
+              class:dragging={dragFrom === i}>
+              <!-- svelte-ignore a11y-no-static-element-interactions -->
+              <span class="drag-handle material-symbols-rounded"
+                on:pointerdown={e => onDragHandleDown(e, i)}>
+                drag_indicator
+              </span>
+              {#if item.imgUrl}
+                <img src={item.imgUrl} alt={item.name} class="ing-thumb" />
+              {:else}
+                <div class="ing-thumb ing-thumb-placeholder">
+                  <span class="material-symbols-rounded" style="font-size:20px;opacity:0.3">fastfood</span>
+                </div>
+              {/if}
+              <div class="ing-info">
+                <span class="ingredient-name">{item.name}</span>
+                <span class="text-3" style="font-size:12px">{item.portion} {item.unit}</span>
               </div>
-            {/if}
-            <div class="ing-info">
-              <span class="ingredient-name">{item.name}</span>
-              <span class="text-3" style="font-size:12px">{item.portion} {item.unit}</span>
+              <span class="text-3 text-sm">{Math.round((Nutrition.calculate(item).calories)||0)} kcal</span>
+              <button class="btn-icon btn-sm" on:click={() => removeIngredient(i)}
+                style="color:var(--text-3)">
+                <span class="material-symbols-rounded" style="font-size:18px">remove_circle</span>
+              </button>
             </div>
-            <span class="text-3 text-sm">{Math.round((Nutrition.calculate(item).calories)||0)} kcal</span>
-            <button class="btn-icon btn-sm" on:click={() => moveIngredient(i, -1)} disabled={i === 0}
-                title="Move up" aria-label="Move up">
-              <span class="material-symbols-rounded" style="font-size:16px">arrow_upward</span>
-            </button>
-            <button class="btn-icon btn-sm" on:click={() => moveIngredient(i, 1)} disabled={i === meal.items.length - 1}
-                title="Move down" aria-label="Move down">
-              <span class="material-symbols-rounded" style="font-size:16px">arrow_downward</span>
-            </button>
-            <button class="btn-icon btn-sm" on:click={() => removeIngredient(i)}
-              style="color:var(--text-3)">
-              <span class="material-symbols-rounded" style="font-size:18px">remove_circle</span>
-            </button>
-          </div>
-        {/each}
+          {/each}
+        </div>
       {/if}
     </div>
 
@@ -555,7 +595,7 @@
 
   /* Photo */
   .photo-preview-wrap {
-    width: 280px; height: 280px; margin: 0 auto;
+    width: 100%; aspect-ratio: 1 / 1;
     border-radius: var(--radius-lg); overflow: hidden;
     border: 2px dashed var(--border);
     background: var(--surface-2);
@@ -579,11 +619,20 @@
   .cat-chip.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
 
   /* Ingredient rows */
+  .ingredient-list { display: flex; flex-direction: column; touch-action: none; }
   .ingredient-row {
     display: flex; align-items: center; gap: 10px;
     padding: 6px 0; border-bottom: 1px solid var(--border);
+    transition: background 120ms, opacity 120ms;
   }
   .ingredient-row:last-child { border-bottom: none; }
+  .ingredient-row.dragging { opacity: 0.4; }
+  .ingredient-row.drag-over { background: var(--accent-dim); border-radius: var(--radius-sm); }
+  .drag-handle {
+    font-size: 20px; color: var(--text-3); cursor: grab; flex-shrink: 0;
+    touch-action: none; user-select: none; -webkit-user-select: none;
+  }
+  .drag-handle:active { cursor: grabbing; }
   .ing-thumb { width: 44px; height: 44px; border-radius: var(--radius-md); object-fit: cover; flex-shrink: 0; }
   .ing-thumb-placeholder {
     display: flex; align-items: center; justify-content: center;
