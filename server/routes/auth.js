@@ -140,4 +140,13 @@ router.delete('/management', requireAuth, requireAdmin, wrap((req, res) => {
   res.json({ ok: true });
 }));
 
+// ── Lockout recovery: disable user management without credentials ──────────
+// Self-hosted escape hatch — only works when the caller has no valid session
+router.post('/recover', wrap((req, res) => {
+  if (req.user) return res.status(400).json({ error: 'You are already signed in. Use Settings to disable user management.' });
+  db.prepare('DELETE FROM users').run();
+  res.clearCookie('nt_token');
+  res.json({ ok: true });
+}));
+
 export default router;

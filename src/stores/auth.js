@@ -14,8 +14,9 @@ export async function loadAuthState() {
       fetch('/api/auth/me',     { credentials: 'include' }),
     ]);
     const { active } = await statusRes.json();
-    const { user }   = await meRes.json();
-    userMgmtActive.set(active);
+    const meData     = await meRes.json();
+    const user       = meData.user || null;
+    userMgmtActive.set(!!active);
     currentUser.set(user);
     // Update user-scoped localStorage key prefix
     if (user) localStorage.setItem('wl:userId', String(user.id));
