@@ -478,9 +478,9 @@
       </div>
     {/if}
 
-    <!-- Nutrition per 100g -->
+    <!-- Nutrition -->
     <div class="card editor-card">
-      <div class="editor-card-title">Nutrition per 100{food.unit || 'g'}</div>
+      <div class="editor-card-title">Nutrition</div>
       {#each displayFields as n}
         <div class="form-group">
           <label class="form-label">{n.label} ({n.unit})</label>
