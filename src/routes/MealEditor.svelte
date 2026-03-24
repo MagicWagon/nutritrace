@@ -18,6 +18,14 @@
   // Photo state
   let photoPreviewUrl = '';
   let cameraOpen = false;
+  let showUrlInput = false;
+  let photoUrl = '';
+  function applyPhotoUrl() {
+    const url = photoUrl.trim();
+    if (url) { photoPreviewUrl = url; }
+    showUrlInput = false;
+    photoUrl = '';
+  }
   let cameraStream = null;
   let videoEl = null;
   let cropOpen = false;
@@ -279,6 +287,10 @@
           <span class="material-symbols-rounded" style="font-size:18px">camera_alt</span>
           Camera
         </button>
+        <button class="btn btn-ghost photo-btn" on:click={() => { showUrlInput = !showUrlInput; photoUrl = ''; }}>
+          <span class="material-symbols-rounded" style="font-size:18px">link</span>
+          URL
+        </button>
         {#if photoPreviewUrl}
           <button class="btn btn-ghost photo-btn" style="color:var(--text-3)"
             on:click={() => photoPreviewUrl = ''}>
@@ -286,6 +298,13 @@
           </button>
         {/if}
       </div>
+      {#if showUrlInput}
+        <div class="photo-url-row">
+          <input class="input photo-url-input" placeholder="https://..." bind:value={photoUrl}
+            on:keydown={e => e.key === 'Enter' && applyPhotoUrl()} />
+          <button class="btn btn-primary" on:click={applyPhotoUrl}>Get</button>
+        </div>
+      {/if}
     </div>
 
     <!-- Name -->
@@ -546,6 +565,8 @@
   .photo-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
   .photo-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
   .photo-btn { display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; font-size: 13px; }
+  .photo-url-row { display: flex; gap: 8px; margin-top: 8px; }
+  .photo-url-input { flex: 1; }
 
   /* Categories */
   .category-chips { display: flex; flex-wrap: wrap; gap: 6px; }

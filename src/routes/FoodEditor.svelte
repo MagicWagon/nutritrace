@@ -11,6 +11,14 @@
   // ── Photo capture / upload ─────────────────────────────────
   let fileInput;
   let showCamera  = false;
+  let showUrlInput = false;
+  let photoUrl = '';
+  function applyPhotoUrl() {
+    const url = photoUrl.trim();
+    if (url) { food.imgUrl = url; }
+    showUrlInput = false;
+    photoUrl = '';
+  }
   let cameraVideo = null;
   let cameraStream = null;
   let showCrop    = false;
@@ -317,13 +325,24 @@
       <div class="photo-btn-row">
         <button class="btn btn-ghost photo-action-btn" on:click={openGallery}>
           <span class="material-symbols-rounded">photo_library</span>
-          Upload Photo
+          Upload
         </button>
         <button class="btn btn-ghost photo-action-btn" on:click={openCamera}>
           <span class="material-symbols-rounded">camera_alt</span>
-          Take Photo
+          Camera
+        </button>
+        <button class="btn btn-ghost photo-action-btn" on:click={() => { showUrlInput = !showUrlInput; photoUrl = ''; }}>
+          <span class="material-symbols-rounded">link</span>
+          URL
         </button>
       </div>
+      {#if showUrlInput}
+        <div class="photo-url-row">
+          <input class="input photo-url-input" placeholder="https://..." bind:value={photoUrl}
+            on:keydown={e => e.key === 'Enter' && applyPhotoUrl()} />
+          <button class="btn btn-primary" on:click={applyPhotoUrl}>Get</button>
+        </div>
+      {/if}
       <input bind:this={fileInput} type="file" accept="image/*" style="display:none" on:change={onFileChange} />
     </div>
 
@@ -542,6 +561,8 @@
     font-size: 13px;
   }
   .photo-action-btn .material-symbols-rounded { font-size: 18px; }
+  .photo-url-row { display: flex; gap: 8px; margin-top: 8px; }
+  .photo-url-input { flex: 1; }
 
   /* Camera / crop overlay */
   :global(.cam-overlay) {
