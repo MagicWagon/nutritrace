@@ -275,9 +275,15 @@
     if (!mealieBaseUrl || !mealieApiToken) { mealieTestStatus = 'fail'; return; }
     mealieTestStatus = 'testing';
     try {
-      const base = mealieBaseUrl.replace(/\/$/, '');
-      const res = await fetch(`${base}/api/recipes?perPage=1&page=1`, {
-        headers: { Authorization: `Bearer ${mealieApiToken}` }
+      const res = await fetch('/api/mealie/proxy', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          baseUrl: mealieBaseUrl,
+          token:   mealieApiToken,
+          path:    '/api/recipes?perPage=1&page=1',
+        }),
       });
       mealieTestStatus = res.ok ? 'ok' : 'fail';
     } catch { mealieTestStatus = 'fail'; }

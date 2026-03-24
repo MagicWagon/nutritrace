@@ -2,6 +2,8 @@
  * mealieApi.js — Mealie self-hosted recipe manager integration
  * Docs: https://docs.mealie.io/documentation/getting-started/api-usage/
  * Auth: Bearer token created at /user/profile/api-tokens in Mealie UI
+ *
+ * All requests are proxied through /api/mealie/proxy to avoid CORS.
  */
 import { DB } from './db.js';
 
@@ -11,8 +13,17 @@ function _cfg() {
   return { baseUrl, token };
 }
 
-function _headers(token) {
-  return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+async function _proxy(path) {
+  const { baseUrl, token } = _cfg();
+  if (!baseUrl || !token) return null;
+  const res = await fetch('/api/mealie/proxy', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ baseUrl, token, path }),
+  });
+  if (!res.ok) return null;
+  return res.json();
 }
 
 const Mealie = {
@@ -21,50 +32,41 @@ const Mealie = {
     return !!(baseUrl && token);
   },
 
-  /** Search recipes by name. Returns list of recipe summaries (slug, name, image key). */
+  /** Search recipes by name. Returns list of recipe summaries. */
   async search(query, page = 1) {
-    const { baseUrl, token } = _cfg();
-    if (!baseUrl || !token || !query) return [];
+    if (!query) return [];
     try {
       const filter = `name LIKE "%${query}%"`;
-      const url = `${baseUrl}/api/recipes?queryFilter=${encodeURIComponent(filter)}&perPage=10&page=${page}`;
-      const res = await fetch(url, { headers: _headers(token) });
-      if (!res.ok) return [];
-      const data = await res.json();
-      return data.items || [];
-    } catch (e) {
+      const data = await _proxy(`/api/recipes?queryFilter=${encodeURIComponent(filter)}&perPage=10&page=${page}`);
+      return data?.items || [];
+    } catch(e) {
       console.error('[Mealie] search failed:', e);
       return [];
     }
   },
 
-  /** Get full recipe details by slug, including nutrition and image UUID. */
+  /** Get full recipe details by slug, including nutrition. */
   async getRecipe(slug) {
-    const { baseUrl, token } = _cfg();
-    if (!baseUrl || !token || !slug) return null;
+    if (!slug) return null;
     try {
-      const res = await fetch(`${baseUrl}/api/recipes/${slug}`, { headers: _headers(token) });
-      if (!res.ok) return null;
-      return await res.json();
-    } catch (e) {
+      return await _proxy(`/api/recipes/${slug}`);
+    } catch(e) {
       console.error('[Mealie] getRecipe failed:', e);
       return null;
     }
   },
 
-  /** Test the connection — returns true if we get a valid response. */
+  /** Test the connection — returns true if the server can reach Mealie. */
   async testConnection() {
-    const { baseUrl, token } = _cfg();
-    if (!baseUrl || !token) return false;
     try {
-      const res = await fetch(`${baseUrl}/api/recipes?perPage=1&page=1`, { headers: _headers(token) });
-      return res.ok;
-    } catch (e) {
+      const data = await _proxy('/api/recipes?perPage=1&page=1');
+      return data != null;
+    } catch {
       return false;
     }
   },
 
-  /** Build the full image URL for a recipe using its UUID. */
+  /** Build the full image URL for a recipe (loaded directly by the browser — no CORS issue for <img>). */
   imageUrl(recipeId) {
     const { baseUrl } = _cfg();
     if (!baseUrl || !recipeId) return '';
@@ -73,15 +75,13 @@ const Mealie = {
 
   /**
    * Map a full Mealie recipe object to the app's food structure.
-   * Mealie stores nutrition per serving. We store with portion=100, unit='serving'
-   * so the diary factor = (100 * qty) / 100 = qty, giving correct per-serving calories.
+   * Nutrition is per-serving; portion=100, unit='serving' so diary qty = servings.
    */
   mapRecipe(recipe) {
     const { baseUrl } = _cfg();
     const n = recipe.nutrition || {};
     const pf = v => parseFloat(v) || 0;
 
-    // Try to extract a brand/source from the original URL
     let brand = '';
     if (recipe.orgURL) {
       try { brand = new URL(recipe.orgURL).hostname.replace(/^www\./, ''); } catch {}
