@@ -14,6 +14,7 @@
   import { DB } from '../lib/db.js';
   import { loadEntry } from '../stores/diary.js';
   import { API, USDA, NtApi } from '../lib/api.js';
+  import { Nutrition } from '../lib/nutrition.js';
   import { Mealie } from '../lib/mealieApi.js';
   import { foodsShowThumbnails, foodsShowCategories, foodsShowNotes, foodsSort, foodCategories, foodsShowYesterdayMeals, mealNames } from '../stores/settings.js';
 
@@ -419,7 +420,7 @@
                   <span class="food-kcal text-sm">
                     {activeTab === 0
                       ? Math.round((food.nutrition?.calories || food.calories || 0) * (food.portion || 100) / 100)
-                      : Math.round(food.nutrition?.calories || food.calories || 0)
+                      : Math.round(Nutrition.sum((food.items||[]).map(i => Nutrition.calculate(i))).calories || food.nutrition?.calories || 0)
                     } kcal
                   </span>
                 </div>
