@@ -9,9 +9,9 @@ const NUTRIMENTS = [
   // Total Fat
   { id: 'fat',                 label: 'Fat',                 unit: 'g',    category: 'macro',   default: true },
   { id: 'saturated-fat',       label: 'Saturated Fat',       unit: 'g',    category: 'macro',   default: true },
-  { id: 'trans-fat',           label: 'Trans Fat',           unit: 'g',    category: 'macro',   default: true },
-  { id: 'polyunsaturated-fat', label: 'Polyunsaturated Fat', unit: 'g',    category: 'macro',   default: true },
-  { id: 'monounsaturated-fat', label: 'Monounsaturated Fat', unit: 'g',    category: 'macro',   default: true },
+  { id: 'trans-fat',           label: 'Trans Fat',           unit: 'g',    category: 'macro',   default: false },
+  { id: 'polyunsaturated-fat', label: 'Polyunsaturated Fat', unit: 'g',    category: 'macro',   default: false },
+  { id: 'monounsaturated-fat', label: 'Monounsaturated Fat', unit: 'g',    category: 'macro',   default: false },
   // Cholesterol & Sodium
   { id: 'cholesterol',   label: 'Cholesterol',   unit: 'mg',   category: 'other',   default: false },
   { id: 'sodium',        label: 'Sodium',        unit: 'mg',   category: 'mineral', default: false },
