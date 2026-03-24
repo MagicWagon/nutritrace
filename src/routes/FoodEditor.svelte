@@ -179,10 +179,12 @@
     for (const n of allNuts) _snapshot[n.id] = parseFloat(food[n.id]) || 0;
   }
 
+  let _scaleTimer = null;
+
   function applyProportional(changedId, newVal) {
     if (!linked || !_snapshot) return;
     const origVal = changedId === '__portion__' ? _snapshot.portion : _snapshot[changedId];
-    if (!origVal || origVal <= 0 || newVal <= 0 || newVal === origVal) return;
+    if (!origVal || origVal <= 0 || newVal <= 0) return;
     const ratio = newVal / origVal;
     const allNuts = [...NUTRIMENTS, ...($customNutriments || [])];
     for (const n of allNuts) {
@@ -196,13 +198,13 @@
     food = { ...food };
   }
 
-  function onPortionInput() {
-    applyProportional('__portion__', parseFloat(food.portion) || 0);
+  function scheduleScale(changedId, getVal) {
+    clearTimeout(_scaleTimer);
+    _scaleTimer = setTimeout(() => { applyProportional(changedId, getVal()); }, 400);
   }
 
-  function onNutInput(id) {
-    applyProportional(id, parseFloat(food[id]) || 0);
-  }
+  function onPortionInput() { scheduleScale('__portion__', () => parseFloat(food.portion) || 0); }
+  function onNutInput(id)   { scheduleScale(id, () => parseFloat(food[id]) || 0); }
 
   async function downloadFromOFF() {
     if (!food.barcode) return;
