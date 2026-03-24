@@ -444,13 +444,23 @@
       try {
         const text = await file.text();
         const data = JSON.parse(text);
-        // Strip base64 images — they can't be migrated to server filesystem
-        const strip = arr => (arr || []).map(item => {
-          if (item.imgUrl && item.imgUrl.startsWith('data:')) return { ...item, imgUrl: '' };
-          return item;
-        });
-        const cleaned = { ...data, foodList: strip(data.foodList), meals: strip(data.meals), recipes: strip(data.recipes) };
-        await NtApi.post('/api/data/import', cleaned);
+        // Upload any base64 images to the server and replace with server URLs
+        async function migrateImg(item) {
+          if (!item.imgUrl || !item.imgUrl.startsWith('data:')) return item;
+          try {
+            const blob = await fetch(item.imgUrl).then(r => r.blob());
+            const file = new File([blob], 'photo.jpg', { type: blob.type || 'image/jpeg' });
+            const url = await NtApi.uploadImage(file);
+            return { ...item, imgUrl: url };
+          } catch { return { ...item, imgUrl: '' }; }
+        }
+        const migrateAll = arr => Promise.all((arr || []).map(migrateImg));
+        const [foodList, meals, recipes] = await Promise.all([
+          migrateAll(data.foodList),
+          migrateAll(data.meals),
+          migrateAll(data.recipes),
+        ]);
+        await NtApi.post('/api/data/import', { ...data, foodList, meals, recipes });
         if (data.settings && typeof data.settings === 'object') {
           for (const [key, value] of Object.entries(data.settings)) DB.setSetting(key, value);
         }
