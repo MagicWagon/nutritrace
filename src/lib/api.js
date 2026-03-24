@@ -260,4 +260,83 @@ const USDA = {
   }
 };
 
+// ── NutriTrace Server API ──────────────────────────────────────────────────
+
+const KEY_URL   = 'nt:apiUrl';
+const KEY_TOKEN = 'nt:apiToken';
+
+export const NtApi = {
+  // Config
+  getUrl()        { return localStorage.getItem(KEY_URL)   || ''; },
+  getToken()      { return localStorage.getItem(KEY_TOKEN) || ''; },
+  setUrl(url)     { localStorage.setItem(KEY_URL,   url.replace(/\/$/, '')); },
+  setToken(token) { localStorage.setItem(KEY_TOKEN, token); },
+  clearToken()    { localStorage.removeItem(KEY_TOKEN); },
+  isConfigured()  { return !!this.getUrl() && !!this.getToken(); },
+
+  // Core fetch
+  async _fetch(method, path, body, isUpload = false) {
+    const url = this.getUrl();
+    if (!url) throw new Error('API URL not configured');
+    const headers = { Authorization: `Bearer ${this.getToken()}` };
+    if (!isUpload) headers['Content-Type'] = 'application/json';
+    const res = await fetch(`${url}${path}`, {
+      method,
+      headers,
+      body: isUpload ? body : body != null ? JSON.stringify(body) : undefined,
+    });
+    if (res.status === 401) { this.clearToken(); throw new Error('Session expired — please log in again'); }
+    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `API error ${res.status}`); }
+    return res.json();
+  },
+
+  get(path)        { return this._fetch('GET',    path); },
+  post(path, body) { return this._fetch('POST',   path, body); },
+  put(path, body)  { return this._fetch('PUT',    path, body); },
+  del(path)        { return this._fetch('DELETE', path); },
+
+  // Auth
+  async login(email, password) {
+    const url = this.getUrl();
+    if (!url) throw new Error('API URL not configured');
+    const res = await fetch(`${url}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Login failed'); }
+    const { token } = await res.json();
+    this.setToken(token);
+    return token;
+  },
+
+  logout() { this.clearToken(); },
+
+  // Foods
+  getFoods()           { return this.get('/api/foods'); },
+  createFood(data)     { return this.post('/api/foods', data); },
+  updateFood(id, data) { return this.put(`/api/foods/${id}`, data); },
+  deleteFood(id)       { return this.del(`/api/foods/${id}`); },
+
+  // Meals & Recipes
+  getMeals()           { return this.get('/api/meals'); },
+  getRecipes()         { return this.get('/api/meals?recipes=1'); },
+  createMeal(data)     { return this.post('/api/meals', data); },
+  updateMeal(id, data) { return this.put(`/api/meals/${id}`, data); },
+  deleteMeal(id)       { return this.del(`/api/meals/${id}`); },
+
+  // Diary
+  getDiaryDate(date)        { return this.get(`/api/diary/${date}`); },
+  saveDiaryDate(date, data) { return this.put(`/api/diary/${date}`, data); },
+  getAllDiary()              { return this.get('/api/diary'); },
+
+  // Upload
+  async uploadImage(file) {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await this._fetch('POST', '/api/upload', form, true);
+    return `${this.getUrl()}${res.url}`;
+  },
+};
+
 export { API, USDA };
