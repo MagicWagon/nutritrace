@@ -95,7 +95,7 @@
     background: var(--overlay);
     backdrop-filter: var(--backdrop-blur);
     -webkit-backdrop-filter: var(--backdrop-blur);
-    z-index: 80;
+    z-index: 100;
   }
 
   .sidebar-panel {
@@ -104,7 +104,7 @@
     width: 280px;
     background: var(--surface-1);
     border-right: 1px solid var(--border);
-    z-index: 90;
+    z-index: 101;
     display: flex;
     flex-direction: column;
     padding: var(--safe-top) 0 var(--safe-bottom);
