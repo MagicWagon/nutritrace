@@ -3,6 +3,12 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
+  server: {
+    proxy: {
+      '/api':     'http://localhost:3001',
+      '/uploads': 'http://localhost:3001',
+    }
+  },
   plugins: [
     svelte(),
     VitePWA({
