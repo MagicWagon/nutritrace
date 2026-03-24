@@ -417,7 +417,10 @@
                     <span class="food-notes text-3 text-sm">{food.notes}</span>
                   {/if}
                   <span class="food-kcal text-sm">
-                    {Math.round(food.nutrition?.calories || food.calories || 0)} kcal / 100g
+                    {activeTab === 0
+                      ? Math.round((food.nutrition?.calories || food.calories || 0) * (food.portion || 100) / 100)
+                      : Math.round(food.nutrition?.calories || food.calories || 0)
+                    } kcal
                   </span>
                 </div>
                 <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
@@ -466,7 +469,7 @@
                   <div class="food-info">
                     <span class="food-name">{food.name}</span>
                     {#if food.brand}<span class="food-brand text-3 text-sm">{food.brand}</span>{/if}
-                    <span class="food-kcal text-sm">{Math.round(food.nutrition?.calories || food.calories || 0)} kcal / 100g</span>
+                    <span class="food-kcal text-sm">{Math.round(food.nutrition?.calories || food.calories || 0)} kcal</span>
                   </div>
                 </button>
               </li>
