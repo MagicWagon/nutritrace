@@ -13,11 +13,21 @@ router.get('/', async (req, res) => {
     if (!ALLOWED.includes(parsed.hostname)) {
       return res.status(403).json({ error: 'Domain not allowed' });
     }
-    const response = await fetch(url);
-    if (!response.ok) return res.status(response.status).json({ error: 'Upstream error' });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; NutriTrace/1.0)' },
+    });
+    clearTimeout(timer);
+    if (!response.ok) {
+      console.error(`[proxy] upstream ${response.status} for ${url}`);
+      return res.status(response.status).json({ error: `Upstream ${response.status}` });
+    }
     res.json(await response.json());
   } catch(e) {
-    res.status(500).json({ error: e.message });
+    console.error('[proxy] fetch error:', e.message, 'url:', url);
+    res.status(503).json({ error: e.message });
   }
 });
 
