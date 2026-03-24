@@ -495,12 +495,11 @@
           } catch { return ''; }
         }
 
-        // Map foods and migrate images before building foodMap used by diary
-        const foods = await Promise.all((raw.foodList||[]).map(async f => ({
-          ...f,
-          imgUrl: await migrateImg(cleanImg(f.image_url)),
-          nutrition: mapNutrition(f.nutrition),
-        })));
+        // Map foods — drop original image_url (base64) after migrating to server URL
+        const foods = await Promise.all((raw.foodList||[]).map(async f => {
+          const { image_url, ...rest } = f;
+          return { ...rest, imgUrl: await migrateImg(cleanImg(image_url)), nutrition: mapNutrition(f.nutrition) };
+        }));
         const foodMap = Object.fromEntries((raw.foodList||[]).map((f,i) => [f.id, foods[i]]));
 
         const resolveItems = items => (items||[]).map(item => {
@@ -508,12 +507,14 @@
           return { ...food, portion: parseFloat(item.portion)||food.portion||100, quantity: parseFloat(item.quantity)||1 };
         }).filter(Boolean);
 
-        const meals = await Promise.all((raw.meals||[]).map(async m => ({
-          ...m, imgUrl: await migrateImg(cleanImg(m.image_url)), items: resolveItems(m.items), nutrition: {},
-        })));
-        const recipes = await Promise.all((raw.recipes||[]).map(async r => ({
-          ...r, imgUrl: await migrateImg(cleanImg(r.image_url)), items: resolveItems(r.items), nutrition: mapNutrition(r.nutrition),
-        })));
+        const meals = await Promise.all((raw.meals||[]).map(async m => {
+          const { image_url, ...rest } = m;
+          return { ...rest, imgUrl: await migrateImg(cleanImg(image_url)), items: resolveItems(m.items), nutrition: {} };
+        }));
+        const recipes = await Promise.all((raw.recipes||[]).map(async r => {
+          const { image_url, ...rest } = r;
+          return { ...rest, imgUrl: await migrateImg(cleanImg(image_url)), items: resolveItems(r.items), nutrition: mapNutrition(r.nutrition) };
+        }));
 
         const byDate = {};
         for (const entry of (raw.diary||[])) {
