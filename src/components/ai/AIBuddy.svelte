@@ -3,6 +3,7 @@
   import { fly, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import { DB }        from '../../lib/db.js';
+  import { NtApi }     from '../../lib/api.js';
   import { Nutrition } from '../../lib/nutrition.js';
   import { callAI }    from '../../lib/aiChat.js';
   import { aiEnabled } from '../../stores/settings.js';
@@ -79,7 +80,7 @@
   // ── Chat ───────────────────────────────────────────────────────────────────
   async function buildContext() {
     const today  = new Date().toISOString().slice(0, 10);
-    const entry  = await DB.getDiaryForDate(today);
+    const entry  = await NtApi.getDiaryDate(today).catch(() => null);
     const g      = DB.getSetting('goals', {});
     const mNames = DB.getSetting('mealNames', ['Breakfast','Lunch','Dinner','Snacks']);
     const eUnit  = DB.getSetting('energyUnit', 'kcal');

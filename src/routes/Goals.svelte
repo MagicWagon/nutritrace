@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { DB } from '../lib/db.js';
+  import { NtApi } from '../lib/api.js';
   import { portal } from '../lib/portal.js';
   import { goals, goalTemplates, energyUnit, weightUnit, heightUnit, lengthUnit, visibleNutriments, hiddenBodyStats } from '../stores/settings.js';
   import { NUTRIMENTS, Nutrition } from '../lib/nutrition.js';
@@ -85,9 +86,9 @@
   let todayBodyStats = {};
 
   onMount(async () => {
-    const entry = await DB.getDiaryForDate(today);
+    const entry = await NtApi.getDiaryDate(today).catch(() => null);
     if (entry) {
-      todayBodyStats = entry.bodyStats || {};
+      todayBodyStats = entry.body_stats || entry.bodyStats || {};
       todayTotals = Nutrition.sum((entry.items || []).map(i => Nutrition.calculate(i)));
     }
   });

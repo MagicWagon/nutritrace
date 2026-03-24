@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { slide, fade } from 'svelte/transition';
   import { DB } from '../lib/db.js';
+  import { NtApi } from '../lib/api.js';
   import { showSuccess, showError } from '../stores/toast.js';
 
   const today = new Date().toISOString().slice(0, 10);
@@ -48,7 +49,7 @@
   onMount(loadWater);
 
   async function loadWater() {
-    const entry = await DB.getDiaryForDate(today);
+    const entry = await NtApi.getDiaryDate(today).catch(() => null);
     logs = entry?.water || [];
     goalMl     = DB.getSetting('waterGoalMl',     2000);
     unit       = DB.getSetting('waterUnit',       'ml');
@@ -59,23 +60,23 @@
     const ml = Number(amount);
     if (!ml || ml <= 0) { showError('Invalid amount'); return; }
 
-    const entry = await DB.getDiaryForDate(today) || { date: today, items: [], bodyStats: {} };
+    const entry = await NtApi.getDiaryDate(today).catch(() => null) || { items: [], body_stats: {}, water: [] };
     const log   = {
       amount: ml,
       time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
     };
     const water = [...(entry.water || []), log];
-    await DB.saveDate(today, { ...entry, water });
+    await NtApi.saveDiaryDate(today, { items: entry.items || [], body_stats: entry.body_stats || entry.bodyStats || {}, water });
     logs = water;
     showCustom = false;
     customAmt  = '';
   }
 
   async function removeLog(index) {
-    const entry = await DB.getDiaryForDate(today);
+    const entry = await NtApi.getDiaryDate(today).catch(() => null);
     if (!entry) return;
     const water = (entry.water || []).filter((_, i) => i !== index);
-    await DB.saveDate(today, { ...entry, water });
+    await NtApi.saveDiaryDate(today, { items: entry.items || [], body_stats: entry.body_stats || entry.bodyStats || {}, water });
     logs = water;
   }
 
