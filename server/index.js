@@ -3,6 +3,7 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+import proxyRoutes  from './routes/proxy.js';
 import foodsRoutes  from './routes/foods.js';
 import mealsRoutes  from './routes/meals.js';
 import diaryRoutes  from './routes/diary.js';
@@ -22,6 +23,7 @@ const uploadsPath = process.env.UPLOADS_PATH || './uploads';
 app.use('/uploads', express.static(uploadsPath));
 
 // API routes
+app.use('/api/proxy',  proxyRoutes);
 app.use('/api/foods',  foodsRoutes);
 app.use('/api/meals',  mealsRoutes);
 app.use('/api/diary',  diaryRoutes);

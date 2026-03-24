@@ -6,7 +6,7 @@ const API = {
 
   async lookupBarcode(barcode) {
     try {
-      const res = await fetch(`${this.OFF_BASE}/api/v0/product/${barcode}.json`);
+      const res = await fetch('/api/proxy?url=' + encodeURIComponent(`${this.OFF_BASE}/api/v0/product/${barcode}.json`));
       if (!res.ok) return null;
       const data = await res.json();
       if (data.status !== 1) return null;
@@ -25,7 +25,7 @@ const API = {
       const offCountry = (typeof DB !== 'undefined') ? DB.getSetting('offSearchCountry', 'All') : 'All';
       if (offLang    && offLang    !== 'Default') offUrl += '&lang=' + encodeURIComponent(offLang) + '&lc=' + encodeURIComponent(offLang);
       if (offCountry && offCountry !== 'All')     offUrl += '&tagtype_0=countries&tag_contains_0=contains&tag_0=' + encodeURIComponent(offCountry);
-      const res = await fetch(offUrl);
+      const res = await fetch('/api/proxy?url=' + encodeURIComponent(offUrl));
       if (!res.ok) return [];
       const data = await res.json();
       return (data.products || []).map(p => this._mapOFFProduct(p)).filter(Boolean);
@@ -223,7 +223,7 @@ const USDA = {
       const url = _USDA_BASE + '/foods/search?query=' + encodeURIComponent(query) +
         '&pageSize=20&pageNumber=' + page +
         '&api_key=' + encodeURIComponent(apiKey);
-      const res = await fetch(url);
+      const res = await fetch('/api/proxy?url=' + encodeURIComponent(url));
       if (!res.ok) return [];
       const data = await res.json();
       return (data.foods || []).map(f => {
@@ -243,7 +243,7 @@ const USDA = {
       // Branded only (only branded products have GTINs/UPCs)
       const url = _USDA_BASE + '/foods/search?query=' + encodeURIComponent(barcode) +
         '&dataType=Branded&pageSize=10&api_key=' + encodeURIComponent(apiKey);
-      const res = await fetch(url);
+      const res = await fetch('/api/proxy?url=' + encodeURIComponent(url));
       if (!res.ok) return null;
       const data = await res.json();
       // Match on exact UPC or UPC without leading zeros
