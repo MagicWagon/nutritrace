@@ -22,6 +22,7 @@
            diaryShowAllNutrients, diaryShowNutritionUnits, visibleNutriments, hiddenBodyStats,
            dateFormat, timeFormat, disableAnimations, goalCelebrations } from '../stores/settings.js';
   import { NtApi } from '../lib/api.js';
+  import { DB } from '../lib/db.js';
   import { portal } from '../lib/portal.js';
   import { Nutrition, NUTRIMENTS } from '../lib/nutrition.js';
 
