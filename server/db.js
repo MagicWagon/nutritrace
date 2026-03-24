@@ -65,9 +65,28 @@ db.exec(`
   );
 `);
 
-// ── Migrations: add user_id to existing tables if absent ───────────────────
+// ── Migrations ─────────────────────────────────────────────────────────────
 function columnExists(table, col) {
   return db.prepare(`PRAGMA table_info(${table})`).all().some(r => r.name === col);
+}
+
+// Rebuild users table if it was created by an older incomplete schema
+if (!columnExists('users', 'username')) {
+  db.exec(`
+    DROP TABLE IF EXISTS users;
+    CREATE TABLE users (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      username      TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      full_name     TEXT,
+      nickname      TEXT,
+      birthday      TEXT,
+      gender        TEXT,
+      avatar_url    TEXT,
+      role          TEXT NOT NULL DEFAULT 'user',
+      created_at    TEXT DEFAULT (datetime('now'))
+    );
+  `);
 }
 
 if (!columnExists('foods', 'user_id')) {
