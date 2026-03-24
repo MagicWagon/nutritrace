@@ -158,10 +158,10 @@
     return dt.toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' });
   }
 
-  function formatDateSub(d) {
+  function formatDateSub(d, fmt) {
     if (!d) return '';
     const dt = new Date(d + 'T12:00:00');
-    const fmt = $dateFormat || 'ISO';
+    fmt = fmt || 'ISO';
     if (fmt === 'US') {
       const m = String(dt.getMonth()+1).padStart(2,'0');
       const dy = String(dt.getDate()).padStart(2,'0');
@@ -478,7 +478,7 @@
       </button>
       <button class="date-btn" on:click={openDatePicker} title="Jump to date">
         <span class="date-label">{formatDate($currentDate)}</span>
-        <span class="date-sub">{formatDateSub($currentDate)}</span>
+        <span class="date-sub">{formatDateSub($currentDate, $dateFormat)}</span>
       </button>
       <button class="btn-icon accent" on:click={nextDay} aria-label="Next day">
         <span class="material-symbols-rounded">chevron_right</span>
@@ -922,7 +922,7 @@
       <div class="sheet-handle"></div>
       <div class="sheet-header-row">
         <h3 class="sheet-title">Nutrition Summary</h3>
-        <span class="text-3 text-sm">{formatDateSub($currentDate)}</span>
+        <span class="text-3 text-sm">{formatDateSub($currentDate, $dateFormat)}</span>
       </div>
       <div class="ns-body">
         <!-- Macro ring -->
