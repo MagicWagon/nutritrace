@@ -485,7 +485,22 @@
         const mapNutrition = n => { const o={}; for(const[k,v] of Object.entries(n||{})) o[NUTR_MAP[k]||k]=parseFloat(v)||0; return o; };
         const cleanImg = u => (u && u !== 'undefined') ? u : null;
 
-        const foods = (raw.foodList||[]).map(f => ({ ...f, imgUrl: cleanImg(f.image_url), nutrition: mapNutrition(f.nutrition) }));
+        // Upload base64 images first so diary items (which embed full food objects) are small
+        async function migrateImg(imgUrl) {
+          if (!imgUrl || !imgUrl.startsWith('data:')) return imgUrl;
+          try {
+            const blob = await fetch(imgUrl).then(r => r.blob());
+            const file = new File([blob], 'photo.jpg', { type: blob.type || 'image/jpeg' });
+            return await NtApi.uploadImage(file);
+          } catch { return ''; }
+        }
+
+        // Map foods and migrate images before building foodMap used by diary
+        const foods = await Promise.all((raw.foodList||[]).map(async f => ({
+          ...f,
+          imgUrl: await migrateImg(cleanImg(f.image_url)),
+          nutrition: mapNutrition(f.nutrition),
+        })));
         const foodMap = Object.fromEntries((raw.foodList||[]).map((f,i) => [f.id, foods[i]]));
 
         const resolveItems = items => (items||[]).map(item => {
@@ -493,8 +508,12 @@
           return { ...food, portion: parseFloat(item.portion)||food.portion||100, quantity: parseFloat(item.quantity)||1 };
         }).filter(Boolean);
 
-        const meals = (raw.meals||[]).map(m => ({ ...m, imgUrl: cleanImg(m.image_url), items: resolveItems(m.items), nutrition: {} }));
-        const recipes = (raw.recipes||[]).map(r => ({ ...r, imgUrl: cleanImg(r.image_url), items: resolveItems(r.items), nutrition: mapNutrition(r.nutrition) }));
+        const meals = await Promise.all((raw.meals||[]).map(async m => ({
+          ...m, imgUrl: await migrateImg(cleanImg(m.image_url)), items: resolveItems(m.items), nutrition: {},
+        })));
+        const recipes = await Promise.all((raw.recipes||[]).map(async r => ({
+          ...r, imgUrl: await migrateImg(cleanImg(r.image_url)), items: resolveItems(r.items), nutrition: mapNutrition(r.nutrition),
+        })));
 
         const byDate = {};
         for (const entry of (raw.diary||[])) {
