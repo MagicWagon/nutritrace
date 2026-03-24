@@ -9,8 +9,9 @@ import foodsRoutes  from './routes/foods.js';
 import mealsRoutes  from './routes/meals.js';
 import diaryRoutes  from './routes/diary.js';
 import uploadRoutes from './routes/upload.js';
+import { logger }   from './logger.js';
 
-// Initialise DB (runs schema + seeds admin user)
+// Initialise DB (runs schema)
 import './db.js';
 
 const app  = express();
@@ -18,6 +19,17 @@ const PORT = process.env.PORT || 3001;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 app.use(express.json({ limit: '50mb' }));
+
+// ── Request logging ────────────────────────────────────────────────────────
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const ms   = Date.now() - start;
+    const lvl  = res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'info';
+    logger[lvl](`${req.method} ${req.path} → ${res.statusCode} (${ms}ms)`);
+  });
+  next();
+});
 
 // Serve uploaded images
 const uploadsPath = process.env.UPLOADS_PATH || './uploads';
@@ -40,4 +52,22 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
-app.listen(PORT, () => console.log(`NutriTrace running on port ${PORT}`));
+// ── Global error handler ───────────────────────────────────────────────────
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  logger.error(`${req.method} ${req.path} — ${err.stack || err.message}`);
+  if (!res.headersSent) {
+    res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
+  }
+});
+
+// ── Process-level safety nets ─────────────────────────────────────────────
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled promise rejection:', reason instanceof Error ? reason.stack : reason);
+});
+process.on('uncaughtException', (err) => {
+  logger.error('Uncaught exception:', err.stack || err.message);
+  process.exit(1);
+});
+
+app.listen(PORT, () => logger.info(`NutriTrace running on port ${PORT}`));

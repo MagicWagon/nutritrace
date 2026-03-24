@@ -26,9 +26,12 @@ const upload = multer({
 
 const router = Router();
 
-router.post('/', upload.single('file'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-  res.json({ url: `/uploads/${req.file.filename}` });
+router.post('/', (req, res, next) => {
+  upload.single('file')(req, res, (err) => {
+    if (err) return next(err);
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    res.json({ url: `/uploads/${req.file.filename}` });
+  });
 });
 
 export default router;

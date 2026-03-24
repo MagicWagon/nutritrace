@@ -1,15 +1,16 @@
 import { Router } from 'express';
 import db from '../db.js';
+import { wrap } from '../logger.js';
 
 const router = Router();
 
 // Clear all app data from SQLite
-router.delete('/', (req, res) => {
+router.delete('/', wrap((req, res) => {
   db.prepare('DELETE FROM foods').run();
   db.prepare('DELETE FROM meals').run();
   db.prepare('DELETE FROM diary').run();
   res.json({ ok: true });
-});
+}));
 
 // Bulk import — accepts NutriTrace backup format (foodList/meals/recipes/diary)
 // Also handles camelCase fields (imgUrl, categories) from frontend objects
@@ -66,7 +67,7 @@ router.post('/import', (req, res) => {
     run();
     res.json({ ok: true });
   } catch(e) {
-    console.error('[data/import]', e.message);
+    logger.error('[data/import]', e.message);
     res.status(500).json({ error: e.message });
   }
 });
