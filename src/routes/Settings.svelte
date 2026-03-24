@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte';
+  import { get } from 'svelte/store';
   import { slide } from 'svelte/transition';
   import Toggle from '../components/settings/Toggle.svelte';
   import Sheet  from '../components/ui/Sheet.svelte';
@@ -299,15 +300,14 @@
 
   function addCategory() {
     if (!newCategoryName.trim()) return;
-    const cats = DB.getSetting('foodCategories', []);
+    const cats = get(foodCategories) || [];
     if (!cats.includes(newCategoryName.trim())) {
       foodCategories.set([...cats, newCategoryName.trim()]);
     }
     newCategoryName = '';
   }
   function removeCategory(cat) {
-    const cats = DB.getSetting('foodCategories', []);
-    foodCategories.set(cats.filter(c => c !== cat));
+    foodCategories.set((get(foodCategories) || []).filter(c => c !== cat));
   }
 
   // ── Custom nutrients ───────────────────────────────────────────────────────
@@ -492,6 +492,14 @@
         if (data.settings && typeof data.settings === 'object') {
           for (const [key, value] of Object.entries(data.settings)) DB.setSetting(key, value);
         }
+
+        // Merge imported categories into the category list
+        const importedCats = [...new Set((foodList || []).map(f => (f.categories && f.categories[0]) || f.category).filter(Boolean))];
+        if (importedCats.length) {
+          const existing = get(foodCategories) || [];
+          foodCategories.set([...new Set([...existing, ...importedCats])]);
+        }
+
         showSuccess('Backup restored — reloading...');
         setTimeout(() => location.reload(), 1500);
       } catch(err) { showError('Import failed: ' + err.message); }
@@ -557,6 +565,14 @@
         }
 
         await NtApi.post('/api/data/import', { foodList: foods, meals, recipes, diary: Object.values(byDate) });
+
+        // Merge imported categories into the category list
+        const importedCats = [...new Set(foods.map(f => (f.categories && f.categories[0]) || f.category).filter(Boolean))];
+        if (importedCats.length) {
+          const existing = get(foodCategories) || [];
+          foodCategories.set([...new Set([...existing, ...importedCats])]);
+        }
+
         showSuccess('Waistline data imported — reloading...');
         setTimeout(() => location.reload(), 1500);
       } catch(err) { showError('Import failed: ' + err.message); }
