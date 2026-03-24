@@ -142,8 +142,8 @@
   let showAllNutrients = false;
   let contributing = false;
   let offSuccess = false;
-  let linked = true;          // scale nutrients when portion changes
-  let _portionRef = 100;      // last committed portion (for ratio calc)
+  let linked = true;          // scale all fields proportionally on change
+  let _focusVal = null;       // value when a field was focused (for ratio)
   let downloading = false;
   let downloadSuccess = false;
   $: isNewFood = !(params && params.id);
@@ -173,17 +173,36 @@
     } finally { contributing = false; }
   }
 
-  function onPortionChange() {
-    const newP = parseFloat(food.portion);
-    if (linked && _portionRef > 0 && newP > 0 && newP !== _portionRef) {
-      const ratio = newP / _portionRef;
-      for (const n of NUTRIMENTS) {
-        const v = parseFloat(food[n.id]);
-        if (!isNaN(v) && v > 0) food[n.id] = Math.round(v * ratio * 10000) / 10000;
-      }
-      food = { ...food }; // trigger reactivity
+  function onFieldFocus(e) {
+    _focusVal = parseFloat(e.target.value) || 0;
+  }
+
+  function applyProportional(changedId, newVal) {
+    if (!linked || !_focusVal || _focusVal <= 0 || newVal === _focusVal) { _focusVal = null; return; }
+    const ratio = newVal / _focusVal;
+    const allNuts = [...NUTRIMENTS, ...(DB.getSetting('customNutriments', []) || [])];
+    for (const n of allNuts) {
+      if (n.id === changedId) continue;
+      const v = parseFloat(food[n.id]);
+      if (!isNaN(v) && v > 0) food[n.id] = Math.round(v * ratio * 10000) / 10000;
     }
-    _portionRef = newP > 0 ? newP : _portionRef;
+    if (changedId === '__portion__') {
+      // portion changed — nutrients already scaled above
+    } else {
+      // nutrient changed — also scale portion
+      const p = parseFloat(food.portion);
+      if (!isNaN(p) && p > 0) food.portion = Math.round(p * ratio * 100) / 100;
+    }
+    food = { ...food };
+    _focusVal = null;
+  }
+
+  function onPortionBlur() {
+    applyProportional('__portion__', parseFloat(food.portion) || 0);
+  }
+
+  function onNutBlur(id) {
+    applyProportional(id, parseFloat(food[id]) || 0);
   }
 
   async function downloadFromOFF() {
@@ -204,7 +223,6 @@
       }
       if (!food.imgUrl && result.imgUrl) food.imgUrl = result.imgUrl;
       food = { ...food };
-      _portionRef = parseFloat(food.portion) || 100;
       downloadSuccess = true;
       setTimeout(() => downloadSuccess = false, 2500);
       showSuccess('Data refreshed from Open Food Facts');
@@ -229,7 +247,6 @@
         food = { ...food, ...existing, ...flatNutrition };
       }
     }
-    _portionRef = parseFloat(food.portion) || 100;
   });
 
   async function save() {
@@ -415,7 +432,8 @@
       <div class="form-row" style="align-items:flex-end">
         <div class="form-group" style="flex:1">
           <label class="form-label">Default portion</label>
-          <input class="input" type="number" min="0" bind:value={food.portion} on:change={onPortionChange} />
+          <input class="input" type="number" min="0" bind:value={food.portion}
+            on:focus={onFieldFocus} on:blur={onPortionBlur} />
         </div>
         <div class="form-group" style="width:100px">
           <label class="form-label">Unit</label>
@@ -425,7 +443,7 @@
             </select>
           </div>
         </div>
-        <button class="btn-icon link-btn" class:linked title={linked ? 'Nutrients scale with portion' : 'Nutrients fixed'}
+        <button class="btn-icon link-btn" class:linked title={linked ? 'All fields scale proportionally' : 'Fields are independent'}
           on:click={() => linked = !linked}>
           <span class="material-symbols-rounded" style="font-size:20px">{linked ? 'link' : 'link_off'}</span>
         </button>
@@ -467,7 +485,9 @@
         <div class="form-group">
           <label class="form-label">{n.label} ({n.unit})</label>
           <input class="input" type="number" min="0" step="0.1" placeholder="0"
-            bind:value={food[n.id]} />
+            bind:value={food[n.id]}
+            on:focus={onFieldFocus}
+            on:blur={() => onNutBlur(n.id)} />
         </div>
       {/each}
       <button class="btn btn-ghost w-full" style="margin-top:8px"
