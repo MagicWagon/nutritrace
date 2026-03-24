@@ -595,7 +595,7 @@
 
   /* Photo */
   .photo-preview-wrap {
-    width: 100%; aspect-ratio: 1 / 1;
+    width: min(360px, 100%); aspect-ratio: 1 / 1; margin: 0 auto;
     border-radius: var(--radius-lg); overflow: hidden;
     border: 2px dashed var(--border);
     background: var(--surface-2);

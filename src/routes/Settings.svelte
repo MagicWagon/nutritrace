@@ -55,13 +55,13 @@
     about:       ['about','version','nutritrace'],
   };
 
-  function sectionVisible(key) {
-    if (!settingsQuery) return true;
-    return (SECTION_KEYWORDS[key] || []).some(kw => kw.includes(settingsQuery));
+  function sectionVisible(query, key) {
+    if (!query) return true;
+    return (SECTION_KEYWORDS[key] || []).some(kw => kw.includes(query));
   }
 
-  function sectionOpen(key) {
-    return openSections[key] || (!!settingsQuery && sectionVisible(key));
+  function sectionOpen(sections, query, key) {
+    return sections[key] || (!!query && sectionVisible(query, key));
   }
 
   // ── Appearance ─────────────────────────────────────────────────────────────
@@ -543,12 +543,12 @@
 
     <p class="settings-group-label">Display</p>
     <!-- ── Appearance ──────────────────────────────────────────────────────── -->
-    <button class="section-toggle" class:hidden={!sectionVisible('appearance')} on:click={() => toggleSection('appearance')}>
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'appearance')} on:click={() => toggleSection('appearance')}>
       <span class="material-symbols-rounded si">contrast</span>
       <span>Appearance</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.appearance}>expand_more</span>
     </button>
-    {#if sectionOpen('appearance') && sectionVisible('appearance')}
+    {#if sectionOpen(openSections, settingsQuery, 'appearance') && sectionVisible(settingsQuery, 'appearance')}
       <div class="section-body" transition:slide={{ duration: 180 }}>
         <div class="card settings-card">
           <div class="setting-row">
@@ -652,12 +652,12 @@
     {/if}
 
     <!-- ── Diary ───────────────────────────────────────────────────────────── -->
-    <button class="section-toggle" class:hidden={!sectionVisible('diary')} on:click={() => toggleSection('diary')}>
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'diary')} on:click={() => toggleSection('diary')}>
       <span class="material-symbols-rounded si">book</span>
       <span>Diary</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.diary}>expand_more</span>
     </button>
-    {#if sectionOpen('diary') && sectionVisible('diary')}
+    {#if sectionOpen(openSections, settingsQuery, 'diary') && sectionVisible(settingsQuery, 'diary')}
       <div class="section-body" transition:slide={{ duration: 180 }}>
         <div class="card settings-card">
           <div class="setting-row"><span class="setting-label">Show brands</span><Toggle checked={$diaryShowBrands} on:change={e => diaryShowBrands.set(e.detail)} /></div>
@@ -705,12 +705,12 @@
     {/if}
 
     <!-- ── Foods ───────────────────────────────────────────────────────────── -->
-    <button class="section-toggle" class:hidden={!sectionVisible('foods')} on:click={() => toggleSection('foods')}>
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'foods')} on:click={() => toggleSection('foods')}>
       <span class="material-symbols-rounded si">restaurant</span>
       <span>Foods</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.foods}>expand_more</span>
     </button>
-    {#if sectionOpen('foods') && sectionVisible('foods')}
+    {#if sectionOpen(openSections, settingsQuery, 'foods') && sectionVisible(settingsQuery, 'foods')}
       <div class="section-body" transition:slide={{ duration: 180 }}>
         <div class="card settings-card">
           <div class="setting-row"><span class="setting-label">Show thumbnails</span><Toggle checked={$foodsShowThumbnails} on:change={e => foodsShowThumbnails.set(e.detail)} /></div>
@@ -735,12 +735,12 @@
     {/if}
 
     <!-- ── Water ───────────────────────────────────────────────────────────── -->
-    <button class="section-toggle" class:hidden={!sectionVisible('water')} on:click={() => toggleSection('water')}>
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'water')} on:click={() => toggleSection('water')}>
       <span class="material-symbols-rounded si">water_drop</span>
       <span>Water</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.water}>expand_more</span>
     </button>
-    {#if sectionOpen('water') && sectionVisible('water')}
+    {#if sectionOpen(openSections, settingsQuery, 'water') && sectionVisible(settingsQuery, 'water')}
       <div class="section-body" transition:slide={{ duration: 180 }}>
         <!-- Goal + unit -->
         <div class="card settings-card">
@@ -827,12 +827,12 @@
 
     <p class="settings-group-label">Data &amp; Tracking</p>
     <!-- ── Categories ─────────────────────────────────────────────────────── -->
-    <button class="section-toggle" class:hidden={!sectionVisible('categories')} on:click={() => toggleSection('categories')}>
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'categories')} on:click={() => toggleSection('categories')}>
       <span class="material-symbols-rounded si">tag</span>
       <span>Categories</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.categories}>expand_more</span>
     </button>
-    {#if sectionOpen('categories') && sectionVisible('categories')}
+    {#if sectionOpen(openSections, settingsQuery, 'categories') && sectionVisible(settingsQuery, 'categories')}
       <div class="section-body" transition:slide={{ duration: 180 }}>
         <div class="card settings-card">
           <div class="cat-chips-wrap">
@@ -859,12 +859,12 @@
     {/if}
 
     <!-- ── Nutrients ───────────────────────────────────────────────────────── -->
-    <button class="section-toggle" class:hidden={!sectionVisible('nutrients')} on:click={() => toggleSection('nutrients')}>
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'nutrients')} on:click={() => toggleSection('nutrients')}>
       <span class="material-symbols-rounded si">science</span>
       <span>Nutrients</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.nutrients}>expand_more</span>
     </button>
-    {#if sectionOpen('nutrients') && sectionVisible('nutrients')}
+    {#if sectionOpen(openSections, settingsQuery, 'nutrients') && sectionVisible(settingsQuery, 'nutrients')}
       <div class="section-body" transition:slide={{ duration: 180 }}>
         <p class="sub-label">Visible nutrients (shown in diary & food editor)</p>
         <div class="card settings-card">
@@ -915,12 +915,12 @@
     {/if}
 
     <!-- ── Body Stats ──────────────────────────────────────────────────────── -->
-    <button class="section-toggle" class:hidden={!sectionVisible('bodyStats')} on:click={() => toggleSection('bodyStats')}>
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'bodyStats')} on:click={() => toggleSection('bodyStats')}>
       <span class="material-symbols-rounded si">monitor_weight</span>
       <span>Body Stats</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.bodyStats}>expand_more</span>
     </button>
-    {#if sectionOpen('bodyStats') && sectionVisible('bodyStats')}
+    {#if sectionOpen(openSections, settingsQuery, 'bodyStats') && sectionVisible(settingsQuery, 'bodyStats')}
       <div class="section-body" transition:slide={{ duration: 180 }}>
         <div class="card settings-card">
           {#each orderedBodyStats as stat, i}
@@ -945,12 +945,12 @@
     {/if}
 
     <!-- ── Statistics ──────────────────────────────────────────────────────── -->
-    <button class="section-toggle" class:hidden={!sectionVisible('statistics')} on:click={() => toggleSection('statistics')}>
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'statistics')} on:click={() => toggleSection('statistics')}>
       <span class="material-symbols-rounded si">bar_chart</span>
       <span>Statistics</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.statistics}>expand_more</span>
     </button>
-    {#if sectionOpen('statistics') && sectionVisible('statistics')}
+    {#if sectionOpen(openSections, settingsQuery, 'statistics') && sectionVisible(settingsQuery, 'statistics')}
       <div class="section-body" transition:slide={{ duration: 180 }}>
         <div class="card settings-card">
           <div class="setting-row">
@@ -975,12 +975,12 @@
     {/if}
 
     <!-- ── Units ───────────────────────────────────────────────────────────── -->
-    <button class="section-toggle" class:hidden={!sectionVisible('units')} on:click={() => toggleSection('units')}>
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'units')} on:click={() => toggleSection('units')}>
       <span class="material-symbols-rounded si">straighten</span>
       <span>Units</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.units}>expand_more</span>
     </button>
-    {#if sectionOpen('units') && sectionVisible('units')}
+    {#if sectionOpen(openSections, settingsQuery, 'units') && sectionVisible(settingsQuery, 'units')}
       <div class="section-body" transition:slide={{ duration: 180 }}>
         <div class="card settings-card">
           <div class="setting-row">
@@ -1028,12 +1028,12 @@
 
     <p class="settings-group-label">Integrations</p>
     <!-- ── Integration ────────────────────────────────────────────────────── -->
-    <button class="section-toggle" class:hidden={!sectionVisible('integration')} on:click={() => toggleSection('integration')}>
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'integration')} on:click={() => toggleSection('integration')}>
       <span class="material-symbols-rounded si">integration_instructions</span>
       <span>Integration</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.integration}>expand_more</span>
     </button>
-    {#if sectionOpen('integration') && sectionVisible('integration')}
+    {#if sectionOpen(openSections, settingsQuery, 'integration') && sectionVisible(settingsQuery, 'integration')}
       <div class="section-body" transition:slide={{ duration: 180 }}>
         <div class="card settings-card">
           <div class="setting-row"><span class="setting-label">Barcode scan beep</span><Toggle checked={$barcodeBeep} on:change={e => barcodeBeep.set(e.detail)} /></div>
@@ -1138,12 +1138,12 @@
     {/if}
 
     <!-- ── FitBot AI ─────────────────────────────────────────────────────────── -->
-    <button class="section-toggle" class:hidden={!sectionVisible('ai')} on:click={() => toggleSection('ai')}>
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'ai')} on:click={() => toggleSection('ai')}>
       <span class="material-symbols-rounded si">smart_toy</span>
       <span>FitBot AI</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.ai}>expand_more</span>
     </button>
-    {#if sectionOpen('ai') && sectionVisible('ai')}
+    {#if sectionOpen(openSections, settingsQuery, 'ai') && sectionVisible(settingsQuery, 'ai')}
       <div class="section-body" transition:slide={{ duration: 180 }}>
         <div class="card settings-card">
           <div class="setting-row">
@@ -1221,12 +1221,12 @@
     {/if}
 
     <!-- ── API Keys ─────────────────────────────────────────────────────────── -->
-    <button class="section-toggle" class:hidden={!sectionVisible('api')} on:click={() => toggleSection('api')}>
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'api')} on:click={() => toggleSection('api')}>
       <span class="material-symbols-rounded si">key</span>
       <span>API Keys</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.api}>expand_more</span>
     </button>
-    {#if sectionOpen('api') && sectionVisible('api')}
+    {#if sectionOpen(openSections, settingsQuery, 'api') && sectionVisible(settingsQuery, 'api')}
       <div class="section-body" transition:slide={{ duration: 180 }}>
         <div class="card settings-card" style="gap:12px;padding:16px">
           <div class="form-group">
@@ -1247,12 +1247,12 @@
 
     <p class="settings-group-label">App</p>
     <!-- ── Backup & Restore ────────────────────────────────────────────────── -->
-    <button class="section-toggle" class:hidden={!sectionVisible('backup')} on:click={() => toggleSection('backup')}>
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'backup')} on:click={() => toggleSection('backup')}>
       <span class="material-symbols-rounded si">backup</span>
       <span>Backup & Restore</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.backup}>expand_more</span>
     </button>
-    {#if sectionOpen('backup') && sectionVisible('backup')}
+    {#if sectionOpen(openSections, settingsQuery, 'backup') && sectionVisible(settingsQuery, 'backup')}
       <div class="section-body" transition:slide={{ duration: 180 }}>
         <div class="card settings-card">
           <button class="setting-row setting-action" on:click={exportBackup}>
@@ -1292,12 +1292,12 @@
     {/if}
 
     <!-- About -->
-    <button class="section-toggle" class:hidden={!sectionVisible('about')} on:click={() => toggleSection('about')}>
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'about')} on:click={() => toggleSection('about')}>
       <span class="material-symbols-rounded si">info</span>
       <span>About</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.about}>expand_more</span>
     </button>
-    {#if sectionOpen('about') && sectionVisible('about')}
+    {#if sectionOpen(openSections, settingsQuery, 'about') && sectionVisible(settingsQuery, 'about')}
       <div class="section-body" transition:slide={{ duration: 180 }}>
         <div class="card settings-card">
           <div class="about-hero">

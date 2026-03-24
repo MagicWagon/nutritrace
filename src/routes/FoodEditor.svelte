@@ -520,8 +520,9 @@
   .photo-card { gap: 10px; }
   .photo-preview-wrap {
     position: relative;
-    width: 100%;
+    width: min(360px, 100%);
     aspect-ratio: 1 / 1;
+    margin: 0 auto;
     background: var(--surface-2);
     border-radius: var(--radius-lg);
     overflow: hidden;
