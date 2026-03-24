@@ -295,12 +295,24 @@ export const NtApi = {
   async updateFood(id, data) { const r = await this.put(`/api/foods/${id}`, this._foodToApi(data)); return this._foodFromApi(r); },
   deleteFood(id)             { return this.del(`/api/foods/${id}`); },
 
+  // Meal field mapping: server uses img_url, app uses imgUrl
+  _mealFromApi(row) {
+    if (!row) return null;
+    const { img_url, ...rest } = row;
+    return { ...rest, imgUrl: img_url || '' };
+  },
+  _mealToApi(meal) {
+    const { imgUrl, img_url, ...rest } = meal;
+    return { ...rest, img_url: imgUrl || img_url || null };
+  },
+
   // Meals & Recipes
-  getMeals()           { return this.get('/api/meals'); },
-  getRecipes()         { return this.get('/api/meals?recipes=1'); },
-  createMeal(data)     { return this.post('/api/meals', data); },
-  updateMeal(id, data) { return this.put(`/api/meals/${id}`, data); },
-  deleteMeal(id)       { return this.del(`/api/meals/${id}`); },
+  async getMeals()           { const r = await this.get('/api/meals'); return r.map(m => this._mealFromApi(m)); },
+  async getMeal(id)          { const r = await this.get(`/api/meals/${id}`); return this._mealFromApi(r); },
+  async getRecipes()         { const r = await this.get('/api/meals?recipes=1'); return r.map(m => this._mealFromApi(m)); },
+  async createMeal(data)     { const r = await this.post('/api/meals', this._mealToApi(data)); return this._mealFromApi(r); },
+  async updateMeal(id, data) { const r = await this.put(`/api/meals/${id}`, this._mealToApi(data)); return this._mealFromApi(r); },
+  deleteMeal(id)             { return this.del(`/api/meals/${id}`); },
 
   // Diary
   getDiaryDate(date)        { return this.get(`/api/diary/${date}`); },
