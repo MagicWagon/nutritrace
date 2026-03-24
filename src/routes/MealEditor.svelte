@@ -542,7 +542,7 @@
     background: var(--surface-2);
     display: flex; align-items: center; justify-content: center;
   }
-  .photo-preview-img { width: 100%; height: 100%; object-fit: contain; display: block; background: var(--surface-2); }
+  .photo-preview-img { width: 100%; height: 100%; object-fit: cover; display: block; background: var(--surface-2); }
   .photo-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
   .photo-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
   .photo-btn { display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; font-size: 13px; }

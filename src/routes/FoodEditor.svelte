@@ -519,7 +519,7 @@
   .photo-preview-img {
     width: 100%;
     height: 100%;
-    object-fit: contain;
+    object-fit: cover;
     background: var(--surface-2);
   }
   .photo-placeholder { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
