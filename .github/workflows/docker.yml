@@ -22,7 +22,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_TOKEN }}
 
-      - name: Build and push
+      - name: Build and push frontend
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -30,3 +30,12 @@ jobs:
           tags: |
             ghcr.io/thebigjoe1/nutritrace:latest
             ghcr.io/thebigjoe1/nutritrace:${{ github.sha }}
+
+      - name: Build and push API
+        uses: docker/build-push-action@v5
+        with:
+          context: ./server
+          push: true
+          tags: |
+            ghcr.io/thebigjoe1/nutritrace-api:latest
+            ghcr.io/thebigjoe1/nutritrace-api:${{ github.sha }}

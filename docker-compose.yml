@@ -7,12 +7,20 @@ services:
     restart: unless-stopped
 
   nutritrace-api:
-    build: ./server
+    image: ghcr.io/thebigjoe1/nutritrace-api:latest
     container_name: nutritrace-api
     ports:
       - "3001:3001"
     volumes:
-      - ./data/db:/data/db
-      - ./data/uploads:/data/uploads
-    env_file: ./server/.env
+      - ${DATA_DB_PATH}:/data/db
+      - ${DATA_UPLOADS_PATH}:/data/uploads
+    environment:
+      # Do not change — these are container-internal paths tied to the volume mounts above
+      - DB_PATH=/data/db/nutritrace.db
+      - UPLOADS_PATH=/data/uploads
+      # Change these in your .env
+      - JWT_SECRET=${JWT_SECRET}
+      - CORS_ORIGIN=${CORS_ORIGIN}
+      - ADMIN_EMAIL=${ADMIN_EMAIL}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
     restart: unless-stopped
