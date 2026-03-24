@@ -90,7 +90,8 @@
     // Load auth state first (sets $currentUser and $userMgmtActive)
     await loadAuthState();
 
-    if (!DB.getSetting('setupComplete', false)) {
+    // Skip wizard if user is logged in — their account is already set up
+    if (!DB.getSetting('setupComplete', false) && !$currentUser) {
       window.location.hash = '#/wizard';
     }
 

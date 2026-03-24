@@ -704,8 +704,13 @@
   async function clearAllData() {
     try {
       await NtApi.del('/api/data');
+      // Clear all settings except app-level flags that survive a data wipe
+      const preserve = new Set(['wl_setupComplete', 'wl:userId']);
       const keys = [];
-      for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k?.startsWith('wl_')) keys.push(k); }
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k?.startsWith('wl_') && !preserve.has(k)) keys.push(k);
+      }
       keys.forEach(k => localStorage.removeItem(k));
       showSuccess('All data cleared');
       setTimeout(() => location.reload(), 1000);
@@ -1648,7 +1653,7 @@
             <img src="/icons/logo.png" alt="NutriTrace" class="about-icon" />
             <div>
               <div class="about-name">NutriTrace</div>
-              <div class="about-version text-3 text-sm">Version 0.9.0 Alpha</div>
+              <div class="about-version text-3 text-sm">v0.9.0-alpha</div>
             </div>
           </div>
           <div class="setting-divider"></div>
