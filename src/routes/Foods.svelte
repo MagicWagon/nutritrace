@@ -72,6 +72,14 @@
   let activeCategoryFilter = ''; // '' = all
   let yesterdayMeals = []; // { mealIdx, mealName, items, totalKcal } — only in pick mode
 
+  // Convert item portions to grams for total serving display
+  const _toG = { g:1, ml:1, oz:28.35, lb:453.59, cup:240, tbsp:15, tsp:5 };
+  function mealServing(items) {
+    if (!items?.length) return '0g';
+    const total = items.reduce((s, i) => s + (parseFloat(i.portion)||0) * (_toG[i.unit] ?? 1), 0);
+    return `${Math.round(total)}g`;
+  }
+
   $: currentStore = TABS[activeTab].value;
   $: displayList = activeTab === 0 ? localFoods : activeTab === 1 ? localMeals : localRecipes;
   $: filteredBySearch = search
@@ -411,18 +419,14 @@
                 {/if}
                 <div class="food-info">
                   <span class="food-name">{food.name}</span>
-                  {#if food.brand}
-                    <span class="food-brand text-3 text-sm">{food.brand}</span>
+                  {#if activeTab === 0}
+                    {#if food.brand}<span class="food-brand text-3 text-sm">{food.brand}</span>{/if}
+                    <span class="food-kcal text-sm">{food.portion || 100}{food.unit || 'g'}</span>
+                  {:else}
+                    {@const _kcal = Math.round(Nutrition.sum((food.items||[]).map(i => Nutrition.calculate(i))).calories || food.nutrition?.calories || 0)}
+                    <span class="food-brand text-3 text-sm">{mealServing(food.items)}</span>
+                    <span class="food-kcal text-sm">{_kcal} kcal</span>
                   {/if}
-                  {#if $foodsShowNotes && food.notes}
-                    <span class="food-notes text-3 text-sm">{food.notes}</span>
-                  {/if}
-                  <span class="food-kcal text-sm">
-                    {activeTab === 0
-                      ? Math.round((food.nutrition?.calories || food.calories || 0) * (food.portion || 100) / 100)
-                      : Math.round(Nutrition.sum((food.items||[]).map(i => Nutrition.calculate(i))).calories || food.nutrition?.calories || 0)
-                    } kcal
-                  </span>
                 </div>
                 <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
               </button>
