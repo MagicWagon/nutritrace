@@ -412,34 +412,6 @@
     };
     input.click();
   }
-  function _compressImage(dataUrl, maxPx = 256, quality = 0.75) {
-    return new Promise(resolve => {
-      if (!dataUrl || !dataUrl.startsWith('data:image')) { resolve(null); return; }
-      const img = new Image();
-      img.onload = () => {
-        const scale = Math.min(1, maxPx / Math.max(img.width, img.height, 1));
-        const canvas = document.createElement('canvas');
-        canvas.width  = Math.round(img.width  * scale);
-        canvas.height = Math.round(img.height * scale);
-        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL('image/jpeg', quality));
-      };
-      img.onerror = () => resolve(null);
-      img.src = dataUrl;
-    });
-  }
-  async function _compressWaistlineImages(data) {
-    for (const food of (data.foodList || [])) {
-      if (food.image_url && food.image_url.startsWith('data:image')) {
-        food.image_url = await _compressImage(food.image_url);
-      }
-    }
-    for (const item of [...(data.meals || []), ...(data.recipes || [])]) {
-      if (item.image_url && item.image_url.startsWith('data:image')) {
-        item.image_url = await _compressImage(item.image_url);
-      }
-    }
-  }
   async function importWaistline() {
     const input = document.createElement('input');
     input.type = 'file'; input.accept = '.json';
@@ -452,7 +424,6 @@
           showError('Not a valid Waistline export file');
           return;
         }
-        await _compressWaistlineImages(data);
         await DB.importWaistline(data);
         showSuccess('Waistline data imported — reloading...');
         setTimeout(() => location.reload(), 1500);
