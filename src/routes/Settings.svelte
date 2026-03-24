@@ -1304,7 +1304,7 @@
             <img src="/icons/logo.png" alt="NutriTrace" class="about-icon" />
             <div>
               <div class="about-name">NutriTrace</div>
-              <div class="about-version text-3 text-sm">Version 0.8.0 Alpha</div>
+              <div class="about-version text-3 text-sm">Version 0.9.0 Alpha</div>
             </div>
           </div>
           <div class="setting-divider"></div>
@@ -1339,13 +1339,8 @@
           </div>
           <div class="setting-divider"></div>
           <div class="about-row">
-            <span class="material-symbols-rounded about-feat-icon">fork_right</span>
-            <span>Based on the original <a href="https://github.com/davidhealey/waistline" target="_blank" rel="noopener" class="about-link">Waistline Android app</a> by David Healey</span>
-          </div>
-          <div class="setting-divider"></div>
-          <div class="about-row">
             <span class="material-symbols-rounded about-feat-icon">favorite</span>
-            <span>With inspiration from <a href="https://github.com/CodeWithCJ/SparkyFitness" target="_blank" rel="noopener" class="about-link">SparkyFitness</a> by CodeWithCJ</span>
+            <span>Inspired by <a href="https://github.com/davidhealey/waistline" target="_blank" rel="noopener" class="about-link">Waistline</a> by David Healey and <a href="https://github.com/CodeWithCJ/SparkyFitness" target="_blank" rel="noopener" class="about-link">SparkyFitness</a> by CodeWithCJ</span>
           </div>
         </div>
       </div>

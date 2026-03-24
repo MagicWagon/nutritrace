@@ -424,7 +424,9 @@
 
   onMount(async () => {
     const today = new Date().toISOString().slice(0, 10);
-    await loadEntry(today);
+    let storedDate;
+    currentDate.subscribe(v => storedDate = v)();
+    await loadEntry(storedDate || today);
     window.addEventListener('wl:setting', _reloadWaterSettings);
     // Trigger bar fill-in animation after first paint
     requestAnimationFrame(() => requestAnimationFrame(() => { _barsMounted = true; }));
