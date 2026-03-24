@@ -7,8 +7,11 @@ const NUTRIMENTS = [
   { id: 'calories',      label: 'Calories',      unit: 'kcal', category: 'energy',  default: true },
   { id: 'kilojoules',    label: 'Kilojoules',    unit: 'kJ',   category: 'energy',  default: false },
   // Total Fat
-  { id: 'fat',           label: 'Fat',           unit: 'g',    category: 'macro',   default: true },
-  { id: 'saturated-fat', label: 'Saturated Fat', unit: 'g',    category: 'macro',   default: true },
+  { id: 'fat',                 label: 'Fat',                 unit: 'g',    category: 'macro',   default: true },
+  { id: 'saturated-fat',       label: 'Saturated Fat',       unit: 'g',    category: 'macro',   default: true },
+  { id: 'trans-fat',           label: 'Trans Fat',           unit: 'g',    category: 'macro',   default: true },
+  { id: 'polyunsaturated-fat', label: 'Polyunsaturated Fat', unit: 'g',    category: 'macro',   default: true },
+  { id: 'monounsaturated-fat', label: 'Monounsaturated Fat', unit: 'g',    category: 'macro',   default: true },
   // Cholesterol & Sodium
   { id: 'cholesterol',   label: 'Cholesterol',   unit: 'mg',   category: 'other',   default: false },
   { id: 'sodium',        label: 'Sodium',        unit: 'mg',   category: 'mineral', default: false },

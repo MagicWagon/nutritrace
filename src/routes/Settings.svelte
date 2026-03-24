@@ -339,16 +339,30 @@
     return [...sorted, ...rest];
   })();
 
-  function moveNutrient(id, dir) {
-    const order = ($nutrimentsOrder && $nutrimentsOrder.length)
-      ? [...$nutrimentsOrder]
-      : NUTRIMENTS.map(n => n.id);
-    const idx = order.indexOf(id);
-    if (idx < 0) return;
-    const target = idx + dir;
-    if (target < 0 || target >= order.length) return;
-    [order[idx], order[target]] = [order[target], order[idx]];
-    nutrimentsOrder.set(order);
+  // Drag-to-reorder for nutrients
+  let nutDragFrom = null, nutDragOver = null;
+  function onNutDragDown(e, i) {
+    nutDragFrom = i; nutDragOver = i;
+    e.currentTarget.closest('.drag-list').setPointerCapture(e.pointerId);
+  }
+  function onNutDragMove(e) {
+    if (nutDragFrom === null) return;
+    const rows = [...e.currentTarget.querySelectorAll('.drag-row')];
+    const y = e.clientY;
+    for (let idx = 0; idx < rows.length; idx++) {
+      const r = rows[idx].getBoundingClientRect();
+      if (y >= r.top && y <= r.bottom) { nutDragOver = idx; break; }
+    }
+  }
+  function onNutDragUp() {
+    if (nutDragFrom !== null && nutDragOver !== null && nutDragFrom !== nutDragOver) {
+      const order = ($nutrimentsOrder && $nutrimentsOrder.length)
+        ? [...$nutrimentsOrder] : orderedNutriments.map(n => n.id);
+      const [removed] = order.splice(nutDragFrom, 1);
+      order.splice(nutDragOver, 0, removed);
+      nutrimentsOrder.set(order);
+    }
+    nutDragFrom = null; nutDragOver = null;
   }
 
   // ── Nutrient visibility ────────────────────────────────────────────────────
@@ -377,16 +391,30 @@
     return [...sorted, ...rest];
   })();
 
-  function moveBodyStat(id, dir) {
-    const order = ($bodyStatsOrder && $bodyStatsOrder.length)
-      ? [...$bodyStatsOrder]
-      : BODY_STATS.map(s => s.id);
-    const idx = order.indexOf(id);
-    if (idx < 0) return;
-    const target = idx + dir;
-    if (target < 0 || target >= order.length) return;
-    [order[idx], order[target]] = [order[target], order[idx]];
-    bodyStatsOrder.set(order);
+  // Drag-to-reorder for body stats
+  let statDragFrom = null, statDragOver = null;
+  function onStatDragDown(e, i) {
+    statDragFrom = i; statDragOver = i;
+    e.currentTarget.closest('.drag-list').setPointerCapture(e.pointerId);
+  }
+  function onStatDragMove(e) {
+    if (statDragFrom === null) return;
+    const rows = [...e.currentTarget.querySelectorAll('.drag-row')];
+    const y = e.clientY;
+    for (let idx = 0; idx < rows.length; idx++) {
+      const r = rows[idx].getBoundingClientRect();
+      if (y >= r.top && y <= r.bottom) { statDragOver = idx; break; }
+    }
+  }
+  function onStatDragUp() {
+    if (statDragFrom !== null && statDragOver !== null && statDragFrom !== statDragOver) {
+      const order = ($bodyStatsOrder && $bodyStatsOrder.length)
+        ? [...$bodyStatsOrder] : orderedBodyStats.map(s => s.id);
+      const [removed] = order.splice(statDragFrom, 1);
+      order.splice(statDragOver, 0, removed);
+      bodyStatsOrder.set(order);
+    }
+    statDragFrom = null; statDragOver = null;
   }
 
   // ── Body stats visibility ──────────────────────────────────────────────────
@@ -946,22 +974,20 @@
     {#if sectionOpen(openSections, settingsQuery, 'nutrients') && sectionVisible(settingsQuery, 'nutrients')}
       <div class="section-body" transition:slide={{ duration: 180 }}>
         <p class="sub-label">Visible nutrients (shown in diary & food editor)</p>
-        <div class="card settings-card">
+        <!-- svelte-ignore a11y-no-static-element-interactions -->
+        <div class="card settings-card drag-list"
+          on:pointermove={onNutDragMove}
+          on:pointerup={onNutDragUp}
+          on:pointercancel={onNutDragUp}>
           {#each orderedNutriments as n, i}
             {#if i > 0}<div class="setting-divider"></div>{/if}
-            <div class="setting-row">
+            <div class="setting-row drag-row"
+              class:drag-over={nutDragOver === i && nutDragFrom !== null && nutDragFrom !== i}
+              class:dragging={nutDragFrom === i}>
+              <!-- svelte-ignore a11y-no-static-element-interactions -->
+              <span class="drag-handle material-symbols-rounded" on:pointerdown={e => onNutDragDown(e, i)}>drag_indicator</span>
               <span class="setting-label">{n.label} <span class="text-3 text-sm">({n.unit})</span></span>
-              <div style="display:flex;align-items:center;gap:4px">
-                <button class="btn-icon" style="width:28px;height:28px" disabled={i===0}
-                  on:click={() => moveNutrient(n.id, -1)} title="Move up">
-                  <span class="material-symbols-rounded" style="font-size:16px">arrow_upward</span>
-                </button>
-                <button class="btn-icon" style="width:28px;height:28px" disabled={i===orderedNutriments.length-1}
-                  on:click={() => moveNutrient(n.id, 1)} title="Move down">
-                  <span class="material-symbols-rounded" style="font-size:16px">arrow_downward</span>
-                </button>
-                <Toggle checked={isNutrientVisible(n.id)} on:change={() => toggleNutrientVisible(n.id)} />
-              </div>
+              <Toggle checked={isNutrientVisible(n.id)} on:change={() => toggleNutrientVisible(n.id)} />
             </div>
           {/each}
         </div>
@@ -1001,22 +1027,20 @@
     </button>
     {#if sectionOpen(openSections, settingsQuery, 'bodyStats') && sectionVisible(settingsQuery, 'bodyStats')}
       <div class="section-body" transition:slide={{ duration: 180 }}>
-        <div class="card settings-card">
+        <!-- svelte-ignore a11y-no-static-element-interactions -->
+        <div class="card settings-card drag-list"
+          on:pointermove={onStatDragMove}
+          on:pointerup={onStatDragUp}
+          on:pointercancel={onStatDragUp}>
           {#each orderedBodyStats as stat, i}
             {#if i > 0}<div class="setting-divider"></div>{/if}
-            <div class="setting-row">
+            <div class="setting-row drag-row"
+              class:drag-over={statDragOver === i && statDragFrom !== null && statDragFrom !== i}
+              class:dragging={statDragFrom === i}>
+              <!-- svelte-ignore a11y-no-static-element-interactions -->
+              <span class="drag-handle material-symbols-rounded" on:pointerdown={e => onStatDragDown(e, i)}>drag_indicator</span>
               <span class="setting-label">{stat.label}</span>
-              <div style="display:flex;align-items:center;gap:4px">
-                <button class="btn-icon" style="width:28px;height:28px" disabled={i===0}
-                  on:click={() => moveBodyStat(stat.id, -1)} title="Move up">
-                  <span class="material-symbols-rounded" style="font-size:16px">arrow_upward</span>
-                </button>
-                <button class="btn-icon" style="width:28px;height:28px" disabled={i===orderedBodyStats.length-1}
-                  on:click={() => moveBodyStat(stat.id, 1)} title="Move down">
-                  <span class="material-symbols-rounded" style="font-size:16px">arrow_downward</span>
-                </button>
-                <Toggle checked={isStatVisible(stat.id)} on:change={() => toggleStatVisible(stat.id)} />
-              </div>
+              <Toggle checked={isStatVisible(stat.id)} on:change={() => toggleStatVisible(stat.id)} />
             </div>
           {/each}
         </div>
@@ -1682,6 +1706,17 @@
     padding: 13px 16px;
     min-height: 50px;
   }
+  .drag-row.dragging  { opacity: 0.4; }
+  .drag-row.drag-over { background: var(--accent-dim); }
+  .drag-handle {
+    font-size: 20px;
+    color: var(--text-3);
+    cursor: grab;
+    flex-shrink: 0;
+    user-select: none;
+    touch-action: none;
+  }
+  .drag-handle:active { cursor: grabbing; }
   .setting-label { font-size: 14px; font-weight: 500; flex: 1; }
   .setting-desc  { font-size: 12px; color: var(--text-3); margin-top: 2px; font-weight: 400; }
   .setting-divider { height: 1px; background: var(--border); margin: 0 16px; }
