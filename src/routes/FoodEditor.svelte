@@ -130,7 +130,7 @@
   let food = {
     name:'', brand:'', barcode:'', imgUrl:'',
     portion: 100, unit: 'g', categories: [], notes: '',
-    calories: '', kilojoules: '', fat: '', 'saturated-fat': '', carbohydrates: '',
+    calories: '', kilojoules: '', fat: '', 'saturated-fat': '', 'trans-fat': '', 'polyunsaturated-fat': '', 'monounsaturated-fat': '', carbohydrates: '',
     sugars: '', 'added-sugars': '', proteins: '', salt: '', fiber: '',
     sodium: '', cholesterol: '', potassium: '', caffeine: '', alcohol: '',
     calcium: '', iron: '', magnesium: '', zinc: '', phosphorus: '',
@@ -180,7 +180,7 @@
   function applyProportional(changedId, newVal) {
     if (!linked || !_focusVal || _focusVal <= 0 || newVal === _focusVal) { _focusVal = null; return; }
     const ratio = newVal / _focusVal;
-    const allNuts = [...NUTRIMENTS, ...(DB.getSetting('customNutriments', []) || [])];
+    const allNuts = [...NUTRIMENTS, ...($customNutriments || [])];
     for (const n of allNuts) {
       if (n.id === changedId) continue;
       const v = parseFloat(food[n.id]);
@@ -431,7 +431,7 @@
       </div>
       <div class="form-row" style="align-items:flex-end">
         <div class="form-group" style="flex:1">
-          <label class="form-label">Default portion</label>
+          <label class="form-label">Serving Size</label>
           <input class="input" type="number" min="0" bind:value={food.portion}
             on:focus={onFieldFocus} on:blur={onPortionBlur} />
         </div>
