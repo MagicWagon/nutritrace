@@ -262,25 +262,20 @@ const USDA = {
 
 // ── NutriTrace Server API ──────────────────────────────────────────────────
 
-const KEY_URL   = 'nt:apiUrl';
 const KEY_TOKEN = 'nt:apiToken';
 
 export const NtApi = {
   // Config
-  getUrl()        { return localStorage.getItem(KEY_URL)   || ''; },
   getToken()      { return localStorage.getItem(KEY_TOKEN) || ''; },
-  setUrl(url)     { localStorage.setItem(KEY_URL,   url.replace(/\/$/, '')); },
   setToken(token) { localStorage.setItem(KEY_TOKEN, token); },
   clearToken()    { localStorage.removeItem(KEY_TOKEN); },
-  isConfigured()  { return !!this.getUrl() && !!this.getToken(); },
+  isConfigured()  { return !!this.getToken(); },
 
-  // Core fetch
+  // Core fetch — uses relative URLs (same origin as frontend)
   async _fetch(method, path, body, isUpload = false) {
-    const url = this.getUrl();
-    if (!url) throw new Error('API URL not configured');
     const headers = { Authorization: `Bearer ${this.getToken()}` };
     if (!isUpload) headers['Content-Type'] = 'application/json';
-    const res = await fetch(`${url}${path}`, {
+    const res = await fetch(path, {
       method,
       headers,
       body: isUpload ? body : body != null ? JSON.stringify(body) : undefined,
@@ -297,9 +292,7 @@ export const NtApi = {
 
   // Auth
   async login(email, password) {
-    const url = this.getUrl();
-    if (!url) throw new Error('API URL not configured');
-    const res = await fetch(`${url}/api/auth/login`, {
+    const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
@@ -335,7 +328,7 @@ export const NtApi = {
     const form = new FormData();
     form.append('file', file);
     const res = await this._fetch('POST', '/api/upload', form, true);
-    return `${this.getUrl()}${res.url}`;
+    return res.url; // relative URL, e.g. /uploads/filename.jpg
   },
 };
 

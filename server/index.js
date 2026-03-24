@@ -1,6 +1,5 @@
 import 'dotenv/config';
 import express from 'express';
-import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -17,25 +16,26 @@ const app  = express();
 const PORT = process.env.PORT || 3001;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
-
 app.use(express.json({ limit: '10mb' }));
 
-// Serve uploaded images as static files
+// Serve uploaded images
 const uploadsPath = process.env.UPLOADS_PATH || './uploads';
 app.use('/uploads', express.static(uploadsPath));
 
-// Routes
+// API routes
 app.use('/api/auth',   authRoutes);
 app.use('/api/foods',  foodsRoutes);
 app.use('/api/meals',  mealsRoutes);
 app.use('/api/diary',  diaryRoutes);
 app.use('/api/upload', uploadRoutes);
-
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
-app.listen(PORT, () => console.log(`NutriTrace API running on port ${PORT}`));
+// Serve Svelte frontend (production build)
+app.use(express.static(path.join(__dirname, 'dist')));
+
+// SPA fallback — all non-API routes return index.html
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+});
+
+app.listen(PORT, () => console.log(`NutriTrace running on port ${PORT}`));

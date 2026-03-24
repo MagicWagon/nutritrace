@@ -3,24 +3,16 @@ services:
     image: ghcr.io/thebigjoe1/nutritrace:latest
     container_name: nutritrace
     ports:
-      - "3000:80"
-    restart: unless-stopped
-
-  nutritrace_api:
-    image: ghcr.io/thebigjoe1/nutritrace-api:latest
-    container_name: nutritrace-api
-    ports:
-      - "3001:3001"
+      - "3000:3001"
     volumes:
       - ${DATA_DB_PATH}:/data/db
       - ${DATA_UPLOADS_PATH}:/data/uploads
     environment:
-      # Do not change — these are container-internal paths tied to the volume mounts above
+      # Do not change — container-internal paths tied to volume mounts above
       - DB_PATH=/data/db/nutritrace.db
       - UPLOADS_PATH=/data/uploads
       # Change these in your .env
       - JWT_SECRET=${JWT_SECRET}
-      - CORS_ORIGIN=${CORS_ORIGIN}
       - ADMIN_EMAIL=${ADMIN_EMAIL}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
     restart: unless-stopped

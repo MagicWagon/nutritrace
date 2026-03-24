@@ -21,14 +21,12 @@
   } from '../stores/settings.js';
   import { DB } from '../lib/db.js';
   import { NUTRIMENTS, Nutrition } from '../lib/nutrition.js';
-  import { NtApi } from '../lib/api.js';
-
   // ── Collapsible section state ──────────────────────────────────────────────
   $: isDark = $appearance === 'dark' || ($appearance === 'system' && (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches));
   let openSections = { appearance: true, diary: false, water: false, foods: false, nutrients: false,
                        bodyStats: false, statistics: false, goals: false, categories: false,
                        units: false, integration: false, api: false, backup: false,
-                       ai: false, server: false, about: false };
+                       ai: false, about: false };
 
   function toggleSection(key) {
     openSections = { ...openSections, [key]: !openSections[key] };
@@ -54,7 +52,6 @@
     api:         ['api','open food facts','username','password','credentials'],
     backup:      ['backup','export','import','restore','waistline','csv','clear data','json'],
     about:       ['about','version','nutritrace'],
-    server:      ['server','api url','login','logout','token','database','connection'],
   };
 
   function sectionVisible(query, key) {
@@ -64,35 +61,6 @@
 
   function sectionOpen(sections, query, key) {
     return sections[key] || (!!query && sectionVisible(query, key));
-  }
-
-  // ── Server connection ──────────────────────────────────────────────────────
-  let serverUrl      = NtApi.getUrl();
-  let serverEmail    = '';
-  let serverPassword = '';
-  let serverLoggedIn = NtApi.isConfigured();
-  let serverLoading  = false;
-
-  async function serverLogin() {
-    if (!serverUrl) return showError('Enter the API URL first');
-    NtApi.setUrl(serverUrl);
-    serverLoading = true;
-    try {
-      await NtApi.login(serverEmail, serverPassword);
-      serverLoggedIn = true;
-      serverEmail = ''; serverPassword = '';
-      showSuccess('Connected to server');
-    } catch (e) {
-      showError(e.message);
-    } finally {
-      serverLoading = false;
-    }
-  }
-
-  function serverLogout() {
-    NtApi.logout();
-    serverLoggedIn = false;
-    showSuccess('Logged out');
   }
 
   // ── Appearance ─────────────────────────────────────────────────────────────
@@ -1318,56 +1286,6 @@
             <span class="setting-label" style="color:var(--danger)">Clear all data</span>
             <span class="material-symbols-rounded" style="font-size:18px;color:var(--danger)">chevron_right</span>
           </button>
-        </div>
-      </div>
-    {/if}
-
-    <!-- ── Server ──────────────────────────────────────────────────────────── -->
-    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'server')} on:click={() => toggleSection('server')}>
-      <span class="material-symbols-rounded si">dns</span>
-      <span>Server</span>
-      <span class="material-symbols-rounded chevron" class:rotated={openSections.server}>expand_more</span>
-    </button>
-    {#if sectionOpen(openSections, settingsQuery, 'server') && sectionVisible(settingsQuery, 'server')}
-      <div class="section-body" transition:slide={{ duration: 180 }}>
-        <div class="card settings-card">
-          <div class="setting-row">
-            <span class="setting-label">API URL</span>
-            <input class="input" type="url" placeholder="https://api.yourdomain.com"
-              bind:value={serverUrl} on:blur={() => NtApi.setUrl(serverUrl)} />
-          </div>
-          {#if serverLoggedIn}
-            <div class="divider"></div>
-            <div class="setting-row">
-              <span class="setting-label">Status</span>
-              <span class="text-accent text-sm" style="display:flex;align-items:center;gap:6px">
-                <span class="material-symbols-rounded" style="font-size:16px;color:var(--accent)">check_circle</span>
-                Connected
-              </span>
-            </div>
-            <div class="divider"></div>
-            <div class="setting-row">
-              <span class="setting-label">Account</span>
-              <button class="btn btn-ghost btn-sm" on:click={serverLogout}>Log out</button>
-            </div>
-          {:else}
-            <div class="divider"></div>
-            <div class="setting-row">
-              <span class="setting-label">Email</span>
-              <input class="input" type="email" placeholder="you@example.com" bind:value={serverEmail} />
-            </div>
-            <div class="divider"></div>
-            <div class="setting-row">
-              <span class="setting-label">Password</span>
-              <input class="input" type="password" placeholder="••••••••" bind:value={serverPassword} />
-            </div>
-            <div class="divider"></div>
-            <div class="setting-row" style="justify-content:flex-end">
-              <button class="btn btn-primary btn-sm" on:click={serverLogin} disabled={serverLoading}>
-                {serverLoading ? 'Connecting…' : 'Connect'}
-              </button>
-            </div>
-          {/if}
         </div>
       </div>
     {/if}
