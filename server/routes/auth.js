@@ -76,8 +76,11 @@ router.post('/register', wrap((req, res) => {
 
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(result.lastInsertRowid);
 
-  // Auto-login the first user
+  // First user: claim all existing data (user_id = NULL → new admin's id)
   if (isFirst) {
+    db.prepare('UPDATE foods SET user_id = ? WHERE user_id IS NULL').run(user.id);
+    db.prepare('UPDATE meals SET user_id = ? WHERE user_id IS NULL').run(user.id);
+    db.prepare('UPDATE diary SET user_id = ? WHERE user_id IS NULL').run(user.id);
     res.cookie('nt_token', signToken(user), COOKIE_OPTS);
   }
 
