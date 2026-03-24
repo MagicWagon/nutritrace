@@ -281,11 +281,23 @@ export const NtApi = {
   put(path, body)  { return this._fetch('PUT',    path, body); },
   del(path)        { return this._fetch('DELETE', path); },
 
+  // Food field mapping: server uses img_url/category, app uses imgUrl/categories
+  _foodFromApi(row) {
+    if (!row) return null;
+    const { img_url, category, ...rest } = row;
+    return { ...rest, imgUrl: img_url || '', categories: category ? [category] : [] };
+  },
+  _foodToApi(food) {
+    const { imgUrl, img_url, categories, category, ...rest } = food;
+    return { ...rest, img_url: imgUrl || img_url || null, category: (categories && categories[0]) || category || null };
+  },
+
   // Foods
-  getFoods()           { return this.get('/api/foods'); },
-  createFood(data)     { return this.post('/api/foods', data); },
-  updateFood(id, data) { return this.put(`/api/foods/${id}`, data); },
-  deleteFood(id)       { return this.del(`/api/foods/${id}`); },
+  async getFoods()           { const r = await this.get('/api/foods'); return r.map(f => this._foodFromApi(f)); },
+  async getFood(id)          { const r = await this.get(`/api/foods/${id}`); return this._foodFromApi(r); },
+  async createFood(data)     { const r = await this.post('/api/foods', this._foodToApi(data)); return this._foodFromApi(r); },
+  async updateFood(id, data) { const r = await this.put(`/api/foods/${id}`, this._foodToApi(data)); return this._foodFromApi(r); },
+  deleteFood(id)             { return this.del(`/api/foods/${id}`); },
 
   // Meals & Recipes
   getMeals()           { return this.get('/api/meals'); },

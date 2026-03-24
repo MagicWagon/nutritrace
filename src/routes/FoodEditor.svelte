@@ -223,7 +223,7 @@
       const flatNutrition = (prefill.nutrition && typeof prefill.nutrition === 'object') ? { ...prefill.nutrition } : {};
       food = { ...food, ...prefill, ...flatNutrition };
     } else if (params && params.id) {
-      const existing = await NtApi.get(`/api/foods/${params.id}`).catch(() => null);
+      const existing = await NtApi.getFood(params.id).catch(() => null);
       if (existing) {
         const flatNutrition = (existing.nutrition && typeof existing.nutrition === 'object') ? { ...existing.nutrition } : {};
         food = { ...food, ...existing, ...flatNutrition };
