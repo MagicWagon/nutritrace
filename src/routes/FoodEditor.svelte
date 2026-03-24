@@ -271,7 +271,7 @@
         pop();
       }
     } catch(e) {
-      showError('Save failed');
+      showError('Save failed: ' + (e.message || e));
     } finally {
       saving = false;
     }
