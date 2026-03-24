@@ -3,6 +3,7 @@
   import { slide } from 'svelte/transition';
   import Toggle from '../components/settings/Toggle.svelte';
   import Sheet  from '../components/ui/Sheet.svelte';
+  import Dialog from '../components/ui/Dialog.svelte';
   import { showSuccess, showError } from '../stores/toast.js';
   import { applyAppearance, applyAccentColor } from '../stores/settings.js';
   import { AI_PROVIDERS, AI_MODELS, AI_DEFAULT_MODELS } from '../lib/aiChat.js';
@@ -443,7 +444,13 @@
       try {
         const text = await file.text();
         const data = JSON.parse(text);
-        await NtApi.post('/api/data/import', data);
+        // Strip base64 images — they can't be migrated to server filesystem
+        const strip = arr => (arr || []).map(item => {
+          if (item.imgUrl && item.imgUrl.startsWith('data:')) return { ...item, imgUrl: '' };
+          return item;
+        });
+        const cleaned = { ...data, foodList: strip(data.foodList), meals: strip(data.meals), recipes: strip(data.recipes) };
+        await NtApi.post('/api/data/import', cleaned);
         if (data.settings && typeof data.settings === 'object') {
           for (const [key, value] of Object.entries(data.settings)) DB.setSetting(key, value);
         }
@@ -519,8 +526,8 @@
     } catch(e) { showError('Export failed: ' + e.message); }
   }
 
+  let showClearDialog = false;
   async function clearAllData() {
-    if (!confirm('Delete ALL data? This cannot be undone.')) return;
     try {
       await NtApi.del('/api/data');
       const keys = [];
@@ -1324,7 +1331,7 @@
             <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
           </button>
           <div class="setting-divider"></div>
-          <button class="setting-row setting-action danger" on:click={clearAllData}>
+          <button class="setting-row setting-action danger" on:click={() => showClearDialog = true}>
             <span class="material-symbols-rounded si" style="color:var(--danger)">delete_forever</span>
             <span class="setting-label" style="color:var(--danger)">Clear all data</span>
             <span class="material-symbols-rounded" style="font-size:18px;color:var(--danger)">chevron_right</span>
@@ -1391,6 +1398,15 @@
     <div style="height:24px"></div>
   </div>
 </div>
+
+<Dialog bind:open={showClearDialog}
+  title="Clear all data"
+  message="This will permanently delete all foods, meals, diary entries, and settings. This cannot be undone."
+  confirmText="Delete everything"
+  cancelText="Cancel"
+  dangerous
+  on:confirm={clearAllData}
+/>
 
 <!-- Custom color picker sheet -->
 <Sheet bind:open={showColorSheet} title="Custom Color">
