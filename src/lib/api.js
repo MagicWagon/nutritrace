@@ -20,11 +20,7 @@ const API = {
   async searchByName(query, page) {
     page = page || 1;
     try {
-      let offUrl = `${this.OFF_BASE}/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page=${page}&page_size=20`;
-      const offLang    = (typeof DB !== 'undefined') ? DB.getSetting('offSearchLanguage', 'Default') : 'Default';
-      const offCountry = (typeof DB !== 'undefined') ? DB.getSetting('offSearchCountry', 'All') : 'All';
-      if (offLang    && offLang    !== 'Default') offUrl += '&lang=' + encodeURIComponent(offLang) + '&lc=' + encodeURIComponent(offLang);
-      if (offCountry && offCountry !== 'All')     offUrl += '&tagtype_0=countries&tag_contains_0=contains&tag_0=' + encodeURIComponent(offCountry);
+      let offUrl = `${this.OFF_BASE}/api/v2/search?q=${encodeURIComponent(query)}&page=${page}&page_size=20&json=1`;
       const res = await fetch('/api/proxy?url=' + encodeURIComponent(offUrl));
       if (!res.ok) return [];
       const data = await res.json();
