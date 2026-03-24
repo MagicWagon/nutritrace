@@ -178,7 +178,7 @@
   }
 
   function applyProportional(changedId, newVal) {
-    if (!linked || !_focusVal || _focusVal <= 0 || newVal === _focusVal) { _focusVal = null; return; }
+    if (!linked || !_focusVal || _focusVal <= 0 || newVal <= 0 || newVal === _focusVal) return;
     const ratio = newVal / _focusVal;
     const allNuts = [...NUTRIMENTS, ...($customNutriments || [])];
     for (const n of allNuts) {
@@ -186,22 +186,20 @@
       const v = parseFloat(food[n.id]);
       if (!isNaN(v) && v > 0) food[n.id] = Math.round(v * ratio * 10000) / 10000;
     }
-    if (changedId === '__portion__') {
-      // portion changed — nutrients already scaled above
-    } else {
-      // nutrient changed — also scale portion
+    if (changedId !== '__portion__') {
       const p = parseFloat(food.portion);
       if (!isNaN(p) && p > 0) food.portion = Math.round(p * ratio * 100) / 100;
     }
     food = { ...food };
-    _focusVal = null;
   }
 
-  function onPortionBlur() {
+  function onFieldBlur() { _focusVal = null; }
+
+  function onPortionInput() {
     applyProportional('__portion__', parseFloat(food.portion) || 0);
   }
 
-  function onNutBlur(id) {
+  function onNutInput(id) {
     applyProportional(id, parseFloat(food[id]) || 0);
   }
 
@@ -433,7 +431,7 @@
         <div class="form-group" style="flex:1">
           <label class="form-label">Serving Size</label>
           <input class="input" type="number" min="0" bind:value={food.portion}
-            on:focus={onFieldFocus} on:blur={onPortionBlur} />
+            on:focus={onFieldFocus} on:input={onPortionInput} on:blur={onFieldBlur} />
         </div>
         <div class="form-group" style="width:100px">
           <label class="form-label">Unit</label>
@@ -487,7 +485,8 @@
           <input class="input" type="number" min="0" step="0.1" placeholder="0"
             bind:value={food[n.id]}
             on:focus={onFieldFocus}
-            on:blur={() => onNutBlur(n.id)} />
+            on:input={() => onNutInput(n.id)}
+            on:blur={onFieldBlur} />
         </div>
       {/each}
       <button class="btn btn-ghost w-full" style="margin-top:8px"
