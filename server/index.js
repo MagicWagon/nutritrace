@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 import proxyRoutes  from './routes/proxy.js';
+import dataRoutes   from './routes/data.js';
 import foodsRoutes  from './routes/foods.js';
 import mealsRoutes  from './routes/meals.js';
 import diaryRoutes  from './routes/diary.js';
@@ -24,6 +25,7 @@ app.use('/uploads', express.static(uploadsPath));
 
 // API routes
 app.use('/api/proxy',  proxyRoutes);
+app.use('/api/data',   dataRoutes);
 app.use('/api/foods',  foodsRoutes);
 app.use('/api/meals',  mealsRoutes);
 app.use('/api/diary',  diaryRoutes);

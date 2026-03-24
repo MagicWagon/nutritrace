@@ -20,6 +20,7 @@
     aiEnabled, aiProvider, aiApiKey, aiModel, aiAssistantName,
   } from '../stores/settings.js';
   import { DB } from '../lib/db.js';
+  import { NtApi } from '../lib/api.js';
   import { NUTRIMENTS, Nutrition } from '../lib/nutrition.js';
   // ── Collapsible section state ──────────────────────────────────────────────
   $: isDark = $appearance === 'dark' || ($appearance === 'system' && (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches));
@@ -417,7 +418,13 @@
   // ── Backup ─────────────────────────────────────────────────────────────────
   async function exportBackup() {
     try {
-      const data = await DB.exportAll();
+      const [foodList, meals, recipes, diary] = await Promise.all([
+        NtApi.getFoods(),
+        NtApi.getMeals(),
+        NtApi.getRecipes(),
+        NtApi.getAllDiary(),
+      ]);
+      const data = { foodList, meals, recipes, diary, settings: DB.getAllSettings(), exportedAt: new Date().toISOString() };
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
@@ -427,6 +434,7 @@
       showSuccess('Backup exported');
     } catch(e) { showError('Export failed: ' + e.message); }
   }
+
   async function importBackup() {
     const input = document.createElement('input');
     input.type = 'file'; input.accept = '.json';
@@ -435,13 +443,17 @@
       try {
         const text = await file.text();
         const data = JSON.parse(text);
-        await DB.importAll(data);
+        await NtApi.post('/api/data/import', data);
+        if (data.settings && typeof data.settings === 'object') {
+          for (const [key, value] of Object.entries(data.settings)) DB.setSetting(key, value);
+        }
         showSuccess('Backup restored — reloading...');
         setTimeout(() => location.reload(), 1500);
       } catch(err) { showError('Import failed: ' + err.message); }
     };
     input.click();
   }
+
   async function importWaistline() {
     const input = document.createElement('input');
     input.type = 'file'; input.accept = '.json';
@@ -449,43 +461,74 @@
       const file = e.target.files[0]; if (!file) return;
       try {
         const text = await file.text();
-        const data = JSON.parse(text);
-        if (!data.foodList && !data.diary) {
-          showError('Not a valid Waistline export file');
-          return;
+        const raw = JSON.parse(text);
+        if (!raw.foodList && !raw.diary) { showError('Not a valid Waistline export file'); return; }
+
+        const NUTR_MAP = { 'Added Sugars':'added-sugars','vitamin-b1':'b1','vitamin-b2':'b2','vitamin-b6':'b6','vitamin-b9':'b9','vitamin-b12':'b12','vitamin-pp':'b3' };
+        const mapNutrition = n => { const o={}; for(const[k,v] of Object.entries(n||{})) o[NUTR_MAP[k]||k]=parseFloat(v)||0; return o; };
+        const cleanImg = u => (u && u !== 'undefined') ? u : null;
+
+        const foods = (raw.foodList||[]).map(f => ({ ...f, imgUrl: cleanImg(f.image_url), nutrition: mapNutrition(f.nutrition) }));
+        const foodMap = Object.fromEntries((raw.foodList||[]).map((f,i) => [f.id, foods[i]]));
+
+        const resolveItems = items => (items||[]).map(item => {
+          const food = foodMap[item.id]; if(!food) return null;
+          return { ...food, portion: parseFloat(item.portion)||food.portion||100, quantity: parseFloat(item.quantity)||1 };
+        }).filter(Boolean);
+
+        const meals = (raw.meals||[]).map(m => ({ ...m, imgUrl: cleanImg(m.image_url), items: resolveItems(m.items), nutrition: {} }));
+        const recipes = (raw.recipes||[]).map(r => ({ ...r, imgUrl: cleanImg(r.image_url), items: resolveItems(r.items), nutrition: mapNutrition(r.nutrition) }));
+
+        const byDate = {};
+        for (const entry of (raw.diary||[])) {
+          if (!entry.dateTime) continue;
+          const date = entry.dateTime.slice(0,10);
+          if (!byDate[date]) byDate[date] = { date, items: [], bodyStats: {} };
+          if (entry.stats?.weight != null) byDate[date].bodyStats.weight = entry.stats.weight;
+          for (const item of (entry.items||[])) {
+            const food = foodMap[item.id]; if(!food) continue;
+            byDate[date].items.push({ ...food, portion: parseFloat(item.portion)||food.portion||100, quantity: parseFloat(item.quantity)||1, meal: Number(item.category??0)||0, addedAt: item.dateTime||entry.dateTime });
+          }
         }
-        await DB.importWaistline(data);
+
+        await NtApi.post('/api/data/import', { foodList: foods, meals, recipes, diary: Object.values(byDate) });
         showSuccess('Waistline data imported — reloading...');
         setTimeout(() => location.reload(), 1500);
       } catch(err) { showError('Import failed: ' + err.message); }
     };
     input.click();
   }
+
   async function exportCSV() {
     try {
-      // Nutrition imported statically above
-      const data = await DB.exportAll();
+      const diary = await NtApi.getAllDiary();
       let csv = 'Date,Meal,Food,Amount,Unit,Calories,Fat,Carbs,Protein\n';
-      (data.diary || []).forEach(day => {
+      diary.forEach(day => {
         (day.items || []).forEach(item => {
           const n = Nutrition.calculate(item);
-          csv += `${day.date},${item.meal || 0},"${item.name || ''}",${item.portion || 100},${item.unit || 'g'},${Math.round(n.calories || 0)},${(n.fat || 0).toFixed(1)},${(n.carbohydrates || 0).toFixed(1)},${(n.proteins || 0).toFixed(1)}\n`;
+          csv += `${day.date},${item.meal||0},"${item.name||''}",${item.portion||100},${item.unit||'g'},${Math.round(n.calories||0)},${(n.fat||0).toFixed(1)},${(n.carbohydrates||0).toFixed(1)},${(n.proteins||0).toFixed(1)}\n`;
         });
       });
       const blob = new Blob([csv], { type: 'text/csv' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = `waistline-diary-${new Date().toISOString().slice(0,10)}.csv`;
+      a.download = `nutritrace-diary-${new Date().toISOString().slice(0,10)}.csv`;
       a.click();
       URL.revokeObjectURL(a.href);
       showSuccess('CSV exported');
     } catch(e) { showError('Export failed: ' + e.message); }
   }
+
   async function clearAllData() {
     if (!confirm('Delete ALL data? This cannot be undone.')) return;
-    await DB.clearAll();
-    showSuccess('All data cleared');
-    setTimeout(() => location.reload(), 1000);
+    try {
+      await NtApi.del('/api/data');
+      const keys = [];
+      for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k?.startsWith('wl_')) keys.push(k); }
+      keys.forEach(k => localStorage.removeItem(k));
+      showSuccess('All data cleared');
+      setTimeout(() => location.reload(), 1000);
+    } catch(e) { showError('Clear failed: ' + e.message); }
   }
 
   // ── Reactive saves ─────────────────────────────────────────────────────────
