@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { pop } from 'svelte-spa-router';
-  import { DB } from '../lib/db.js';
+  import { NtApi } from '../lib/api.js';
   import { portal } from '../lib/portal.js';
   import { showSuccess, showError } from '../stores/toast.js';
   import { editorState, clearMealEditorState } from '../stores/editorState.js';
@@ -57,7 +57,7 @@
     if (editorState.mealPrefill) {
       meal = { ...meal, ...editorState.mealPrefill };
     } else if (params && params.id) {
-      const existing = await DB.get(store, params.id);
+      const existing = await NtApi.getMeal(params.id).catch(() => null);
       if (existing) meal = { ...meal, ...existing };
     }
     if (meal.imgUrl) photoPreviewUrl = meal.imgUrl;
@@ -136,8 +136,10 @@
 
   // ── Ingredient search ──────────────────────────────────────────────────────
   async function searchFoods() {
-    const foods = (await DB.getAll('foodList')) || [];
-    const recipeItems = isRecipe ? [] : ((await DB.getAll('recipes')) || []);
+    const [foods, recipeItems] = await Promise.all([
+      NtApi.getFoods(),
+      isRecipe ? Promise.resolve([]) : NtApi.getRecipes(),
+    ]);
     const combined = [
       ...foods.map(f => ({ ...f, _source: 'food' })),
       ...recipeItems.map(r => ({ ...r, _source: 'recipe' }))
@@ -269,13 +271,14 @@
         ...meal,
         imgUrl: photoPreviewUrl || '',
         nutrition: totals,
-        id: meal.id || Date.now()
+        is_recipe: isRecipe,
       };
       if (isRecipe) {
         item.portion = parseFloat(recipeAmount) || Math.round(meal.items.reduce((s,it)=>s+toGrams(it.portion,it.unit),0)) || 100;
         item.unit = recipeUnit;
       }
-      await DB.put(store, item);
+      if (meal.id) await NtApi.updateMeal(meal.id, item);
+      else await NtApi.createMeal(item);
       clearMealEditorState();
       showSuccess('Saved');
       pop();

@@ -13,7 +13,7 @@
   import { editorState, clearFoodEditorState } from '../stores/editorState.js';
   import { DB } from '../lib/db.js';
   import { loadEntry } from '../stores/diary.js';
-  import { API, USDA } from '../lib/api.js';
+  import { API, USDA, NtApi } from '../lib/api.js';
   import { Mealie } from '../lib/mealieApi.js';
   import { foodsShowThumbnails, foodsShowCategories, foodsShowNotes, foodsSort, foodCategories, foodsShowYesterdayMeals, mealNames } from '../stores/settings.js';
 
@@ -83,11 +83,12 @@
     : filteredBySearch;
 
   async function load() {
-    localFoods   = await DB.getAll('foodList')   || [];
-    localMeals   = await DB.getAll('meals')       || [];
-    localRecipes = await DB.getAll('recipes')     || [];
-    // Sort
-    const sort = DB.getSetting('foodsSort', 'date');
+    [localFoods, localMeals, localRecipes] = await Promise.all([
+      NtApi.getFoods(),
+      NtApi.getMeals(),
+      NtApi.getRecipes(),
+    ]);
+    const sort = foodsSort.get();
     if (sort === 'alpha') {
       [localFoods, localMeals, localRecipes].forEach(arr =>
         arr.sort((a,b) => (a.name||'').localeCompare(b.name||'')));
@@ -190,14 +191,12 @@
 
   async function _addFoodToDiary(food, qty) {
     const { addDiaryItem } = await import('../stores/diary.js');
-    // Ensure the food exists in the local foodList so it shows up in Foods page.
+    // Ensure the food exists on the server so it shows up in Foods page.
     // Local records already have a numeric id; API results may have a string id or none.
     let savedFood = food;
     if (!food.id || typeof food.id !== 'number') {
-      // Strip any non-numeric id (e.g. barcode string) so IndexedDB auto-assigns one
       const { id: _drop, ...rest } = food;
-      const newId = await DB.put('foodList', { ...rest, dateTime: food.dateTime || new Date().toISOString() });
-      savedFood = { ...rest, id: newId };
+      savedFood = await NtApi.createFood({ ...rest, created_at: food.dateTime || new Date().toISOString() });
     }
     await addDiaryItem({ ...savedFood, portion: savedFood.portion || 100, unit: savedFood.unit || 'g', quantity: qty }, Number(pickMeal) || 0, pickDate || undefined);
     import('../stores/toast.js').then(m => m.showSuccess('Added to diary'));
@@ -211,19 +210,17 @@
   }
 
   async function deleteItem(item) {
-    await DB.delete(currentStore, item.id);
+    if (currentStore === 'foodList') await NtApi.deleteFood(item.id);
+    else await NtApi.deleteMeal(item.id);
     await load();
     showSuccess('Deleted');
   }
 
   async function cloneItem(item) {
-    const clone = {
-      ...item,
-      id: Date.now(),
-      name: 'Copy of ' + (item.name || ''),
-      dateTime: new Date().toISOString(),
-    };
-    await DB.put(currentStore, clone);
+    const { id: _drop, ...rest } = item;
+    const clone = { ...rest, name: 'Copy of ' + (item.name || ''), created_at: new Date().toISOString() };
+    if (currentStore === 'foodList') await NtApi.createFood(clone);
+    else await NtApi.createMeal(clone);
     await load();
     showSuccess('Cloned');
   }
@@ -269,13 +266,13 @@
   }
 
   async function loadYesterdayMeals() {
-    if (!pickMode || !DB.getSetting('foodsShowYesterdayMeals', true)) { yesterdayMeals = []; return; }
+    if (!pickMode || !$foodsShowYesterdayMeals) { yesterdayMeals = []; return; }
     const yDate = new Date();
     yDate.setDate(yDate.getDate() - 1);
     const yStr = yDate.toISOString().slice(0, 10);
-    const entry = await DB.getDate(yStr);
+    const entry = await NtApi.getDiaryDate(yStr);
     if (!entry || !entry.items || !entry.items.length) { yesterdayMeals = []; return; }
-    const names = DB.getSetting('mealNames', ['Breakfast','Lunch','Dinner','Snacks']);
+    const names = $mealNames || ['Breakfast','Lunch','Dinner','Snacks'];
     const groups = {};
     for (const item of entry.items) {
       const m = item.meal != null ? Number(item.meal) : 0;

@@ -21,7 +21,7 @@
            diaryShowPortionSize, diaryShowNutritionBar, diaryTotalsMode,
            diaryShowAllNutrients, diaryShowNutritionUnits, visibleNutriments, hiddenBodyStats,
            dateFormat, timeFormat, disableAnimations, goalCelebrations } from '../stores/settings.js';
-  import { DB } from '../lib/db.js';
+  import { NtApi } from '../lib/api.js';
   import { portal } from '../lib/portal.js';
   import { Nutrition, NUTRIMENTS } from '../lib/nutrition.js';
 
@@ -416,9 +416,15 @@
   }
 
   async function _addWaterFromDiary(volumeMl) {
-    const e = await DB.getDiaryForDate($currentDate) || { date: $currentDate, items: [], bodyStats: {} };
+    let entry = null;
+    currentEntry.subscribe(v => entry = v)();
     const log = { amount: volumeMl, time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) };
-    await DB.saveDate($currentDate, { ...e, water: [...(e.water || []), log] });
+    const updated = { ...entry, water: [...(entry?.water || []), log] };
+    await NtApi.saveDiaryDate($currentDate, {
+      items: updated.items || [],
+      body_stats: updated.bodyStats || {},
+      water: updated.water,
+    });
     await loadEntry($currentDate);
   }
 

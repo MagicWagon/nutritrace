@@ -4,12 +4,12 @@
   import { portal } from '../lib/portal.js';
   import Chart from 'chart.js/auto';
   import { DB } from '../lib/db.js';
+  import { NtApi } from '../lib/api.js';
   import { NUTRIMENTS, Nutrition } from '../lib/nutrition.js';
   import { goals, energyUnit, weightUnit, lengthUnit, statsChartType, statsYZero,
            statsAvgLine, statsGoalLine, statsTrendLine, hiddenBodyStats, dateFormat } from '../stores/settings.js';
-  import { DB as _DB } from '../lib/db.js';
-  let _waterShowInStats = _DB.getSetting('waterShowInStats', true);
-  let _waterUnit        = _DB.getSetting('waterUnit', 'ml');
+  let _waterShowInStats = DB.getSetting('waterShowInStats', true);
+  let _waterUnit        = DB.getSetting('waterUnit', 'ml');
   // Reload when settings change
   if (typeof window !== 'undefined') {
     window.addEventListener('wl:setting', () => {
@@ -64,8 +64,8 @@
     let dates = [];
 
     if (range === 'all') {
-      const all = await DB.getAllDates();
-      dates = [...new Set(all)].sort();
+      const all = await NtApi.getAllDiary();
+      dates = [...new Set(all.map(e => e.date))].sort();
     } else if (range === 'custom') {
       if (!customStart || !customEnd) { loading = false; return; }
       const start = new Date(customStart + 'T12:00:00');
@@ -87,18 +87,24 @@
 
     const isBodyStat = BODY_STATS.some(s => s.value === metric);
     const isWater    = metric === 'water';
+
+    // Fetch all entries for the date range in one request
+    if (ver !== _loadVer) return;
+    const allEntries = await NtApi.getAllDiary();
+    const entryMap = Object.fromEntries(allEntries.map(e => [e.date, e]));
+
     const rows = [];
     for (const date of dates) {
       if (ver !== _loadVer) return; // newer call started — abort
-      const entry = await DB.getDate(date);
+      const entry = entryMap[date];
       let val = null;
       if (entry) {
         if (isWater) {
           const total = (entry.water || []).reduce((s, l) => s + (l.amount || 0), 0);
           val = total > 0 ? total : null;
         } else if (isBodyStat) {
-          const v = entry.bodyStats && entry.bodyStats[metric];
-          val = v ? Number(v) : null;
+          const bs = entry.body_stats || entry.bodyStats || {};
+          val = bs[metric] ? Number(bs[metric]) : null;
         } else {
           const totals = Nutrition.sum((entry.items || []).map(i => Nutrition.calculate(i)));
           val = totals[metric] ? Math.round(totals[metric] * 10) / 10 : null;

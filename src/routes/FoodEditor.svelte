@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { pop, push } from 'svelte-spa-router';
-  import { DB } from '../lib/db.js';
+  import { NtApi } from '../lib/api.js';
   import { NUTRIMENTS } from '../lib/nutrition.js';
   import { showSuccess, showError } from '../stores/toast.js';
   import { editorState, clearFoodEditorState } from '../stores/editorState.js';
@@ -223,7 +223,7 @@
       const flatNutrition = (prefill.nutrition && typeof prefill.nutrition === 'object') ? { ...prefill.nutrition } : {};
       food = { ...food, ...prefill, ...flatNutrition };
     } else if (params && params.id) {
-      const existing = await DB.get(store, params.id);
+      const existing = await NtApi.get(`/api/foods/${params.id}`).catch(() => null);
       if (existing) {
         const flatNutrition = (existing.nutrition && typeof existing.nutrition === 'object') ? { ...existing.nutrition } : {};
         food = { ...food, ...existing, ...flatNutrition };
@@ -247,8 +247,11 @@
           _nutrition[_n.id] = parseFloat(_v) || 0;
         }
       }
-      const item = { ...food, id: food.id || Date.now(), nutrition: _nutrition };
-      await DB.put(store, item);
+      const item = { ...food, nutrition: _nutrition };
+      const saved = food.id
+        ? await NtApi.updateFood(food.id, item)
+        : await NtApi.createFood(item);
+      item.id = saved.id;
       // If called from diary pick mode, also add to diary
       const ctx = editorState.foodDiaryCtx;
       if (ctx) {
