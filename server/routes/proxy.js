@@ -3,7 +3,7 @@ import { Router } from 'express';
 const router = Router();
 
 // Whitelist: only these external hosts may be proxied
-const ALLOWED = ['world.openfoodfacts.org', 'api.nal.usda.gov'];
+const ALLOWED = ['world.openfoodfacts.org', 'search.openfoodfacts.org', 'api.nal.usda.gov'];
 
 router.get('/', async (req, res) => {
   const { url } = req.query;

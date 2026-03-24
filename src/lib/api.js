@@ -20,11 +20,11 @@ const API = {
   async searchByName(query, page) {
     page = page || 1;
     try {
-      let offUrl = `${this.OFF_BASE}/api/v2/search?q=${encodeURIComponent(query)}&page=${page}&page_size=20&json=1`;
+      const offUrl = `https://search.openfoodfacts.org/search?q=${encodeURIComponent(query)}&json=1&page_size=20&page=${page}`;
       const res = await fetch('/api/proxy?url=' + encodeURIComponent(offUrl));
       if (!res.ok) return [];
       const data = await res.json();
-      return (data.products || []).map(p => this._mapOFFProduct(p)).filter(Boolean);
+      return (data.hits || []).map(p => this._mapOFFProduct(p)).filter(Boolean);
     } catch(e) {
       console.error('Search failed:', e);
       return [];
@@ -42,7 +42,7 @@ const API = {
     const kcal = g('energy-kcal_100g') || (n.energy_100g ? (parseFloat(n.energy_100g)||0) / 4.184 : 0);
     return {
       name:      (p.product_name || '').trim(),
-      brand:     ((p.brands || '').split(',')[0] || '').trim(),
+      brand:     (Array.isArray(p.brands) ? (p.brands[0] || '') : (p.brands || '').split(',')[0] || '').trim(),
       barcode:   p.code || p._id || p.id || '',
       unit:      'g',
       portion:   100,
