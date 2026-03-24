@@ -614,6 +614,43 @@
   let umError        = '';
   let showDisableUmDialog = false;
 
+  // Enable user management from Settings
+  let showEnableUm    = false;
+  let enableAdminUser = '';
+  let enableAdminPass = '';
+  let enableAdminConf = '';
+  let enableAdminName = '';
+  let enableUmError   = '';
+  let enableUmLoading = false;
+
+  async function enableUserManagement() {
+    enableUmError = '';
+    if (!enableAdminUser.trim()) { enableUmError = 'Username is required'; return; }
+    if (enableAdminPass.length < 6) { enableUmError = 'Password must be at least 6 characters'; return; }
+    if (enableAdminPass !== enableAdminConf) { enableUmError = 'Passwords do not match'; return; }
+    enableUmLoading = true;
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username:  enableAdminUser.trim(),
+          password:  enableAdminPass,
+          full_name: enableAdminName.trim() || undefined,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { enableUmError = data.error || 'Registration failed'; enableUmLoading = false; return; }
+      localStorage.setItem('wl:userId', data.user.id);
+      await loadAuthState();
+      showEnableUm = false;
+      enableAdminUser = ''; enableAdminPass = ''; enableAdminConf = ''; enableAdminName = '';
+      await loadUsers();
+      showSuccess('User management enabled');
+    } catch(e) { enableUmError = 'Could not connect to server'; }
+    enableUmLoading = false;
+  }
+
   async function loadUsers() {
     try {
       umUsers = await NtApi.get('/api/auth/users');
@@ -1565,10 +1602,34 @@
               <span class="setting-label">Sign out</span>
             </button>
           {:else}
-            <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px;padding:16px">
-              <span class="setting-label">Single-user mode</span>
-              <div class="setting-desc">User management is not enabled. To add multiple user accounts, enable it from the first-run wizard or visit <strong>/wizard</strong>.</div>
-            </div>
+            <button class="setting-row setting-action" on:click={() => { showEnableUm = !showEnableUm; enableUmError = ''; }}>
+              <span class="material-symbols-rounded si" style="color:var(--accent)">group_add</span>
+              <div>
+                <span class="setting-label">Enable user management</span>
+                <div class="setting-desc">Add multiple user accounts with separate data &amp; settings</div>
+              </div>
+              <span class="material-symbols-rounded text-3" style="font-size:18px">{showEnableUm ? 'expand_less' : 'expand_more'}</span>
+            </button>
+
+            {#if showEnableUm}
+              <div class="section-body" style="padding:0 16px 16px" transition:slide={{ duration: 160 }}>
+                <p class="um-section-label" style="margin-bottom:8px">Create admin account</p>
+                <div class="um-add-form">
+                  <div class="um-form-row">
+                    <input class="input" type="text" bind:value={enableAdminUser} placeholder="Username *" autocomplete="username" />
+                    <input class="input" type="text" bind:value={enableAdminName} placeholder="Full name (optional)" />
+                  </div>
+                  <div class="um-form-row">
+                    <input class="input" type="password" bind:value={enableAdminPass} placeholder="Password *" autocomplete="new-password" />
+                    <input class="input" type="password" bind:value={enableAdminConf} placeholder="Confirm *" autocomplete="new-password" />
+                  </div>
+                  {#if enableUmError}<p class="um-error">{enableUmError}</p>{/if}
+                  <button class="btn btn-primary" style="width:100%" on:click={enableUserManagement} disabled={enableUmLoading}>
+                    {enableUmLoading ? 'Enabling...' : 'Enable & Create Admin'}
+                  </button>
+                </div>
+              </div>
+            {/if}
           {/if}
         </div>
       </div>
@@ -1974,6 +2035,10 @@
   .about-link:hover { opacity: 0.8; }
 
   /* ── User Management ── */
+  .um-section-label {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--text-3);
+  }
   .um-add-form { display: flex; flex-direction: column; gap: 8px; width: 100%; padding-top: 4px; }
   .um-form-row { display: flex; gap: 8px; }
   .um-form-row > .input { flex: 1; min-width: 0; }
