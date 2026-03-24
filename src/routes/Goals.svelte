@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { DB } from '../lib/db.js';
   import { portal } from '../lib/portal.js';
-  import { goals, energyUnit, weightUnit, heightUnit, lengthUnit, visibleNutriments, hiddenBodyStats } from '../stores/settings.js';
+  import { goals, goalTemplates, energyUnit, weightUnit, heightUnit, lengthUnit, visibleNutriments, hiddenBodyStats } from '../stores/settings.js';
   import { NUTRIMENTS, Nutrition } from '../lib/nutrition.js';
   import { loadEntry } from '../stores/diary.js';
   import { showSuccess } from '../stores/toast.js';
@@ -40,7 +40,46 @@
   // Your Goals: every stat that has a goal configured (regardless of visibility)
   $: configuredStats = allFields.filter(s => $goals[s.id]);
 
-  let activeTab = 'yours'; // 'yours' | 'all'
+  let activeTab = 'yours'; // 'yours' | 'all' | 'templates'
+
+  // ── Goal templates ─────────────────────────────────────────────────────────
+  let showSaveSheet    = false;
+  let templateName     = '';
+  let showApplyConfirm = null; // template object pending apply
+
+  function openSaveSheet() {
+    templateName = '';
+    showSaveSheet = true;
+  }
+
+  function saveTemplate() {
+    const name = templateName.trim();
+    if (!name) return;
+    const tpl = {
+      id:        Date.now(),
+      name,
+      createdAt: new Date().toISOString(),
+      goals:     { ...$goals },
+    };
+    goalTemplates.update(list => [...list, tpl]);
+    showSaveSheet = false;
+    showSuccess('Template saved');
+  }
+
+  function applyTemplate(tpl) {
+    goals.set({ ...tpl.goals });
+    showApplyConfirm = null;
+    activeTab = 'yours';
+    showSuccess(`"${tpl.name}" applied`);
+  }
+
+  function deleteTemplate(id) {
+    goalTemplates.update(list => list.filter(t => t.id !== id));
+  }
+
+  function formatDate(iso) {
+    return new Date(iso).toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' });
+  }
   let today = new Date().toISOString().slice(0,10);
   let todayTotals = {};
   let todayBodyStats = {};
@@ -178,6 +217,9 @@
     <button class="tab-btn" class:active={activeTab==='all'} on:click={() => activeTab='all'}>
       All Fields
     </button>
+    <button class="tab-btn" class:active={activeTab==='templates'} on:click={() => activeTab='templates'}>
+      Templates
+    </button>
   </div>
 
   <div class="page-content">
@@ -223,7 +265,7 @@
       {/if}
 
     <!-- ── All Fields tab ── -->
-    {:else}
+    {:else if activeTab === 'all'}
       <p class="text-3 text-sm" style="padding:0 var(--page-px) 8px">Tap any field to set or edit its goal.</p>
 
       <!-- Body Stats -->
@@ -275,6 +317,44 @@
           </button>
         {/each}
       </div>
+
+    <!-- ── Templates tab ── -->
+    {:else if activeTab === 'templates'}
+      <div class="tpl-header">
+        <p class="text-3 text-sm">Save your current goals as a named template to reuse later.</p>
+        <button class="btn btn-primary tpl-save-btn" on:click={openSaveSheet}>
+          <span class="material-symbols-rounded" style="font-size:18px">save</span>
+          Save Current Goals
+        </button>
+      </div>
+
+      {#if $goalTemplates.length === 0}
+        <div class="empty-state">
+          <span class="material-symbols-rounded" style="font-size:48px;opacity:0.2">bookmarks</span>
+          <p>No templates yet.</p>
+          <p class="text-3 text-sm">Save your current goals to create your first template.</p>
+        </div>
+      {:else}
+        <div class="card">
+          {#each $goalTemplates as tpl, i}
+            {#if i > 0}<div class="divider"></div>{/if}
+            <div class="tpl-row">
+              <div class="tpl-info">
+                <span class="font-medium">{tpl.name}</span>
+                <span class="text-3 text-sm">{formatDate(tpl.createdAt)} · {Object.keys(tpl.goals).length} goals</span>
+              </div>
+              <div class="tpl-actions">
+                <button class="btn btn-ghost tpl-btn" on:click={() => showApplyConfirm = tpl}>
+                  Apply
+                </button>
+                <button class="btn-icon" style="color:var(--text-3)" on:click={() => deleteTemplate(tpl.id)}>
+                  <span class="material-symbols-rounded" style="font-size:20px">delete</span>
+                </button>
+              </div>
+            </div>
+          {/each}
+        </div>
+      {/if}
     {/if}
 
     <div style="height:24px"></div>
@@ -365,6 +445,48 @@
   </div>
 {/if}
 
+<!-- ── Save template sheet ── -->
+{#if showSaveSheet}
+  <div use:portal class="sheet-backdrop" role="dialog" aria-modal="true"
+    on:click={() => showSaveSheet = false} on:keydown={() => {}}>
+    <div class="sheet-panel" on:click|stopPropagation on:keydown={() => {}}>
+      <div class="sheet-handle"></div>
+      <div class="sheet-header"><h3 class="sheet-title">Save as Template</h3></div>
+      <div class="sheet-body">
+        <label class="form-label">Template name</label>
+        <input class="input" placeholder="e.g. Cut — Summer 2025" bind:value={templateName}
+          on:keydown={e => e.key === 'Enter' && saveTemplate()} />
+        <p class="text-3 text-sm" style="margin-top:4px">
+          Saves a snapshot of all {Object.keys($goals).length} current goals.
+        </p>
+      </div>
+      <div class="sheet-footer">
+        <button class="btn btn-primary w-full" on:click={saveTemplate}
+          disabled={!templateName.trim()}>Save Template</button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- ── Apply confirm sheet ── -->
+{#if showApplyConfirm}
+  <div use:portal class="sheet-backdrop" role="dialog" aria-modal="true"
+    on:click={() => showApplyConfirm = null} on:keydown={() => {}}>
+    <div class="sheet-panel" on:click|stopPropagation on:keydown={() => {}}>
+      <div class="sheet-handle"></div>
+      <div class="sheet-header"><h3 class="sheet-title">Apply Template</h3></div>
+      <div class="sheet-body">
+        <p>Apply <strong>{showApplyConfirm.name}</strong>?</p>
+        <p class="text-3 text-sm">This will replace your current goals with the {Object.keys(showApplyConfirm.goals).length} goals saved in this template.</p>
+      </div>
+      <div class="sheet-footer" style="display:flex;flex-direction:column;gap:8px">
+        <button class="btn btn-primary w-full" on:click={() => applyTemplate(showApplyConfirm)}>Apply</button>
+        <button class="btn btn-ghost w-full" on:click={() => showApplyConfirm = null}>Cancel</button>
+      </div>
+    </div>
+  </div>
+{/if}
+
 <style>
 
   .tab-bar {
@@ -410,6 +532,20 @@
     display: flex; flex-direction: column; align-items: center;
     gap: 8px; padding: 48px 16px; text-align: center;
   }
+
+  /* Templates */
+  .tpl-header {
+    display: flex; flex-direction: column; gap: 8px;
+    padding: 12px var(--page-px);
+  }
+  .tpl-save-btn { display: flex; align-items: center; gap: 6px; }
+  .tpl-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 16px;
+  }
+  .tpl-info { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+  .tpl-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+  .tpl-btn { height: 32px; padding: 0 12px; font-size: 13px; color: var(--accent); }
 
   /* Sheet */
   .sheet-backdrop {

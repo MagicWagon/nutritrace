@@ -35,6 +35,7 @@ export const appearance       = createSettingStore('appearance',       'system')
 export const energyUnit        = createSettingStore('energyUnit',       'kcal');
 export const mealNames         = createSettingStore('mealNames',        ['Breakfast','Lunch','Dinner','Snacks']);
 export const goals             = createSettingStore('goals',            {});
+export const goalTemplates     = createSettingStore('goalTemplates',    []);
 export const visibleNutriments = createSettingStore('visibleNutriments', null);
 export const nutrimentsOrder   = createSettingStore('nutrimentsOrder',  []);
 export const customNutriments  = createSettingStore('customNutriments', []);

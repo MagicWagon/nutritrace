@@ -160,6 +160,12 @@
       openEditor(food, 'foodList');
       return;
     }
+    // Meals: always expand ingredients at saved portions — no quantity prompt
+    if (activeTab === 1 && food.items && food.items.length > 0) {
+      await _expandMealToDiary(food);
+      return;
+    }
+    // Foods & Recipes: prompt for quantity if setting enabled
     if ($diaryPromptQuantity) {
       promptFood = food;
       promptQty  = food.portion || 100;
@@ -169,21 +175,21 @@
     await _addFoodToDiary(food, 1);
   }
 
+  async function _expandMealToDiary(meal) {
+    const { addDiaryItem } = await import('../stores/diary.js');
+    for (const item of meal.items) {
+      await addDiaryItem(
+        { ...item, quantity: item.quantity || 1 },
+        Number(pickMeal) || 0,
+        pickDate || undefined
+      );
+    }
+    import('../stores/toast.js').then(m => m.showSuccess('Added to diary'));
+    history.back();
+  }
+
   async function _addFoodToDiary(food, qty) {
     const { addDiaryItem } = await import('../stores/diary.js');
-    // Meals and recipes: expand ingredients and add each one individually
-    if (food.items && food.items.length > 0) {
-      for (const item of food.items) {
-        await addDiaryItem(
-          { ...item, quantity: item.quantity || 1 },
-          Number(pickMeal) || 0,
-          pickDate || undefined
-        );
-      }
-      import('../stores/toast.js').then(m => m.showSuccess('Added to diary'));
-      history.back();
-      return;
-    }
     // Ensure the food exists in the local foodList so it shows up in Foods page.
     // Local records already have a numeric id; API results may have a string id or none.
     let savedFood = food;
