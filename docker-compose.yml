@@ -6,9 +6,9 @@ services:
       - "3000:80"
     restart: unless-stopped
 
-  nutritrace-api:
+  nutritrace_api:
     image: ghcr.io/thebigjoe1/nutritrace-api:latest
-    container_name: nutritrace-api
+    container_name: nutritrace_api
     ports:
       - "3001:3001"
     volumes:
