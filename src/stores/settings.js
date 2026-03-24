@@ -56,7 +56,7 @@ export const diaryPromptQuantity    = createSettingStore('diaryPromptQuantity', 
 export const diaryShowPortionSize   = createSettingStore('diaryShowPortionSize',    false);
 
 export const foodsShowCategories    = createSettingStore('foodsShowCategories',    true);
-export const foodsShowNotes         = createSettingStore('foodsShowNotes',         false);
+export const foodsShowNotes         = createSettingStore('foodsShowNotes',         true);
 export const foodsShowThumbnails    = createSettingStore('foodsShowThumbnails',    true);
 export const foodsShowYesterdayMeals= createSettingStore('foodsShowYesterdayMeals',true);
 export const foodsSort              = createSettingStore('foodsSort',              'alpha');
@@ -113,7 +113,7 @@ export const disableAnimations  = createSettingStore('disableAnimations',  false
 export const goalCelebrations   = createSettingStore('goalCelebrations',   true);
 
 // Date / time display format
-export const dateFormat = createSettingStore('dateFormat', 'ISO');  // 'ISO' | 'US' | 'EU' | 'natural'
+export const dateFormat = createSettingStore('dateFormat', 'EU');   // 'ISO' | 'US' | 'EU' | 'natural'
 export const timeFormat = createSettingStore('timeFormat', '12h');  // '12h' | '24h'
 
 // Statistics chart settings
