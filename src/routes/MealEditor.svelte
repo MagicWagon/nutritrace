@@ -203,7 +203,7 @@
   function onDragHandleDown(e, i) {
     dragFrom = i;
     dragOver = i;
-    e.currentTarget.closest('.ingredient-row').setPointerCapture(e.pointerId);
+    e.currentTarget.closest('.ingredient-list').setPointerCapture(e.pointerId);
   }
 
   function onDragPointerMove(e, i) {
