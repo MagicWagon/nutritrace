@@ -27,7 +27,7 @@ const SERVER_SETTINGS = new Set([
 
 const _saveQueue = {};
 function _isLoggedIn() { return !!localStorage.getItem('wl:userId'); }
-function _scheduleSave(key, value) {
+export function scheduleSave(key, value) {
   if (!SERVER_SETTINGS.has(key)) return;
   clearTimeout(_saveQueue[key]);
   _saveQueue[key] = setTimeout(() => {
@@ -78,7 +78,7 @@ function createSettingStore(key, defaultValue) {
     set(value) {
       DB.setSetting(key, value);
       store.set(value);
-      _scheduleSave(key, value);
+      scheduleSave(key, value);
     },
     update(fn) {
       const current = DB.getSetting(key, defaultValue);

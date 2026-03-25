@@ -8,7 +8,7 @@
   import { showSuccess, showError } from '../stores/toast.js';
   import { applyAppearance, applyAccentColor } from '../stores/settings.js';
   import { AI_PROVIDERS, AI_MODELS, AI_DEFAULT_MODELS } from '../lib/aiChat.js';
-  import { catName as _catName, catDisplay as _catDisplay } from '../stores/settings.js';
+  import { catName as _catName, catDisplay as _catDisplay, scheduleSave } from '../stores/settings.js';
   import 'emoji-picker-element';
   import {
     appearance, accentColor, energyUnit, mealNames,
@@ -504,7 +504,7 @@
   }
 
   // ── Save helpers ───────────────────────────────────────────────────────────
-  function set(key, value) { DB.setSetting(key, value); }
+  function set(key, value) { DB.setSetting(key, value); scheduleSave(key, value); }
 
   function autoSaveMeals() {
     const toSave = meals.filter(m => m.trim());
