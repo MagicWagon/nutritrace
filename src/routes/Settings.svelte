@@ -311,43 +311,69 @@
   // ── Categories ─────────────────────────────────────────────────────────────
   let newCategoryName  = '';
   let newCategoryLabel = '';
-  let showEmojiPicker  = false;
-  let emojiPickerX     = 0;
-  let emojiPickerY     = 0;
 
-  function openEmojiPicker(e) {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const pickerH = 400;
-    const pickerW = 320;
-    const margin = 8;
-    // Prefer above the button; fall back to below if not enough room
-    let y = rect.top - pickerH - margin;
-    if (y < margin) y = rect.bottom + margin;
-    // Clamp horizontal to viewport
-    let x = rect.left;
-    if (x + pickerW > window.innerWidth - margin) x = window.innerWidth - pickerW - margin;
-    x = Math.max(x, margin);
-    emojiPickerX = x;
-    emojiPickerY = y;
-    showEmojiPicker = !showEmojiPicker;
+  // Emoji picker — mounted imperatively on document.body to avoid
+  // position:fixed being trapped by any scrolling/transformed ancestor
+  let _emojiPortal = null;
+
+  function _destroyEmojiPicker() {
+    if (_emojiPortal) { _emojiPortal.remove(); _emojiPortal = null; }
+    document.removeEventListener('pointerdown', _emojiOutside, true);
   }
 
-  function onEmojiPick(e) {
-    newCategoryLabel = e.detail.unicode;
-    showEmojiPicker  = false;
+  function _emojiOutside(e) {
+    if (_emojiPortal && !_emojiPortal.contains(e.target)) _destroyEmojiPicker();
+  }
+
+  function openEmojiPicker(e) {
+    if (_emojiPortal) { _destroyEmojiPicker(); return; }
+
+    const rect    = e.currentTarget.getBoundingClientRect();
+    const pickerH = 420;
+    const pickerW = 320;
+    const margin  = 8;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    // Prefer below button; flip above if it would overflow bottom
+    let y = rect.bottom + margin;
+    if (y + pickerH > vh - margin) y = rect.top - pickerH - margin;
+    // Final clamp so it never leaves the viewport
+    y = Math.min(Math.max(y, margin), vh - pickerH - margin);
+
+    let x = rect.left;
+    if (x + pickerW > vw - margin) x = vw - pickerW - margin;
+    x = Math.max(x, margin);
+
+    _emojiPortal = document.createElement('div');
+    _emojiPortal.style.cssText =
+      `position:fixed;left:${x}px;top:${y}px;z-index:99999;` +
+      `border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.35)`;
+
+    const picker = document.createElement('emoji-picker');
+    // Inherit CSS custom properties from the document root
+    picker.style.cssText =
+      '--border-radius:12px;' +
+      `--background:${getComputedStyle(document.documentElement).getPropertyValue('--surface-1').trim()};` +
+      `--border-color:${getComputedStyle(document.documentElement).getPropertyValue('--border').trim()};` +
+      `--input-border-color:${getComputedStyle(document.documentElement).getPropertyValue('--border').trim()};` +
+      `--input-font-color:${getComputedStyle(document.documentElement).getPropertyValue('--text-1').trim()};` +
+      `--input-placeholder-color:${getComputedStyle(document.documentElement).getPropertyValue('--text-3').trim()};` +
+      '--category-emoji-size:1.1rem;--emoji-size:1.4rem';
+    picker.addEventListener('emoji-click', ev => {
+      newCategoryLabel = ev.detail.unicode;
+      _destroyEmojiPicker();
+    });
+
+    _emojiPortal.appendChild(picker);
+    document.body.appendChild(_emojiPortal);
+    setTimeout(() => document.addEventListener('pointerdown', _emojiOutside, true), 50);
   }
 
   function clickOutside(node, fn) {
     function handle(e) { if (!node.contains(e.target)) fn(); }
     document.addEventListener('pointerdown', handle, true);
     return { destroy() { document.removeEventListener('pointerdown', handle, true); } };
-  }
-
-  // Action for emoji-picker-element: uses addEventListener directly (more reliable with web components)
-  function emojiPickerAction(node) {
-    function handle(e) { onEmojiPick(e); }
-    node.addEventListener('emoji-click', handle);
-    return { destroy() { node.removeEventListener('emoji-click', handle); } };
   }
 
   function addCategory() {
@@ -2310,13 +2336,6 @@
     <div style="height:24px"></div>
   </div>
 
-  {#if showEmojiPicker}
-    <div class="emoji-picker-wrap"
-      style="left:{emojiPickerX}px;top:{emojiPickerY}px"
-      use:clickOutside={() => showEmojiPicker = false}>
-      <emoji-picker use:emojiPickerAction></emoji-picker>
-    </div>
-  {/if}
 </div>
 
 <Dialog bind:open={showClearDialog}
@@ -2705,21 +2724,6 @@
   .emoji-btn {
     width: 54px; height: 40px; font-size: 20px; padding: 0;
     text-align: center; cursor: pointer; line-height: 1;
-  }
-  .emoji-picker-wrap {
-    position: fixed;
-    z-index: 9999; border-radius: 12px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.35);
-  }
-  .emoji-picker-wrap emoji-picker {
-    --border-radius: 12px;
-    --background: var(--surface-1);
-    --border-color: var(--border);
-    --input-border-color: var(--border);
-    --input-font-color: var(--text-1);
-    --input-placeholder-color: var(--text-3);
-    --category-emoji-size: 1.1rem;
-    --emoji-size: 1.4rem;
   }
 
   .form-group { display: flex; flex-direction: column; gap: 6px; }
