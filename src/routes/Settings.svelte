@@ -1700,8 +1700,10 @@
           </div>
           <div class="setting-divider"></div>
           <div class="about-desc">
-            A privacy-first nutrition &amp; body stats tracker that runs entirely in your browser.
-            No account required — your data stays on your device.
+            Track every bite, every stat — on your own terms. NutriTrace is a self-hosted nutrition
+            and body stats tracker built for privacy. Your data lives on your server, not in the cloud.
+            Run it solo with no login required, or enable user accounts to support multiple profiles
+            on a shared instance.
           </div>
           <div class="setting-divider"></div>
           <div class="about-row">
