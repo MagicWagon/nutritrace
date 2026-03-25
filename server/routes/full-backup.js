@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import { fileURLToPath } from 'url';
 import AdmZip from 'adm-zip';
 import multer from 'multer';
@@ -9,13 +10,17 @@ import db from '../db.js';
 const router = express.Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const BACKUPS_DIR = process.env.BACKUPS_PATH || path.resolve(__dirname, '..', 'data', 'backups');
 const UPLOADS_DIR = process.env.UPLOADS_PATH  || path.resolve(__dirname, '..', 'uploads');
+// Default backups inside the uploads volume so they survive container restarts
+const BACKUPS_DIR = process.env.BACKUPS_PATH  || path.join(UPLOADS_DIR, 'backups');
 
 fs.mkdirSync(BACKUPS_DIR, { recursive: true });
 
-// Multer: store uploaded backup ZIPs in memory (they're small enough)
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 500 * 1024 * 1024 } });
+// Multer: stream to disk (temp dir) so large ZIPs don't OOM the container
+const upload = multer({
+  storage: multer.diskStorage({ destination: (req, file, cb) => cb(null, os.tmpdir()) }),
+  limits: { fileSize: 2 * 1024 * 1024 * 1024 }, // 2 GB
+});
 
 function requireAdmin(req, res, next) {
   if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
@@ -181,10 +186,13 @@ router.post('/:name/restore', requireAdmin, (req, res) => {
 router.post('/upload-restore', requireAdmin, upload.single('backup'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
   try {
-    restoreFromZip(new AdmZip(req.file.buffer));
+    restoreFromZip(new AdmZip(req.file.path));
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  } finally {
+    // Clean up temp file
+    try { fs.unlinkSync(req.file.path); } catch {}
   }
 });
 

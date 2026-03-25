@@ -96,8 +96,8 @@
     // Load auth state first (sets $currentUser and $userMgmtActive)
     await loadAuthState();
 
-    // Skip wizard if user is logged in — their account is already set up
-    if (!DB.getSetting('setupComplete', false) && !$currentUser) {
+    // Skip wizard if user is logged in, or if user management is already active
+    if (!DB.getSetting('setupComplete', false) && !$currentUser && !$userMgmtActive) {
       window.location.hash = '#/wizard';
     }
 
@@ -163,6 +163,9 @@
 <AIBuddy />
 
 {/if}
+
+<!-- Toast must also render outside the login gate so errors show on the login screen -->
+{#if needsLogin}<Toast />{/if}
 
 <style>
   :global(body) { overflow-x: hidden; }
