@@ -94,8 +94,9 @@
   $: _mp = Nutrition.macroPercents(totals);
 
   // Meal visual identity (icon + accent color per meal slot)
-  // MEAL_ICONS kept for MEAL_COLORS index parity only; icons now computed per name
-  const MEAL_COLORS = ['#FFB347', '#4FFFB0', '#4FC3F7', '#CE93D8'];
+  // Icons are now computed per meal name via mealIcon(); colors cycle for any number of meals
+  const MEAL_COLORS = ['#FFB347','#4FFFB0','#4FC3F7','#CE93D8','#FF7070','#80DEEA','#C5E1A5','#FFD54F','#FF80AB','#B39DDB'];
+  const mealColor = i => MEAL_COLORS[i % MEAL_COLORS.length];
 
   // Tweened counters — animate numbers when food is added/removed
   // Pass duration dynamically so they respect "Disable animations"
@@ -492,7 +493,7 @@
     {#each meals as meal, mealIdx}
       {@const items = getMealItems(entry.items, mealIdx)}
       <section class="meal-group card" in:fly={{ y: 18, duration: 280, delay: 60 + mealIdx * 55 }}>
-        <div class="meal-header" style="--meal-color:{MEAL_COLORS[mealIdx] || MEAL_COLORS[3]}">
+        <div class="meal-header" style="--meal-color:{mealColor(mealIdx)}">
           <span class="meal-type-icon material-symbols-rounded">{mealIcon(meal)}</span>
           <span class="meal-name">{meal}</span>
           {#if items.length > 0}
@@ -507,7 +508,7 @@
 
         {#if items.length === 0}
           <div class="meal-empty">
-            <span class="material-symbols-rounded meal-empty-icon" style="color:{MEAL_COLORS[mealIdx] || MEAL_COLORS[3]}">add_circle</span>
+            <span class="material-symbols-rounded meal-empty-icon" style="color:{mealColor(mealIdx)}">add_circle</span>
             <span class="meal-empty-text">Tap + to add food</span>
           </div>
         {:else}
