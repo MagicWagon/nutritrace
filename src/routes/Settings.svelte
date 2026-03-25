@@ -1104,11 +1104,17 @@
           </div>
           <div class="setting-divider"></div>
           <div class="cat-add-row">
-            <input class="input" style="width:54px;height:40px;text-align:center;font-size:20px;padding:0 6px;flex-shrink:0"
-              placeholder="😀" title="Optional label (emoji)" bind:value={newCategoryLabel} maxlength="4" />
-            <input class="input" style="flex:1;height:40px" placeholder="Category name..."
-              bind:value={newCategoryName} on:keydown={e => e.key==='Enter' && addCategory()} />
-            <button class="btn btn-secondary" style="height:40px;padding:0 16px" on:click={addCategory}>Add</button>
+            <div style="display:flex;flex-direction:column;gap:3px;flex-shrink:0">
+              <span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);text-align:center">Label</span>
+              <input class="input" style="width:54px;height:40px;text-align:center;font-size:20px;padding:0 6px"
+                placeholder="🏷️" title="Optional emoji label" bind:value={newCategoryLabel} maxlength="4" />
+            </div>
+            <div style="display:flex;flex-direction:column;gap:3px;flex:1">
+              <span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3)">Category name *</span>
+              <input class="input" style="height:40px" placeholder="e.g. Dairy, Proteins…"
+                bind:value={newCategoryName} on:keydown={e => e.key==='Enter' && addCategory()} />
+            </div>
+            <button class="btn btn-secondary" style="height:40px;padding:0 16px;align-self:flex-end" on:click={addCategory}>Add</button>
           </div>
         </div>
       </div>
@@ -1997,21 +2003,24 @@
     padding: 13px 16px;
     min-height: 50px;
   }
+  /* Allow dragged items to visually escape the card boundary */
+  .drag-list { overflow: visible; }
+
   .drag-row {
     position: relative;
     will-change: transform;
     transition: transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 220ms ease, opacity 220ms ease;
   }
   .drag-row.dragging {
-    opacity: 0.92;
+    opacity: 0.90;
     z-index: 20;
     border-radius: var(--radius-lg);
     background: var(--surface-2);
     box-shadow:
-      0 24px 64px rgba(0,0,0,0.45),
-      0 6px 20px rgba(0,0,0,0.25),
-      0 0 0 1px rgba(255,255,255,0.06);
-    backdrop-filter: blur(2px);
+      0 28px 72px rgba(0,0,0,0.50),
+      0 8px 24px rgba(0,0,0,0.30),
+      0 0 0 1px rgba(255,255,255,0.08);
+    backdrop-filter: blur(4px);
   }
   .drag-handle {
     font-size: 20px;
