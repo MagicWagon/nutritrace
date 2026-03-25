@@ -1,6 +1,64 @@
 import { writable, get } from 'svelte/store';
 import { DB } from '../lib/db.js';
 
+// ── Server-side settings sync ──────────────────────────────────────────────
+// Keys in this set are synced to the server when user management is active.
+// Browser-only keys (appearance, nav style, etc.) are NOT in this set.
+const SERVER_SETTINGS = new Set([
+  'energyUnit','mealNames','goals','goalTemplates',
+  'visibleNutriments','nutrimentsOrder','customNutriments',
+  'bodyStatsOrder','hiddenBodyStats','foodCategories',
+  'diaryShowNutritionBar','diaryTotalsMode',
+  'diaryShowBrands','diaryShowTimestamps','diaryShowThumbnails',
+  'diaryShowAllNutrients','diaryShowNutritionUnits','diaryShowMacroSummary',
+  'diaryPromptQuantity','diaryShowPortionSize',
+  'foodsShowCategories','foodsShowNotes','foodsShowThumbnails',
+  'foodsShowYesterdayMeals','foodsSort',
+  'barcodeBeep','barcodeFlashlight','cropPhotos',
+  'offSearchLanguage','offSearchCountry','offUploadCountry',
+  'weightUnit','heightUnit','lengthUnit','distUnit',
+  'waterGoalMl','waterUnit','waterContainers','waterShowInStats','waterShowInDiary',
+  'dateFormat','timeFormat',
+  'statsChartType','statsYZero','statsAvgLine','statsGoalLine','statsTrendLine',
+  'aiEnabled','aiProvider','aiApiKey','aiModel','aiAssistantName',
+  'usdaEnabled','usdaApiKey','offUsername','offPassword',
+  'mealieEnabled','mealieBaseUrl','mealieApiToken',
+]);
+
+const _saveQueue = {};
+function _isLoggedIn() { return !!localStorage.getItem('wl:userId'); }
+function _scheduleSave(key, value) {
+  if (!SERVER_SETTINGS.has(key)) return;
+  clearTimeout(_saveQueue[key]);
+  _saveQueue[key] = setTimeout(() => {
+    if (!_isLoggedIn()) return;
+    fetch('/api/settings', {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, value }),
+    }).catch(() => {});
+  }, 600);
+}
+
+/**
+ * Called after login/auth-check. Fetches all server settings and populates
+ * localStorage + notifies all stores via wl:setting events.
+ */
+export async function loadServerSettings() {
+  if (!_isLoggedIn()) return;
+  try {
+    const res = await fetch('/api/settings', { credentials: 'include' });
+    if (!res.ok) return;
+    const serverSettings = await res.json();
+    for (const [key, value] of Object.entries(serverSettings)) {
+      // Use raw key for localStorage (DB.setSetting prefixes with wl_)
+      DB.setSetting(key, value);
+      window.dispatchEvent(new CustomEvent('wl:setting', { detail: { key: `wl_${key}` } }));
+    }
+  } catch {}
+}
+
 /**
  * Creates a Svelte store backed by a DB setting.
  * Syncs with the 'wl:setting' window event so changes in one
@@ -20,6 +78,7 @@ function createSettingStore(key, defaultValue) {
     set(value) {
       DB.setSetting(key, value);
       store.set(value);
+      _scheduleSave(key, value);
     },
     update(fn) {
       const current = DB.getSetting(key, defaultValue);

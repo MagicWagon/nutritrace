@@ -354,19 +354,26 @@
   })();
 
   // Drag-to-reorder for nutrients
-  let nutDragFrom = null, nutDragOver = null;
+  let nutDragFrom = null, nutDragOver = null, nutDragDelta = 0, nutRowHeights = [];
   function onNutDragDown(e, i) {
-    nutDragFrom = i; nutDragOver = i;
-    e.currentTarget.closest('.drag-list').setPointerCapture(e.pointerId);
+    const list = e.currentTarget.closest('.drag-list');
+    const rows = [...list.querySelectorAll('.drag-row')];
+    nutRowHeights = rows.map(r => r.getBoundingClientRect().height);
+    nutDragFrom = i; nutDragOver = i; nutDragDelta = 0;
+    list.setPointerCapture(e.pointerId);
+    list._dragStartY = e.clientY;
   }
   function onNutDragMove(e) {
     if (nutDragFrom === null) return;
+    nutDragDelta = e.clientY - e.currentTarget._dragStartY;
     const rows = [...e.currentTarget.querySelectorAll('.drag-row')];
     const y = e.clientY;
+    let best = nutDragOver;
     for (let idx = 0; idx < rows.length; idx++) {
       const r = rows[idx].getBoundingClientRect();
-      if (y >= r.top && y <= r.bottom) { nutDragOver = idx; break; }
+      if (y >= r.top && y <= r.bottom) { best = idx; break; }
     }
+    nutDragOver = best;
   }
   function onNutDragUp() {
     if (nutDragFrom !== null && nutDragOver !== null && nutDragFrom !== nutDragOver) {
@@ -376,7 +383,7 @@
       order.splice(nutDragOver, 0, removed);
       nutrimentsOrder.set(order);
     }
-    nutDragFrom = null; nutDragOver = null;
+    nutDragFrom = null; nutDragOver = null; nutDragDelta = 0; nutRowHeights = [];
   }
 
   // ── Nutrient visibility ────────────────────────────────────────────────────
@@ -406,19 +413,26 @@
   })();
 
   // Drag-to-reorder for body stats
-  let statDragFrom = null, statDragOver = null;
+  let statDragFrom = null, statDragOver = null, statDragDelta = 0, statRowHeights = [];
   function onStatDragDown(e, i) {
-    statDragFrom = i; statDragOver = i;
-    e.currentTarget.closest('.drag-list').setPointerCapture(e.pointerId);
+    const list = e.currentTarget.closest('.drag-list');
+    const rows = [...list.querySelectorAll('.drag-row')];
+    statRowHeights = rows.map(r => r.getBoundingClientRect().height);
+    statDragFrom = i; statDragOver = i; statDragDelta = 0;
+    list.setPointerCapture(e.pointerId);
+    list._dragStartY = e.clientY;
   }
   function onStatDragMove(e) {
     if (statDragFrom === null) return;
+    statDragDelta = e.clientY - e.currentTarget._dragStartY;
     const rows = [...e.currentTarget.querySelectorAll('.drag-row')];
     const y = e.clientY;
+    let best = statDragOver;
     for (let idx = 0; idx < rows.length; idx++) {
       const r = rows[idx].getBoundingClientRect();
-      if (y >= r.top && y <= r.bottom) { statDragOver = idx; break; }
+      if (y >= r.top && y <= r.bottom) { best = idx; break; }
     }
+    statDragOver = best;
   }
   function onStatDragUp() {
     if (statDragFrom !== null && statDragOver !== null && statDragFrom !== statDragOver) {
@@ -428,7 +442,16 @@
       order.splice(statDragOver, 0, removed);
       bodyStatsOrder.set(order);
     }
-    statDragFrom = null; statDragOver = null;
+    statDragFrom = null; statDragOver = null; statDragDelta = 0; statRowHeights = [];
+  }
+
+  // Compute translateY for a non-dragging row given current drag state
+  function dragShift(i, from, over, heights) {
+    if (from === null || over === null || i === from || from === over) return 0;
+    const h = heights[from] || 52;
+    if (from < over && i > from && i <= over) return -h;  // dragging down: items above shift up
+    if (from > over && i >= over && i < from) return h;   // dragging up: items below shift down
+    return 0;
   }
 
   // ── Body stats visibility ──────────────────────────────────────────────────
@@ -1108,8 +1131,12 @@
           {#each orderedNutriments as n, i}
             {#if i > 0}<div class="setting-divider"></div>{/if}
             <div class="setting-row drag-row"
-              class:drag-over={nutDragOver === i && nutDragFrom !== null && nutDragFrom !== i}
-              class:dragging={nutDragFrom === i}>
+              class:dragging={nutDragFrom === i}
+              style={nutDragFrom !== null
+                ? nutDragFrom === i
+                  ? `transform:scale(1.04) translateY(${nutDragDelta}px);transition:box-shadow 200ms ease,opacity 200ms ease`
+                  : `transform:translateY(${dragShift(i,nutDragFrom,nutDragOver,nutRowHeights)}px)`
+                : ''}>
               <!-- svelte-ignore a11y-no-static-element-interactions -->
               <span class="drag-handle material-symbols-rounded" on:pointerdown={e => onNutDragDown(e, i)}>drag_indicator</span>
               <span class="setting-label">{n.label} <span class="text-3 text-sm">({n.unit})</span></span>
@@ -1161,8 +1188,12 @@
           {#each orderedBodyStats as stat, i}
             {#if i > 0}<div class="setting-divider"></div>{/if}
             <div class="setting-row drag-row"
-              class:drag-over={statDragOver === i && statDragFrom !== null && statDragFrom !== i}
-              class:dragging={statDragFrom === i}>
+              class:dragging={statDragFrom === i}
+              style={statDragFrom !== null
+                ? statDragFrom === i
+                  ? `transform:scale(1.04) translateY(${statDragDelta}px);transition:box-shadow 200ms ease,opacity 200ms ease`
+                  : `transform:translateY(${dragShift(i,statDragFrom,statDragOver,statRowHeights)}px)`
+                : ''}>
               <!-- svelte-ignore a11y-no-static-element-interactions -->
               <span class="drag-handle material-symbols-rounded" on:pointerdown={e => onStatDragDown(e, i)}>drag_indicator</span>
               <span class="setting-label">{stat.label}</span>
@@ -1968,23 +1999,19 @@
   }
   .drag-row {
     position: relative;
-    transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
+    will-change: transform;
+    transition: transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 220ms ease, opacity 220ms ease;
   }
   .drag-row.dragging {
-    opacity: 0.85;
-    transform: scale(1.02);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.22);
+    opacity: 0.92;
+    z-index: 20;
+    border-radius: var(--radius-lg);
     background: var(--surface-2);
-    border-radius: 8px;
-    z-index: 10;
-  }
-  .drag-row.drag-over::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 8px; right: 8px;
-    height: 2px;
-    background: var(--accent);
-    border-radius: 2px;
+    box-shadow:
+      0 24px 64px rgba(0,0,0,0.45),
+      0 6px 20px rgba(0,0,0,0.25),
+      0 0 0 1px rgba(255,255,255,0.06);
+    backdrop-filter: blur(2px);
   }
   .drag-handle {
     font-size: 20px;
@@ -1993,8 +2020,10 @@
     flex-shrink: 0;
     user-select: none;
     touch-action: none;
+    transition: color var(--dur-fast);
   }
-  .drag-handle:active { cursor: grabbing; }
+  .drag-handle:hover  { color: var(--accent); }
+  .drag-handle:active { cursor: grabbing; color: var(--accent); }
   .setting-label { font-size: 14px; font-weight: 500; flex: 1; }
   .setting-desc  { font-size: 12px; color: var(--text-3); margin-top: 2px; font-weight: 400; }
   .setting-divider { height: 1px; background: var(--border); margin: 0 16px; }

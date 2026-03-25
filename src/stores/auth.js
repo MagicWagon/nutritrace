@@ -1,4 +1,5 @@
 import { writable } from 'svelte/store';
+import { loadServerSettings } from './settings.js';
 
 /** Currently logged-in user object, or null */
 export const currentUser = writable(null);
@@ -21,6 +22,7 @@ export async function loadAuthState() {
     // Update user-scoped localStorage key prefix
     if (user) localStorage.setItem('wl:userId', String(user.id));
     else       localStorage.removeItem('wl:userId');
+    if (user) await loadServerSettings();
   } catch {
     userMgmtActive.set(false);
     currentUser.set(null);
