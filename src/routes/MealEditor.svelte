@@ -372,13 +372,15 @@
     {#if $foodsShowCategories && $foodCategories && $foodCategories.length > 0}
       <div class="card editor-card">
         <div class="editor-card-title">Categories</div>
-        <div class="category-chips">
+        <div class="cat-chips">
           {#each $foodCategories as cat}
-            <button
-              class="cat-chip"
-              class:active={(meal.categories||[]).includes(_catName(cat))}
-              on:click={() => toggleCat(cat)}
-            >{_catDisplay(cat)}</button>
+            <button class="chip" class:accent={(meal.categories||[]).includes(_catName(cat))}
+              on:click={() => toggleCat(cat)}>
+              {#if (meal.categories||[]).includes(_catName(cat))}
+                <span class="material-symbols-rounded" style="font-size:14px">check</span>
+              {/if}
+              {_catDisplay(cat)}
+            </button>
           {/each}
         </div>
       </div>
@@ -613,14 +615,7 @@
   .photo-url-input { flex: 1; }
 
   /* Categories */
-  .category-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-  .cat-chip {
-    padding: 6px 12px; border-radius: var(--radius-full);
-    border: 1.5px solid var(--border); background: none;
-    font-size: 13px; cursor: pointer; color: var(--text-2);
-    transition: all var(--dur-fast);
-  }
-  .cat-chip.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+  .cat-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 
   /* Ingredient rows */
   .ingredient-list { display: flex; flex-direction: column; touch-action: none; }

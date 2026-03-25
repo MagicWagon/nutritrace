@@ -473,6 +473,24 @@
       </div>
     </div>
 
+    <!-- Categories -->
+    {#if $foodsShowCategories && ($foodCategories || []).length > 0}
+      <div class="card editor-card">
+        <div class="editor-card-title">Categories</div>
+        <div class="cat-chips">
+          {#each $foodCategories as cat}
+            <button class="chip" class:accent={(food.categories||[]).includes(_catName(cat))}
+              on:click={() => toggleCategory(cat)}>
+              {#if (food.categories||[]).includes(_catName(cat))}
+                <span class="material-symbols-rounded" style="font-size:14px">check</span>
+              {/if}
+              {_catDisplay(cat)}
+            </button>
+          {/each}
+        </div>
+      </div>
+    {/if}
+
     <!-- Notes -->
     {#if $foodsShowNotes}
       <div class="card editor-card">
@@ -497,24 +515,6 @@
         {showAllNutrients ? 'Show less' : 'Show all nutrients'}
       </button>
     </div>
-
-    <!-- Categories -->
-    {#if $foodsShowCategories && ($foodCategories || []).length > 0}
-      <div class="card editor-card">
-        <div class="editor-card-title">Categories</div>
-        <div class="cat-chips">
-          {#each $foodCategories as cat}
-            <button class="chip" class:accent={(food.categories||[]).includes(_catName(cat))}
-              on:click={() => toggleCategory(cat)}>
-              {#if (food.categories||[]).includes(_catName(cat))}
-                <span class="material-symbols-rounded" style="font-size:14px">check</span>
-              {/if}
-              {_catDisplay(cat)}
-            </button>
-          {/each}
-        </div>
-      </div>
-    {/if}
 
     <div style="height:16px"></div>
   </div>
