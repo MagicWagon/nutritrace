@@ -561,19 +561,7 @@
           return { ...rest, imgUrl: await migrateImg(cleanImg(image_url)), items: resolveItems(r.items), nutrition: mapNutrition(r.nutrition) };
         }));
 
-        const byDate = {};
-        for (const entry of (raw.diary||[])) {
-          if (!entry.dateTime) continue;
-          const date = entry.dateTime.slice(0,10);
-          if (!byDate[date]) byDate[date] = { date, items: [], bodyStats: {} };
-          if (entry.stats?.weight != null) byDate[date].bodyStats.weight = entry.stats.weight;
-          for (const item of (entry.items||[])) {
-            const food = foodMap[item.id]; if(!food) continue;
-            byDate[date].items.push({ ...food, portion: parseFloat(item.portion)||food.portion||100, quantity: parseFloat(item.quantity)||1, meal: Number(item.category??0)||0, addedAt: item.dateTime||entry.dateTime });
-          }
-        }
-
-        await NtApi.post('/api/data/import', { foodList: foods, meals, recipes, diary: Object.values(byDate) });
+        await NtApi.post('/api/data/import', { foodList: foods, meals, recipes });
 
         // Merge imported categories into the category list
         const importedCats = [...new Set(foods.map(f => (f.categories && f.categories[0]) || f.category).filter(Boolean))];
