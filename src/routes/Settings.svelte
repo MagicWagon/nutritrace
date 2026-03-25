@@ -727,6 +727,37 @@
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   }
 
+  let showUploadRestoreDialog = false;
+  let uploadRestoreFile       = null;
+
+  function pickUploadRestore() {
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = '.zip';
+    input.onchange = e => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      uploadRestoreFile = file;
+      showUploadRestoreDialog = true;
+    };
+    input.click();
+  }
+
+  async function confirmUploadRestore() {
+    if (!uploadRestoreFile) return;
+    showUploadRestoreDialog = false;
+    fullBackupBusy = true;
+    try {
+      const form = new FormData();
+      form.append('backup', uploadRestoreFile);
+      const res  = await fetch('/api/full-backup/upload-restore', { method: 'POST', credentials: 'include', body: form });
+      const data = await res.json();
+      if (!res.ok) { showError(data.error || 'Restore failed'); return; }
+      showSuccess('Restore complete — reloading…');
+      setTimeout(() => location.reload(), 1500);
+    } catch { showError('Restore failed'); }
+    finally   { fullBackupBusy = false; uploadRestoreFile = null; }
+  }
+
   // Load backup list when section opens (admin only)
   $: if (openSections.backup && $currentUser?.role === 'admin') loadFullBackups();
 
@@ -1755,14 +1786,20 @@
         <div class="card settings-card">
           <div style="padding:12px 16px 4px">
             <p class="setting-desc" style="margin:0 0 12px">A complete snapshot of everything — all user data, diary, foods, meals, recipes, settings, and uploaded images. Saved on the server and available to download or restore at any time.</p>
-            <button class="btn btn-primary" style="height:36px;font-size:13px;margin-bottom:14px"
-              on:click={createFullBackup} disabled={fullBackupBusy}>
-              {#if fullBackupBusy}
-                <span class="material-symbols-rounded spin" style="font-size:16px">autorenew</span> Working…
-              {:else}
-                <span class="material-symbols-rounded" style="font-size:16px">add_circle</span> Create Backup
-              {/if}
-            </button>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+              <button class="btn btn-primary" style="height:36px;font-size:13px"
+                on:click={createFullBackup} disabled={fullBackupBusy}>
+                {#if fullBackupBusy}
+                  <span class="material-symbols-rounded spin" style="font-size:16px">autorenew</span> Working…
+                {:else}
+                  <span class="material-symbols-rounded" style="font-size:16px">add_circle</span> Create Backup
+                {/if}
+              </button>
+              <button class="btn btn-secondary" style="height:36px;font-size:13px"
+                on:click={pickUploadRestore} disabled={fullBackupBusy}>
+                <span class="material-symbols-rounded" style="font-size:16px">upload</span> Upload &amp; Restore
+              </button>
+            </div>
           </div>
 
           {#if fullBackups.length > 0}
@@ -2160,6 +2197,15 @@
   cancelText="Cancel"
   dangerous
   on:confirm={confirmRestoreFullBackup}
+/>
+
+<Dialog bind:open={showUploadRestoreDialog}
+  title="Restore from uploaded file?"
+  message="This will replace all current data with the contents of the uploaded backup. This cannot be undone."
+  confirmText="Restore"
+  cancelText="Cancel"
+  dangerous
+  on:confirm={confirmUploadRestore}
 />
 
 <Dialog bind:open={showDeleteBkDialog}

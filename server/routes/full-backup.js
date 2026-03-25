@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import AdmZip from 'adm-zip';
+import multer from 'multer';
 import db from '../db.js';
 
 const router = express.Router();
@@ -13,10 +14,72 @@ const UPLOADS_DIR = process.env.UPLOADS_PATH  || path.resolve(__dirname, '..', '
 
 fs.mkdirSync(BACKUPS_DIR, { recursive: true });
 
+// Multer: store uploaded backup ZIPs in memory (they're small enough)
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 500 * 1024 * 1024 } });
+
 function requireAdmin(req, res, next) {
   if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
   next();
+}
+
+function restoreFromZip(zip) {
+  const data = JSON.parse(zip.readAsText('database.json'));
+
+  db.transaction(() => {
+    db.prepare('DELETE FROM password_reset_tokens').run();
+    db.prepare('DELETE FROM invite_tokens').run();
+    db.prepare('DELETE FROM user_settings').run();
+    db.prepare('DELETE FROM app_config').run();
+    db.prepare('DELETE FROM diary').run();
+    db.prepare('DELETE FROM foods').run();
+    db.prepare('DELETE FROM meals').run();
+    db.prepare('DELETE FROM users').run();
+
+    const insUser = db.prepare(`
+      INSERT OR IGNORE INTO users (id, username, password_hash, full_name, nickname, email, birthday, gender, avatar_url, role, created_at)
+      VALUES (@id, @username, @password_hash, @full_name, @nickname, @email, @birthday, @gender, @avatar_url, @role, @created_at)
+    `);
+    for (const u of data.users || []) insUser.run(u);
+
+    const insFood = db.prepare(`
+      INSERT OR IGNORE INTO foods (id, user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, created_at)
+      VALUES (@id, @user_id, @name, @brand, @nutrition, @portion, @unit, @img_url, @notes, @category, @barcode, @created_at)
+    `);
+    for (const f of data.foods || []) insFood.run(f);
+
+    const insMeal = db.prepare(`
+      INSERT OR IGNORE INTO meals (id, user_id, name, nutrition, items, img_url, notes, is_recipe, portion, unit, created_at)
+      VALUES (@id, @user_id, @name, @nutrition, @items, @img_url, @notes, @is_recipe, @portion, @unit, @created_at)
+    `);
+    for (const m of data.meals || []) insMeal.run(m);
+
+    const insDiary = db.prepare(`
+      INSERT OR IGNORE INTO diary (id, user_id, date, items, body_stats, water, updated_at)
+      VALUES (@id, @user_id, @date, @items, @body_stats, @water, @updated_at)
+    `);
+    for (const d of data.diary || []) insDiary.run(d);
+
+    const insSettings = db.prepare(`
+      INSERT OR IGNORE INTO user_settings (user_id, key, value) VALUES (@user_id, @key, @value)
+    `);
+    for (const s of data.user_settings || []) insSettings.run(s);
+
+    const insConfig = db.prepare(`
+      INSERT OR REPLACE INTO app_config (key, value) VALUES (@key, @value)
+    `);
+    for (const c of data.app_config || []) insConfig.run(c);
+  })();
+
+  // Restore images
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  for (const entry of zip.getEntries()) {
+    if (!entry.entryName.startsWith('images/') || entry.isDirectory) continue;
+    const rel  = entry.entryName.slice('images/'.length);
+    const dest = path.join(UPLOADS_DIR, rel);
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.writeFileSync(dest, entry.getData());
+  }
 }
 
 function dumpDatabase() {
@@ -101,79 +164,24 @@ router.delete('/:name', requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
-// ── POST /api/full-backup/:name/restore ───────────────────────────────────
+// ── POST /api/full-backup/:name/restore — restore from a server-side backup ─
 router.post('/:name/restore', requireAdmin, (req, res) => {
   const filename = path.basename(req.params.name);
   const filePath = path.join(BACKUPS_DIR, filename);
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Not found' });
-
   try {
-    const zip  = new AdmZip(filePath);
-    const data = JSON.parse(zip.readAsText('database.json'));
+    restoreFromZip(new AdmZip(filePath));
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
-    // Restore database in a transaction
-    db.transaction(() => {
-      // Clear all data
-      db.prepare('DELETE FROM password_reset_tokens').run();
-      db.prepare('DELETE FROM invite_tokens').run();
-      db.prepare('DELETE FROM user_settings').run();
-      db.prepare('DELETE FROM app_config').run();
-      db.prepare('DELETE FROM diary').run();
-      db.prepare('DELETE FROM foods').run();
-      db.prepare('DELETE FROM meals').run();
-      db.prepare('DELETE FROM users').run();
-
-      // Restore users
-      const insUser = db.prepare(`
-        INSERT OR IGNORE INTO users (id, username, password_hash, full_name, nickname, email, birthday, gender, avatar_url, role, created_at)
-        VALUES (@id, @username, @password_hash, @full_name, @nickname, @email, @birthday, @gender, @avatar_url, @role, @created_at)
-      `);
-      for (const u of data.users || []) insUser.run(u);
-
-      // Restore foods
-      const insFood = db.prepare(`
-        INSERT OR IGNORE INTO foods (id, user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, created_at)
-        VALUES (@id, @user_id, @name, @brand, @nutrition, @portion, @unit, @img_url, @notes, @category, @barcode, @created_at)
-      `);
-      for (const f of data.foods || []) insFood.run(f);
-
-      // Restore meals
-      const insMeal = db.prepare(`
-        INSERT OR IGNORE INTO meals (id, user_id, name, nutrition, items, img_url, notes, is_recipe, portion, unit, created_at)
-        VALUES (@id, @user_id, @name, @nutrition, @items, @img_url, @notes, @is_recipe, @portion, @unit, @created_at)
-      `);
-      for (const m of data.meals || []) insMeal.run(m);
-
-      // Restore diary
-      const insDiary = db.prepare(`
-        INSERT OR IGNORE INTO diary (id, user_id, date, items, body_stats, water, updated_at)
-        VALUES (@id, @user_id, @date, @items, @body_stats, @water, @updated_at)
-      `);
-      for (const d of data.diary || []) insDiary.run(d);
-
-      // Restore user_settings
-      const insSettings = db.prepare(`
-        INSERT OR IGNORE INTO user_settings (user_id, key, value) VALUES (@user_id, @key, @value)
-      `);
-      for (const s of data.user_settings || []) insSettings.run(s);
-
-      // Restore app_config
-      const insConfig = db.prepare(`
-        INSERT OR REPLACE INTO app_config (key, value) VALUES (@key, @value)
-      `);
-      for (const c of data.app_config || []) insConfig.run(c);
-    })();
-
-    // Restore images
-    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-    for (const entry of zip.getEntries()) {
-      if (!entry.entryName.startsWith('images/') || entry.isDirectory) continue;
-      const rel    = entry.entryName.slice('images/'.length);
-      const dest   = path.join(UPLOADS_DIR, rel);
-      fs.mkdirSync(path.dirname(dest), { recursive: true });
-      fs.writeFileSync(dest, entry.getData());
-    }
-
+// ── POST /api/full-backup/upload-restore — upload a ZIP and restore from it ─
+router.post('/upload-restore', requireAdmin, upload.single('backup'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+  try {
+    restoreFromZip(new AdmZip(req.file.buffer));
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
