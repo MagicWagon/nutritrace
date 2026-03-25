@@ -952,6 +952,8 @@
         if (k?.startsWith('wl_') && !preserve.has(k)) keys.push(k);
       }
       keys.forEach(k => localStorage.removeItem(k));
+      // Re-stamp setupComplete so the wizard doesn't re-trigger
+      DB.setSetting('setupComplete', true);
       showSuccess('All data cleared');
       setTimeout(() => location.reload(), 1000);
     } catch(e) { showError('Clear failed: ' + e.message); }

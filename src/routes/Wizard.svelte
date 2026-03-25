@@ -38,9 +38,10 @@
   let targetW  = 65;
   let activity = '';
 
-  // Computed TDEE / goal for summary step
-  let tdee = 0;
-  let goalKcal = 0;
+  // Computed TDEE / goal / water for summary step
+  let tdee      = 0;
+  let goalKcal  = 0;
+  let waterGoal = 0; // ml
 
   const ACTIVITY_LEVELS = [
     { value: 'sedentary',   label: 'Sedentary',          desc: 'Little or no exercise' },
@@ -85,6 +86,12 @@
     if (tWKg < wKg * 0.99)      goalKcal = Math.round(tdee * 0.80);
     else if (tWKg > wKg * 1.01) goalKcal = Math.round(tdee * 1.20);
     else                         goalKcal = tdee;
+
+    // Water goal: 35ml per kg body weight + activity adjustment
+    const ACTIVITY_WATER = { sedentary: 0, light: 350, moderate: 500, active: 700, very_active: 1000 };
+    const baseWater = wKg * 35;
+    const actBonus  = ACTIVITY_WATER[activity] ?? 0;
+    waterGoal = Math.round((baseWater + actBonus) / 50) * 50; // round to nearest 50ml
   }
 
   $: currentStepName = ALL_STEPS[step];
@@ -174,6 +181,7 @@
       const current = DB.getSetting('goals', {});
       goals.set({ ...current, calories: { max: goalKcal, sharedGoal: true, isMin: false, showInDiary: true, showInStats: true, days: Array(7).fill(goalKcal) } });
     }
+    if (waterGoal) DB.setSetting('waterGoalMl', waterGoal);
     DB.setSetting('setupComplete', true);
     push('/');
   }
@@ -369,8 +377,8 @@
 
       <!-- ── Summary ── -->
       {:else if currentStepName === 'summary'}
-        <h2 class="step-title">Your Daily Calorie Goal</h2>
-        <p class="step-desc">Based on your stats using the Mifflin-St Jeor formula.</p>
+        <h2 class="step-title">Your Daily Goals</h2>
+        <p class="step-desc">Calculated from your stats using the Mifflin-St Jeor formula.</p>
         <div class="summary-card">
           <div class="tdee-row">
             <div class="tdee-label">Estimated TDEE</div>
@@ -380,8 +388,12 @@
           <hr style="border:none;border-top:1px solid var(--border);margin:16px 0" />
           <div class="summary-rows">
             <div class="summary-row">
-              <span class="text-3">Suggested goal</span>
+              <span class="text-3">Calorie goal</span>
               <strong>{goalKcal} kcal/day</strong>
+            </div>
+            <div class="summary-row">
+              <span class="text-3">Water goal</span>
+              <strong>{waterGoal >= 1000 ? (waterGoal / 1000).toFixed(1) + ' L' : waterGoal + ' ml'}/day</strong>
             </div>
             <div class="summary-row">
               <span class="text-3">Current weight</span>
@@ -397,7 +409,7 @@
             </div>
           </div>
           <p class="text-3" style="font-size:12px;margin-top:12px;text-align:center">
-            You can adjust this anytime in Goals → Settings.
+            You can adjust these anytime in Settings.
           </p>
         </div>
       {/if}
