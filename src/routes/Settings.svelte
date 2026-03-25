@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { get } from 'svelte/store';
   import { slide } from 'svelte/transition';
   import Toggle from '../components/settings/Toggle.svelte';
@@ -767,6 +767,12 @@
   }
 
   let restoreStatus = null; // null | { phase: 'uploading'|'restoring', percent: number, label: string }
+  let restoreProgressEl = null;
+
+  async function _scrollToProgress() {
+    await tick();
+    restoreProgressEl?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
 
   async function confirmRestoreFullBackup() {
     if (!restoreTarget) return;
@@ -775,6 +781,7 @@
     restoreTarget = null;
     fullBackupBusy = true;
     restoreStatus = { phase: 'restoring', percent: 40, label: 'Restoring backup…' };
+    _scrollToProgress();
     try {
       const res  = await fetch(`/api/full-backup/${encodeURIComponent(filename)}/restore`, { method: 'POST', credentials: 'include' });
       const data = await res.json();
@@ -818,53 +825,56 @@
     input.click();
   }
 
-  async function confirmUploadRestore() {
+  function confirmUploadRestore() {
     if (!uploadRestoreFile) return;
     showUploadRestoreDialog = false;
     fullBackupBusy = true;
     restoreStatus = { phase: 'uploading', percent: 0, label: 'Uploading backup…' };
-    try {
-      await new Promise((resolve, reject) => {
-        const form = new FormData();
-        form.append('backup', uploadRestoreFile);
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', '/api/full-backup/upload-restore');
-        xhr.withCredentials = true;
-        xhr.upload.onprogress = ev => {
-          if (ev.lengthComputable) {
-            const pct = Math.round((ev.loaded / ev.total) * 80); // 0-80% = upload
-            restoreStatus = { phase: 'uploading', percent: pct, label: `Uploading… ${pct}%` };
-          }
-        };
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            try {
-              const data = JSON.parse(xhr.responseText);
-              if (data.error) { reject(new Error(data.error)); return; }
-            } catch { /* non-JSON response */ }
-            restoreStatus = { phase: 'restoring', percent: 90, label: 'Restoring on server…' };
-            setTimeout(() => {
-              restoreStatus = { phase: 'restoring', percent: 100, label: 'Restore complete — reloading…' };
-              setTimeout(() => location.reload(), 1000);
-            }, 500);
-            resolve();
-          } else {
-            try {
-              const d = JSON.parse(xhr.responseText);
-              reject(new Error(d.error || `Server error ${xhr.status}`));
-            } catch { reject(new Error(`Server error ${xhr.status}`)); }
-          }
-        };
-        xhr.onerror = () => reject(new Error('Network error — upload failed'));
-        xhr.send(form);
-      });
-    } catch (err) {
-      showError('Restore failed: ' + err.message);
-      restoreStatus = null;
-    } finally {
+    _scrollToProgress();
+
+    const file = uploadRestoreFile;
+    uploadRestoreFile = null;
+
+    const form = new FormData();
+    form.append('backup', file);
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/full-backup/upload-restore');
+    xhr.withCredentials = true;
+
+    // onprogress at top level — Svelte can track these assignments directly
+    xhr.upload.onprogress = ev => {
+      if (ev.lengthComputable) {
+        const pct = Math.round((ev.loaded / ev.total) * 85);
+        restoreStatus = { phase: 'uploading', percent: pct, label: `Uploading… ${pct}%` };
+      }
+    };
+
+    xhr.onload = () => {
       fullBackupBusy = false;
-      uploadRestoreFile = null;
-    }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        let err = null;
+        try { const d = JSON.parse(xhr.responseText); if (d.error) err = d.error; } catch {}
+        if (err) { showError('Restore failed: ' + err); restoreStatus = null; return; }
+        restoreStatus = { phase: 'restoring', percent: 95, label: 'Restoring on server…' };
+        setTimeout(() => {
+          restoreStatus = { phase: 'restoring', percent: 100, label: 'Restore complete — reloading…' };
+          setTimeout(() => location.reload(), 1000);
+        }, 600);
+      } else {
+        let msg = `Server error ${xhr.status}`;
+        try { const d = JSON.parse(xhr.responseText); if (d.error) msg = d.error; } catch {}
+        showError('Restore failed: ' + msg);
+        restoreStatus = null;
+      }
+    };
+
+    xhr.onerror = () => {
+      fullBackupBusy = false;
+      restoreStatus = null;
+      showError('Restore failed: network error');
+    };
+
+    xhr.send(form);
   }
 
   // Load backup list when section opens (admin only)
@@ -1953,7 +1963,7 @@
               </button>
             </div>
             {#if restoreStatus}
-              <div class="restore-progress">
+              <div class="restore-progress" bind:this={restoreProgressEl}>
                 <div class="restore-progress-label">
                   <span class="material-symbols-rounded spin" style="font-size:15px;flex-shrink:0">autorenew</span>
                   {restoreStatus.label}
