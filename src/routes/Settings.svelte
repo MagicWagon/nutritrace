@@ -320,12 +320,9 @@
     const pickerH = 400;
     const pickerW = 320;
     const margin = 8;
-    // Prefer below button; if it overflows bottom, push up — but never go above viewport top
-    let y = rect.bottom + margin;
-    if (y + pickerH > window.innerHeight - margin) {
-      y = window.innerHeight - pickerH - margin;
-    }
-    y = Math.max(y, margin);
+    // Prefer above the button; fall back to below if not enough room
+    let y = rect.top - pickerH - margin;
+    if (y < margin) y = rect.bottom + margin;
     // Clamp horizontal to viewport
     let x = rect.left;
     if (x + pickerW > window.innerWidth - margin) x = window.innerWidth - pickerW - margin;
