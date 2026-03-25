@@ -1,5 +1,6 @@
 <script>
   import { currentUser, userMgmtActive, loadAuthState } from '../stores/auth.js';
+  import { loadServerSettings } from '../stores/settings.js';
   import { showError, showSuccess } from '../stores/toast.js';
   import { push } from 'svelte-spa-router';
   import { slide } from 'svelte/transition';
@@ -26,6 +27,7 @@
       if (!res.ok) { showError(data.error || 'Login failed'); return; }
       localStorage.setItem('wl:userId', String(data.user.id));
       currentUser.set(data.user);
+      await loadServerSettings();
       push('/');
     } catch(e) {
       showError('Could not reach server');
