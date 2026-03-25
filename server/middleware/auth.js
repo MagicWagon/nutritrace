@@ -10,11 +10,21 @@ export function userMgmtActive() {
 
 /** Sign a JWT for a user row */
 export function signToken(user) {
+  const cfg = db.prepare("SELECT value FROM app_config WHERE key = 'session_hours'").get();
+  const hours = cfg?.value != null && cfg.value !== '' ? parseInt(cfg.value) : 720;
+  const opts = hours > 0 ? { expiresIn: `${hours}h` } : {};
   return jwt.sign(
     { id: user.id, username: user.username, role: user.role },
     JWT_SECRET,
-    { expiresIn: '30d' }
+    opts
   );
+}
+
+/** Read session maxAge for cookies (in ms). 0 = no expiry → 10 years. */
+export function sessionMaxAge() {
+  const cfg = db.prepare("SELECT value FROM app_config WHERE key = 'session_hours'").get();
+  const hours = cfg?.value != null && cfg.value !== '' ? parseInt(cfg.value) : 720;
+  return hours > 0 ? hours * 60 * 60 * 1000 : 100 * 365 * 24 * 60 * 60 * 1000;
 }
 
 /** Attach req.user if a valid JWT cookie is present (non-blocking) */

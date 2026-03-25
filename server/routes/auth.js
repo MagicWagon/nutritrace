@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import db from '../db.js';
 import { wrap } from '../logger.js';
-import { signToken, userMgmtActive, requireAuth, requireAdmin } from '../middleware/auth.js';
+import { signToken, sessionMaxAge, userMgmtActive, requireAuth, requireAdmin } from '../middleware/auth.js';
 import { sendPasswordReset, sendInvite, isEmailConfigured } from '../email.js';
 
 const router = Router();
@@ -42,7 +42,8 @@ router.post('/login', wrap((req, res) => {
     return res.status(401).json({ error: 'Invalid username or password' });
   }
 
-  res.cookie('nt_token', signToken(user), COOKIE_OPTS);
+  const cookieOpts = { ...COOKIE_OPTS, maxAge: sessionMaxAge() };
+  res.cookie('nt_token', signToken(user), cookieOpts);
   res.json({ user: safeUser(user) });
 }));
 

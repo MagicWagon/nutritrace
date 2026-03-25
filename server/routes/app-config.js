@@ -8,6 +8,7 @@ const router = Router();
 
 const ALLOWED_KEYS = new Set([
   'smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_pass', 'smtp_from',
+  'session_hours',
 ]);
 
 // ── GET /api/app-config — return all config (passwords redacted) ───────────

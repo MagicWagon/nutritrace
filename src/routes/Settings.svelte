@@ -339,6 +339,13 @@
     return { destroy() { document.removeEventListener('pointerdown', handle, true); } };
   }
 
+  // Action for emoji-picker-element: uses addEventListener directly (more reliable with web components)
+  function emojiPickerAction(node) {
+    function handle(e) { onEmojiPick(e); }
+    node.addEventListener('emoji-click', handle);
+    return { destroy() { node.removeEventListener('emoji-click', handle); } };
+  }
+
   function addCategory() {
     const name = newCategoryName.trim();
     if (!name) return;
@@ -509,6 +516,50 @@
   function autoSaveMeals() {
     const toSave = meals.filter(m => m.trim());
     if (toSave.length) mealNames.set(toSave);
+  }
+
+  // Keyword-based meal icon
+  function mealIcon(name) {
+    const n = (name || '').toLowerCase();
+    if (n.includes('breakfast') || n.includes('morning') || n.includes('brunch')) return 'free_breakfast';
+    if (n.includes('lunch') || n.includes('noon') || n.includes('midday')) return 'lunch_dining';
+    if (n.includes('dinner') || n.includes('supper') || n.includes('evening')) return 'dinner_dining';
+    if (n.includes('snack') || n.includes('bite') || n.includes('treat')) return 'cookie';
+    if (n.includes('drink') || n.includes('smoothie') || n.includes('shake')) return 'local_cafe';
+    return 'restaurant';
+  }
+
+  // Drag-to-reorder for meal names
+  let mealDragFrom = null, mealDragOver = null, mealDragDelta = 0, mealRowHeights = [];
+  function onMealDragDown(e, i) {
+    const list = e.currentTarget.closest('.drag-list');
+    const rows = [...list.querySelectorAll('.drag-row')];
+    mealRowHeights = rows.map(r => r.getBoundingClientRect().height);
+    mealDragFrom = i; mealDragOver = i; mealDragDelta = 0;
+    list.setPointerCapture(e.pointerId);
+    list._dragStartY = e.clientY;
+  }
+  function onMealDragMove(e) {
+    if (mealDragFrom === null) return;
+    mealDragDelta = e.clientY - e.currentTarget._dragStartY;
+    const rows = [...e.currentTarget.querySelectorAll('.drag-row')];
+    const y = e.clientY;
+    let best = mealDragOver;
+    for (let idx = 0; idx < rows.length; idx++) {
+      const r = rows[idx].getBoundingClientRect();
+      if (y >= r.top && y <= r.bottom) { best = idx; break; }
+    }
+    mealDragOver = best;
+  }
+  function onMealDragUp() {
+    if (mealDragFrom !== null && mealDragOver !== null && mealDragFrom !== mealDragOver) {
+      const reordered = [...meals];
+      const [removed] = reordered.splice(mealDragFrom, 1);
+      reordered.splice(mealDragOver, 0, removed);
+      meals = reordered;
+      autoSaveMeals();
+    }
+    mealDragFrom = null; mealDragOver = null; mealDragDelta = 0; mealRowHeights = [];
   }
 
   // ── Backup ─────────────────────────────────────────────────────────────────
@@ -818,6 +869,27 @@
     } catch { smtpTestStatus = 'fail'; }
   }
 
+  // ── Session duration (admin-only) ─────────────────────────────────────────
+  let sessionHours = '720';
+  let sessionSaved = false;
+  async function loadSessionConfig() {
+    try {
+      const res = await fetch('/api/app-config', { credentials: 'include' });
+      if (!res.ok) return;
+      const cfg = await res.json();
+      sessionHours = cfg.session_hours ?? '720';
+    } catch {}
+  }
+  async function saveSessionHours() {
+    await fetch('/api/app-config', {
+      method: 'PUT', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'session_hours', value: sessionHours }),
+    }).catch(() => {});
+    sessionSaved = true;
+    setTimeout(() => sessionSaved = false, 2000);
+  }
+
   $: if (openSections.email && $currentUser?.role === 'admin') loadSmtpConfig();
 
   // ── Invite ─────────────────────────────────────────────────────────────────
@@ -938,7 +1010,7 @@
   }
 
   // Load users when section opens
-  $: if (openSections.users && $userMgmtActive) loadUsers();
+  $: if (openSections.users && $userMgmtActive) { loadUsers(); if ($currentUser?.role === 'admin') loadSessionConfig(); }
 
   let showClearDialog = false;
   async function clearAllData() {
@@ -955,7 +1027,7 @@
       // Re-stamp setupComplete so the wizard doesn't re-trigger
       DB.setSetting('setupComplete', true);
       showSuccess('All data cleared');
-      setTimeout(() => location.reload(), 1000);
+      await loadAuthState();
     } catch(e) { showError('Clear failed: ' + e.message); }
   }
 
@@ -1168,11 +1240,25 @@
         </div>
 
         <p class="sub-label">Meal names</p>
-        <div class="card settings-card">
+        <!-- svelte-ignore a11y-no-static-element-interactions -->
+        <div class="card settings-card drag-list"
+          on:pointermove={onMealDragMove}
+          on:pointerup={onMealDragUp}
+          on:pointercancel={onMealDragUp}>
           {#each meals as _, i}
-            <div class="setting-row">
-              <span class="setting-label text-3 text-sm" style="min-width:56px">Meal {i+1}</span>
-              <input class="input" style="flex:1;height:36px;max-width:220px" placeholder="Meal {i+1}" bind:value={meals[i]} on:blur={autoSaveMeals} />
+            {#if i > 0}<div class="setting-divider"></div>{/if}
+            <div class="setting-row drag-row"
+              class:dragging={mealDragFrom === i}
+              class:drag-target={mealDragFrom !== null && mealDragFrom !== i && mealDragOver === i}
+              style={mealDragFrom !== null
+                ? mealDragFrom === i
+                  ? `transform:scale(1.04) translateY(${mealDragDelta}px);transition:box-shadow 200ms ease,opacity 200ms ease`
+                  : `transform:translateY(${dragShift(i,mealDragFrom,mealDragOver,mealRowHeights)}px)`
+                : ''}>
+              <!-- svelte-ignore a11y-no-static-element-interactions -->
+              <span class="drag-handle material-symbols-rounded" on:pointerdown={e => onMealDragDown(e, i)}>drag_indicator</span>
+              <span class="material-symbols-rounded" style="font-size:18px;color:var(--text-3);flex-shrink:0">{mealIcon(meals[i])}</span>
+              <input class="input" style="flex:1;height:36px;min-width:0" placeholder="Meal {i+1}" bind:value={meals[i]} on:blur={autoSaveMeals} />
               {#if meals.length > 1}
                 <button class="btn-icon" style="width:32px;height:32px;color:var(--danger);flex-shrink:0"
                   on:click={() => { meals = meals.filter((_,j) => j !== i); autoSaveMeals(); }} title="Remove meal">
@@ -1180,7 +1266,6 @@
                 </button>
               {/if}
             </div>
-            <div class="setting-divider"></div>
           {/each}
           <div style="padding:8px 16px 14px">
             <button class="btn btn-secondary" style="height:36px;font-size:13px;width:100%;display:flex;align-items:center;justify-content:center;gap:4px"
@@ -1354,13 +1439,6 @@
                 on:click={openEmojiPicker}>
                 {newCategoryLabel || '🏷️'}
               </button>
-              {#if showEmojiPicker}
-                <div class="emoji-picker-wrap"
-                  style="left:{emojiPickerX}px;top:{emojiPickerY}px"
-                  use:clickOutside={() => showEmojiPicker = false}>
-                  <emoji-picker on:emoji-click={onEmojiPick}></emoji-picker>
-                </div>
-              {/if}
             </div>
             <div style="display:flex;flex-direction:column;gap:3px;flex:1">
               <span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3)">Category name *</span>
@@ -1391,6 +1469,7 @@
             {#if i > 0}<div class="setting-divider"></div>{/if}
             <div class="setting-row drag-row"
               class:dragging={nutDragFrom === i}
+              class:drag-target={nutDragFrom !== null && nutDragFrom !== i && nutDragOver === i}
               style={nutDragFrom !== null
                 ? nutDragFrom === i
                   ? `transform:scale(1.04) translateY(${nutDragDelta}px);transition:box-shadow 200ms ease,opacity 200ms ease`
@@ -1448,6 +1527,7 @@
             {#if i > 0}<div class="setting-divider"></div>{/if}
             <div class="setting-row drag-row"
               class:dragging={statDragFrom === i}
+              class:drag-target={statDragFrom !== null && statDragFrom !== i && statDragOver === i}
               style={statDragFrom !== null
                 ? statDragFrom === i
                   ? `transform:scale(1.04) translateY(${statDragDelta}px);transition:box-shadow 200ms ease,opacity 200ms ease`
@@ -2081,6 +2161,30 @@
               </div>
 
               <div class="setting-divider"></div>
+              <div class="setting-row">
+                <div>
+                  <span class="setting-label">Session duration</span>
+                  <div class="setting-desc">How long users stay signed in. Applies to new logins.</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <div class="select-wrap" style="width:130px">
+                    <select class="select sel-sm" bind:value={sessionHours}>
+                      <option value="0">Never expires</option>
+                      <option value="8">8 hours</option>
+                      <option value="24">1 day</option>
+                      <option value="168">7 days</option>
+                      <option value="720">30 days</option>
+                      <option value="2160">90 days</option>
+                      <option value="8760">1 year</option>
+                    </select>
+                  </div>
+                  <button class="btn btn-secondary" style="height:32px;font-size:12px;padding:0 12px;white-space:nowrap" on:click={saveSessionHours}>
+                    {#if sessionSaved}<span class="material-symbols-rounded" style="font-size:14px">check</span>{:else}Save{/if}
+                  </button>
+                </div>
+              </div>
+
+              <div class="setting-divider"></div>
               <button class="setting-row setting-action danger" on:click={() => showDisableUmDialog = true}>
                 <span class="material-symbols-rounded si" style="color:var(--danger)">no_accounts</span>
                 <div>
@@ -2188,6 +2292,14 @@
 
     <div style="height:24px"></div>
   </div>
+
+  {#if showEmojiPicker}
+    <div class="emoji-picker-wrap"
+      style="left:{emojiPickerX}px;top:{emojiPickerY}px"
+      use:clickOutside={() => showEmojiPicker = false}>
+      <emoji-picker use:emojiPickerAction></emoji-picker>
+    </div>
+  {/if}
 </div>
 
 <Dialog bind:open={showClearDialog}
@@ -2486,6 +2598,11 @@
     position: relative;
     will-change: transform;
     transition: transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 220ms ease, opacity 220ms ease;
+  }
+  .drag-row.drag-target {
+    background: var(--accent-dim);
+    border-radius: var(--radius-sm);
+    transition: background 120ms ease;
   }
   .drag-row.dragging {
     opacity: 0.90;
