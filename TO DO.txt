@@ -3,8 +3,6 @@ Multiple photos, 1 main, then addition if desired - all areas
 Food banner?
 -> can maybe be just in menu for foods, meals and recipes, different from eatch… possibly randomly rotating pics or a collage of them of actuall items there? If non present use preset?
 
-Camera for scanner not position right
-
 floating add buttons instead of at top?
 
 maybe change ai bot a bit, to be a muscular robot or something
@@ -15,16 +13,11 @@ error logging - done.. but maybe set in settings, error logging, verbose, none, 
 
 loading of thumbnails slow?
 
-
 add a serving size option for recipes?
 
 add more to first run wizard, helps with all our additions
 
 sign out, user profile better location
-
-save button when adding api key
-
-backup/restore server side... like mealie?
 
 create readme
 
@@ -38,3 +31,13 @@ mobile app... identical to webapp...but with option to store data local
 --what is legal or not based on the implemntation and build?
 
 api key to pull data out of here elsewhere?
+
+admin password resets for other users?
+
+calculation settings - sparky?
+
+steps/sleep tracker?
+
+remove water section and have it in dairy somewhere?
+
+test various backup/restores

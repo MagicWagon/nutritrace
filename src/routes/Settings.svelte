@@ -57,7 +57,7 @@
     units:             ['units','energy unit','weight unit','height','circumference','imperial','metric'],
     connectedServices: ['connected services','usda','open food facts','mealie','recipe','search language','country','api key','credentials','username','password'],
     ai:                ['ai','fitbot','assistant','provider','model','api key','artificial intelligence','chat'],
-    backup:            ['backup','export','import','restore','waistline','csv','clear data','json'],
+    backup:            ['backup','export','import','restore','waistline','csv','clear data','json','full backup','images','zip'],
     email:             ['email','smtp','mail','password reset','invites','notifications'],
     users:             ['users','user management','accounts','login','password','admin','register','profile'],
     about:             ['about','version','nutritrace'],
@@ -311,6 +311,22 @@
   let newCategoryName  = '';
   let newCategoryLabel = '';
   let showEmojiPicker  = false;
+  let emojiPickerX     = 0;
+  let emojiPickerY     = 0;
+
+  function openEmojiPicker(e) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    // Position below the button; flip up if it would overflow viewport bottom
+    const pickerH = 400; // approximate picker height
+    const spaceBelow = window.innerHeight - rect.bottom;
+    if (spaceBelow < pickerH) {
+      emojiPickerY = rect.top - pickerH - 6;
+    } else {
+      emojiPickerY = rect.bottom + 6;
+    }
+    emojiPickerX = rect.left;
+    showEmojiPicker = !showEmojiPicker;
+  }
 
   function onEmojiPick(e) {
     newCategoryLabel = e.detail.unicode;
@@ -643,6 +659,77 @@
     } catch(e) { showError('Export failed: ' + e.message); }
   }
 
+  // ── Full Backup ────────────────────────────────────────────────────────────
+  let fullBackups        = [];
+  let fullBackupBusy     = false;
+  let restoreTarget      = null;  // filename pending restore confirm
+  let deleteTarget       = null;  // filename pending delete confirm
+  let showRestoreDialog  = false;
+  let showDeleteBkDialog = false;
+
+  async function loadFullBackups() {
+    try {
+      const res = await fetch('/api/full-backup', { credentials: 'include' });
+      if (res.ok) fullBackups = await res.json();
+    } catch {}
+  }
+
+  async function createFullBackup() {
+    fullBackupBusy = true;
+    try {
+      const res  = await fetch('/api/full-backup', { method: 'POST', credentials: 'include' });
+      const data = await res.json();
+      if (!res.ok) { showError(data.error || 'Backup failed'); return; }
+      showSuccess('Full backup created');
+      await loadFullBackups();
+    } catch { showError('Backup failed'); }
+    finally   { fullBackupBusy = false; }
+  }
+
+  function downloadFullBackup(filename) {
+    const a = document.createElement('a');
+    a.href = `/api/full-backup/${encodeURIComponent(filename)}/download`;
+    a.download = filename;
+    a.click();
+  }
+
+  async function confirmRestoreFullBackup() {
+    if (!restoreTarget) return;
+    showRestoreDialog = false;
+    const filename = restoreTarget;
+    restoreTarget = null;
+    fullBackupBusy = true;
+    try {
+      const res  = await fetch(`/api/full-backup/${encodeURIComponent(filename)}/restore`, { method: 'POST', credentials: 'include' });
+      const data = await res.json();
+      if (!res.ok) { showError(data.error || 'Restore failed'); return; }
+      showSuccess('Restore complete — reloading…');
+      setTimeout(() => location.reload(), 1500);
+    } catch { showError('Restore failed'); }
+    finally   { fullBackupBusy = false; }
+  }
+
+  async function confirmDeleteFullBackup() {
+    if (!deleteTarget) return;
+    showDeleteBkDialog = false;
+    const filename = deleteTarget;
+    deleteTarget = null;
+    try {
+      const res = await fetch(`/api/full-backup/${encodeURIComponent(filename)}`, { method: 'DELETE', credentials: 'include' });
+      if (res.ok) { showSuccess('Backup deleted'); await loadFullBackups(); }
+      else showError('Delete failed');
+    } catch { showError('Delete failed'); }
+  }
+
+  function fmtBytes(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  // Load backup list when section opens (admin only)
+  $: if (openSections.backup && $currentUser?.role === 'admin') loadFullBackups();
+
   // ── Email / SMTP ───────────────────────────────────────────────────────────
   let smtpHost   = '';
   let smtpPort   = '587';
@@ -672,6 +759,24 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key, value: String(value) }),
     }).catch(() => {});
+  }
+
+  let smtpSaving = false;
+  let smtpSaved  = false;
+  async function saveSmtp() {
+    smtpSaving = true;
+    try {
+      await saveSmtpField('smtp_host',   smtpHost);
+      await saveSmtpField('smtp_port',   smtpPort);
+      await saveSmtpField('smtp_secure', String(smtpSecure));
+      await saveSmtpField('smtp_user',   smtpUser);
+      await saveSmtpField('smtp_pass',   smtpPass);
+      await saveSmtpField('smtp_from',   smtpFrom);
+      smtpSaved = true;
+      setTimeout(() => smtpSaved = false, 2000);
+    } finally {
+      smtpSaving = false;
+    }
   }
 
   async function testSmtp() {
@@ -839,20 +944,25 @@
   $: set('weightUnit',         weightUnit);
   $: set('heightUnit',         heightUnit);
   $: set('lengthUnit',         lengthUnit);
-  $: set('usdaApiKey',         usdaApiKey);
-  $: set('offUsername',        offUsername);
-  $: set('offPassword',        offPassword);
   $: set('usdaEnabled',        usdaEnabled);
   $: set('offSearchLanguage',  offSearchLanguage);
   $: set('offSearchCountry',   offSearchCountry);
   $: set('offUploadCountry',   offUploadCountry);
-  $: set('mealieBaseUrl',      mealieBaseUrl);
-  $: set('mealieApiToken',     mealieApiToken);
   $: { aiEnabled.set(aiEnabledVal); }
   $: { aiProvider.set(aiProviderVal); }
-  $: set('aiApiKey',        aiApiKeyVal);
   $: set('aiModel',         aiModelVal);
   $: set('aiAssistantName', aiAssistantNameVal);
+
+  // ── Explicit credential saves ──────────────────────────────────────────────
+  let usdaSaved   = false;
+  let offSaved    = false;
+  let mealieSaved = false;
+  let aiKeySaved  = false;
+
+  function saveUsda()   { set('usdaApiKey', usdaApiKey);   usdaSaved = true;   setTimeout(() => usdaSaved   = false, 2000); }
+  function saveOff()    { set('offUsername', offUsername); set('offPassword', offPassword); offSaved = true; setTimeout(() => offSaved = false, 2000); }
+  function saveMealie() { set('mealieBaseUrl', mealieBaseUrl); set('mealieApiToken', mealieApiToken); mealieSaved = true; setTimeout(() => mealieSaved = false, 2000); }
+  function saveAiKey()  { set('aiApiKey', aiApiKeyVal);    aiKeySaved = true;  setTimeout(() => aiKeySaved  = false, 2000); }
 </script>
 
 <div class="page-shell">
@@ -1208,11 +1318,13 @@
             <div style="display:flex;flex-direction:column;gap:3px;flex-shrink:0;position:relative">
               <span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);text-align:center">Label</span>
               <button class="input emoji-btn" title="Pick an emoji label"
-                on:click={() => showEmojiPicker = !showEmojiPicker}>
+                on:click={openEmojiPicker}>
                 {newCategoryLabel || '🏷️'}
               </button>
               {#if showEmojiPicker}
-                <div class="emoji-picker-wrap" use:clickOutside={() => showEmojiPicker = false}>
+                <div class="emoji-picker-wrap"
+                  style="left:{emojiPickerX}px;top:{emojiPickerY}px"
+                  use:clickOutside={() => showEmojiPicker = false}>
                   <emoji-picker on:emoji-click={onEmojiPick}></emoji-picker>
                 </div>
               {/if}
@@ -1423,7 +1535,12 @@
             <div class="setting-divider"></div>
             <div class="form-group" style="padding:10px 16px 14px">
               <label class="form-label" for="usda-key">API Key</label>
-              <input id="usda-key" class="input" placeholder="Get a free key at api.nal.usda.gov" bind:value={usdaApiKey} />
+              <div style="display:flex;gap:8px;align-items:center">
+                <input id="usda-key" class="input" style="flex:1" placeholder="Get a free key at api.nal.usda.gov" bind:value={usdaApiKey} />
+                <button class="btn btn-primary" style="height:40px;font-size:13px;white-space:nowrap" on:click={saveUsda}>
+                  {#if usdaSaved}<span class="material-symbols-rounded" style="font-size:16px">check</span>{:else}Save{/if}
+                </button>
+              </div>
             </div>
           {/if}
         </div>
@@ -1462,7 +1579,10 @@
             <label class="form-label" for="off-user">Account username</label>
             <input id="off-user" class="input" style="margin-bottom:8px" placeholder="Optional — required to contribute edits" bind:value={offUsername} />
             <label class="form-label" for="off-pass">Account password</label>
-            <input id="off-pass" class="input" type="password" placeholder="OFF account password" bind:value={offPassword} />
+            <input id="off-pass" class="input" type="password" style="margin-bottom:10px" placeholder="OFF account password" bind:value={offPassword} />
+            <button class="btn btn-primary" style="height:36px;font-size:13px;align-self:flex-start" on:click={saveOff}>
+              {#if offSaved}<span class="material-symbols-rounded" style="font-size:16px">check</span> Saved{:else}Save{/if}
+            </button>
           </div>
         </div>
 
@@ -1517,6 +1637,10 @@
                 {:else if mealieTestStatus === 'testing'}
                   <span style="color:var(--text-2);font-size:13px">Testing…</span>
                 {/if}
+                <button class="btn btn-primary" style="padding:6px 14px;font-size:13px;height:32px"
+                  on:click={saveMealie}>
+                  {#if mealieSaved}<span class="material-symbols-rounded" style="font-size:16px">check</span>{:else}Save{/if}
+                </button>
                 <button class="btn btn-secondary" style="padding:6px 14px;font-size:13px;height:32px"
                   on:click={testMealieConnection}
                   disabled={!mealieBaseUrl || !mealieApiToken || mealieTestStatus === 'testing'}>
@@ -1595,6 +1719,9 @@
                 <button class="btn-icon" on:click={() => aiShowKey = !aiShowKey} title={aiShowKey ? 'Hide' : 'Show'}>
                   <span class="material-symbols-rounded">{aiShowKey ? 'visibility_off' : 'visibility'}</span>
                 </button>
+                <button class="btn btn-primary" style="height:40px;font-size:13px;white-space:nowrap" on:click={saveAiKey}>
+                  {#if aiKeySaved}<span class="material-symbols-rounded" style="font-size:16px">check</span>{:else}Save{/if}
+                </button>
               </div>
               <div class="setting-desc" style="margin-top:6px">
                 {#if aiProviderVal === 'claude'}
@@ -1621,42 +1748,111 @@
     </button>
     {#if sectionOpen(openSections, settingsQuery, 'backup') && sectionVisible(settingsQuery, 'backup')}
       <div class="section-body" transition:slide={{ duration: 180 }}>
+
+        <!-- Full backup (admin only) -->
+        {#if $currentUser?.role === 'admin'}
+        <p class="sub-label">Full Backup</p>
+        <div class="card settings-card">
+          <div style="padding:12px 16px 4px">
+            <p class="setting-desc" style="margin:0 0 12px">A complete snapshot of everything — all user data, diary, foods, meals, recipes, settings, and uploaded images. Saved on the server and available to download or restore at any time.</p>
+            <button class="btn btn-primary" style="height:36px;font-size:13px;margin-bottom:14px"
+              on:click={createFullBackup} disabled={fullBackupBusy}>
+              {#if fullBackupBusy}
+                <span class="material-symbols-rounded spin" style="font-size:16px">autorenew</span> Working…
+              {:else}
+                <span class="material-symbols-rounded" style="font-size:16px">add_circle</span> Create Backup
+              {/if}
+            </button>
+          </div>
+
+          {#if fullBackups.length > 0}
+            <div class="setting-divider"></div>
+            {#each fullBackups as bk, i}
+              {#if i > 0}<div class="setting-divider"></div>{/if}
+              <div class="backup-row">
+                <div class="backup-meta">
+                  <span class="backup-name">{bk.filename.replace('nutritrace-backup-','').replace('.zip','').replace(/T|-/g, s => s === 'T' ? ' ' : ':').slice(0,16)}</span>
+                  <span class="backup-size">{fmtBytes(bk.size)}</span>
+                </div>
+                <div class="backup-actions">
+                  <button class="btn btn-secondary" style="height:30px;font-size:12px;padding:0 10px"
+                    on:click={() => downloadFullBackup(bk.filename)} title="Download">
+                    <span class="material-symbols-rounded" style="font-size:15px">download</span>
+                  </button>
+                  <button class="btn btn-secondary" style="height:30px;font-size:12px;padding:0 10px"
+                    on:click={() => { restoreTarget = bk.filename; showRestoreDialog = true; }} title="Restore" disabled={fullBackupBusy}>
+                    <span class="material-symbols-rounded" style="font-size:15px">restore</span>
+                  </button>
+                  <button class="btn-icon" style="color:var(--danger)"
+                    on:click={() => { deleteTarget = bk.filename; showDeleteBkDialog = true; }} title="Delete">
+                    <span class="material-symbols-rounded" style="font-size:18px">delete</span>
+                  </button>
+                </div>
+              </div>
+            {/each}
+          {:else}
+            <div class="setting-divider"></div>
+            <p style="padding:12px 16px;font-size:13px;color:var(--text-3);margin:0">No backups yet</p>
+          {/if}
+        </div>
+        {/if}
+
+        <!-- Portable JSON export/import -->
+        <p class="sub-label">Portable Export</p>
         <div class="card settings-card">
           <button class="setting-row setting-action" on:click={exportBackup}>
             <span class="material-symbols-rounded si" style="color:var(--accent)">download</span>
-            <span class="setting-label">Export JSON backup</span>
-            <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
+            <div>
+              <span class="setting-label">Export JSON</span>
+              <div class="setting-desc">Downloads your foods, meals, recipes, diary, and settings as a JSON file. Good for moving data to another device or app.</div>
+            </div>
+            <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
           </button>
           <div class="setting-divider"></div>
           <button class="setting-row setting-action" on:click={importBackup}>
             <span class="material-symbols-rounded si" style="color:var(--accent)">upload</span>
-            <span class="setting-label">Import JSON backup</span>
-            <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
+            <div>
+              <span class="setting-label">Import JSON</span>
+              <div class="setting-desc">Restores from a previously exported JSON file. Merges with existing data — does not erase what's already here. Note: server-hosted images will need to be re-uploaded separately.</div>
+            </div>
+            <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
           </button>
-          <div class="setting-divider"></div>
+        </div>
+
+        <!-- Other tools -->
+        <p class="sub-label">Other</p>
+        <div class="card settings-card">
           <button class="setting-row setting-action" on:click={importWaistline}>
             <span class="material-symbols-rounded si" style="color:var(--accent)">swap_horiz</span>
             <div>
               <span class="setting-label">Import from Waistline</span>
               <div class="setting-desc">Import foods, meals &amp; recipes from the Waistline Android app</div>
             </div>
-            <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
+            <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
           </button>
           <div class="setting-divider"></div>
           <button class="setting-row setting-action" on:click={exportCSV}>
             <span class="material-symbols-rounded si" style="color:var(--info)">table_chart</span>
-            <span class="setting-label">Export diary as CSV</span>
-            <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
+            <div>
+              <span class="setting-label">Export diary as CSV</span>
+              <div class="setting-desc">Downloads your full diary history as a spreadsheet. Useful for analysis in Excel or Google Sheets.</div>
+            </div>
+            <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
           </button>
           <div class="setting-divider"></div>
           <button class="setting-row setting-action danger" on:click={() => showClearDialog = true}>
             <span class="material-symbols-rounded si" style="color:var(--danger)">delete_forever</span>
-            <span class="setting-label" style="color:var(--danger)">Clear all data</span>
-            <span class="material-symbols-rounded" style="font-size:18px;color:var(--danger)">chevron_right</span>
+            <div>
+              <span class="setting-label" style="color:var(--danger)">Clear all data</span>
+              <div class="setting-desc">Permanently deletes all diary entries, foods, meals, and recipes. This cannot be undone.</div>
+            </div>
+            <span class="material-symbols-rounded" style="font-size:18px;color:var(--danger);flex-shrink:0">chevron_right</span>
           </button>
         </div>
+
       </div>
     {/if}
+
 
     <!-- ── Email ────────────────────────────────────────────────────────────── -->
     {#if $currentUser?.role === 'admin'}
@@ -1672,38 +1868,46 @@
           <div class="form-group">
             <label class="form-label">SMTP Host</label>
             <input class="input" type="text" placeholder="smtp.gmail.com"
-              bind:value={smtpHost} on:blur={() => saveSmtpField('smtp_host', smtpHost)} />
+              bind:value={smtpHost} />
           </div>
           <div style="display:flex;gap:10px">
             <div class="form-group" style="flex:1">
               <label class="form-label">Port</label>
               <input class="input" type="number" placeholder="587"
-                bind:value={smtpPort} on:blur={() => saveSmtpField('smtp_port', smtpPort)} />
+                bind:value={smtpPort} />
             </div>
             <div class="form-group" style="display:flex;flex-direction:column;gap:6px;justify-content:flex-end;padding-bottom:2px">
               <label class="form-label">TLS</label>
-              <Toggle checked={smtpSecure} on:change={e => { smtpSecure = e.detail; saveSmtpField('smtp_secure', String(e.detail)); }} />
+              <Toggle checked={smtpSecure} on:change={e => smtpSecure = e.detail} />
             </div>
           </div>
           <div class="form-group">
             <label class="form-label">Username</label>
             <input class="input" type="text" autocomplete="off" placeholder="SMTP username or email"
-              bind:value={smtpUser} on:blur={() => saveSmtpField('smtp_user', smtpUser)} />
+              bind:value={smtpUser} />
           </div>
           <div class="form-group">
             <label class="form-label">Password</label>
             <input class="input" type="password" autocomplete="new-password" placeholder="SMTP password or app password"
-              bind:value={smtpPass} on:blur={() => saveSmtpField('smtp_pass', smtpPass)} />
+              bind:value={smtpPass} />
           </div>
           <div class="form-group">
             <label class="form-label">From address</label>
             <input class="input" type="email" placeholder='NutriTrace <noreply@example.com>'
-              bind:value={smtpFrom} on:blur={() => saveSmtpField('smtp_from', smtpFrom)} />
+              bind:value={smtpFrom} />
           </div>
           <div style="display:flex;align-items:center;gap:10px">
+            <button class="btn btn-primary" style="height:36px;font-size:13px"
+              on:click={saveSmtp} disabled={smtpSaving}>
+              {#if smtpSaved}
+                <span class="material-symbols-rounded" style="font-size:16px">check</span> Saved
+              {:else}
+                {smtpSaving ? 'Saving…' : 'Save'}
+              {/if}
+            </button>
             <button class="btn btn-secondary" style="height:36px;font-size:13px"
               on:click={testSmtp} disabled={!smtpHost || smtpTestStatus === 'testing'}>
-              {smtpTestStatus === 'testing' ? 'Testing…' : 'Test connection'}
+              {smtpTestStatus === 'testing' ? 'Testing…' : 'Test'}
             </button>
             {#if smtpTestStatus === 'ok'}
               <span style="color:var(--macro-carbs);font-size:13px;display:flex;align-items:center;gap:4px">
@@ -1947,6 +2151,24 @@
   cancelText="Cancel"
   dangerous
   on:confirm={clearAllData}
+/>
+
+<Dialog bind:open={showRestoreDialog}
+  title="Restore backup?"
+  message="This will replace all current data with the contents of this backup. This cannot be undone."
+  confirmText="Restore"
+  cancelText="Cancel"
+  dangerous
+  on:confirm={confirmRestoreFullBackup}
+/>
+
+<Dialog bind:open={showDeleteBkDialog}
+  title="Delete backup?"
+  message="This backup file will be permanently removed from the server."
+  confirmText="Delete"
+  cancelText="Cancel"
+  dangerous
+  on:confirm={confirmDeleteFullBackup}
 />
 
 <Dialog bind:open={showDisableUmDialog}
@@ -2252,6 +2474,15 @@
   }
   .sel-sm { height: 36px; font-size: 13px; }
 
+  .backup-row {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; padding: 10px 16px;
+  }
+  .backup-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .backup-name { font-size: 13px; font-weight: 500; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .backup-size { font-size: 11px; color: var(--text-3); }
+  .backup-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+
   .cat-chips-wrap {
     display: flex; flex-wrap: wrap; gap: 8px;
     padding: 14px 16px 8px;
@@ -2265,8 +2496,8 @@
     text-align: center; cursor: pointer; line-height: 1;
   }
   .emoji-picker-wrap {
-    position: absolute; top: calc(100% + 6px); left: 0;
-    z-index: 200; border-radius: 12px;
+    position: fixed;
+    z-index: 9999; border-radius: 12px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.35);
   }
   .emoji-picker-wrap emoji-picker {

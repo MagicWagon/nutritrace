@@ -13,7 +13,8 @@ import diaryRoutes  from './routes/diary.js';
 import uploadRoutes from './routes/upload.js';
 import mealieRoutes    from './routes/mealie.js';
 import settingsRoutes  from './routes/settings.js';
-import appConfigRoutes from './routes/app-config.js';
+import appConfigRoutes  from './routes/app-config.js';
+import fullBackupRoutes from './routes/full-backup.js';
 import { logger }   from './logger.js';
 import { authenticate } from './middleware/auth.js';
 
@@ -53,7 +54,8 @@ app.use('/api/diary',  diaryRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/mealie',     mealieRoutes);
 app.use('/api/settings',  settingsRoutes);
-app.use('/api/app-config', appConfigRoutes);
+app.use('/api/app-config',  appConfigRoutes);
+app.use('/api/full-backup', fullBackupRoutes);
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 // Serve Svelte frontend (production build)

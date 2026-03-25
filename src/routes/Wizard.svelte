@@ -22,6 +22,7 @@
   let adminConfirm    = '';
   let adminFullName   = '';
   let adminNickname   = '';
+  let adminEmail      = '';
   let adminBirthday   = '';
   let adminGender     = '';
   let umError         = '';
@@ -115,6 +116,7 @@
               password:   adminPassword,
               full_name:  adminFullName.trim() || undefined,
               nickname:   adminNickname.trim() || undefined,
+              email:      adminEmail.trim()    || undefined,
               birthday:   adminBirthday || undefined,
               gender:     adminGender   || undefined,
             }),
@@ -204,7 +206,7 @@
         <div class="step-hero compact">
           <span class="material-symbols-rounded hero-icon">group</span>
           <h1 class="step-title">Multi-User Support</h1>
-          <p class="step-desc">NutriTrace can run in single-user mode (default) or multi-user mode with separate logins. You can always enable this later in Settings.</p>
+          <p class="step-desc">NutriTrace can run in single-user mode (default) or multi-user mode with separate logins and password resets. You can always enable this later in Settings.</p>
         </div>
 
         <div class="toggle-row" on:click={() => enableUserMgmt = !enableUserMgmt} role="button" tabindex="0">
@@ -235,6 +237,12 @@
             <div class="form-group">
               <label class="form-label">Full name</label>
               <input class="input" type="text" bind:value={adminFullName} placeholder="Optional" />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Email address</label>
+              <input class="input" type="email" bind:value={adminEmail}
+                placeholder="Used for password resets (optional)" autocomplete="email" />
             </div>
 
             <div class="form-row-2">
