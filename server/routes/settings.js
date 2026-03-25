@@ -27,4 +27,12 @@ router.put('/', wrap((req, res) => {
   res.json({ ok: true });
 }));
 
+// DELETE /api/settings — clear all settings for the current user
+router.delete('/', wrap((req, res) => {
+  if (userMgmtActive() && req.user) {
+    db.prepare('DELETE FROM user_settings WHERE user_id = ?').run(req.user.id);
+  }
+  res.json({ ok: true });
+}));
+
 export default router;

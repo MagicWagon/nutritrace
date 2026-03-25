@@ -1015,18 +1015,30 @@
   async function clearAllData() {
     try {
       await NtApi.del('/api/data');
-      // Clear all settings except app-level flags that survive a data wipe
-      const preserve = new Set(['wl_setupComplete', 'wl:userId']);
+      // Only delete food/diary data — settings are untouched
+      showSuccess('All data cleared');
+      await loadAuthState();
+    } catch(e) { showError('Clear failed: ' + e.message); }
+  }
+
+  let showClearSettingsDialog = false;
+  async function clearAllSettings() {
+    try {
+      await fetch('/api/settings', { method: 'DELETE', credentials: 'include' });
+      // Clear user-scoped localStorage settings
+      const userId = localStorage.getItem('wl:userId');
+      const prefix = userId ? `wl_u${userId}_` : 'wl_';
       const keys = [];
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
-        if (k?.startsWith('wl_') && !preserve.has(k)) keys.push(k);
+        if (k && k.startsWith(prefix)) keys.push(k);
       }
       keys.forEach(k => localStorage.removeItem(k));
       // Re-stamp setupComplete so the wizard doesn't re-trigger
       DB.setSetting('setupComplete', true);
-      showSuccess('All data cleared');
-      await loadAuthState();
+      showSuccess('All settings cleared');
+      // Reload to reinitialize all local settings vars with defaults
+      setTimeout(() => location.reload(), 800);
     } catch(e) { showError('Clear failed: ' + e.message); }
   }
 
@@ -1969,7 +1981,16 @@
             <span class="material-symbols-rounded si" style="color:var(--danger)">delete_forever</span>
             <div>
               <span class="setting-label" style="color:var(--danger)">Clear all data</span>
-              <div class="setting-desc">Permanently deletes all diary entries, foods, meals, and recipes. This cannot be undone.</div>
+              <div class="setting-desc">Permanently deletes all diary entries, foods, meals, and body stats. Settings and credentials are kept.</div>
+            </div>
+            <span class="material-symbols-rounded" style="font-size:18px;color:var(--danger);flex-shrink:0">chevron_right</span>
+          </button>
+          <div class="setting-divider"></div>
+          <button class="setting-row setting-action danger" on:click={() => showClearSettingsDialog = true}>
+            <span class="material-symbols-rounded si" style="color:var(--danger)">manage_history</span>
+            <div>
+              <span class="setting-label" style="color:var(--danger)">Clear all settings</span>
+              <div class="setting-desc">Resets all preferences, credentials, and API keys to defaults. Food and diary data are kept.</div>
             </div>
             <span class="material-symbols-rounded" style="font-size:18px;color:var(--danger);flex-shrink:0">chevron_right</span>
           </button>
@@ -2303,11 +2324,20 @@
 
 <Dialog bind:open={showClearDialog}
   title="Clear all data"
-  message="This will permanently delete all foods, meals, diary entries, and settings. This cannot be undone."
-  confirmText="Delete everything"
+  message="This will permanently delete all diary entries, foods, meals, and body stats. Settings and credentials are kept. This cannot be undone."
+  confirmText="Delete all data"
   cancelText="Cancel"
   dangerous
   on:confirm={clearAllData}
+/>
+
+<Dialog bind:open={showClearSettingsDialog}
+  title="Clear all settings"
+  message="This will reset all preferences, credentials, and API keys to defaults. Food and diary data are kept. This cannot be undone."
+  confirmText="Clear all settings"
+  cancelText="Cancel"
+  dangerous
+  on:confirm={clearAllSettings}
 />
 
 <Dialog bind:open={showRestoreDialog}
