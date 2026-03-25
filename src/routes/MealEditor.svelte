@@ -6,7 +6,7 @@
   import { showSuccess, showError } from '../stores/toast.js';
   import { editorState, clearMealEditorState } from '../stores/editorState.js';
   import { Nutrition, NUTRIMENTS } from '../lib/nutrition.js';
-  import { foodsShowCategories, foodsShowNotes, foodCategories, catName as _catName, catDisplay as _catDisplay } from '../stores/settings.js';
+  import { foodsShowCategories, foodsShowLabels, foodsShowNotes, foodCategories, catName as _catName, catDisplay as _catDisplay } from '../stores/settings.js';
 
   export let params = {};
 
@@ -379,7 +379,7 @@
               {#if (meal.categories||[]).includes(_catName(cat))}
                 <span class="material-symbols-rounded" style="font-size:14px">check</span>
               {/if}
-              {_catDisplay(cat)}
+              {$foodsShowLabels ? _catDisplay(cat) : _catName(cat)}
             </button>
           {/each}
         </div>

@@ -12,7 +12,7 @@ const SERVER_SETTINGS = new Set([
   'diaryShowBrands','diaryShowTimestamps','diaryShowThumbnails',
   'diaryShowAllNutrients','diaryShowNutritionUnits','diaryShowMacroSummary',
   'diaryPromptQuantity','diaryShowPortionSize',
-  'foodsShowCategories','foodsShowNotes','foodsShowThumbnails',
+  'foodsShowCategories','foodsShowLabels','foodsShowNotes','foodsShowThumbnails',
   'foodsShowYesterdayMeals','foodsSort',
   'barcodeBeep','barcodeFlashlight','cropPhotos',
   'offSearchLanguage','offSearchCountry','offUploadCountry',
@@ -115,6 +115,7 @@ export const diaryPromptQuantity    = createSettingStore('diaryPromptQuantity', 
 export const diaryShowPortionSize   = createSettingStore('diaryShowPortionSize',    false);
 
 export const foodsShowCategories    = createSettingStore('foodsShowCategories',    true);
+export const foodsShowLabels        = createSettingStore('foodsShowLabels',        true);
 export const foodsShowNotes         = createSettingStore('foodsShowNotes',         true);
 export const foodsShowThumbnails    = createSettingStore('foodsShowThumbnails',    true);
 export const foodsShowYesterdayMeals= createSettingStore('foodsShowYesterdayMeals',true);
