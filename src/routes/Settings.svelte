@@ -9,6 +9,7 @@
   import { applyAppearance, applyAccentColor } from '../stores/settings.js';
   import { AI_PROVIDERS, AI_MODELS, AI_DEFAULT_MODELS } from '../lib/aiChat.js';
   import { catName as _catName, catDisplay as _catDisplay } from '../stores/settings.js';
+  import 'emoji-picker-element';
   import {
     appearance, accentColor, energyUnit, mealNames,
     diaryShowBrands, diaryShowTimestamps, diaryShowThumbnails, diaryShowAllNutrients,
@@ -308,6 +309,18 @@
   // ── Categories ─────────────────────────────────────────────────────────────
   let newCategoryName  = '';
   let newCategoryLabel = '';
+  let showEmojiPicker  = false;
+
+  function onEmojiPick(e) {
+    newCategoryLabel = e.detail.unicode;
+    showEmojiPicker  = false;
+  }
+
+  function clickOutside(node, fn) {
+    function handle(e) { if (!node.contains(e.target)) fn(); }
+    document.addEventListener('pointerdown', handle, true);
+    return { destroy() { document.removeEventListener('pointerdown', handle, true); } };
+  }
 
   function addCategory() {
     const name = newCategoryName.trim();
@@ -1104,10 +1117,17 @@
           </div>
           <div class="setting-divider"></div>
           <div class="cat-add-row">
-            <div style="display:flex;flex-direction:column;gap:3px;flex-shrink:0">
+            <div style="display:flex;flex-direction:column;gap:3px;flex-shrink:0;position:relative">
               <span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);text-align:center">Label</span>
-              <input class="input" style="width:54px;height:40px;text-align:center;font-size:20px;padding:0 6px"
-                placeholder="🏷️" title="Optional emoji label" bind:value={newCategoryLabel} maxlength="4" />
+              <button class="input emoji-btn" title="Pick an emoji label"
+                on:click={() => showEmojiPicker = !showEmojiPicker}>
+                {newCategoryLabel || '🏷️'}
+              </button>
+              {#if showEmojiPicker}
+                <div class="emoji-picker-wrap" use:clickOutside={() => showEmojiPicker = false}>
+                  <emoji-picker on:emoji-click={onEmojiPick}></emoji-picker>
+                </div>
+              {/if}
             </div>
             <div style="display:flex;flex-direction:column;gap:3px;flex:1">
               <span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3)">Category name *</span>
@@ -2063,6 +2083,25 @@
   .chip-x { background: none; border: none; cursor: pointer; display: flex; align-items: center; color: var(--text-3); padding: 0; }
   .chip-x:hover { color: var(--danger); }
   .cat-add-row { display: flex; gap: 8px; padding: 8px 16px 14px; }
+  .emoji-btn {
+    width: 54px; height: 40px; font-size: 20px; padding: 0;
+    text-align: center; cursor: pointer; line-height: 1;
+  }
+  .emoji-picker-wrap {
+    position: absolute; top: calc(100% + 6px); left: 0;
+    z-index: 200; border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+  }
+  .emoji-picker-wrap emoji-picker {
+    --border-radius: 12px;
+    --background: var(--surface-1);
+    --border-color: var(--border);
+    --input-border-color: var(--border);
+    --input-font-color: var(--text-1);
+    --input-placeholder-color: var(--text-3);
+    --category-emoji-size: 1.1rem;
+    --emoji-size: 1.4rem;
+  }
 
   .form-group { display: flex; flex-direction: column; gap: 6px; }
   .form-label { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); }
