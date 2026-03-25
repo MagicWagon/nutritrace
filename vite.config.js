@@ -14,10 +14,17 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        navigateFallback: 'index.html',
-        navigateFallbackAllowlist: [/^\/$/],
+        // Exclude html — index.html must always be fetched fresh so new deploys
+        // are picked up immediately without a hard refresh
+        globPatterns: ['**/*.{js,css,ico,png,svg,woff2}'],
+        navigateFallback: null,
         runtimeCaching: [
+          {
+            // Always fetch HTML from network so the latest app version loads
+            urlPattern: ({ request }) => request.mode === 'navigate',
+            handler: 'NetworkFirst',
+            options: { cacheName: 'navigation', networkTimeoutSeconds: 5 }
+          },
           {
             urlPattern: /^https:\/\/world\.openfoodfacts\.org\/.*/i,
             handler: 'NetworkFirst',
