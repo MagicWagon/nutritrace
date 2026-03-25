@@ -860,6 +860,9 @@
           restoreStatus = { phase: 'restoring', percent: 100, label: 'Restore complete — reloading…' };
           setTimeout(() => location.reload(), 1000);
         }, 600);
+      } else if (xhr.status === 413) {
+        showError('Upload failed: file exceeds the maximum size allowed by your server or reverse proxy. If accessing remotely, try uploading from your local network.');
+        restoreStatus = null;
       } else {
         let msg = `Server error ${xhr.status}`;
         try { const d = JSON.parse(xhr.responseText); if (d.error) msg = d.error; } catch {}
