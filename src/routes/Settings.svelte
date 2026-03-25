@@ -766,19 +766,22 @@
     a.click();
   }
 
+  let restoreStatus = null; // null | { phase: 'uploading'|'restoring', percent: number, label: string }
+
   async function confirmRestoreFullBackup() {
     if (!restoreTarget) return;
     showRestoreDialog = false;
     const filename = restoreTarget;
     restoreTarget = null;
     fullBackupBusy = true;
+    restoreStatus = { phase: 'restoring', percent: 40, label: 'Restoring backup…' };
     try {
       const res  = await fetch(`/api/full-backup/${encodeURIComponent(filename)}/restore`, { method: 'POST', credentials: 'include' });
       const data = await res.json();
-      if (!res.ok) { showError(data.error || 'Restore failed'); return; }
-      showSuccess('Restore complete — reloading…');
+      if (!res.ok) { showError(data.error || 'Restore failed'); restoreStatus = null; return; }
+      restoreStatus = { phase: 'restoring', percent: 100, label: 'Restore complete — reloading…' };
       setTimeout(() => location.reload(), 1500);
-    } catch { showError('Restore failed'); }
+    } catch (err) { showError('Restore failed: ' + (err.message || 'Unknown error')); restoreStatus = null; }
     finally   { fullBackupBusy = false; }
   }
 
@@ -819,16 +822,49 @@
     if (!uploadRestoreFile) return;
     showUploadRestoreDialog = false;
     fullBackupBusy = true;
+    restoreStatus = { phase: 'uploading', percent: 0, label: 'Uploading backup…' };
     try {
-      const form = new FormData();
-      form.append('backup', uploadRestoreFile);
-      const res  = await fetch('/api/full-backup/upload-restore', { method: 'POST', credentials: 'include', body: form });
-      const data = await res.json();
-      if (!res.ok) { showError(data.error || 'Restore failed'); return; }
-      showSuccess('Restore complete — reloading…');
-      setTimeout(() => location.reload(), 1500);
-    } catch { showError('Restore failed'); }
-    finally   { fullBackupBusy = false; uploadRestoreFile = null; }
+      await new Promise((resolve, reject) => {
+        const form = new FormData();
+        form.append('backup', uploadRestoreFile);
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/full-backup/upload-restore');
+        xhr.withCredentials = true;
+        xhr.upload.onprogress = ev => {
+          if (ev.lengthComputable) {
+            const pct = Math.round((ev.loaded / ev.total) * 80); // 0-80% = upload
+            restoreStatus = { phase: 'uploading', percent: pct, label: `Uploading… ${pct}%` };
+          }
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const data = JSON.parse(xhr.responseText);
+              if (data.error) { reject(new Error(data.error)); return; }
+            } catch { /* non-JSON response */ }
+            restoreStatus = { phase: 'restoring', percent: 90, label: 'Restoring on server…' };
+            setTimeout(() => {
+              restoreStatus = { phase: 'restoring', percent: 100, label: 'Restore complete — reloading…' };
+              setTimeout(() => location.reload(), 1000);
+            }, 500);
+            resolve();
+          } else {
+            try {
+              const d = JSON.parse(xhr.responseText);
+              reject(new Error(d.error || `Server error ${xhr.status}`));
+            } catch { reject(new Error(`Server error ${xhr.status}`)); }
+          }
+        };
+        xhr.onerror = () => reject(new Error('Network error — upload failed'));
+        xhr.send(form);
+      });
+    } catch (err) {
+      showError('Restore failed: ' + err.message);
+      restoreStatus = null;
+    } finally {
+      fullBackupBusy = false;
+      uploadRestoreFile = null;
+    }
   }
 
   // Load backup list when section opens (admin only)
@@ -1916,6 +1952,17 @@
                 <span class="material-symbols-rounded" style="font-size:16px">upload</span> Upload &amp; Restore
               </button>
             </div>
+            {#if restoreStatus}
+              <div class="restore-progress">
+                <div class="restore-progress-label">
+                  <span class="material-symbols-rounded spin" style="font-size:15px;flex-shrink:0">autorenew</span>
+                  {restoreStatus.label}
+                </div>
+                <div class="restore-progress-track">
+                  <div class="restore-progress-fill" style="width:{restoreStatus.percent}%"></div>
+                </div>
+              </div>
+            {/if}
           </div>
 
           {#if fullBackups.length > 0}
@@ -2690,6 +2737,25 @@
     padding: 4px 2px 2px;
   }
   .sel-sm { height: 36px; font-size: 13px; }
+
+  .restore-progress {
+    padding: 0 16px 14px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .restore-progress-label {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 13px; color: var(--text-2);
+  }
+  .restore-progress-track {
+    height: 6px; border-radius: 3px;
+    background: var(--surface-2);
+    overflow: hidden;
+  }
+  .restore-progress-fill {
+    height: 100%; border-radius: 3px;
+    background: var(--accent);
+    transition: width 300ms ease;
+  }
 
   .backup-table-header {
     display: grid;
