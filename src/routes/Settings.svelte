@@ -23,6 +23,7 @@
     sidebarPersistent, goalCelebrations,
     aiEnabled, aiProvider, aiApiKey, aiModel, aiAssistantName,
   } from '../stores/settings.js';
+  import { mealIcon } from '../lib/mealIcon.js';
   import { DB } from '../lib/db.js';
   import { NtApi } from '../lib/api.js';
   import { NUTRIMENTS, Nutrition } from '../lib/nutrition.js';
@@ -316,15 +317,21 @@
 
   function openEmojiPicker(e) {
     const rect = e.currentTarget.getBoundingClientRect();
-    // Position below the button; flip up if it would overflow viewport bottom
-    const pickerH = 400; // approximate picker height
-    const spaceBelow = window.innerHeight - rect.bottom;
-    if (spaceBelow < pickerH) {
-      emojiPickerY = rect.top - pickerH - 6;
-    } else {
-      emojiPickerY = rect.bottom + 6;
+    const pickerH = 400;
+    const pickerW = 320;
+    const margin = 8;
+    // Prefer below button; if it overflows bottom, push up — but never go above viewport top
+    let y = rect.bottom + margin;
+    if (y + pickerH > window.innerHeight - margin) {
+      y = window.innerHeight - pickerH - margin;
     }
-    emojiPickerX = rect.left;
+    y = Math.max(y, margin);
+    // Clamp horizontal to viewport
+    let x = rect.left;
+    if (x + pickerW > window.innerWidth - margin) x = window.innerWidth - pickerW - margin;
+    x = Math.max(x, margin);
+    emojiPickerX = x;
+    emojiPickerY = y;
     showEmojiPicker = !showEmojiPicker;
   }
 
@@ -407,6 +414,7 @@
     const y = e.clientY;
     let best = nutDragOver;
     for (let idx = 0; idx < rows.length; idx++) {
+      if (idx === nutDragFrom) continue;
       const r = rows[idx].getBoundingClientRect();
       if (y >= r.top && y <= r.bottom) { best = idx; break; }
     }
@@ -466,6 +474,7 @@
     const y = e.clientY;
     let best = statDragOver;
     for (let idx = 0; idx < rows.length; idx++) {
+      if (idx === statDragFrom) continue;
       const r = rows[idx].getBoundingClientRect();
       if (y >= r.top && y <= r.bottom) { best = idx; break; }
     }
@@ -518,17 +527,6 @@
     if (toSave.length) mealNames.set(toSave);
   }
 
-  // Keyword-based meal icon
-  function mealIcon(name) {
-    const n = (name || '').toLowerCase();
-    if (n.includes('breakfast') || n.includes('morning') || n.includes('brunch')) return 'free_breakfast';
-    if (n.includes('lunch') || n.includes('noon') || n.includes('midday')) return 'lunch_dining';
-    if (n.includes('dinner') || n.includes('supper') || n.includes('evening')) return 'dinner_dining';
-    if (n.includes('snack') || n.includes('bite') || n.includes('treat')) return 'cookie';
-    if (n.includes('drink') || n.includes('smoothie') || n.includes('shake')) return 'local_cafe';
-    return 'restaurant';
-  }
-
   // Drag-to-reorder for meal names
   let mealDragFrom = null, mealDragOver = null, mealDragDelta = 0, mealRowHeights = [];
   function onMealDragDown(e, i) {
@@ -546,6 +544,7 @@
     const y = e.clientY;
     let best = mealDragOver;
     for (let idx = 0; idx < rows.length; idx++) {
+      if (idx === mealDragFrom) continue;
       const r = rows[idx].getBoundingClientRect();
       if (y >= r.top && y <= r.bottom) { best = idx; break; }
     }

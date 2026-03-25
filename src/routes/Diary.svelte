@@ -6,6 +6,7 @@
   import { cubicOut } from 'svelte/easing';
 
   import MacroRing    from '../components/diary/MacroRing.svelte';
+  import { mealIcon } from '../lib/mealIcon.js';
   import Sheet        from '../components/ui/Sheet.svelte';
   import Dialog       from '../components/ui/Dialog.svelte';
   import ActionSheet  from '../components/ui/ActionSheet.svelte';
@@ -93,7 +94,7 @@
   $: _mp = Nutrition.macroPercents(totals);
 
   // Meal visual identity (icon + accent color per meal slot)
-  const MEAL_ICONS  = ['coffee', 'lunch_dining', 'dinner_dining', 'nutrition'];
+  // MEAL_ICONS kept for MEAL_COLORS index parity only; icons now computed per name
   const MEAL_COLORS = ['#FFB347', '#4FFFB0', '#4FC3F7', '#CE93D8'];
 
   // Tweened counters — animate numbers when food is added/removed
@@ -492,7 +493,7 @@
       {@const items = getMealItems(entry.items, mealIdx)}
       <section class="meal-group card" in:fly={{ y: 18, duration: 280, delay: 60 + mealIdx * 55 }}>
         <div class="meal-header" style="--meal-color:{MEAL_COLORS[mealIdx] || MEAL_COLORS[3]}">
-          <span class="meal-type-icon material-symbols-rounded">{MEAL_ICONS[mealIdx] || MEAL_ICONS[3]}</span>
+          <span class="meal-type-icon material-symbols-rounded">{mealIcon(meal)}</span>
           <span class="meal-name">{meal}</span>
           {#if items.length > 0}
             <span class="meal-kcal text-3 text-sm">
