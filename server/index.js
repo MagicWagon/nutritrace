@@ -17,9 +17,13 @@ import appConfigRoutes  from './routes/app-config.js';
 import fullBackupRoutes from './routes/full-backup.js';
 import { logger }   from './logger.js';
 import { authenticate } from './middleware/auth.js';
+import { seedSmtpFromEnv } from './email.js';
 
 // Initialise DB (runs schema)
 import './db.js';
+
+// Seed SMTP config from env vars if provided
+seedSmtpFromEnv();
 
 const app  = express();
 const PORT = process.env.PORT || 3001;

@@ -13,4 +13,11 @@ services:
       - UPLOADS_PATH=/data/uploads
       # Required if using user management — set a long random secret
       - JWT_SECRET=${JWT_SECRET}
+      # Optional — SMTP email (for password reset & invites). Can also be set in Settings UI.
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_SECURE=${SMTP_SECURE:-false}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - SMTP_FROM=${SMTP_FROM:-}
     restart: unless-stopped

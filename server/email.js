@@ -1,7 +1,25 @@
 import nodemailer from 'nodemailer';
 import db from './db.js';
 
-/** Read SMTP config from app_config table */
+/** Seed app_config from env vars at startup (env vars take priority) */
+export function seedSmtpFromEnv() {
+  const map = {
+    SMTP_HOST:   'smtp_host',
+    SMTP_PORT:   'smtp_port',
+    SMTP_SECURE: 'smtp_secure',
+    SMTP_USER:   'smtp_user',
+    SMTP_PASS:   'smtp_pass',
+    SMTP_FROM:   'smtp_from',
+  };
+  const upsert = db.prepare(
+    'INSERT INTO app_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
+  );
+  for (const [envKey, dbKey] of Object.entries(map)) {
+    if (process.env[envKey] != null) upsert.run(dbKey, process.env[envKey]);
+  }
+}
+
+/** Read SMTP config from app_config table (env vars already seeded at startup) */
 function getSmtpConfig() {
   const rows = db.prepare('SELECT key, value FROM app_config WHERE key LIKE ?').all('smtp_%');
   const cfg = {};
