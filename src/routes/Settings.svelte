@@ -1804,32 +1804,39 @@
 
           {#if fullBackups.length > 0}
             <div class="setting-divider"></div>
+            <!-- Table header -->
+            <div class="backup-table-header">
+              <span>Name</span>
+              <span>Created</span>
+              <span>Size</span>
+              <span></span>
+            </div>
+            <div class="setting-divider"></div>
             {#each fullBackups as bk, i}
               {#if i > 0}<div class="setting-divider"></div>{/if}
               <div class="backup-row">
-                <div class="backup-meta">
-                  <span class="backup-name">{bk.filename.replace('nutritrace-backup-','').replace('.zip','').replace(/T|-/g, s => s === 'T' ? ' ' : ':').slice(0,16)}</span>
-                  <span class="backup-size">{fmtBytes(bk.size)}</span>
-                </div>
+                <span class="backup-name">{bk.filename}</span>
+                <span class="backup-col-date">{new Date(bk.createdAt).toLocaleDateString()}</span>
+                <span class="backup-col-size">{fmtBytes(bk.size)}</span>
                 <div class="backup-actions">
-                  <button class="btn btn-secondary" style="height:30px;font-size:12px;padding:0 10px"
-                    on:click={() => downloadFullBackup(bk.filename)} title="Download">
-                    <span class="material-symbols-rounded" style="font-size:15px">download</span>
+                  <button class="btn btn-secondary backup-action-btn"
+                    on:click={() => downloadFullBackup(bk.filename)}>
+                    <span class="material-symbols-rounded" style="font-size:15px">download</span> Download
                   </button>
-                  <button class="btn btn-secondary" style="height:30px;font-size:12px;padding:0 10px"
-                    on:click={() => { restoreTarget = bk.filename; showRestoreDialog = true; }} title="Restore" disabled={fullBackupBusy}>
-                    <span class="material-symbols-rounded" style="font-size:15px">restore</span>
+                  <button class="btn btn-secondary backup-action-btn"
+                    on:click={() => { restoreTarget = bk.filename; showRestoreDialog = true; }} disabled={fullBackupBusy}>
+                    <span class="material-symbols-rounded" style="font-size:15px">restore</span> Restore
                   </button>
-                  <button class="btn-icon" style="color:var(--danger)"
-                    on:click={() => { deleteTarget = bk.filename; showDeleteBkDialog = true; }} title="Delete">
-                    <span class="material-symbols-rounded" style="font-size:18px">delete</span>
+                  <button class="btn-icon" style="color:var(--danger);padding:0 4px"
+                    on:click={() => { deleteTarget = bk.filename; showDeleteBkDialog = true; }}>
+                    <span class="material-symbols-rounded" style="font-size:20px">delete</span>
                   </button>
                 </div>
               </div>
             {/each}
           {:else}
             <div class="setting-divider"></div>
-            <p style="padding:12px 16px;font-size:13px;color:var(--text-3);margin:0">No backups yet</p>
+            <p style="padding:12px 16px;font-size:13px;color:var(--text-3);margin:0">No backups yet — click Create Backup to get started.</p>
           {/if}
         </div>
         {/if}
@@ -2520,14 +2527,27 @@
   }
   .sel-sm { height: 36px; font-size: 13px; }
 
-  .backup-row {
-    display: flex; align-items: center; justify-content: space-between;
-    gap: 12px; padding: 10px 16px;
+  .backup-table-header {
+    display: grid;
+    grid-template-columns: 1fr 100px 80px auto;
+    gap: 12px; padding: 6px 16px;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--text-3);
   }
-  .backup-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-  .backup-name { font-size: 13px; font-weight: 500; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .backup-size { font-size: 11px; color: var(--text-3); }
-  .backup-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .backup-row {
+    display: grid;
+    grid-template-columns: 1fr 100px 80px auto;
+    gap: 12px; padding: 10px 16px;
+    align-items: center;
+  }
+  .backup-name {
+    font-size: 12px; font-weight: 500; color: var(--text-1);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .backup-col-date { font-size: 13px; color: var(--text-2); }
+  .backup-col-size { font-size: 13px; color: var(--text-2); }
+  .backup-actions { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
+  .backup-action-btn { height: 30px; font-size: 12px; padding: 0 10px; display: flex; align-items: center; gap: 4px; }
 
   .cat-chips-wrap {
     display: flex; flex-wrap: wrap; gap: 8px;
