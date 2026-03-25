@@ -44,6 +44,9 @@ app.use((req, res, next) => {
 const uploadsPath = process.env.UPLOADS_PATH || './uploads';
 app.use('/uploads', express.static(uploadsPath));
 
+// Prevent browser/proxy caching of all API responses
+app.use('/api', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
+
 // API routes
 app.use('/api/auth',   authRoutes);
 app.use('/api/proxy',  proxyRoutes);

@@ -273,6 +273,7 @@ export const NtApi = {
       method,
       headers,
       credentials: 'include',
+      cache: 'no-store',
       body: isUpload ? body : body != null ? JSON.stringify(body) : undefined,
     });
     if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `API error ${res.status}`); }
