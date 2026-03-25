@@ -11,6 +11,7 @@
   "dependencies": {
     "chart.js": "^4.4.0",
     "emoji-picker-element": "^1.29.1",
+    "nodemailer": "^8.0.3",
     "svelte-spa-router": "^4.0.1"
   },
   "devDependencies": {

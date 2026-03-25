@@ -5,13 +5,36 @@ Food banner?
 
 Camera for scanner not position right
 
-Database so data becomes persistant?
-
-User management? Login screen
-
-placement of nutrition summary and body stats.... not sure i like what happens with side bar
-
 floating add buttons instead of at top?
 
-
 maybe change ai bot a bit, to be a muscular robot or something
+
+validate exported data and import of my app to make sure it covers everything... settings, pictures, diary, foods, notes, etc
+
+error logging - done.. but maybe set in settings, error logging, verbose, none, etc?
+
+loading of thumbnails slow?
+
+
+add a serving size option for recipes?
+
+add more to first run wizard, helps with all our additions
+
+sign out, user profile better location
+
+save button when adding api key
+
+backup/restore server side... like mealie?
+
+create readme
+
+future considerations
+
+/wizard for login page?
+
+enable mfa/oath future?
+
+mobile app... identical to webapp...but with option to store data local
+--what is legal or not based on the implemntation and build?
+
+api key to pull data out of here elsewhere?

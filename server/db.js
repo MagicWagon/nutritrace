@@ -70,6 +70,27 @@ db.exec(`
     value   TEXT,
     PRIMARY KEY (user_id, key)
   );
+
+  CREATE TABLE IF NOT EXISTS app_config (
+    key   TEXT PRIMARY KEY,
+    value TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    token      TEXT PRIMARY KEY,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    expires_at TEXT NOT NULL,
+    used       INTEGER DEFAULT 0
+  );
+
+  CREATE TABLE IF NOT EXISTS invite_tokens (
+    token      TEXT PRIMARY KEY,
+    email      TEXT,
+    role       TEXT NOT NULL DEFAULT 'user',
+    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    expires_at TEXT NOT NULL,
+    used       INTEGER DEFAULT 0
+  );
 `);
 
 // ── Migrations ─────────────────────────────────────────────────────────────
@@ -94,6 +115,10 @@ if (!columnExists('users', 'username')) {
       created_at    TEXT DEFAULT (datetime('now'))
     );
   `);
+}
+
+if (!columnExists('users', 'email')) {
+  db.exec(`ALTER TABLE users ADD COLUMN email TEXT`);
 }
 
 if (!columnExists('foods', 'user_id')) {

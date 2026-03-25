@@ -12,6 +12,7 @@
   let birthday   = '';
   let gender     = '';
   let avatar_url = '';
+  let email      = '';
   let saving     = false;
   let fileInput;
   let uploading  = false;
@@ -24,6 +25,7 @@
     birthday   = u.birthday   || '';
     gender     = u.gender     || '';
     avatar_url = u.avatar_url || '';
+    email      = u.email      || '';
   });
 
   async function save() {
@@ -33,7 +35,7 @@
         method: 'PUT',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ full_name, nickname, birthday, gender, avatar_url }),
+        body: JSON.stringify({ full_name, nickname, birthday, gender, avatar_url, email }),
       });
       const data = await res.json();
       if (!res.ok) { showError(data.error || 'Save failed'); return; }
@@ -130,6 +132,11 @@
       <div class="form-group">
         <label class="form-label">Full Name</label>
         <input class="input" type="text" placeholder="Your full name" bind:value={full_name} />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email address</label>
+        <input class="input" type="email" autocomplete="email"
+          placeholder="Used for password resets" bind:value={email} />
       </div>
       <div class="form-group">
         <label class="form-label">Nickname / Display Name</label>

@@ -81,6 +81,10 @@
         {loading ? 'Signing in…' : 'Sign in'}
       </button>
 
+      <div style="text-align:center">
+        <button class="recovery-toggle" on:click={() => push('/forgot-password')}>Forgot password?</button>
+      </div>
+
       <!-- Locked out recovery -->
       <button class="recovery-toggle" on:click={() => showRecovery = !showRecovery}>
         {showRecovery ? 'Hide' : 'Locked out?'}

@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import db from '../db.js';
 import { wrap } from '../logger.js';
 import { signToken, userMgmtActive, requireAuth, requireAdmin } from '../middleware/auth.js';
+import { sendPasswordReset, sendInvite, isEmailConfigured } from '../email.js';
 
 const router = Router();
 
@@ -59,7 +61,7 @@ router.post('/register', wrap((req, res) => {
     return res.status(403).json({ error: 'Admin only' });
   }
 
-  const { username, password, full_name, nickname, birthday, gender, role } = req.body;
+  const { username, password, full_name, nickname, birthday, gender, role, email } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
   if (password.length < 4) return res.status(400).json({ error: 'Password must be at least 4 characters' });
 
@@ -67,11 +69,12 @@ router.post('/register', wrap((req, res) => {
   const assignedRole = isFirst ? 'admin' : (role === 'admin' ? 'admin' : 'user');
 
   const result = db.prepare(
-    `INSERT INTO users (username, password_hash, full_name, nickname, birthday, gender, role)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO users (username, password_hash, full_name, nickname, birthday, gender, role, email)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     username.trim().toLowerCase(), hash,
-    full_name || null, nickname || null, birthday || null, gender || null, assignedRole
+    full_name || null, nickname || null, birthday || null, gender || null, assignedRole,
+    email ? email.trim().toLowerCase() : null
   );
 
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(result.lastInsertRowid);
@@ -89,10 +92,11 @@ router.post('/register', wrap((req, res) => {
 
 // ── Update own profile ─────────────────────────────────────────────────────
 router.put('/profile', requireAuth, wrap((req, res) => {
-  const { full_name, nickname, birthday, gender, avatar_url } = req.body;
+  const { full_name, nickname, birthday, gender, avatar_url, email } = req.body;
   db.prepare(
-    `UPDATE users SET full_name=?, nickname=?, birthday=?, gender=?, avatar_url=? WHERE id=?`
-  ).run(full_name || null, nickname || null, birthday || null, gender || null, avatar_url || null, req.user.id);
+    `UPDATE users SET full_name=?, nickname=?, birthday=?, gender=?, avatar_url=?, email=? WHERE id=?`
+  ).run(full_name || null, nickname || null, birthday || null, gender || null, avatar_url || null,
+        email ? email.trim().toLowerCase() : null, req.user.id);
 
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
   res.json({ user: safeUser(user) });
@@ -144,12 +148,121 @@ router.delete('/management', requireAuth, requireAdmin, wrap((req, res) => {
 }));
 
 // ── Lockout recovery: disable user management without credentials ──────────
-// Self-hosted escape hatch — only works when the caller has no valid session
 router.post('/recover', wrap((req, res) => {
   if (req.user) return res.status(400).json({ error: 'You are already signed in. Use Settings to disable user management.' });
   db.prepare('DELETE FROM users').run();
   res.clearCookie('nt_token');
   res.json({ ok: true });
+}));
+
+// ── Forgot password ────────────────────────────────────────────────────────
+router.post('/forgot-password', wrap(async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email required' });
+  if (!isEmailConfigured()) return res.status(503).json({ error: 'Email not configured on this server. Contact your administrator.' });
+
+  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.trim().toLowerCase());
+  // Always return success to avoid leaking whether the email exists
+  if (!user) return res.json({ ok: true });
+
+  // Invalidate any existing tokens for this user
+  db.prepare('UPDATE password_reset_tokens SET used = 1 WHERE user_id = ?').run(user.id);
+
+  const token = crypto.randomBytes(32).toString('hex');
+  const expires = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour
+  db.prepare('INSERT INTO password_reset_tokens (token, user_id, expires_at) VALUES (?, ?, ?)').run(token, user.id, expires);
+
+  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  await sendPasswordReset(user.email, `${baseUrl}/#/reset-password?token=${token}`);
+  res.json({ ok: true });
+}));
+
+// ── Reset password (via token) ─────────────────────────────────────────────
+router.post('/reset-password', wrap((req, res) => {
+  const { token, password } = req.body;
+  if (!token || !password) return res.status(400).json({ error: 'Token and password required' });
+  if (password.length < 4) return res.status(400).json({ error: 'Password must be at least 4 characters' });
+
+  const row = db.prepare('SELECT * FROM password_reset_tokens WHERE token = ?').get(token);
+  if (!row || row.used) return res.status(400).json({ error: 'Invalid or expired reset link' });
+  if (new Date(row.expires_at) < new Date()) return res.status(400).json({ error: 'Reset link has expired' });
+
+  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(bcrypt.hashSync(password, 10), row.user_id);
+  db.prepare('UPDATE password_reset_tokens SET used = 1 WHERE token = ?').run(token);
+
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(row.user_id);
+  res.cookie('nt_token', signToken(user), COOKIE_OPTS);
+  res.json({ user: safeUser(user) });
+}));
+
+// ── Admin: create invite ───────────────────────────────────────────────────
+router.post('/invite', requireAuth, requireAdmin, wrap(async (req, res) => {
+  const { email, role = 'user' } = req.body;
+
+  const token = crypto.randomBytes(32).toString('hex');
+  const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days
+  db.prepare('INSERT INTO invite_tokens (token, email, role, created_by, expires_at) VALUES (?, ?, ?, ?, ?)')
+    .run(token, email ? email.trim().toLowerCase() : null, role, req.user.id, expires);
+
+  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  const inviteUrl = `${baseUrl}/#/accept-invite?token=${token}`;
+
+  if (email && isEmailConfigured()) {
+    const inviter = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+    const inviterName = inviter?.nickname || inviter?.full_name || inviter?.username || 'An admin';
+    await sendInvite(email, inviteUrl, inviterName);
+    res.json({ ok: true, sent: true, inviteUrl });
+  } else {
+    res.json({ ok: true, sent: false, inviteUrl });
+  }
+}));
+
+// ── Accept invite ──────────────────────────────────────────────────────────
+router.post('/accept-invite', wrap((req, res) => {
+  const { token, username, password, full_name } = req.body;
+  if (!token || !username || !password) return res.status(400).json({ error: 'Token, username and password required' });
+  if (password.length < 4) return res.status(400).json({ error: 'Password must be at least 4 characters' });
+
+  const invite = db.prepare('SELECT * FROM invite_tokens WHERE token = ?').get(token);
+  if (!invite || invite.used) return res.status(400).json({ error: 'Invalid or already used invite link' });
+  if (new Date(invite.expires_at) < new Date()) return res.status(400).json({ error: 'Invite link has expired' });
+
+  const hash = bcrypt.hashSync(password, 10);
+  const result = db.prepare(
+    `INSERT INTO users (username, password_hash, full_name, role, email)
+     VALUES (?, ?, ?, ?, ?)`
+  ).run(
+    username.trim().toLowerCase(), hash,
+    full_name || null, invite.role,
+    invite.email || null
+  );
+
+  db.prepare('UPDATE invite_tokens SET used = 1 WHERE token = ?').run(token);
+
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(result.lastInsertRowid);
+  res.cookie('nt_token', signToken(user), COOKIE_OPTS);
+  res.json({ user: safeUser(user) });
+}));
+
+// ── Validate a token (reset or invite) without consuming it ───────────────
+router.get('/validate-token', wrap((req, res) => {
+  const { token, type } = req.query;
+  if (!token || !type) return res.status(400).json({ error: 'token and type required' });
+
+  if (type === 'reset') {
+    const row = db.prepare('SELECT * FROM password_reset_tokens WHERE token = ?').get(token);
+    if (!row || row.used || new Date(row.expires_at) < new Date()) return res.status(400).json({ error: 'Invalid or expired link' });
+    const user = db.prepare('SELECT username FROM users WHERE id = ?').get(row.user_id);
+    return res.json({ ok: true, username: user?.username });
+  }
+
+  if (type === 'invite') {
+    const row = db.prepare('SELECT * FROM invite_tokens WHERE token = ?').get(token);
+    if (!row || row.used || new Date(row.expires_at) < new Date()) return res.status(400).json({ error: 'Invalid or expired link' });
+    return res.json({ ok: true, email: row.email || null, role: row.role });
+  }
+
+  res.status(400).json({ error: 'Unknown token type' });
 }));
 
 export default router;

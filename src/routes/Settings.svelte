@@ -33,7 +33,7 @@
   let openSections = { appearance: true, regional: false, diary: false, foods: false, water: false,
                        categories: false, nutrients: false, bodyStats: false, statistics: false,
                        units: false, connectedServices: false, ai: false,
-                       backup: false, users: false, about: false };
+                       backup: false, email: false, users: false, about: false };
 
   function toggleSection(key) {
     openSections = { ...openSections, [key]: !openSections[key] };
@@ -58,6 +58,7 @@
     connectedServices: ['connected services','usda','open food facts','mealie','recipe','search language','country','api key','credentials','username','password'],
     ai:                ['ai','fitbot','assistant','provider','model','api key','artificial intelligence','chat'],
     backup:            ['backup','export','import','restore','waistline','csv','clear data','json'],
+    email:             ['email','smtp','mail','password reset','invites','notifications'],
     users:             ['users','user management','accounts','login','password','admin','register','profile'],
     about:             ['about','version','nutritrace'],
   };
@@ -640,6 +641,70 @@
       URL.revokeObjectURL(a.href);
       showSuccess('CSV exported');
     } catch(e) { showError('Export failed: ' + e.message); }
+  }
+
+  // ── Email / SMTP ───────────────────────────────────────────────────────────
+  let smtpHost   = '';
+  let smtpPort   = '587';
+  let smtpSecure = false;
+  let smtpUser   = '';
+  let smtpPass   = '';
+  let smtpFrom   = '';
+  let smtpTestStatus = ''; // '', 'testing', 'ok', 'fail'
+
+  async function loadSmtpConfig() {
+    try {
+      const res  = await fetch('/api/app-config', { credentials: 'include' });
+      if (!res.ok) return;
+      const cfg  = await res.json();
+      smtpHost   = cfg.smtp_host   || '';
+      smtpPort   = cfg.smtp_port   || '587';
+      smtpSecure = cfg.smtp_secure === 'true';
+      smtpUser   = cfg.smtp_user   || '';
+      smtpPass   = cfg.smtp_pass   || '';
+      smtpFrom   = cfg.smtp_from   || '';
+    } catch {}
+  }
+
+  async function saveSmtpField(key, value) {
+    await fetch('/api/app-config', {
+      method: 'PUT', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, value: String(value) }),
+    }).catch(() => {});
+  }
+
+  async function testSmtp() {
+    smtpTestStatus = 'testing';
+    try {
+      const res = await fetch('/api/app-config/test-email', { method: 'POST', credentials: 'include' });
+      smtpTestStatus = res.ok ? 'ok' : 'fail';
+    } catch { smtpTestStatus = 'fail'; }
+  }
+
+  $: if (openSections.email && $currentUser?.role === 'admin') loadSmtpConfig();
+
+  // ── Invite ─────────────────────────────────────────────────────────────────
+  let inviteEmail  = '';
+  let inviteRole   = 'user';
+  let inviteLoading = false;
+  let inviteResult = null; // { inviteUrl, sent }
+
+  async function createInvite() {
+    inviteLoading = true;
+    inviteResult  = null;
+    try {
+      const res  = await fetch('/api/auth/invite', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: inviteEmail.trim() || undefined, role: inviteRole }),
+      });
+      const data = await res.json();
+      if (!res.ok) { showError(data.error || 'Failed to create invite'); return; }
+      inviteResult = data;
+      inviteEmail  = '';
+    } catch { showError('Could not create invite'); }
+    inviteLoading = false;
   }
 
   // ── User Management ────────────────────────────────────────────────────────
@@ -1593,6 +1658,68 @@
       </div>
     {/if}
 
+    <!-- ── Email ────────────────────────────────────────────────────────────── -->
+    {#if $currentUser?.role === 'admin'}
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'email')} on:click={() => toggleSection('email')}>
+      <span class="material-symbols-rounded si">mail</span>
+      <span>Email</span>
+      <span class="material-symbols-rounded chevron" class:rotated={openSections.email}>expand_more</span>
+    </button>
+    {#if sectionOpen(openSections, settingsQuery, 'email') && sectionVisible(settingsQuery, 'email')}
+      <div class="section-body" transition:slide={{ duration: 180 }}>
+        <p class="sub-label" style="padding-bottom:4px">Used for password resets and user invites</p>
+        <div class="card settings-card" style="padding:16px;display:flex;flex-direction:column;gap:12px">
+          <div class="form-group">
+            <label class="form-label">SMTP Host</label>
+            <input class="input" type="text" placeholder="smtp.gmail.com"
+              bind:value={smtpHost} on:blur={() => saveSmtpField('smtp_host', smtpHost)} />
+          </div>
+          <div style="display:flex;gap:10px">
+            <div class="form-group" style="flex:1">
+              <label class="form-label">Port</label>
+              <input class="input" type="number" placeholder="587"
+                bind:value={smtpPort} on:blur={() => saveSmtpField('smtp_port', smtpPort)} />
+            </div>
+            <div class="form-group" style="display:flex;flex-direction:column;gap:6px;justify-content:flex-end;padding-bottom:2px">
+              <label class="form-label">TLS</label>
+              <Toggle checked={smtpSecure} on:change={e => { smtpSecure = e.detail; saveSmtpField('smtp_secure', String(e.detail)); }} />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Username</label>
+            <input class="input" type="text" autocomplete="off" placeholder="SMTP username or email"
+              bind:value={smtpUser} on:blur={() => saveSmtpField('smtp_user', smtpUser)} />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Password</label>
+            <input class="input" type="password" autocomplete="new-password" placeholder="SMTP password or app password"
+              bind:value={smtpPass} on:blur={() => saveSmtpField('smtp_pass', smtpPass)} />
+          </div>
+          <div class="form-group">
+            <label class="form-label">From address</label>
+            <input class="input" type="email" placeholder='NutriTrace <noreply@example.com>'
+              bind:value={smtpFrom} on:blur={() => saveSmtpField('smtp_from', smtpFrom)} />
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <button class="btn btn-secondary" style="height:36px;font-size:13px"
+              on:click={testSmtp} disabled={!smtpHost || smtpTestStatus === 'testing'}>
+              {smtpTestStatus === 'testing' ? 'Testing…' : 'Test connection'}
+            </button>
+            {#if smtpTestStatus === 'ok'}
+              <span style="color:var(--macro-carbs);font-size:13px;display:flex;align-items:center;gap:4px">
+                <span class="material-symbols-rounded" style="font-size:16px">check_circle</span>Connected
+              </span>
+            {:else if smtpTestStatus === 'fail'}
+              <span style="color:var(--danger);font-size:13px;display:flex;align-items:center;gap:4px">
+                <span class="material-symbols-rounded" style="font-size:16px">error</span>Failed
+              </span>
+            {/if}
+          </div>
+        </div>
+      </div>
+    {/if}
+    {/if}
+
     <!-- ── User Management ──────────────────────────────────────────────────── -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'users')} on:click={() => toggleSection('users')}>
       <span class="material-symbols-rounded si">group</span>
@@ -1669,6 +1796,40 @@
                   {/each}
                 </div>
               </div>
+              <div class="setting-divider"></div>
+
+              <!-- Invite user -->
+              <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px;padding:12px 16px">
+                <span class="setting-label">Invite user</span>
+                <div class="um-form-row">
+                  <input class="input" type="email" bind:value={inviteEmail} placeholder="Email (optional)" />
+                  <select class="input" bind:value={inviteRole}>
+                    <option value="user">User</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+                <button class="btn btn-secondary" style="width:100%" on:click={createInvite} disabled={inviteLoading}>
+                  {inviteLoading ? 'Creating…' : 'Generate invite link'}
+                </button>
+                {#if inviteResult}
+                  <div class="invite-result" transition:slide={{ duration: 160 }}>
+                    {#if inviteResult.sent}
+                      <span class="material-symbols-rounded" style="color:var(--accent);font-size:18px">mark_email_read</span>
+                      <span style="font-size:13px">Invite sent to <strong>{inviteEmail || 'user'}</strong></span>
+                    {:else}
+                      <span style="font-size:13px;color:var(--text-2)">Share this link:</span>
+                      <div class="invite-link-row">
+                        <input class="input" style="flex:1;font-size:12px" readonly value={inviteResult.inviteUrl} />
+                        <button class="btn btn-secondary" style="height:36px;padding:0 12px;font-size:12px"
+                          on:click={() => { navigator.clipboard?.writeText(inviteResult.inviteUrl); showSuccess('Copied!'); }}>
+                          Copy
+                        </button>
+                      </div>
+                    {/if}
+                  </div>
+                {/if}
+              </div>
+
               <div class="setting-divider"></div>
               <button class="setting-row setting-action danger" on:click={() => showDisableUmDialog = true}>
                 <span class="material-symbols-rounded si" style="color:var(--danger)">no_accounts</span>
@@ -2149,6 +2310,8 @@
   .um-form-row > .input { flex: 1; min-width: 0; }
   .um-error { font-size: 12px; color: var(--danger, #ff6b6b); background: rgba(255,107,107,0.1); border-radius: var(--radius-sm); padding: 6px 10px; }
   .um-user-list { display: flex; flex-direction: column; gap: 4px; width: 100%; }
+  .invite-result { display: flex; flex-direction: column; gap: 8px; width: 100%; padding: 10px 12px; background: var(--surface-2); border-radius: var(--radius-md); border: 1px solid var(--border); }
+  .invite-link-row { display: flex; gap: 6px; align-items: center; }
   .um-user-row {
     display: flex; align-items: center; gap: 10px;
     padding: 8px; border-radius: var(--radius-md);

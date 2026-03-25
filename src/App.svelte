@@ -19,8 +19,11 @@
   import Settings   from './routes/Settings.svelte';
   import Wizard     from './routes/Wizard.svelte';
   import Water      from './routes/Water.svelte';
-  import Login      from './routes/Login.svelte';
-  import Profile    from './routes/Profile.svelte';
+  import Login          from './routes/Login.svelte';
+  import Profile        from './routes/Profile.svelte';
+  import ForgotPassword from './routes/ForgotPassword.svelte';
+  import ResetPassword  from './routes/ResetPassword.svelte';
+  import AcceptInvite   from './routes/AcceptInvite.svelte';
   import AIBuddy    from './components/ai/AIBuddy.svelte';
 
   const routes = {
@@ -35,8 +38,11 @@
     '/goals':           Goals,
     '/settings':        Settings,
     '/wizard':          Wizard,
-    '/profile':         Profile,
-    '*':                Diary,
+    '/profile':           Profile,
+    '/forgot-password':   ForgotPassword,
+    '/reset-password':    ResetPassword,
+    '/accept-invite':     AcceptInvite,
+    '*':                  Diary,
   };
 
   const NAV_HIDDEN = ['/wizard', '/foods/edit', '/meal-editor', '/profile'];
@@ -112,8 +118,9 @@
     }
   });
 
-  // Auth gate: when user management is active and no user is logged in, show Login
-  $: needsLogin = $userMgmtActive && !$currentUser;
+  // Auth gate: bypass for password reset / invite pages
+  const AUTH_BYPASS = ['/forgot-password', '/reset-password', '/accept-invite'];
+  $: needsLogin = $userMgmtActive && !$currentUser && !AUTH_BYPASS.includes($location);
 </script>
 
 <!-- Login gate (when user management active and not authenticated) -->
