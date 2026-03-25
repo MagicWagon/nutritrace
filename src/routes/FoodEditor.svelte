@@ -6,7 +6,7 @@
   import { showSuccess, showError } from '../stores/toast.js';
   import { editorState, clearFoodEditorState } from '../stores/editorState.js';
   import Toggle from '../components/settings/Toggle.svelte';
-  import { foodsShowCategories, foodsShowNotes, foodCategories, visibleNutriments, nutrimentsOrder, customNutriments, cropPhotos, offUsername, offPassword, offUploadCountry } from '../stores/settings.js';
+  import { foodsShowCategories, foodsShowNotes, foodCategories, visibleNutriments, nutrimentsOrder, customNutriments, cropPhotos, offUsername, offPassword, offUploadCountry, catName as _catName, catDisplay as _catDisplay } from '../stores/settings.js';
 
   // ── Photo capture / upload ─────────────────────────────────
   let fileInput;
@@ -297,11 +297,12 @@
   }
 
   function toggleCategory(cat) {
+    const name = _catName(cat);
     food.categories = food.categories || [];
-    if (food.categories.includes(cat)) {
-      food.categories = food.categories.filter(c => c !== cat);
+    if (food.categories.includes(name)) {
+      food.categories = food.categories.filter(c => c !== name);
     } else {
-      food.categories = [...food.categories, cat];
+      food.categories = [...food.categories, name];
     }
   }
 
@@ -503,12 +504,12 @@
         <div class="editor-card-title">Categories</div>
         <div class="cat-chips">
           {#each $foodCategories as cat}
-            <button class="chip" class:accent={(food.categories||[]).includes(cat)}
+            <button class="chip" class:accent={(food.categories||[]).includes(_catName(cat))}
               on:click={() => toggleCategory(cat)}>
-              {#if (food.categories||[]).includes(cat)}
+              {#if (food.categories||[]).includes(_catName(cat))}
                 <span class="material-symbols-rounded" style="font-size:14px">check</span>
               {/if}
-              {cat}
+              {_catDisplay(cat)}
             </button>
           {/each}
         </div>

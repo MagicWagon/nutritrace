@@ -52,7 +52,7 @@ export const diaryShowThumbnails    = createSettingStore('diaryShowThumbnails', 
 export const diaryShowAllNutrients  = createSettingStore('diaryShowAllNutrients',   false);
 export const diaryShowNutritionUnits= createSettingStore('diaryShowNutritionUnits', true);
 export const diaryShowMacroSummary  = createSettingStore('diaryShowMacroSummary',   true);
-export const diaryPromptQuantity    = createSettingStore('diaryPromptQuantity',     false);
+export const diaryPromptQuantity    = createSettingStore('diaryPromptQuantity',     true);
 export const diaryShowPortionSize   = createSettingStore('diaryShowPortionSize',    false);
 
 export const foodsShowCategories    = createSettingStore('foodsShowCategories',    true);
@@ -113,7 +113,7 @@ export const disableAnimations  = createSettingStore('disableAnimations',  false
 export const goalCelebrations   = createSettingStore('goalCelebrations',   true);
 
 // Date / time display format
-export const dateFormat = createSettingStore('dateFormat', 'EU');   // 'ISO' | 'US' | 'EU' | 'natural'
+export const dateFormat = createSettingStore('dateFormat', 'US');   // 'ISO' | 'US' | 'EU' | 'natural'
 export const timeFormat = createSettingStore('timeFormat', '12h');  // '12h' | '24h'
 
 // Statistics chart settings
@@ -134,6 +134,12 @@ export const usdaApiKey  = createSettingStore('usdaApiKey',  '');
 export const usdaEnabled = createSettingStore('usdaEnabled', false);
 export const offUsername = createSettingStore('offUsername', '');
 export const offPassword = createSettingStore('offPassword', '');
+
+// ── Category label helpers ─────────────────────────────────────────────────
+// foodCategories items can be a plain string (legacy) or { name, label? }
+export const catName    = c => typeof c === 'string' ? c : (c?.name    || '');
+export const catLabel   = c => typeof c === 'string' ? '' : (c?.label  || '');
+export const catDisplay = c => { const l = catLabel(c); return l ? `${l} ${catName(c)}` : catName(c); };
 
 // FitBot AI
 export const aiEnabled       = createSettingStore('aiEnabled',       false);

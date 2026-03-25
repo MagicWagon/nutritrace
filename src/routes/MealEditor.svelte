@@ -6,7 +6,7 @@
   import { showSuccess, showError } from '../stores/toast.js';
   import { editorState, clearMealEditorState } from '../stores/editorState.js';
   import { Nutrition, NUTRIMENTS } from '../lib/nutrition.js';
-  import { foodsShowCategories, foodsShowNotes, foodCategories } from '../stores/settings.js';
+  import { foodsShowCategories, foodsShowNotes, foodCategories, catName as _catName, catDisplay as _catDisplay } from '../stores/settings.js';
 
   export let params = {};
 
@@ -253,11 +253,12 @@
 
   // ── Category chips ─────────────────────────────────────────────────────────
   function toggleCat(cat) {
+    const name = _catName(cat);
     const cats = meal.categories || [];
-    if (cats.includes(cat)) {
-      meal = { ...meal, categories: cats.filter(c => c !== cat) };
+    if (cats.includes(name)) {
+      meal = { ...meal, categories: cats.filter(c => c !== name) };
     } else {
-      meal = { ...meal, categories: [...cats, cat] };
+      meal = { ...meal, categories: [...cats, name] };
     }
   }
 
@@ -375,9 +376,9 @@
           {#each $foodCategories as cat}
             <button
               class="cat-chip"
-              class:active={(meal.categories||[]).includes(cat)}
+              class:active={(meal.categories||[]).includes(_catName(cat))}
               on:click={() => toggleCat(cat)}
-            >{cat}</button>
+            >{_catDisplay(cat)}</button>
           {/each}
         </div>
       </div>

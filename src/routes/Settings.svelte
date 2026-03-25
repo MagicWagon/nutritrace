@@ -8,6 +8,7 @@
   import { showSuccess, showError } from '../stores/toast.js';
   import { applyAppearance, applyAccentColor } from '../stores/settings.js';
   import { AI_PROVIDERS, AI_MODELS, AI_DEFAULT_MODELS } from '../lib/aiChat.js';
+  import { catName as _catName, catDisplay as _catDisplay } from '../stores/settings.js';
   import {
     appearance, accentColor, energyUnit, mealNames,
     diaryShowBrands, diaryShowTimestamps, diaryShowThumbnails, diaryShowAllNutrients,
@@ -305,18 +306,22 @@
   let meals = [...(DB.getSetting('mealNames', ['Breakfast','Lunch','Dinner','Snacks']))];
 
   // ── Categories ─────────────────────────────────────────────────────────────
-  let newCategoryName = '';
+  let newCategoryName  = '';
+  let newCategoryLabel = '';
 
   function addCategory() {
-    if (!newCategoryName.trim()) return;
+    const name = newCategoryName.trim();
+    if (!name) return;
     const cats = get(foodCategories) || [];
-    if (!cats.includes(newCategoryName.trim())) {
-      foodCategories.set([...cats, newCategoryName.trim()]);
-    }
+    if (cats.some(c => _catName(c) === name)) return;
+    const label = newCategoryLabel.trim();
+    foodCategories.set([...cats, label ? { name, label } : name]);
     newCategoryName = '';
+    newCategoryLabel = '';
   }
   function removeCategory(cat) {
-    foodCategories.set((get(foodCategories) || []).filter(c => c !== cat));
+    const n = _catName(cat);
+    foodCategories.set((get(foodCategories) || []).filter(c => _catName(c) !== n));
   }
 
   // ── Custom nutrients ───────────────────────────────────────────────────────
@@ -506,7 +511,9 @@
         const importedCats = [...new Set((foodList || []).map(f => (f.categories && f.categories[0]) || f.category).filter(Boolean))];
         if (importedCats.length) {
           const existing = get(foodCategories) || [];
-          foodCategories.set([...new Set([...existing, ...importedCats])]);
+          const existingNames = new Set(existing.map(c => _catName(c)));
+          const toAdd = importedCats.filter(n => !existingNames.has(n));
+          if (toAdd.length) foodCategories.set([...existing, ...toAdd]);
         }
 
         showSuccess('Backup restored — reloading...');
@@ -567,7 +574,9 @@
         const importedCats = [...new Set(foods.map(f => (f.categories && f.categories[0]) || f.category).filter(Boolean))];
         if (importedCats.length) {
           const existing = get(foodCategories) || [];
-          foodCategories.set([...new Set([...existing, ...importedCats])]);
+          const existingNames = new Set(existing.map(c => _catName(c)));
+          const toAdd = importedCats.filter(n => !existingNames.has(n));
+          if (toAdd.length) foodCategories.set([...existing, ...toAdd]);
         }
 
         showSuccess('Waistline data imported — reloading...');
@@ -1060,7 +1069,7 @@
           <div class="cat-chips-wrap">
             {#each ($foodCategories || []) as cat}
               <div class="chip">
-                {cat}
+                {_catDisplay(cat)}
                 <button class="chip-x" on:click={() => removeCategory(cat)} aria-label="Remove">
                   <span class="material-symbols-rounded" style="font-size:14px">close</span>
                 </button>
@@ -1072,7 +1081,9 @@
           </div>
           <div class="setting-divider"></div>
           <div class="cat-add-row">
-            <input class="input" style="flex:1;height:40px" placeholder="New category..."
+            <input class="input" style="width:54px;height:40px;text-align:center;font-size:20px;padding:0 6px;flex-shrink:0"
+              placeholder="😀" title="Optional label (emoji)" bind:value={newCategoryLabel} maxlength="4" />
+            <input class="input" style="flex:1;height:40px" placeholder="Category name..."
               bind:value={newCategoryName} on:keydown={e => e.key==='Enter' && addCategory()} />
             <button class="btn btn-secondary" style="height:40px;padding:0 16px" on:click={addCategory}>Add</button>
           </div>

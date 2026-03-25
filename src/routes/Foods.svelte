@@ -16,7 +16,7 @@
   import { API, USDA, NtApi } from '../lib/api.js';
   import { Nutrition } from '../lib/nutrition.js';
   import { Mealie } from '../lib/mealieApi.js';
-  import { foodsShowThumbnails, foodsShowCategories, foodsShowNotes, foodsSort, foodCategories, foodsShowYesterdayMeals, mealNames, usdaEnabled, usdaApiKey } from '../stores/settings.js';
+  import { foodsShowThumbnails, foodsShowCategories, foodsShowNotes, foodsSort, foodCategories, foodsShowYesterdayMeals, mealNames, usdaEnabled, usdaApiKey, catName as _catName, catDisplay as _catDisplay } from '../stores/settings.js';
 
   // Query string params
   function qs() {
@@ -360,8 +360,8 @@
       <button class="cat-chip" class:active={!activeCategoryFilter}
         on:click={() => activeCategoryFilter = ''}>All</button>
       {#each $foodCategories as cat}
-        <button class="cat-chip" class:active={activeCategoryFilter === cat}
-          on:click={() => activeCategoryFilter = activeCategoryFilter === cat ? '' : cat}>{cat}</button>
+        <button class="cat-chip" class:active={activeCategoryFilter === _catName(cat)}
+          on:click={() => activeCategoryFilter = activeCategoryFilter === _catName(cat) ? '' : _catName(cat)}>{_catDisplay(cat)}</button>
       {/each}
     </div>
   {/if}
