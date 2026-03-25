@@ -30,10 +30,10 @@
   import { push } from 'svelte-spa-router';
   // ── Collapsible section state ──────────────────────────────────────────────
   $: isDark = $appearance === 'dark' || ($appearance === 'system' && (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches));
-  let openSections = { appearance: true, diary: false, water: false, foods: false, nutrients: false,
-                       bodyStats: false, statistics: false, goals: false, categories: false,
-                       units: false, integration: false, api: false, backup: false,
-                       ai: false, users: false, about: false };
+  let openSections = { appearance: true, regional: false, diary: false, foods: false, water: false,
+                       categories: false, nutrients: false, bodyStats: false, statistics: false,
+                       units: false, connectedServices: false, ai: false,
+                       backup: false, users: false, about: false };
 
   function toggleSection(key) {
     openSections = { ...openSections, [key]: !openSections[key] };
@@ -44,22 +44,22 @@
   $: settingsQuery = settingsSearch.toLowerCase().trim();
 
   const SECTION_KEYWORDS = {
-    appearance:  ['appearance','theme','dark','light','accent','color','date format','time format','navigation','sidebar','persistent','start page','animations','celebrations'],
-    diary:       ['diary','brands','timestamps','thumbnails','nutrients','nutrition units','macros','macro summary','prompt quantity','portion size','nutrition bar','goals progress','meal names','meals'],
-    foods:       ['foods','thumbnails','category','notes','yesterday meals','sort order','sort'],
-    water:       ['water','display unit','daily goal','containers','bottle','cup','glass'],
-    categories:  ['categories','food categories','tags'],
-    nutrients:   ['nutrients','nutriments','custom nutrients','vitamins','minerals'],
-    bodyStats:   ['body stats','body','weight','measurements','stats'],
-    statistics:  ['statistics','chart','y-axis','average','goal line','trend','stats'],
-    goals:       ['goals','target','calorie goal'],
-    units:       ['units','energy unit','weight unit','height','circumference','imperial','metric'],
-    integration: ['integration','barcode','scan','beep','flashlight','crop photos','usda','open food facts','mealie','recipe','search language','country'],
-    ai:          ['ai','fitbot','assistant','provider','model','api key','artificial intelligence','chat'],
-    api:         ['api','open food facts','username','password','credentials'],
-    backup:      ['backup','export','import','restore','waistline','csv','clear data','json'],
-    users:       ['users','user management','accounts','login','password','admin','register','profile'],
-    about:       ['about','version','nutritrace'],
+    appearance:        ['appearance','theme','dark','light','accent','color','navigation','sidebar','persistent','start page','animations','celebrations','reduce motion'],
+    regional:          ['regional','date format','time format','locale','date','time','12h','24h'],
+    diary:             ['diary','brands','timestamps','thumbnails','nutrients','nutrition units','macros','macro summary','prompt quantity','portion size','nutrition bar','goals progress','meal names','meals'],
+    foods:             ['foods','thumbnails','category','notes','yesterday meals','sort order','sort','barcode','scan','beep','flashlight','crop photos'],
+    water:             ['water','display unit','daily goal','containers','bottle','cup','glass'],
+    categories:        ['categories','food categories','tags','labels'],
+    nutrients:         ['nutrients','nutriments','custom nutrients','vitamins','minerals'],
+    bodyStats:         ['body stats','body','weight','measurements','stats'],
+    statistics:        ['statistics','chart','y-axis','average','goal line','trend','stats'],
+    goals:             ['goals','target','calorie goal'],
+    units:             ['units','energy unit','weight unit','height','circumference','imperial','metric'],
+    connectedServices: ['connected services','usda','open food facts','mealie','recipe','search language','country','api key','credentials','username','password'],
+    ai:                ['ai','fitbot','assistant','provider','model','api key','artificial intelligence','chat'],
+    backup:            ['backup','export','import','restore','waistline','csv','clear data','json'],
+    users:             ['users','user management','accounts','login','password','admin','register','profile'],
+    about:             ['about','version','nutritrace'],
   };
 
   function sectionVisible(query, key) {
@@ -815,6 +815,7 @@
       <span>Appearance</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.appearance}>expand_more</span>
     </button>
+
     {#if sectionOpen(openSections, settingsQuery, 'appearance') && sectionVisible(settingsQuery, 'appearance')}
       <div class="section-body" transition:slide={{ duration: 180 }}>
         <div class="card settings-card">
@@ -853,28 +854,6 @@
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <span class="setting-label">Date format</span>
-            <div class="select-wrap" style="width:160px">
-              <select class="select sel-sm" value={$dateFormat} on:change={e => dateFormat.set(e.target.value)}>
-                <option value="ISO">YYYY-MM-DD</option>
-                <option value="US">MM/DD/YYYY</option>
-                <option value="EU">DD/MM/YYYY</option>
-                <option value="natural">D MMM YYYY</option>
-              </select>
-            </div>
-          </div>
-          <div class="setting-divider"></div>
-          <div class="setting-row">
-            <span class="setting-label">Time format</span>
-            <div class="select-wrap" style="width:160px">
-              <select class="select sel-sm" value={$timeFormat} on:change={e => timeFormat.set(e.target.value)}>
-                <option value="12h">12-hour (AM/PM)</option>
-                <option value="24h">24-hour</option>
-              </select>
-            </div>
-          </div>
-          <div class="setting-divider"></div>
-          <div class="setting-row">
             <span class="setting-label">Navigation style</span>
             <div class="select-wrap" style="width:150px">
               <select class="select sel-sm" bind:value={navStyle}>
@@ -903,16 +882,50 @@
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <span class="setting-label">Disable animations</span>
+            <span class="setting-label">Reduce motion</span>
             <Toggle checked={disableAnimations} on:change={e => { disableAnimations = e.detail; set('disableAnimations', e.detail); }} />
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
             <div>
-              <span class="setting-label">Goal celebrations</span>
-              <span class="setting-hint">Pulse animation when hitting calorie or water goal</span>
+              <span class="setting-label">Celebrate goals</span>
+              <span class="setting-hint">Pulse animation when hitting your calorie or water goal</span>
             </div>
             <Toggle checked={$goalCelebrations} on:change={e => goalCelebrations.set(e.detail)} />
+          </div>
+        </div>
+      </div>
+    {/if}
+
+    <!-- ── Regional ────────────────────────────────────────────────────────── -->
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'regional')} on:click={() => toggleSection('regional')}>
+      <span class="material-symbols-rounded si">language</span>
+      <span>Regional</span>
+      <span class="material-symbols-rounded chevron" class:rotated={openSections.regional}>expand_more</span>
+    </button>
+    {#if sectionOpen(openSections, settingsQuery, 'regional') && sectionVisible(settingsQuery, 'regional')}
+      <div class="section-body" transition:slide={{ duration: 180 }}>
+        <div class="card settings-card">
+          <div class="setting-row">
+            <span class="setting-label">Date format</span>
+            <div class="select-wrap" style="width:160px">
+              <select class="select sel-sm" value={$dateFormat} on:change={e => dateFormat.set(e.target.value)}>
+                <option value="ISO">YYYY-MM-DD</option>
+                <option value="US">MM/DD/YYYY</option>
+                <option value="EU">DD/MM/YYYY</option>
+                <option value="natural">D MMM YYYY</option>
+              </select>
+            </div>
+          </div>
+          <div class="setting-divider"></div>
+          <div class="setting-row">
+            <span class="setting-label">Time format</span>
+            <div class="select-wrap" style="width:160px">
+              <select class="select sel-sm" value={$timeFormat} on:change={e => timeFormat.set(e.target.value)}>
+                <option value="12h">12-hour (AM/PM)</option>
+                <option value="24h">24-hour</option>
+              </select>
+            </div>
           </div>
         </div>
       </div>
@@ -927,23 +940,23 @@
     {#if sectionOpen(openSections, settingsQuery, 'diary') && sectionVisible(settingsQuery, 'diary')}
       <div class="section-body" transition:slide={{ duration: 180 }}>
         <div class="card settings-card">
-          <div class="setting-row"><span class="setting-label">Show brands</span><Toggle checked={$diaryShowBrands} on:change={e => diaryShowBrands.set(e.detail)} /></div>
+          <div class="setting-row"><span class="setting-label">Show brand names</span><Toggle checked={$diaryShowBrands} on:change={e => diaryShowBrands.set(e.detail)} /></div>
           <div class="setting-divider"></div>
           <div class="setting-row"><span class="setting-label">Show timestamps</span><Toggle checked={$diaryShowTimestamps} on:change={e => diaryShowTimestamps.set(e.detail)} /></div>
           <div class="setting-divider"></div>
           <div class="setting-row"><span class="setting-label">Show thumbnails</span><Toggle checked={$diaryShowThumbnails} on:change={e => diaryShowThumbnails.set(e.detail)} /></div>
           <div class="setting-divider"></div>
-          <div class="setting-row"><span class="setting-label">Show all nutrients on overview</span><Toggle checked={$diaryShowAllNutrients} on:change={e => diaryShowAllNutrients.set(e.detail)} /></div>
+          <div class="setting-row"><span class="setting-label">Show all nutrients</span><Toggle checked={$diaryShowAllNutrients} on:change={e => diaryShowAllNutrients.set(e.detail)} /></div>
           <div class="setting-divider"></div>
           <div class="setting-row"><span class="setting-label">Show nutrition units</span><Toggle checked={$diaryShowNutritionUnits} on:change={e => diaryShowNutritionUnits.set(e.detail)} /></div>
           <div class="setting-divider"></div>
-          <div class="setting-row"><span class="setting-label">Show macros summary per meal</span><Toggle checked={$diaryShowMacroSummary} on:change={e => diaryShowMacroSummary.set(e.detail)} /></div>
+          <div class="setting-row"><span class="setting-label">Show macro summary per meal</span><Toggle checked={$diaryShowMacroSummary} on:change={e => diaryShowMacroSummary.set(e.detail)} /></div>
           <div class="setting-divider"></div>
-          <div class="setting-row"><span class="setting-label">Prompt for quantity when adding</span><Toggle checked={$diaryPromptQuantity} on:change={e => diaryPromptQuantity.set(e.detail)} /></div>
+          <div class="setting-row"><span class="setting-label">Ask for quantity when adding</span><Toggle checked={$diaryPromptQuantity} on:change={e => diaryPromptQuantity.set(e.detail)} /></div>
           <div class="setting-divider"></div>
-          <div class="setting-row"><span class="setting-label">Show total portion size</span><Toggle checked={$diaryShowPortionSize} on:change={e => diaryShowPortionSize.set(e.detail)} /></div>
+          <div class="setting-row"><span class="setting-label">Show portion size</span><Toggle checked={$diaryShowPortionSize} on:change={e => diaryShowPortionSize.set(e.detail)} /></div>
           <div class="setting-divider"></div>
-          <div class="setting-row"><span class="setting-label">Show nutrition bar (goals progress)</span><Toggle checked={$diaryShowNutritionBar} on:change={e => diaryShowNutritionBar.set(e.detail)} /></div>
+          <div class="setting-row"><span class="setting-label">Show daily goals progress bar</span><Toggle checked={$diaryShowNutritionBar} on:change={e => diaryShowNutritionBar.set(e.detail)} /></div>
         </div>
 
         <p class="sub-label">Meal names</p>
@@ -992,13 +1005,21 @@
           <div class="setting-divider"></div>
           <div class="setting-row">
             <span class="setting-label">Sort order</span>
-            <div class="select-wrap" style="width:120px">
+            <div class="select-wrap" style="width:140px">
               <select class="select sel-sm" value={$foodsSort} on:change={e => foodsSort.set(e.target.value)}>
-                <option value="date">By date</option>
+                <option value="date">Recently added</option>
                 <option value="alpha">Alphabetical</option>
               </select>
             </div>
           </div>
+        </div>
+        <p class="sub-label">Camera &amp; Scanning</p>
+        <div class="card settings-card">
+          <div class="setting-row"><span class="setting-label">Beep on successful scan</span><Toggle checked={$barcodeBeep} on:change={e => barcodeBeep.set(e.detail)} /></div>
+          <div class="setting-divider"></div>
+          <div class="setting-row"><span class="setting-label">Use flashlight while scanning</span><Toggle checked={$barcodeFlashlight} on:change={e => barcodeFlashlight.set(e.detail)} /></div>
+          <div class="setting-divider"></div>
+          <div class="setting-row"><span class="setting-label">Crop photos on upload</span><Toggle checked={$cropPhotos} on:change={e => cropPhotos.set(e.detail)} /></div>
         </div>
       </div>
     {/if}
@@ -1251,7 +1272,7 @@
             </div>
           </div>
           <div class="setting-divider"></div>
-          <div class="setting-row"><span class="setting-label">Y-axis starts at zero</span><Toggle checked={statsYZero} on:change={e => { statsYZero = e.detail; set('statsYZero', e.detail); }} /></div>
+          <div class="setting-row"><span class="setting-label">Lock Y-axis to zero</span><Toggle checked={statsYZero} on:change={e => { statsYZero = e.detail; set('statsYZero', e.detail); }} /></div>
           <div class="setting-divider"></div>
           <div class="setting-row"><span class="setting-label">Show average line</span><Toggle checked={statsAvgLine} on:change={e => { statsAvgLine = e.detail; set('statsAvgLine', e.detail); }} /></div>
           <div class="setting-divider"></div>
@@ -1314,24 +1335,34 @@
       </div>
     {/if}
 
-    <p class="settings-group-label">Integrations</p>
-    <!-- ── Integration ────────────────────────────────────────────────────── -->
-    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'integration')} on:click={() => toggleSection('integration')}>
-      <span class="material-symbols-rounded si">integration_instructions</span>
-      <span>Integration</span>
-      <span class="material-symbols-rounded chevron" class:rotated={openSections.integration}>expand_more</span>
+    <p class="settings-group-label">Connected Services</p>
+    <!-- ── Connected Services ─────────────────────────────────────────────── -->
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'connectedServices')} on:click={() => toggleSection('connectedServices')}>
+      <span class="material-symbols-rounded si">hub</span>
+      <span>Connected Services</span>
+      <span class="material-symbols-rounded chevron" class:rotated={openSections.connectedServices}>expand_more</span>
     </button>
-    {#if sectionOpen(openSections, settingsQuery, 'integration') && sectionVisible(settingsQuery, 'integration')}
+    {#if sectionOpen(openSections, settingsQuery, 'connectedServices') && sectionVisible(settingsQuery, 'connectedServices')}
       <div class="section-body" transition:slide={{ duration: 180 }}>
+
+        <p class="sub-label">USDA FoodData Central</p>
         <div class="card settings-card">
-          <div class="setting-row"><span class="setting-label">Barcode scan beep</span><Toggle checked={$barcodeBeep} on:change={e => barcodeBeep.set(e.detail)} /></div>
-          <div class="setting-divider"></div>
-          <div class="setting-row"><span class="setting-label">Barcode scan flashlight</span><Toggle checked={$barcodeFlashlight} on:change={e => barcodeFlashlight.set(e.detail)} /></div>
-          <div class="setting-divider"></div>
-          <div class="setting-row"><span class="setting-label">Crop photos before upload</span><Toggle checked={$cropPhotos} on:change={e => cropPhotos.set(e.detail)} /></div>
-          <div class="setting-divider"></div>
-          <div class="setting-row"><span class="setting-label">Enable USDA search</span><Toggle checked={usdaEnabled} on:change={e => { usdaEnabled = e.detail; set('usdaEnabled', e.detail); }} /></div>
+          <div class="setting-row">
+            <div>
+              <span class="setting-label">Enable USDA FoodData</span>
+              <div class="setting-desc">Search the USDA nutrition database when adding foods</div>
+            </div>
+            <Toggle checked={usdaEnabled} on:change={e => { usdaEnabled = e.detail; set('usdaEnabled', e.detail); }} />
+          </div>
+          {#if usdaEnabled}
+            <div class="setting-divider"></div>
+            <div class="form-group" style="padding:10px 16px 14px">
+              <label class="form-label" for="usda-key">API Key</label>
+              <input id="usda-key" class="input" placeholder="Get a free key at api.nal.usda.gov" bind:value={usdaApiKey} />
+            </div>
+          {/if}
         </div>
+
         <p class="sub-label">Open Food Facts</p>
         <div class="card settings-card">
           <div class="setting-row">
@@ -1361,7 +1392,15 @@
               </select>
             </div>
           </div>
+          <div class="setting-divider"></div>
+          <div class="form-group" style="padding:10px 16px 14px">
+            <label class="form-label" for="off-user">Account username</label>
+            <input id="off-user" class="input" style="margin-bottom:8px" placeholder="Optional — required to contribute edits" bind:value={offUsername} />
+            <label class="form-label" for="off-pass">Account password</label>
+            <input id="off-pass" class="input" type="password" placeholder="OFF account password" bind:value={offPassword} />
+          </div>
         </div>
+
         <p class="sub-label">Mealie</p>
         <div class="card settings-card">
           <div class="setting-row">
@@ -1453,7 +1492,7 @@
 
             <div class="setting-divider"></div>
             <div class="setting-row">
-              <span class="setting-label">AI Provider</span>
+              <span class="setting-label">Provider</span>
               <div class="select-wrap" style="width:170px">
                 <select class="select sel-sm" bind:value={aiProviderVal}>
                   {#each AI_PROVIDERS as p}
@@ -1500,35 +1539,10 @@
                 {:else if aiProviderVal === 'gemini'}
                   Get your key at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" class="about-link">aistudio.google.com</a>
                 {/if}
-                Your key is stored locally on your device only.
+                Your key is stored securely on the server.
               </div>
             </div>
           {/if}
-        </div>
-      </div>
-    {/if}
-
-    <!-- ── API Keys ─────────────────────────────────────────────────────────── -->
-    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'api')} on:click={() => toggleSection('api')}>
-      <span class="material-symbols-rounded si">key</span>
-      <span>API Keys</span>
-      <span class="material-symbols-rounded chevron" class:rotated={openSections.api}>expand_more</span>
-    </button>
-    {#if sectionOpen(openSections, settingsQuery, 'api') && sectionVisible(settingsQuery, 'api')}
-      <div class="section-body" transition:slide={{ duration: 180 }}>
-        <div class="card settings-card" style="gap:12px;padding:16px">
-          <div class="form-group">
-            <label class="form-label" for="usda-key">USDA FoodData Central API Key</label>
-            <input id="usda-key" class="input" placeholder="Get free key at api.nal.usda.gov" bind:value={usdaApiKey} />
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="off-user">Open Food Facts Username</label>
-            <input id="off-user" class="input" placeholder="OFF account username" bind:value={offUsername} />
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="off-pass">Open Food Facts Password</label>
-            <input id="off-pass" class="input" type="password" placeholder="OFF account password" bind:value={offPassword} />
-          </div>
         </div>
       </div>
     {/if}
@@ -1559,7 +1573,7 @@
             <span class="material-symbols-rounded si" style="color:var(--accent)">swap_horiz</span>
             <div>
               <span class="setting-label">Import from Waistline</span>
-              <div class="setting-desc">Import foods &amp; diary from Waistline Android app</div>
+              <div class="setting-desc">Import foods, meals &amp; recipes from the Waistline Android app</div>
             </div>
             <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
           </button>
@@ -1717,7 +1731,7 @@
             <img src="/icons/logo.png" alt="NutriTrace" class="about-icon" />
             <div>
               <div class="about-name">NutriTrace</div>
-              <div class="about-version text-3 text-sm">v0.9.0-alpha</div>
+              <div class="about-version text-3 text-sm">v0.10.0-alpha</div>
             </div>
           </div>
           <div class="setting-divider"></div>
@@ -1729,8 +1743,8 @@
           </div>
           <div class="setting-divider"></div>
           <div class="about-row">
-            <span class="material-symbols-rounded about-feat-icon">storage</span>
-            <span>All data stored locally (IndexedDB)</span>
+            <span class="material-symbols-rounded about-feat-icon">database</span>
+            <span>Data stored on your own server (SQLite)</span>
           </div>
           <div class="setting-divider"></div>
           <div class="about-row">
@@ -1745,7 +1759,7 @@
           <div class="setting-divider"></div>
           <div class="about-row">
             <span class="material-symbols-rounded about-feat-icon">lock</span>
-            <span>No tracking, no ads, no servers</span>
+            <span>No tracking, no ads, no third parties</span>
           </div>
           <div class="setting-divider"></div>
           <div class="about-row">
