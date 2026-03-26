@@ -21,7 +21,8 @@
            diaryShowTimestamps, diaryShowMacroSummary, diaryPromptQuantity,
            diaryShowPortionSize, diaryShowNutritionBar, diaryTotalsMode,
            diaryShowAllNutrients, diaryShowNutritionUnits, visibleNutriments, hiddenBodyStats,
-           dateFormat, timeFormat, disableAnimations, goalCelebrations } from '../stores/settings.js';
+           dateFormat, timeFormat, disableAnimations, goalCelebrations, pageBanners } from '../stores/settings.js';
+  import DiaryBanner from '../components/banners/DiaryBanner.svelte';
   import { NtApi } from '../lib/api.js';
   import { DB } from '../lib/db.js';
   import { portal } from '../lib/portal.js';
@@ -473,12 +474,13 @@
   </div>
 
   <!-- Standard page-header — identical to every other page -->
-  <header class="page-header diary-header">
+  <header class="page-header diary-header" class:has-banner={$pageBanners}>
+    {#if $pageBanners}<DiaryBanner />{/if}
     <h1>Diary</h1>
   </header>
 
   <!-- Date navigation — sticky sub-bar directly below the header -->
-  <div class="diary-date-bar">
+  <div class="diary-date-bar" class:has-banner={$pageBanners}>
     <button class="btn-icon accent" on:click={prevDay} aria-label="Previous day">
       <span class="material-symbols-rounded">chevron_left</span>
     </button>
@@ -1078,7 +1080,8 @@
   }
 
   /* Sticky date navigation sub-bar — sits directly below the page-header.
-     top = page-top + 10px (padding-top adjustment) + 40px (h1) + 12px (padding-bottom) */
+     top = page-top + 10px (padding-top adjustment) + 40px (h1) + 12px (padding-bottom)
+     With banner: padding-bottom increases to 52px (+40px) */
   .diary-date-bar {
     position: sticky;
     top: calc(var(--page-top, var(--safe-top)) + 62px);
@@ -1091,6 +1094,9 @@
     align-items: center;
     gap: 4px;
     padding: 8px var(--page-px);
+  }
+  .diary-date-bar.has-banner {
+    top: calc(var(--page-top, var(--safe-top)) + 102px);
   }
 
   .date-btn {

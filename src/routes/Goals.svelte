@@ -3,7 +3,8 @@
   import { DB } from '../lib/db.js';
   import { NtApi } from '../lib/api.js';
   import { portal } from '../lib/portal.js';
-  import { goals, goalTemplates, energyUnit, weightUnit, heightUnit, lengthUnit, visibleNutriments, hiddenBodyStats, waterGoalMl, waterUnit } from '../stores/settings.js';
+  import { goals, goalTemplates, energyUnit, weightUnit, heightUnit, lengthUnit, visibleNutriments, hiddenBodyStats, waterGoalMl, waterUnit, pageBanners } from '../stores/settings.js';
+  import GoalsBanner from '../components/banners/GoalsBanner.svelte';
   import { NUTRIMENTS, Nutrition } from '../lib/nutrition.js';
   import { loadEntry } from '../stores/diary.js';
   import { showSuccess } from '../stores/toast.js';
@@ -243,7 +244,8 @@
 </script>
 
 <div class="page-shell">
-  <header class="page-header">
+  <header class="page-header" class:has-banner={$pageBanners}>
+    {#if $pageBanners}<GoalsBanner />{/if}
     <h1>Goals</h1>
   </header>
 

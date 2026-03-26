@@ -4,6 +4,7 @@
   import { slide } from 'svelte/transition';
   import Toggle from '../components/settings/Toggle.svelte';
   import Sheet  from '../components/ui/Sheet.svelte';
+  import SettingsBanner from '../components/banners/SettingsBanner.svelte';
   import Dialog from '../components/ui/Dialog.svelte';
   import { showSuccess, showError } from '../stores/toast.js';
   import { applyAppearance, applyAccentColor } from '../stores/settings.js';
@@ -1149,7 +1150,8 @@
 </script>
 
 <div class="page-shell">
-  <header class="page-header">
+  <header class="page-header" class:has-banner={$pageBanners}>
+    {#if $pageBanners}<SettingsBanner />{/if}
     <h1>Settings</h1>
   </header>
 

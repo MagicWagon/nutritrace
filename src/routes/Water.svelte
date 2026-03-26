@@ -4,6 +4,8 @@
   import { DB } from '../lib/db.js';
   import { NtApi } from '../lib/api.js';
   import { showSuccess, showError } from '../stores/toast.js';
+  import { pageBanners } from '../stores/settings.js';
+  import WaterBanner from '../components/banners/WaterBanner.svelte';
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -88,7 +90,8 @@
 </script>
 
 <div class="page-shell">
-  <header class="page-header">
+  <header class="page-header" class:has-banner={$pageBanners}>
+    {#if $pageBanners}<WaterBanner />{/if}
     <h1>Water</h1>
   </header>
 

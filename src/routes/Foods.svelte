@@ -16,7 +16,8 @@
   import { API, USDA, NtApi } from '../lib/api.js';
   import { Nutrition } from '../lib/nutrition.js';
   import { Mealie } from '../lib/mealieApi.js';
-  import { foodsShowThumbnails, foodsShowCategories, foodsShowLabels, foodsShowNotes, foodsSort, foodCategories, foodsShowYesterdayMeals, mealNames, usdaEnabled, usdaApiKey, catName as _catName, catDisplay as _catDisplay } from '../stores/settings.js';
+  import { foodsShowThumbnails, foodsShowCategories, foodsShowLabels, foodsShowNotes, foodsSort, foodCategories, foodsShowYesterdayMeals, mealNames, usdaEnabled, usdaApiKey, catName as _catName, catDisplay as _catDisplay, pageBanners } from '../stores/settings.js';
+  import FoodsBanner from '../components/banners/FoodsBanner.svelte';
 
   // Query string params
   function qs() {
@@ -316,7 +317,8 @@
 
 <div class="page-shell">
   <!-- Header -->
-  <header class="page-header">
+  <header class="page-header" class:has-banner={$pageBanners}>
+    {#if $pageBanners}<FoodsBanner />{/if}
     <h1>Foods</h1>
     <button class="btn-icon accent" on:click={() => {
       if (activeTab === 0) openEditor(null, 'foodList');
