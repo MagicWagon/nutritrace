@@ -52,7 +52,7 @@
     await new Promise(r => setTimeout(r, 80));
     try {
       cameraStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' }, width: { ideal: 4096 }, height: { ideal: 2160 } }
+        video: { facingMode: { ideal: 'environment' } }
       });
       if (cameraVideo) { cameraVideo.srcObject = cameraStream; cameraVideo.play(); }
     } catch(err) {
