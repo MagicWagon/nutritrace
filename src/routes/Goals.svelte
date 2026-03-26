@@ -3,7 +3,7 @@
   import { DB } from '../lib/db.js';
   import { NtApi } from '../lib/api.js';
   import { portal } from '../lib/portal.js';
-  import { goals, goalTemplates, energyUnit, weightUnit, heightUnit, lengthUnit, visibleNutriments, hiddenBodyStats } from '../stores/settings.js';
+  import { goals, goalTemplates, energyUnit, weightUnit, heightUnit, lengthUnit, visibleNutriments, hiddenBodyStats, waterGoalMl, waterUnit } from '../stores/settings.js';
   import { NUTRIMENTS, Nutrition } from '../lib/nutrition.js';
   import { loadEntry } from '../stores/diary.js';
   import { showSuccess } from '../stores/toast.js';
@@ -84,14 +84,47 @@
   let today = new Date().toISOString().slice(0,10);
   let todayTotals = {};
   let todayBodyStats = {};
+  let todayWaterMl = 0;
 
   onMount(async () => {
     const entry = await NtApi.getDiaryDate(today).catch(() => null);
     if (entry) {
       todayBodyStats = entry.body_stats || entry.bodyStats || {};
       todayTotals = Nutrition.sum((entry.items || []).map(i => Nutrition.calculate(i)));
+      todayWaterMl = (entry.water || []).reduce((s, l) => s + (l.amount || 0), 0);
     }
   });
+
+  // ── Water goal helpers ────────────────────────────────────────────────────
+  function mlToDisplay(ml, unit) {
+    if (unit === 'oz') return +(ml / 29.5735).toFixed(1);
+    if (unit === 'L')  return +(ml / 1000).toFixed(2);
+    if (unit === 'G')  return +(ml / 3785.41).toFixed(3);
+    return Math.round(ml);
+  }
+  function displayToMl(val, unit) {
+    const n = parseFloat(val) || 0;
+    if (unit === 'oz') return Math.round(n * 29.5735);
+    if (unit === 'L')  return Math.round(n * 1000);
+    if (unit === 'G')  return Math.round(n * 3785.41);
+    return Math.round(n);
+  }
+
+  let editWaterOpen = false;
+  let editWaterVal = '';
+  function openEditWater() {
+    editWaterVal = String(mlToDisplay($waterGoalMl, $waterUnit));
+    editWaterOpen = true;
+  }
+  function saveWaterGoal() {
+    waterGoalMl.set(displayToMl(editWaterVal, $waterUnit));
+    editWaterOpen = false;
+    showSuccess('Water goal saved');
+  }
+
+  $: waterGoalDisplay = mlToDisplay($waterGoalMl, $waterUnit);
+  $: waterTodayDisplay = mlToDisplay(todayWaterMl, $waterUnit);
+  $: waterPct = $waterGoalMl > 0 ? Math.min(100, Math.round(todayWaterMl / $waterGoalMl * 100)) : 0;
 
   // ── Edit state ────────────────────────────────────────────────────────────
   let editOpen = false;
@@ -265,6 +298,21 @@
         </div>
       {/if}
 
+      <!-- Water Goal -->
+      <p class="section-title" style="margin-top:16px">Water</p>
+      <div class="card">
+        <button class="goal-row" on:click={openEditWater}>
+          <div class="goal-info">
+            <span class="font-medium">Daily Water Goal</span>
+            <div class="goal-progress-bar">
+              <div class="goal-progress-fill" style="width:{waterPct}%"></div>
+            </div>
+            <span class="text-3 text-sm">{waterTodayDisplay} / {waterGoalDisplay} {$waterUnit}</span>
+          </div>
+          <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
+        </button>
+      </div>
+
     <!-- ── All Fields tab ── -->
     {:else if activeTab === 'all'}
       <p class="text-3 text-sm" style="padding:0 var(--page-px) 8px">Tap any field to set or edit its goal.</p>
@@ -317,6 +365,21 @@
             <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
           </button>
         {/each}
+      </div>
+
+      <!-- Water -->
+      <p class="section-title">Water</p>
+      <div class="card">
+        <button class="goal-row" on:click={openEditWater}>
+          <div class="goal-info">
+            <span class="font-medium">Daily Water Goal</span>
+            <div class="goal-progress-bar">
+              <div class="goal-progress-fill" style="width:{waterPct}%"></div>
+            </div>
+            <span class="text-3 text-sm">{waterTodayDisplay} / {waterGoalDisplay} {$waterUnit}</span>
+          </div>
+          <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
+        </button>
       </div>
 
     <!-- ── Templates tab ── -->
@@ -441,6 +504,23 @@
           </button>
         {/if}
         <button class="btn btn-primary w-full" on:click={saveGoal}>Save Goal</button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- ── Water goal edit sheet ── -->
+{#if editWaterOpen}
+  <div use:portal class="sheet-backdrop" role="dialog" aria-modal="true"
+    on:click={() => editWaterOpen = false} on:keydown={() => {}}>
+    <div class="sheet-panel" on:click|stopPropagation on:keydown={() => {}}>
+      <div class="sheet-handle"></div>
+      <div class="sheet-header"><h3 class="sheet-title">Daily Water Goal</h3></div>
+      <div class="sheet-body">
+        <label class="form-label">Goal ({$waterUnit})</label>
+        <input class="input" type="number" min="0" step="0.1" bind:value={editWaterVal}
+          on:keydown={e => e.key === 'Enter' && saveWaterGoal()} />
+        <button class="btn btn-primary w-full" style="margin-top:16px" on:click={saveWaterGoal}>Save</button>
       </div>
     </div>
   </div>

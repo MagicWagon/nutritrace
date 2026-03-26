@@ -54,7 +54,7 @@
     nutrients:         ['nutrients','nutriments','custom nutrients','vitamins','minerals'],
     bodyStats:         ['body stats','body','weight','measurements','stats'],
     statistics:        ['statistics','chart','y-axis','average','goal line','trend','stats'],
-    goals:             ['goals','target','calorie goal'],
+    goals:             ['goals','target','calorie goal','water goal','daily water'],
     units:             ['units','energy unit','weight unit','height','circumference','imperial','metric'],
     connectedServices: ['connected services','usda','open food facts','mealie','recipe','search language','country','api key','credentials','username','password'],
     ai:                ['ai','fitbot','assistant','provider','model','api key','artificial intelligence','chat'],
@@ -1087,7 +1087,7 @@
   async function clearAllData() {
     try {
       await NtApi.del('/api/data');
-      // Only delete food/diary data — settings are untouched
+      // Only deletes food/diary data — settings are untouched
       showSuccess('All data cleared');
       await loadAuthState();
     } catch(e) { showError('Clear failed: ' + e.message); }
@@ -1418,20 +1418,6 @@
               <option value="L">Liters (L)</option>
               <option value="G">Gallons (G)</option>
             </select>
-          </div>
-          <div class="setting-divider"></div>
-          <div class="setting-row">
-            <div>
-              <span class="setting-label">Daily goal</span>
-              <div class="setting-desc">Target intake per day</div>
-            </div>
-            <div style="display:flex;gap:6px;align-items:center">
-              <input class="input" type="number" min="0.1" step="0.1"
-                value={_waterGoalDisplay}
-                on:change={e => _updateWaterGoal(e.target.value)}
-                style="width:120px;text-align:right" />
-              <span class="text-3 text-sm">{waterUnit}</span>
-            </div>
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
