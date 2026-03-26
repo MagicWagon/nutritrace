@@ -3,10 +3,21 @@
   import { cubicOut } from 'svelte/easing';
   import { location, push } from 'svelte-spa-router';
   import { createEventDispatcher } from 'svelte';
+  import { currentUser, userMgmtActive, logout } from '../../stores/auth.js';
 
   export let open = false;
   export let persistent = false;
   const dispatch = createEventDispatcher();
+
+  async function handleLogout() {
+    await logout();
+    open = false;
+    dispatch('close');
+  }
+
+  function getInitial(user) {
+    return (user?.full_name || user?.username || '?')[0].toUpperCase();
+  }
 
   const navItems = [
     { path: '/',           icon: 'book',           label: 'Diary'      },
@@ -84,7 +95,20 @@
     </nav>
 
     <div class="sidebar-footer">
-      <span class="sidebar-version">v0.10.0-alpha</span>
+      {#if $userMgmtActive && $currentUser}
+        <div class="sidebar-user">
+          <div class="user-avatar">{getInitial($currentUser)}</div>
+          <div class="user-info">
+            <span class="user-name">{$currentUser.full_name || $currentUser.username}</span>
+            <span class="sidebar-version">v0.10.0-alpha</span>
+          </div>
+          <button class="btn-icon logout-btn" on:click={handleLogout} title="Sign out" aria-label="Sign out">
+            <span class="material-symbols-rounded">logout</span>
+          </button>
+        </div>
+      {:else}
+        <span class="sidebar-version">v0.10.0-alpha</span>
+      {/if}
     </div>
   </aside>
 {/if}
@@ -192,11 +216,52 @@
   }
 
   .sidebar-footer {
-    padding: 16px 20px;
+    padding: 12px 14px;
     border-top: 1px solid var(--border);
     display: flex;
     align-items: center;
     justify-content: flex-end;
   }
   .sidebar-version { font-size: 11px; color: var(--text-3); }
+
+  .sidebar-user {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+  }
+  .user-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--accent-dim);
+    color: var(--accent);
+    font-size: 14px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .user-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+  }
+  .user-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-1);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .logout-btn {
+    flex-shrink: 0;
+    color: var(--text-3);
+    transition: color var(--dur-fast);
+  }
+  .logout-btn:hover { color: var(--error, #f87171); }
 </style>
