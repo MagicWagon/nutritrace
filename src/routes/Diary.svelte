@@ -1055,7 +1055,7 @@
     border-top: 1px solid var(--border); margin-top: 4px;
   }
 
-  .diary-page { padding-top: 0; }
+  /* diary-page no longer overrides page-shell padding-top — same as every other page */
 
   /* Action icons fixed at top-right, same level as hamburger */
   :global(.diary-topbar-actions) {
