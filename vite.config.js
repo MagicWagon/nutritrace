@@ -21,6 +21,7 @@ export default defineConfig({
         // kept serving old bundles until the new SW fully activated.
         globPatterns: [],
         navigateFallback: null,
+        cleanupOutdatedCaches: true,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/world\.openfoodfacts\.org\/.*/i,

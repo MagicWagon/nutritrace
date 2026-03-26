@@ -69,20 +69,21 @@ app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 // Serve Svelte frontend (production build)
 // Content-hashed assets (in /assets/) are safe to cache forever — new deploy = new filename
-// index.html must never be cached so the browser always loads the latest app version
+// index.html uses no-cache (not no-store) so the browser always revalidates with the server
+// before using any cached copy — this fixes soft-reload serving stale HTML
 app.use(express.static(path.join(__dirname, 'dist'), {
   setHeaders(res, filePath) {
     if (filePath.includes('/assets/')) {
       res.set('Cache-Control', 'public, max-age=31536000, immutable');
     } else {
-      res.set('Cache-Control', 'no-store');
+      res.set('Cache-Control', 'no-cache');
     }
   }
 }));
 
-// SPA fallback — index.html, never cached
+// SPA fallback — index.html, always revalidated
 app.get('*', (req, res) => {
-  res.set('Cache-Control', 'no-store');
+  res.set('Cache-Control', 'no-cache');
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
