@@ -22,8 +22,10 @@
   let customAmt = '';
   let showCustom = false;
 
-  $: total = logs.reduce((s, l) => s + l.amount, 0);
-  $: pct   = goalMl > 0 ? Math.min(100, Math.round(total / goalMl * 100)) : 0;
+  $: total      = logs.reduce((s, l) => s + l.amount, 0);
+  $: rawPct     = goalMl > 0 ? Math.round(total / goalMl * 100) : 0;
+  $: pct        = Math.min(100, rawPct);
+  $: overflowing = rawPct >= 100;
 
   // SVG bottle fill geometry
   // Fillable interior: y=50 (just below neck) to y=182 (bottle bottom) = 132 units
@@ -96,12 +98,13 @@
     <div class="bottle-section">
 
       <!-- SVG Animated Water Bottle -->
-      <div class="bottle-wrap">
+      <div class="bottle-wrap" class:overflowing>
         <svg
           class="bottle-svg"
+          class:overflowing
           viewBox="0 0 120 200"
           xmlns="http://www.w3.org/2000/svg"
-          aria-label="Water bottle, {pct}% full"
+          aria-label="Water bottle, {rawPct}% full"
         >
           <defs>
             <!-- Bottle interior clip (excludes cap) -->
@@ -147,6 +150,18 @@
 
           <!-- Cap highlight line -->
           <line x1="44" y1="16" x2="76" y2="16" class="cap-line" />
+
+          <!-- ── Overflow animation (goal met/exceeded) ─────────────────── -->
+          {#if overflowing}
+            <!-- Water pooling on top of cap -->
+            <ellipse class="overflow-spill" cx="60" cy="5" rx="19" ry="4" />
+            <!-- Drips escaping from left side of cap, falling outward -->
+            <circle class="overflow-drip drip-1" cx="43" cy="14" r="3" />
+            <circle class="overflow-drip drip-2" cx="42" cy="13" r="2.5" />
+            <!-- Drips escaping from right side of cap, falling outward -->
+            <circle class="overflow-drip drip-3" cx="77" cy="14" r="3" />
+            <circle class="overflow-drip drip-4" cx="78" cy="13" r="2.5" />
+          {/if}
         </svg>
       </div>
 
@@ -157,8 +172,8 @@
           <span class="water-sep">/</span>
           <span class="water-goal">{displayGoal()}</span>
         </div>
-        <div class="water-pct" class:goal-met={pct >= 100}>
-          {pct}%{pct >= 100 ? ' 🎉' : ''}
+        <div class="water-pct" class:goal-met={overflowing}>
+          {rawPct}%{overflowing ? ' 🎉' : ''}
         </div>
 
         <!-- Progress bar -->
@@ -302,6 +317,54 @@
   @keyframes wave-flow {
     from { transform: translateX(0px);    }
     to   { transform: translateX(-120px); }
+  }
+
+  /* ── Overflow state (goal met/exceeded) ──────────────────────────────────── */
+
+  /* Pulsing glow on the bottle wrap */
+  .bottle-wrap.overflowing {
+    animation: overflow-glow 1.8s ease-in-out infinite;
+  }
+  @keyframes overflow-glow {
+    0%, 100% { filter: drop-shadow(0 8px 24px rgba(0,0,0,0.3)); }
+    50%       { filter: drop-shadow(0 0 22px rgba(79,255,176,0.55)) drop-shadow(0 8px 24px rgba(0,0,0,0.2)); }
+  }
+
+  /* Speed up the wave when overflowing */
+  .bottle-svg.overflowing .water-wave {
+    animation-duration: 0.65s;
+  }
+
+  /* Water pooling on top of cap */
+  .overflow-spill {
+    fill: var(--accent);
+    animation: spill-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes spill-pulse {
+    0%, 100% { opacity: 0.35; }
+    50%       { opacity: 0.65; }
+  }
+
+  /* Animated drip drops from cap sides */
+  .overflow-drip {
+    fill: var(--accent);
+  }
+  /* Left drips fall left and down */
+  .drip-1 { animation: drip-fall-l 1.4s ease-in 0s    infinite; }
+  .drip-2 { animation: drip-fall-l 1.4s ease-in 0.7s  infinite; }
+  /* Right drips fall right and down */
+  .drip-3 { animation: drip-fall-r 1.4s ease-in 0.35s infinite; }
+  .drip-4 { animation: drip-fall-r 1.4s ease-in 1.05s infinite; }
+
+  @keyframes drip-fall-l {
+    0%   { transform: translate(0px,   0px);   opacity: 0;    }
+    8%   { opacity: 0.85; }
+    100% { transform: translate(-10px, 34px);  opacity: 0;    }
+  }
+  @keyframes drip-fall-r {
+    0%   { transform: translate(0px,  0px);    opacity: 0;    }
+    8%   { opacity: 0.85; }
+    100% { transform: translate(10px, 34px);   opacity: 0;    }
   }
 
   /* ── Stats ─────────────────────────────────────────────────────────────── */

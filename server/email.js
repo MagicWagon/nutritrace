@@ -14,9 +14,20 @@ export function seedSmtpFromEnv() {
   const upsert = db.prepare(
     'INSERT INTO app_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
   );
+  let locked = false;
   for (const [envKey, dbKey] of Object.entries(map)) {
-    if (process.env[envKey] != null) upsert.run(dbKey, process.env[envKey]);
+    if (process.env[envKey] != null) {
+      upsert.run(dbKey, process.env[envKey]);
+      locked = true;
+    }
   }
+  // Store lock flag so clients can disable the UI fields
+  if (locked) upsert.run('smtp_env_locked', 'true');
+}
+
+export function isSmtpEnvLocked() {
+  const row = db.prepare('SELECT value FROM app_config WHERE key = ?').get('smtp_env_locked');
+  return row?.value === 'true';
 }
 
 /** Read SMTP config from app_config table (env vars already seeded at startup) */

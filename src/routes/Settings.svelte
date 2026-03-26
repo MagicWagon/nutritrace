@@ -1137,6 +1137,15 @@
   function saveOff()    { set('offUsername', offUsername); set('offPassword', offPassword); offSaved = true; setTimeout(() => offSaved = false, 2000); }
   function saveMealie() { set('mealieBaseUrl', mealieBaseUrl); set('mealieApiToken', mealieApiToken); mealieSaved = true; setTimeout(() => mealieSaved = false, 2000); }
   function saveAiKey()  { set('aiApiKey', aiApiKeyVal);    aiKeySaved = true;  setTimeout(() => aiKeySaved  = false, 2000); }
+
+  // ── Env-lock state — which admin sections are locked by environment vars ───
+  let envLocks = { smtp: false, ai: false };
+  onMount(async () => {
+    try {
+      const res = await fetch('/api/app-config/env-locks', { credentials: 'include' });
+      if (res.ok) envLocks = await res.json();
+    } catch {}
+  });
 </script>
 
 <div class="page-shell">
@@ -1829,13 +1838,19 @@
     </button>
     {#if sectionOpen(openSections, settingsQuery, 'ai') && sectionVisible(settingsQuery, 'ai')}
       <div class="section-body" transition:slide={{ duration: 180 }}>
+        {#if envLocks.ai}
+          <div class="env-lock-banner">
+            <span class="material-symbols-rounded">lock</span>
+            Configured via environment variables — changes are disabled.
+          </div>
+        {/if}
         <div class="card settings-card">
           <div class="setting-row">
             <div>
               <span class="setting-label">Enable FitBot AI</span>
               <div class="setting-desc">Adds a floating chat button to all pages</div>
             </div>
-            <Toggle checked={aiEnabledVal} on:change={e => aiEnabledVal = e.detail} />
+            <Toggle checked={aiEnabledVal} on:change={e => aiEnabledVal = e.detail} disabled={envLocks.ai} />
           </div>
 
           {#if aiEnabledVal}
@@ -1851,7 +1866,7 @@
             <div class="setting-row">
               <span class="setting-label">Provider</span>
               <div class="select-wrap" style="width:170px">
-                <select class="select sel-sm" bind:value={aiProviderVal}>
+                <select class="select sel-sm" bind:value={aiProviderVal} disabled={envLocks.ai}>
                   {#each AI_PROVIDERS as p}
                     <option value={p.value}>{p.label}</option>
                   {/each}
@@ -1863,7 +1878,7 @@
             <div class="setting-row">
               <span class="setting-label">Model</span>
               <div class="select-wrap" style="width:200px">
-                <select class="select sel-sm" bind:value={aiModelVal}>
+                <select class="select sel-sm" bind:value={aiModelVal} disabled={envLocks.ai}>
                   {#each (AI_MODELS[aiProviderVal] || []) as m}
                     <option value={m.value}>{m.label}</option>
                   {/each}
@@ -1871,37 +1886,39 @@
               </div>
             </div>
 
-            <div class="setting-divider"></div>
-            <div class="form-group" style="padding:10px 16px">
-              <label class="form-label" for="ai-api-key">API Key</label>
-              <div style="display:flex;gap:8px;align-items:center">
-                {#if aiShowKey}
-                  <input id="ai-api-key" class="input" type="text"
-                    placeholder="Paste your API key here"
-                    bind:value={aiApiKeyVal} autocomplete="off" style="flex:1" />
-                {:else}
-                  <input id="ai-api-key" class="input" type="password"
-                    placeholder="Paste your API key here"
-                    bind:value={aiApiKeyVal} autocomplete="off" style="flex:1" />
-                {/if}
-                <button class="btn-icon" on:click={() => aiShowKey = !aiShowKey} title={aiShowKey ? 'Hide' : 'Show'}>
-                  <span class="material-symbols-rounded">{aiShowKey ? 'visibility_off' : 'visibility'}</span>
-                </button>
-                <button class="btn btn-primary" style="height:40px;font-size:13px;white-space:nowrap" on:click={saveAiKey}>
-                  {#if aiKeySaved}<span class="material-symbols-rounded" style="font-size:16px">check</span>{:else}Save{/if}
-                </button>
+            {#if !envLocks.ai}
+              <div class="setting-divider"></div>
+              <div class="form-group" style="padding:10px 16px">
+                <label class="form-label" for="ai-api-key">API Key</label>
+                <div style="display:flex;gap:8px;align-items:center">
+                  {#if aiShowKey}
+                    <input id="ai-api-key" class="input" type="text"
+                      placeholder="Paste your API key here"
+                      bind:value={aiApiKeyVal} autocomplete="off" style="flex:1" />
+                  {:else}
+                    <input id="ai-api-key" class="input" type="password"
+                      placeholder="Paste your API key here"
+                      bind:value={aiApiKeyVal} autocomplete="off" style="flex:1" />
+                  {/if}
+                  <button class="btn-icon" on:click={() => aiShowKey = !aiShowKey} title={aiShowKey ? 'Hide' : 'Show'}>
+                    <span class="material-symbols-rounded">{aiShowKey ? 'visibility_off' : 'visibility'}</span>
+                  </button>
+                  <button class="btn btn-primary" style="height:40px;font-size:13px;white-space:nowrap" on:click={saveAiKey}>
+                    {#if aiKeySaved}<span class="material-symbols-rounded" style="font-size:16px">check</span>{:else}Save{/if}
+                  </button>
+                </div>
+                <div class="setting-desc" style="margin-top:6px">
+                  {#if aiProviderVal === 'claude'}
+                    Get your key at <a href="https://console.anthropic.com" target="_blank" rel="noopener" class="about-link">console.anthropic.com</a>
+                  {:else if aiProviderVal === 'openai'}
+                    Get your key at <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener" class="about-link">platform.openai.com</a>
+                  {:else if aiProviderVal === 'gemini'}
+                    Get your key at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" class="about-link">aistudio.google.com</a>
+                  {/if}
+                  Your key is stored securely on the server.
+                </div>
               </div>
-              <div class="setting-desc" style="margin-top:6px">
-                {#if aiProviderVal === 'claude'}
-                  Get your key at <a href="https://console.anthropic.com" target="_blank" rel="noopener" class="about-link">console.anthropic.com</a>
-                {:else if aiProviderVal === 'openai'}
-                  Get your key at <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener" class="about-link">platform.openai.com</a>
-                {:else if aiProviderVal === 'gemini'}
-                  Get your key at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" class="about-link">aistudio.google.com</a>
-                {/if}
-                Your key is stored securely on the server.
-              </div>
-            </div>
+            {/if}
           {/if}
         </div>
       </div>
@@ -1996,7 +2013,7 @@
             <span class="material-symbols-rounded si" style="color:var(--accent)">download</span>
             <div>
               <span class="setting-label">Export JSON</span>
-              <div class="setting-desc">Downloads your foods, meals, recipes, diary, and settings as a JSON file. Good for moving data to another device or app.</div>
+              <div class="setting-desc">Downloads your foods, meals, recipes, diary, and all settings as a JSON file. In single-user mode this is the recommended way to back up settings (the full ZIP backup only captures settings when user management is enabled). Note: server-hosted images will need to be re-uploaded separately.</div>
             </div>
             <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
           </button>
@@ -2065,41 +2082,47 @@
     {#if sectionOpen(openSections, settingsQuery, 'email') && sectionVisible(settingsQuery, 'email')}
       <div class="section-body" transition:slide={{ duration: 180 }}>
         <p class="sub-label" style="padding-bottom:4px">Used for password resets and user invites</p>
+        {#if envLocks.smtp}
+          <div class="env-lock-banner">
+            <span class="material-symbols-rounded">lock</span>
+            Configured via environment variables — changes are disabled.
+          </div>
+        {/if}
         <div class="card settings-card" style="padding:16px;display:flex;flex-direction:column;gap:12px">
           <div class="form-group">
             <label class="form-label">SMTP Host</label>
             <input class="input" type="text" placeholder="e.g. smtp.example.com"
-              bind:value={smtpHost} />
+              bind:value={smtpHost} disabled={envLocks.smtp} />
           </div>
           <div style="display:flex;gap:10px">
             <div class="form-group" style="flex:1">
               <label class="form-label">Port</label>
               <input class="input" type="number" placeholder="587"
-                bind:value={smtpPort} />
+                bind:value={smtpPort} disabled={envLocks.smtp} />
             </div>
             <div class="form-group" style="display:flex;flex-direction:column;gap:6px;justify-content:flex-end;padding-bottom:2px">
               <label class="form-label">TLS</label>
-              <Toggle checked={smtpSecure} on:change={e => smtpSecure = e.detail} />
+              <Toggle checked={smtpSecure} on:change={e => smtpSecure = e.detail} disabled={envLocks.smtp} />
             </div>
           </div>
           <div class="form-group">
             <label class="form-label">Username</label>
             <input class="input" type="text" autocomplete="off" placeholder="SMTP username or email"
-              bind:value={smtpUser} />
+              bind:value={smtpUser} disabled={envLocks.smtp} />
           </div>
           <div class="form-group">
             <label class="form-label">Password</label>
             <input class="input" type="password" autocomplete="new-password" placeholder="SMTP password or app password"
-              bind:value={smtpPass} />
+              bind:value={smtpPass} disabled={envLocks.smtp} />
           </div>
           <div class="form-group">
             <label class="form-label">From address</label>
             <input class="input" type="email" placeholder='NutriTrace <noreply@example.com>'
-              bind:value={smtpFrom} />
+              bind:value={smtpFrom} disabled={envLocks.smtp} />
           </div>
           <div style="display:flex;align-items:center;gap:10px">
             <button class="btn btn-primary" style="height:36px;font-size:13px"
-              on:click={saveSmtp} disabled={smtpSaving}>
+              on:click={saveSmtp} disabled={smtpSaving || envLocks.smtp}>
               {#if smtpSaved}
                 <span class="material-symbols-rounded" style="font-size:16px">check</span> Saved
               {:else}
@@ -2839,4 +2862,19 @@
   .um-user-name { font-size: 14px; font-weight: 600; }
   .um-user-sub  { font-size: 12px; color: var(--text-3); }
   .um-del-btn { padding: 4px; min-width: 0; }
+
+  /* ── Env-lock badge ────────────────────────────────────────────────────── */
+  .env-lock-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    border-radius: var(--radius-md);
+    font-size: 12px;
+    color: var(--text-2);
+    margin-bottom: 4px;
+  }
+  .env-lock-banner .material-symbols-rounded { font-size: 16px; color: var(--accent); flex-shrink: 0; }
 </style>

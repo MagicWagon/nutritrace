@@ -4,7 +4,7 @@
   import { cubicOut } from 'svelte/easing';
   import { NtApi }     from '../../lib/api.js';
   import { Nutrition } from '../../lib/nutrition.js';
-  import { callAI }    from '../../lib/aiChat.js';
+  import { callAI, callAIProxy } from '../../lib/aiChat.js';
   import { aiEnabled, aiAssistantName, aiApiKey, aiProvider, aiModel, goals, mealNames, energyUnit } from '../../stores/settings.js';
   import { showError } from '../../stores/toast.js';
 
@@ -16,6 +16,9 @@
   let messagesEl;
   let hasUnread  = false;
 
+  // Whether AI config is locked via env vars (proxy mode)
+  let aiEnvLocked = false;
+
   // Settings — refreshed each time panel opens
   let assistantName = 'FitBot';
   let apiKey        = '';
@@ -26,10 +29,14 @@
     apiKey        = $aiApiKey;
   }
 
-  onMount(() => {
+  onMount(async () => {
     try {
       const saved = localStorage.getItem('wl:aiChatHistory');
       if (saved) messages = JSON.parse(saved);
+    } catch {}
+    try {
+      const res = await fetch('/api/app-config/env-locks', { credentials: 'include' });
+      if (res.ok) { const d = await res.json(); aiEnvLocked = !!d.ai; }
     } catch {}
   });
 
@@ -151,7 +158,7 @@
     const provider = aiProvider.get() || 'claude';
     const model    = aiModel.get()    || undefined;
 
-    if (!key) { showError('Add your API key in Settings → FitBot AI'); return; }
+    if (!aiEnvLocked && !key) { showError('Add your API key in Settings → FitBot AI'); return; }
 
     messages = [...messages, { role: 'user', content, time: fmtTime() }];
     input    = '';
@@ -166,7 +173,9 @@
       const apiMessages  = messages
         .map(m => ({ role: m.role, content: m.content }))
         .slice(-20);
-      const reply = await callAI({ provider, apiKey: key, model, messages: apiMessages, systemPrompt });
+      const reply = aiEnvLocked
+        ? await callAIProxy({ messages: apiMessages, systemPrompt })
+        : await callAI({ provider, apiKey: key, model, messages: apiMessages, systemPrompt });
       messages = [...messages, { role: 'assistant', content: reply, time: fmtTime() }];
       localStorage.setItem('wl:aiChatHistory', JSON.stringify(messages.slice(-100)));
       if (!panelOpen) hasUnread = true;

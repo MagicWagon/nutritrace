@@ -17,10 +17,6 @@ add a serving size option for recipes?
 
 add more to first run wizard, helps with all our additions
 
-sign out, user profile better location
-
-create readme
-
 future considerations
 
 enable mfa/oath future?
@@ -34,7 +30,7 @@ admin password resets for other users?
 
 bmi calculation settings - sparky?
 
-steps/sleep tracker?
+steps/sleep tracker? -> experimental section?
 
 remove water section and have it in dairy somewhere?
 
@@ -48,4 +44,8 @@ if multiple users enabled, then maybe an option so that the integrations automat
 
 test upload to off
 
-meal default icon change, fork and spoon maybe....move to meal option in diary for individual food item?...maybe have top level menu to create meal from breakfast or int he meal section... have to think what is more natural.
+move to meal option in diary for individual food item?...maybe have top level menu to create meal from breakfast or int he meal section... have to think what is more natural.
+
+other then in about section remove all traces of waistline/sparky in code without breaking anything if possible.
+
+show weight in or under the weight checkin icon up top? like in v1

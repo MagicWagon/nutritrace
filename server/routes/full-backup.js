@@ -6,6 +6,8 @@ import { fileURLToPath } from 'url';
 import AdmZip from 'adm-zip';
 import multer from 'multer';
 import db from '../db.js';
+import { seedSmtpFromEnv } from '../email.js';
+import { seedAiFromEnv } from '../ai.js';
 
 const router = express.Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -85,6 +87,11 @@ function restoreFromZip(zip) {
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     fs.writeFileSync(dest, entry.getData());
   }
+
+  // Re-apply env-var config so lock flags always reflect the current environment,
+  // regardless of what was in the backup (the backup may predate the lock flags).
+  seedSmtpFromEnv();
+  seedAiFromEnv();
 }
 
 function dumpDatabase() {

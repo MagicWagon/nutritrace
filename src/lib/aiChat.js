@@ -14,6 +14,22 @@ export async function callAI({ provider, apiKey, model, messages, systemPrompt }
   }
 }
 
+/**
+ * Server-side proxy call — used when AI config is env-locked.
+ * The API key stays on the server; only messages + systemPrompt are sent.
+ */
+export async function callAIProxy({ messages, systemPrompt }) {
+  const res = await fetch('/api/ai/chat', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messages, systemPrompt }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `AI proxy error ${res.status}`);
+  return data.text;
+}
+
 // ── Default models per provider ───────────────────────────────────────────────
 export const AI_PROVIDERS = [
   { value: 'claude', label: 'Anthropic Claude' },

@@ -14,16 +14,19 @@ import uploadRoutes from './routes/upload.js';
 import mealieRoutes    from './routes/mealie.js';
 import settingsRoutes  from './routes/settings.js';
 import appConfigRoutes  from './routes/app-config.js';
+import aiRoutes         from './routes/ai.js';
 import fullBackupRoutes from './routes/full-backup.js';
 import { logger }   from './logger.js';
 import { authenticate } from './middleware/auth.js';
 import { seedSmtpFromEnv } from './email.js';
+import { seedAiFromEnv } from './ai.js';
 
 // Initialise DB (runs schema)
 import './db.js';
 
-// Seed SMTP config from env vars if provided
+// Seed config from env vars if provided (env vars take priority over UI)
 seedSmtpFromEnv();
+seedAiFromEnv();
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -64,6 +67,7 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/mealie',     mealieRoutes);
 app.use('/api/settings',  settingsRoutes);
 app.use('/api/app-config',  appConfigRoutes);
+app.use('/api/ai',          aiRoutes);
 app.use('/api/full-backup', fullBackupRoutes);
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
