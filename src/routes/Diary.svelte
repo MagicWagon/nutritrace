@@ -457,35 +457,38 @@
 </script>
 
 <div class="page-shell diary-page">
-  <header class="page-header diary-header">
-    <div class="diary-title-row">
-      <h1>Diary</h1>
-      <div class="diary-title-actions">
-        {#if _waterShowInDiary}
-          <button class="btn-icon accent" on:click={() => showWaterQuickAdd = true} aria-label="Log water" title="Water — log your water intake">
-            <span class="material-symbols-rounded">water_drop</span>
-          </button>
-        {/if}
-        <button class="btn-icon accent" on:click={() => diaryShowNutritionSummary.set(true)} aria-label="Nutrition summary" title="Nutrition Summary — full breakdown of today's nutrients">
-          <span class="material-symbols-rounded">monitoring</span>
-        </button>
-        <button class="btn-icon accent" on:click={() => diaryShowBodyStats.set(true)} aria-label="Body stats" title="Body Stats — log weight, body fat, and measurements">
-          <span class="material-symbols-rounded">scale</span>
-        </button>
-      </div>
-    </div>
-    <div class="diary-date-row">
-      <button class="btn-icon accent" on:click={prevDay} aria-label="Previous day">
-        <span class="material-symbols-rounded">chevron_left</span>
+  <!-- Date navigation — fixed at hamburger level, centered -->
+  <div use:portal class="diary-topbar-date">
+    <button class="btn-icon accent" on:click={prevDay} aria-label="Previous day">
+      <span class="material-symbols-rounded">chevron_left</span>
+    </button>
+    <button class="date-btn" on:click={openDatePicker} title="Jump to date">
+      <span class="date-label">{formatDate($currentDate)}</span>
+      <span class="date-sub">{formatDateSub($currentDate, $dateFormat)}</span>
+    </button>
+    <button class="btn-icon accent" on:click={nextDay} aria-label="Next day">
+      <span class="material-symbols-rounded">chevron_right</span>
+    </button>
+  </div>
+
+  <!-- Action icons — fixed at hamburger level, right side -->
+  <div use:portal class="diary-topbar-actions">
+    {#if _waterShowInDiary}
+      <button class="btn-icon accent" on:click={() => showWaterQuickAdd = true} aria-label="Log water" title="Water — log your water intake">
+        <span class="material-symbols-rounded">water_drop</span>
       </button>
-      <button class="date-btn" on:click={openDatePicker} title="Jump to date">
-        <span class="date-label">{formatDate($currentDate)}</span>
-        <span class="date-sub">{formatDateSub($currentDate, $dateFormat)}</span>
-      </button>
-      <button class="btn-icon accent" on:click={nextDay} aria-label="Next day">
-        <span class="material-symbols-rounded">chevron_right</span>
-      </button>
-    </div>
+    {/if}
+    <button class="btn-icon accent" on:click={() => diaryShowNutritionSummary.set(true)} aria-label="Nutrition summary" title="Nutrition Summary — full breakdown of today's nutrients">
+      <span class="material-symbols-rounded">monitoring</span>
+    </button>
+    <button class="btn-icon accent" on:click={() => diaryShowBodyStats.set(true)} aria-label="Body stats" title="Body Stats — log weight, body fat, and measurements">
+      <span class="material-symbols-rounded">scale</span>
+    </button>
+  </div>
+
+  <!-- Standard page-header — same as every other page -->
+  <header class="page-header">
+    <h1>Diary</h1>
   </header>
 
   <div class="page-content diary-content" style="padding-bottom:{contentPad}">
@@ -1054,15 +1057,27 @@
 
   .diary-page { padding-top: 0; }
 
-  /* Diary header extends .page-header with its unique column / date-row layout */
-  .diary-header {
-    flex-direction: column;
-    align-items: stretch;
-    padding-bottom: 0;
+  /* Diary fixed topbar elements — share the hamburger band (--safe-top + 10px) */
+  :global(.diary-topbar-date),
+  :global(.diary-topbar-actions) {
+    position: fixed;
+    top: calc(var(--safe-top, 0px) + 10px);
+    z-index: 41;
+    display: flex;
+    align-items: center;
+    pointer-events: all;
   }
-  .diary-title-row { display: flex; align-items: center; padding-bottom: 6px; }
-  .diary-title-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; }
-  .diary-date-row { display: flex; align-items: center; gap: 4px; padding-bottom: 8px; }
+  /* Span between hamburger (left ~60px) and icons (right ~140px), center content within */
+  :global(.diary-topbar-date) {
+    left: 60px;
+    right: 140px;
+    justify-content: center;
+    gap: 4px;
+  }
+  :global(.diary-topbar-actions) {
+    right: 12px;
+    gap: 2px;
+  }
 
   .date-btn {
     flex: 1;
