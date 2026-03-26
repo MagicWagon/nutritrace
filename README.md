@@ -66,7 +66,9 @@ NutriTrace runs entirely in a single Docker container on your own hardware. No a
 
 ### Quick Start
 
-1. Copy `.env.example` to `.env` and fill in your paths:
+1. Download the `docker-compose.yml` from this repo. It pulls the latest image from GitHub Container Registry and mounts your two data directories. No changes to the file are needed — everything is driven by `.env`. If you want to pin to a specific version, change the image tag from `latest` to a release tag.
+
+2. Copy `.env.example` to `.env` and fill in your paths:
 
 ```env
 DATA_DB_PATH=/your/host/path/db
@@ -87,8 +89,6 @@ Generate a JWT secret:
 ```bash
 openssl rand -base64 48
 ```
-
-2. The included `docker-compose.yml` pulls the latest image from GitHub Container Registry and mounts your two data directories. No changes to the compose file are needed — everything is driven by `.env`. If you want to pin to a specific version, change the image tag from `latest` to a release tag.
 
 3. Start the container:
 
