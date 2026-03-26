@@ -597,83 +597,37 @@
   .photo-url-row { display: flex; gap: 8px; margin-top: 8px; }
   .photo-url-input { flex: 1; }
 
-  /* Camera / crop overlay */
+  /* Camera / crop overlay — shared with MealEditor via :global */
   :global(.cam-overlay) {
-    position: fixed;
-    inset: 0;
-    z-index: 9999;
-    background: #000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    position: fixed; inset: 0; z-index: 9999;
+    background: rgba(0,0,0,0.85);
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px;
   }
   :global(.cam-popup) {
-    width: 100%;
-    height: 100%;
     background: var(--surface-1);
-    display: flex;
-    flex-direction: column;
+    border-radius: var(--radius-xl);
+    width: min(480px, 96vw);
+    overflow: hidden;
+    display: flex; flex-direction: column;
   }
   :global(.cam-header) {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: max(env(safe-area-inset-top), 14px) 16px 14px;
-    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px; border-bottom: 1px solid var(--border);
     flex-shrink: 0;
-    background: var(--surface-1);
   }
   :global(.cam-title) { font-size: 17px; font-weight: 600; }
-  :global(.cam-video) {
-    width: 100%;
-    flex: 1;
-    object-fit: cover;
-    background: #000;
-    display: block;
-    min-height: 0;
-  }
+  :global(.cam-video) { width: 100%; max-height: 55vh; object-fit: cover; background: #000; display: block; }
   :global(.cam-footer) {
-    padding: 20px 16px max(env(safe-area-inset-bottom), 20px);
+    padding: 14px 16px;
     border-top: 1px solid var(--border);
-    display: flex;
-    justify-content: center;
+    display: flex; justify-content: center;
     flex-shrink: 0;
-    background: var(--surface-1);
   }
-  :global(.cam-capture-btn) { gap: 6px; min-width: 160px; height: 48px; font-size: 16px; }
+  :global(.cam-capture-btn) { gap: 6px; min-width: 140px; }
   :global(.crop-hint) { padding: 8px 16px 0; font-size: 12px; color: var(--text-3); }
-  :global(.crop-container) { position: relative; overflow: hidden; user-select: none; touch-action: none; flex: 1; min-height: 0; }
-  :global(.crop-img) { display: block; width: 100%; height: 100%; object-fit: contain; }
-
-  /* On larger screens keep it as a centered card */
-  @media (min-width: 600px) {
-    :global(.cam-overlay) {
-      background: rgba(0,0,0,0.85);
-      padding: 16px;
-    }
-    :global(.cam-popup) {
-      width: auto;
-      height: auto;
-      max-width: 520px;
-      max-height: min(700px, calc(100dvh - 32px));
-      border-radius: var(--radius-xl);
-      overflow: hidden;
-    }
-    :global(.cam-header) {
-      padding: 14px 16px;
-    }
-    :global(.cam-video) {
-      flex: none;
-      max-height: 60vh;
-      object-fit: contain;
-    }
-    :global(.cam-footer) {
-      padding: 14px 16px;
-    }
-    :global(.cam-capture-btn) { min-width: 140px; height: auto; font-size: inherit; }
-    :global(.crop-container) { flex: none; }
-    :global(.crop-img) { width: auto; height: auto; max-width: 100%; max-height: 55vh; object-fit: contain; }
-  }
+  :global(.crop-container) { position: relative; overflow: hidden; user-select: none; touch-action: none; }
+  :global(.crop-img) { display: block; max-width: 100%; max-height: 55vh; user-select: none; }
   :global(.crop-box) {
     position: absolute;
     border: 2px solid #fff;
