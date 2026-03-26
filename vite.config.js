@@ -14,17 +14,14 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       workbox: {
-        // Exclude html — index.html must always be fetched fresh so new deploys
-        // are picked up immediately without a hard refresh
-        globPatterns: ['**/*.{js,css,ico,png,svg,woff2}'],
+        // No precaching — HTTP Cache-Control headers handle all asset caching:
+        //   index.html → no-store (always fresh)
+        //   /assets/*.js|css → immutable (content-hashed, cached forever)
+        // Precaching JS/CSS caused stale UI after deploys because the old SW
+        // kept serving old bundles until the new SW fully activated.
+        globPatterns: [],
         navigateFallback: null,
         runtimeCaching: [
-          {
-            // Always fetch HTML from network so the latest app version loads
-            urlPattern: ({ request }) => request.mode === 'navigate',
-            handler: 'NetworkFirst',
-            options: { cacheName: 'navigation', networkTimeoutSeconds: 5 }
-          },
           {
             urlPattern: /^https:\/\/world\.openfoodfacts\.org\/.*/i,
             handler: 'NetworkFirst',
