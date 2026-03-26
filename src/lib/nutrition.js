@@ -14,8 +14,8 @@ const NUTRIMENTS = [
   { id: 'monounsaturated-fat', label: 'Monounsaturated Fat', unit: 'g',    category: 'macro',   default: false },
   // Cholesterol & Sodium
   { id: 'cholesterol',   label: 'Cholesterol',   unit: 'mg',   category: 'other',   default: false },
-  { id: 'sodium',        label: 'Sodium',        unit: 'mg',   category: 'mineral', default: false },
-  { id: 'salt',          label: 'Salt',          unit: 'g',    category: 'macro',   default: true },
+  { id: 'sodium',        label: 'Sodium',        unit: 'mg',   category: 'mineral', default: true },
+  { id: 'salt',          label: 'Salt',          unit: 'g',    category: 'macro',   default: false },
   // Total Carbohydrate
   { id: 'carbohydrates', label: 'Carbs',         unit: 'g',    category: 'macro',   default: true },
   { id: 'fiber',         label: 'Fiber',         unit: 'g',    category: 'macro',   default: true },

@@ -38,7 +38,7 @@
   ];
   let activeTab = 0;
   $: { activeTab; activeCategoryFilter = ''; if (activeTab !== 0) searchSource = 'local'; }
-  $: _tabIcon = activeTab === 0 ? 'restaurant' : activeTab === 1 ? 'lunch_dining' : 'menu_book';
+  $: _tabIcon = activeTab === 0 ? 'restaurant' : activeTab === 1 ? 'dinner_dining' : 'menu_book';
   $: { if (pickMode) loadYesterdayMeals(); }
 
   let search = '';
@@ -396,7 +396,7 @@
       {#if filteredList.length === 0 && !search}
         <div class="empty-state">
           <span class="material-symbols-rounded empty-icon">
-            {activeTab === 0 ? 'restaurant' : activeTab === 1 ? 'lunch_dining' : 'book'}
+            {activeTab === 0 ? 'restaurant' : activeTab === 1 ? 'dinner_dining' : 'book'}
           </span>
           <p>No {TABS[activeTab].label.toLowerCase()} yet</p>
           <button class="btn btn-primary" on:click={() => {

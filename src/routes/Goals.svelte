@@ -38,8 +38,10 @@
 
   // All fields for goal-setting: all body stats + all nutrients
   $: allFields = [...bodyStatsWithUnit, ...allNutrients];
-  // Your Goals: every stat that has a goal configured (regardless of visibility)
-  $: configuredStats = allFields.filter(s => $goals[s.id]);
+  // Your Goals: categorized
+  $: configuredBodyStats = bodyStatsWithUnit.filter(s => $goals[s.id]);
+  $: configuredNutrients = allNutrients.filter(s => $goals[s.id]);
+  $: hasAnyGoal = configuredBodyStats.length > 0 || configuredNutrients.length > 0;
 
   let activeTab = 'yours'; // 'yours' | 'all' | 'templates'
 
@@ -208,9 +210,11 @@
     return stat && (stat.id in MACRO_DENSITY);
   }
 
-  function getTodayValue(stat) {
-    if (stat.isBody) return todayBodyStats[stat.id] ?? null;
-    return todayTotals[stat.id] ?? null;
+  function getTodayValue(stat, totals, bodyStats) {
+    const t = totals    ?? todayTotals;
+    const b = bodyStats ?? todayBodyStats;
+    if (stat.isBody) return b[stat.id] ?? null;
+    return t[stat.id] ?? null;
   }
 
   function getTarget(stat) {
@@ -230,8 +234,8 @@
     return Math.round(calGoal * raw / 100 / density);
   }
 
-  function getPct(stat) {
-    const cur = getTodayValue(stat);
+  function getPct(stat, totals, bodyStats) {
+    const cur = getTodayValue(stat, totals, bodyStats);
     const tgt = getTarget(stat);
     if (cur == null || tgt == null || tgt === 0) return 0;
     return Math.min(100, Math.round(cur / tgt * 100));
@@ -260,46 +264,78 @@
 
     <!-- ── Your Goals tab ── -->
     {#if activeTab === 'yours'}
-      {#if configuredStats.length === 0}
+      {#if !hasAnyGoal}
         <div class="empty-state">
           <span class="material-symbols-rounded" style="font-size:48px;opacity:0.2">flag</span>
           <p>No goals set yet.</p>
           <p class="text-3 text-sm">Go to <strong>All Fields</strong> tab to add goals.</p>
         </div>
       {:else}
-        <div class="card">
-          {#each configuredStats as stat, i}
-            {#if i > 0}<div class="divider"></div>{/if}
-            <button class="goal-row" on:click={() => openEdit(stat)}>
-              <div class="goal-info">
-                <span class="font-medium">{stat.label}</span>
-                {#if getTarget(stat) != null}
-                  {@const pct = getPct(stat)}
-                  {@const tgt = getTarget(stat)}
-                  {@const cur = getTodayValue(stat)}
-                  {@const isMin = $goals[stat.id]?.isMin}
-                  {@const bad = cur != null && tgt != null && (isMin ? cur < tgt : cur > tgt)}
-                  <div class="goal-progress-bar">
-                    <div class="goal-progress-fill"
-                      class:over={bad}
-                      style="width:{pct}%"></div>
-                  </div>
-                  <span class="text-3 text-sm">
-                    {cur != null ? Math.round(cur*10)/10 : '—'} / {tgt} {stat.unit || ''}
-                    {#if isMin}<span style="opacity:0.6">(min)</span>{/if}
-                  </span>
-                {:else}
-                  <span class="text-3 text-sm">Not set</span>
-                {/if}
-              </div>
-              <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
-            </button>
-          {/each}
-        </div>
+        {#if configuredBodyStats.length > 0}
+          <p class="section-title">Body Stats</p>
+          <div class="card">
+            {#each configuredBodyStats as stat, i}
+              {#if i > 0}<div class="divider"></div>{/if}
+              <button class="goal-row" on:click={() => openEdit(stat)}>
+                <div class="goal-info">
+                  <span class="font-medium">{stat.label}</span>
+                  {#if getTarget(stat) != null}
+                    {@const pct = getPct(stat, todayTotals, todayBodyStats)}
+                    {@const tgt = getTarget(stat)}
+                    {@const cur = getTodayValue(stat, todayTotals, todayBodyStats)}
+                    {@const isMin = $goals[stat.id]?.isMin}
+                    {@const bad = cur != null && tgt != null && (isMin ? cur < tgt : cur > tgt)}
+                    <div class="goal-progress-bar">
+                      <div class="goal-progress-fill" class:over={bad} style="width:{pct}%"></div>
+                    </div>
+                    <span class="text-3 text-sm">
+                      {cur != null ? Math.round(cur*10)/10 : '—'} / {tgt} {stat.unit || ''}
+                      {#if isMin}<span style="opacity:0.6">(min)</span>{/if}
+                    </span>
+                  {:else}
+                    <span class="text-3 text-sm">Not set</span>
+                  {/if}
+                </div>
+                <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
+              </button>
+            {/each}
+          </div>
+        {/if}
+
+        {#if configuredNutrients.length > 0}
+          <p class="section-title">Nutrients</p>
+          <div class="card">
+            {#each configuredNutrients as stat, i}
+              {#if i > 0}<div class="divider"></div>{/if}
+              <button class="goal-row" on:click={() => openEdit(stat)}>
+                <div class="goal-info">
+                  <span class="font-medium">{stat.label}</span>
+                  {#if getTarget(stat) != null}
+                    {@const pct = getPct(stat, todayTotals, todayBodyStats)}
+                    {@const tgt = getTarget(stat)}
+                    {@const cur = getTodayValue(stat, todayTotals, todayBodyStats)}
+                    {@const isMin = $goals[stat.id]?.isMin}
+                    {@const bad = cur != null && tgt != null && (isMin ? cur < tgt : cur > tgt)}
+                    <div class="goal-progress-bar">
+                      <div class="goal-progress-fill" class:over={bad} style="width:{pct}%"></div>
+                    </div>
+                    <span class="text-3 text-sm">
+                      {cur != null ? Math.round(cur*10)/10 : '—'} / {tgt} {stat.unit || ''}
+                      {#if isMin}<span style="opacity:0.6">(min)</span>{/if}
+                    </span>
+                  {:else}
+                    <span class="text-3 text-sm">Not set</span>
+                  {/if}
+                </div>
+                <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
+              </button>
+            {/each}
+          </div>
+        {/if}
       {/if}
 
       <!-- Water Goal -->
-      <p class="section-title" style="margin-top:16px">Water</p>
+      <p class="section-title" style="margin-top:{hasAnyGoal ? 0 : 16}px">Water</p>
       <div class="card">
         <button class="goal-row" on:click={openEditWater}>
           <div class="goal-info">
@@ -326,9 +362,9 @@
             <div class="goal-info">
               <span class="font-medium">{stat.label}</span>
               {#if $goals[stat.id]}
-                {@const pct = getPct(stat)}
+                {@const pct = getPct(stat, todayTotals, todayBodyStats)}
                 {@const tgt = getTarget(stat)}
-                {@const cur = getTodayValue(stat)}
+                {@const cur = getTodayValue(stat, todayTotals, todayBodyStats)}
                 <div class="goal-progress-bar">
                   <div class="goal-progress-fill" style="width:{pct}%"></div>
                 </div>
@@ -351,9 +387,9 @@
             <div class="goal-info">
               <span class="font-medium">{stat.label}</span>
               {#if $goals[stat.id]}
-                {@const pct = getPct(stat)}
+                {@const pct = getPct(stat, todayTotals, todayBodyStats)}
                 {@const tgt = getTarget(stat)}
-                {@const cur = getTodayValue(stat)}
+                {@const cur = getTodayValue(stat, todayTotals, todayBodyStats)}
                 <div class="goal-progress-bar">
                   <div class="goal-progress-fill" style="width:{pct}%"></div>
                 </div>
