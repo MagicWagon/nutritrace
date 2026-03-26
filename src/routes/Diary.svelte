@@ -472,22 +472,24 @@
     </button>
   </div>
 
-  <!-- Two-row sticky header: date nav on top, then Diary title below -->
+  <!-- Standard page-header — identical to every other page -->
   <header class="page-header diary-header">
-    <div class="diary-date-row">
-      <button class="btn-icon accent" on:click={prevDay} aria-label="Previous day">
-        <span class="material-symbols-rounded">chevron_left</span>
-      </button>
-      <button class="date-btn" on:click={openDatePicker} title="Jump to date">
-        <span class="date-label">{formatDate($currentDate)}</span>
-        <span class="date-sub">{formatDateSub($currentDate, $dateFormat)}</span>
-      </button>
-      <button class="btn-icon accent" on:click={nextDay} aria-label="Next day">
-        <span class="material-symbols-rounded">chevron_right</span>
-      </button>
-    </div>
     <h1>Diary</h1>
   </header>
+
+  <!-- Date navigation — sticky sub-bar directly below the header -->
+  <div class="diary-date-bar">
+    <button class="btn-icon accent" on:click={prevDay} aria-label="Previous day">
+      <span class="material-symbols-rounded">chevron_left</span>
+    </button>
+    <button class="date-btn" on:click={openDatePicker} title="Jump to date">
+      <span class="date-label">{formatDate($currentDate)}</span>
+      <span class="date-sub">{formatDateSub($currentDate, $dateFormat)}</span>
+    </button>
+    <button class="btn-icon accent" on:click={nextDay} aria-label="Next day">
+      <span class="material-symbols-rounded">chevron_right</span>
+    </button>
+  </div>
 
   <div class="page-content diary-content" style="padding-bottom:{contentPad}">
     <!-- Meal groups -->
@@ -1067,20 +1069,28 @@
     pointer-events: all;
   }
 
-  /* Two-row sticky diary header */
-  .diary-header {
-    flex-direction: column;
-    align-items: stretch;
-    padding-bottom: 0;
+  /* Force h1 to 40px — same as btn-icon height used on other pages,
+     so Diary header height exactly matches Foods / Goals / etc. */
+  .diary-header h1 {
+    height: 40px;
+    display: flex;
+    align-items: center;
   }
-  .diary-date-row {
+
+  /* Sticky date navigation sub-bar — sits directly below the page-header.
+     top = page-top + 10px (padding-top adjustment) + 40px (h1) + 12px (padding-bottom) */
+  .diary-date-bar {
+    position: sticky;
+    top: calc(var(--page-top, var(--safe-top)) + 62px);
+    z-index: 9;
+    background: var(--glass-surface);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
     gap: 4px;
-    padding-bottom: 6px;
-  }
-  .diary-header h1 {
-    padding-bottom: 12px;
+    padding: 8px var(--page-px);
   }
 
   .date-btn {
