@@ -789,7 +789,7 @@
 <ActionSheet
   bind:open={showMoveToMeal}
   title="Move to meal"
-  actions={meals.map((m, i) => ({ label: m, icon: 'restaurant', value: i }))}
+  actions={meals.map((m, i) => ({ label: m, icon: mealIcon(m), value: i }))}
   on:select={moveItemToMeal}
 />
 
