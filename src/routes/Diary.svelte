@@ -457,21 +457,7 @@
 </script>
 
 <div class="page-shell diary-page">
-  <!-- Date navigation — fixed at hamburger level, centered -->
-  <div use:portal class="diary-topbar-date">
-    <button class="btn-icon accent" on:click={prevDay} aria-label="Previous day">
-      <span class="material-symbols-rounded">chevron_left</span>
-    </button>
-    <button class="date-btn" on:click={openDatePicker} title="Jump to date">
-      <span class="date-label">{formatDate($currentDate)}</span>
-      <span class="date-sub">{formatDateSub($currentDate, $dateFormat)}</span>
-    </button>
-    <button class="btn-icon accent" on:click={nextDay} aria-label="Next day">
-      <span class="material-symbols-rounded">chevron_right</span>
-    </button>
-  </div>
-
-  <!-- Action icons — fixed at hamburger level, right side -->
+  <!-- Action icons — fixed at top-right, same level as hamburger -->
   <div use:portal class="diary-topbar-actions">
     {#if _waterShowInDiary}
       <button class="btn-icon accent" on:click={() => showWaterQuickAdd = true} aria-label="Log water" title="Water — log your water intake">
@@ -486,8 +472,20 @@
     </button>
   </div>
 
-  <!-- Standard page-header — same as every other page -->
-  <header class="page-header">
+  <!-- Two-row sticky header: date nav on top, then Diary title below -->
+  <header class="page-header diary-header">
+    <div class="diary-date-row">
+      <button class="btn-icon accent" on:click={prevDay} aria-label="Previous day">
+        <span class="material-symbols-rounded">chevron_left</span>
+      </button>
+      <button class="date-btn" on:click={openDatePicker} title="Jump to date">
+        <span class="date-label">{formatDate($currentDate)}</span>
+        <span class="date-sub">{formatDateSub($currentDate, $dateFormat)}</span>
+      </button>
+      <button class="btn-icon accent" on:click={nextDay} aria-label="Next day">
+        <span class="material-symbols-rounded">chevron_right</span>
+      </button>
+    </div>
     <h1>Diary</h1>
   </header>
 
@@ -1057,26 +1055,32 @@
 
   .diary-page { padding-top: 0; }
 
-  /* Diary fixed topbar elements — share the hamburger band (--safe-top + 10px) */
-  :global(.diary-topbar-date),
+  /* Action icons fixed at top-right, same level as hamburger */
   :global(.diary-topbar-actions) {
     position: fixed;
     top: calc(var(--safe-top, 0px) + 10px);
+    right: 12px;
     z-index: 41;
     display: flex;
     align-items: center;
+    gap: 2px;
     pointer-events: all;
   }
-  /* Span between hamburger (left ~60px) and icons (right ~140px), center content within */
-  :global(.diary-topbar-date) {
-    left: 60px;
-    right: 140px;
-    justify-content: center;
-    gap: 4px;
+
+  /* Two-row sticky diary header */
+  .diary-header {
+    flex-direction: column;
+    align-items: stretch;
+    padding-bottom: 0;
   }
-  :global(.diary-topbar-actions) {
-    right: 12px;
-    gap: 2px;
+  .diary-date-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding-bottom: 6px;
+  }
+  .diary-header h1 {
+    padding-bottom: 12px;
   }
 
   .date-btn {
