@@ -111,13 +111,14 @@ router.post('/', requireAdmin, (req, res) => {
     const dbDump = JSON.stringify(dumpDatabase(), null, 2);
     zip.addFile('database.json', Buffer.from(dbDump, 'utf8'));
 
-    // 2. Uploaded images
+    // 2. Uploaded images (skip the backups sub-directory)
     if (fs.existsSync(UPLOADS_DIR)) {
       const addDir = (dir, zipPath) => {
         for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
           const full = path.join(dir, entry.name);
           const zp   = zipPath ? `${zipPath}/${entry.name}` : entry.name;
           if (entry.isDirectory()) {
+            if (full === BACKUPS_DIR) continue; // never include backup archives
             addDir(full, zp);
           } else {
             zip.addFile(`images/${zp}`, fs.readFileSync(full));

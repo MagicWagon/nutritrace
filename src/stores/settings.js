@@ -23,6 +23,9 @@ const SERVER_SETTINGS = new Set([
   'aiEnabled','aiProvider','aiApiKey','aiModel','aiAssistantName',
   'usdaEnabled','usdaApiKey','offUsername','offPassword',
   'mealieEnabled','mealieBaseUrl','mealieApiToken',
+  // Appearance / UI prefs — included so full backups restore the full look-and-feel
+  'appearance','accentColor',
+  'navStyle','sidebarPersistent','startPage','disableAnimations','goalCelebrations',
 ]);
 
 const _saveQueue = {};

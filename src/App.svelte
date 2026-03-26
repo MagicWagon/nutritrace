@@ -7,7 +7,7 @@
   import Sidebar   from './components/layout/Sidebar.svelte';
   import Toast     from './components/ui/Toast.svelte';
   import { DB }    from './lib/db.js';
-  import { navStyle, applyAccentColor, accentColor, disableAnimations, sidebarPersistent } from './stores/settings.js';
+  import { navStyle, applyAccentColor, accentColor, applyAppearance, appearance, disableAnimations, sidebarPersistent } from './stores/settings.js';
   import { currentUser, userMgmtActive, loadAuthState } from './stores/auth.js';
 
   import Diary      from './routes/Diary.svelte';
@@ -84,8 +84,9 @@
   // Also close immediately if sidebar nav is removed entirely (e.g. switched to bottom-only)
   $: if (!_hasSidebar) sidebarOpen = false;
 
-  // Restore saved accent color on startup
+  // Restore saved accent color and appearance on startup (also re-applies after loadServerSettings)
   $: applyAccentColor($accentColor);
+  $: applyAppearance($appearance);
 
   // Apply/remove no-animations class when setting changes
   $: if (typeof document !== 'undefined') {

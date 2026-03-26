@@ -536,7 +536,7 @@
 
 <!-- ── Camera overlay ── -->
 {#if cameraOpen}
-  <div class="cam-overlay" role="dialog" aria-modal="true">
+  <div class="cam-overlay" role="dialog" aria-modal="true" use:portal>
     <div class="cam-panel">
       <div class="cam-header">
         <span style="font-weight:600">Take Photo</span>
@@ -558,7 +558,7 @@
 
 <!-- ── Crop overlay ── -->
 {#if cropOpen}
-  <div class="cam-overlay" role="dialog" aria-modal="true">
+  <div class="cam-overlay" role="dialog" aria-modal="true" use:portal>
     <div class="cam-panel">
       <div class="cam-header">
         <span style="font-weight:600">Crop Photo</span>
