@@ -88,13 +88,15 @@ Generate a JWT secret:
 openssl rand -base64 48
 ```
 
-2. Start the container:
+2. The included `docker-compose.yml` pulls the latest image from GitHub Container Registry and mounts your two data directories. No changes to the compose file are needed — everything is driven by `.env`. If you want to pin to a specific version, change the image tag from `latest` to a release tag.
+
+3. Start the container:
 
 ```bash
 docker compose up -d
 ```
 
-3. Open `http://localhost:3000` in your browser.
+4. Open `http://localhost:3000` in your browser.
 
 On first launch, a setup wizard walks you through enabling user management and creating your admin account. If you skip user management, the app runs in single-user mode with no login required.
 
