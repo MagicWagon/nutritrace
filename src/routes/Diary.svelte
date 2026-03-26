@@ -32,10 +32,10 @@
   let showDeleteDialog = false;
   let pendingDeleteIdx = null;
   // showBodyStats and showNutritionSummary now live in diary.js stores (controlled from topbar)
-  let editItem         = null;   // { item, idx }
-  let editPortion      = 100;
+  let editItem         = null;
+  let editPortion      = 100;   // food's base serving size — reference only
   let editUnit         = 'g';
-  let editQuantity     = 1;
+  let editQuantity     = 1;     // number of servings — drives nutrition calc
   let showEditSheet    = false;
 
   // Sheet lock helper - prevents backdrop click-through on mobile
@@ -77,7 +77,7 @@
   }
 
   $: meals = $mealNames || ['Breakfast','Lunch','Dinner','Snacks'];
-  $: editCalc = editItem ? Nutrition.calculate({ ...editItem, portion: editPortion || 100, quantity: editQuantity || 1 }) : {};
+  $: editCalc = editItem ? Nutrition.calculate({ ...editItem, quantity: editQuantity || 1 }) : {};
   // Only use currentEntry if it belongs to the currently-displayed date;
   // this prevents stale data from a previous date from showing when navigating
   $: entry = ($currentEntry && $currentEntry.date === $currentDate)
@@ -718,24 +718,18 @@
 <Sheet bind:open={showEditSheet} title={editItem ? editItem.name : ''} on:close={() => showEditSheet = false}>
   {#if editItem}
     <div class="edit-sheet-body">
-      <div class="form-row" style="gap:12px;margin-bottom:16px">
-        <div style="flex:1">
-          <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:4px">Amount</label>
-          <input class="input" type="number" min="0.1" step="0.1" bind:value={editPortion} style="width:100%" />
-        </div>
-        <div style="width:90px">
-          <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:4px">Unit</label>
-          <select class="select" bind:value={editUnit} style="width:100%">
-            {#each ['g','ml','oz','lb','cup','tbsp','tsp','piece','slice','serving'] as u}
-              <option value={u}>{u}</option>
-            {/each}
-          </select>
-        </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface-2);border-radius:var(--radius-md);margin-bottom:16px">
+        <span style="font-size:13px;color:var(--text-3)">Serving Size</span>
+        <span style="font-size:14px;font-weight:500">{editPortion}{editUnit}</span>
       </div>
-      <div style="margin-bottom:8px">
-          <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:4px">Quantity (servings)</label>
-          <input class="input" type="number" min="0.1" step="0.1" bind:value={editQuantity} style="width:100%" />
-        </div>
+      <div style="margin-bottom:16px">
+        <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:4px">Number of Servings</label>
+        <input class="input" type="number" min="0.1" step="0.1" bind:value={editQuantity} style="width:100%" />
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface-2);border-radius:var(--radius-md);margin-bottom:16px">
+        <span style="font-size:13px;color:var(--text-3)">Total Amount</span>
+        <span style="font-size:14px;font-weight:500">{Math.round(editPortion * (parseFloat(editQuantity) || 1) * 10) / 10}{editUnit}</span>
+      </div>
       <div class="edit-macros">
         <div class="edit-macro-pill">
           <span class="edit-macro-val">{Math.round(editCalc.calories || 0)}</span>

@@ -270,9 +270,8 @@ const DB = (() => {
       function calcNutrition(items) {
         const totals = {};
         for (const item of items) {
-          const portion = parseFloat(item.portion) || 100;
           const quantity = parseFloat(item.quantity) || 1;
-          const factor = (portion * quantity) / 100;
+          const factor = quantity;
           for (const [k, v] of Object.entries(item.nutrition || {})) {
             totals[k] = (totals[k] || 0) + (parseFloat(v) || 0) * factor;
           }

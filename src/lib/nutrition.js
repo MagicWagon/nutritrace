@@ -50,9 +50,8 @@ const NUTRIMENTS = [
 const Nutrition = {
   calculate(item) {
     if (!item) return {};
-    const portion = parseFloat(item.portion) || 100;
     const quantity = parseFloat(item.quantity) || 1;
-    const factor = (portion * quantity) / 100;
+    const factor = quantity; // nutrition values are per serving; quantity = number of servings
     const result = {};
     if (item.nutrition && typeof item.nutrition === 'object' && Object.keys(item.nutrition).length > 0) {
       // Nested structure (API foods and properly-saved FoodEditor items)

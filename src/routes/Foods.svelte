@@ -67,7 +67,7 @@
   let scannerOpen = false;
   let showQtyPrompt = false;
   let promptFood = null;
-  let promptQty = 1;
+  let promptServings = 1;
   let activeCategoryFilter = ''; // '' = all
   let yesterdayMeals = []; // { mealIdx, mealName, items, totalKcal } — only in pick mode
 
@@ -177,7 +177,7 @@
     // Foods & Recipes: prompt for quantity if setting enabled
     if ($diaryPromptQuantity) {
       promptFood = food;
-      promptQty  = food.portion || 100;
+      promptServings = 1;
       showQtyPrompt = true;
       return;
     }
@@ -213,8 +213,7 @@
 
   async function confirmQtyPrompt() {
     if (!promptFood) return;
-    const food = { ...promptFood, portion: parseFloat(promptQty) || promptFood.portion || 100 };
-    await _addFoodToDiary(food, 1);
+    await _addFoodToDiary(promptFood, parseFloat(promptServings) || 1);
   }
 
   async function deleteItem(item) {
@@ -292,7 +291,7 @@
       mealName: names[Number(mIdx)] || ('Meal ' + (Number(mIdx)+1)),
       items,
       totalKcal: Math.round(items.reduce((s,i) => {
-        const factor = ((i.portion||100) * (i.quantity||1)) / 100;
+        const factor = (i.quantity || 1);
         return s + (i.nutrition?.calories || i.calories || 0) * factor;
       }, 0))
     }));
@@ -512,14 +511,20 @@
 </div>
 
 <!-- Quantity prompt sheet -->
-<Sheet bind:open={showQtyPrompt} title={promptFood ? promptFood.name : 'Quantity'}>
+<Sheet bind:open={showQtyPrompt} title={promptFood ? promptFood.name : 'Add to Diary'}>
   <div style="display:flex;flex-direction:column;gap:16px;padding-top:8px">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface-2);border-radius:var(--radius-md)">
+      <span style="font-size:13px;color:var(--text-3)">Serving Size</span>
+      <span style="font-size:14px;font-weight:500">{promptFood?.portion || 100}{promptFood?.unit || 'g'}</span>
+    </div>
     <div>
-      <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:6px">
-        Amount ({promptFood?.unit || 'g'})
-      </label>
-      <input class="input" type="number" min="0.1" step="0.1" bind:value={promptQty}
+      <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:6px">Number of Servings</label>
+      <input class="input" type="number" min="0.1" step="0.1" bind:value={promptServings}
         style="font-size:16px;width:100%" />
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface-2);border-radius:var(--radius-md)">
+      <span style="font-size:13px;color:var(--text-3)">Total Amount</span>
+      <span style="font-size:14px;font-weight:500">{Math.round((promptFood?.portion || 100) * (parseFloat(promptServings) || 1) * 10) / 10}{promptFood?.unit || 'g'}</span>
     </div>
     <button class="btn btn-primary w-full" on:click={confirmQtyPrompt}>Add to Diary</button>
   </div>
