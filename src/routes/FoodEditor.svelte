@@ -600,9 +600,8 @@
   /* Camera / crop overlay — shared with MealEditor via :global */
   :global(.cam-overlay) {
     position: fixed; inset: 0; z-index: 9999;
-    background: rgba(0,0,0,0.85);
+    background: rgba(0,0,0,0.9);
     display: flex; align-items: center; justify-content: center;
-    padding: 16px;
   }
   :global(.cam-popup) {
     background: var(--surface-1);
@@ -617,9 +616,9 @@
     flex-shrink: 0;
   }
   :global(.cam-title) { font-size: 17px; font-weight: 600; }
-  :global(.cam-video) { width: 100%; max-height: 55vh; object-fit: cover; background: #000; display: block; }
+  :global(.cam-video) { width: 100%; max-height: 50vh; background: #000; display: block; }
   :global(.cam-footer) {
-    padding: 14px 16px;
+    padding: 16px;
     border-top: 1px solid var(--border);
     display: flex; justify-content: center;
     flex-shrink: 0;
