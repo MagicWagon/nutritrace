@@ -72,6 +72,15 @@ NutriTrace runs entirely in a single Docker container on your own hardware. No a
 DATA_DB_PATH=/your/host/path/db
 DATA_UPLOADS_PATH=/your/host/path/uploads
 JWT_SECRET=your-long-random-secret
+
+# Optional — SMTP for password reset emails and user invites
+# If omitted, invites fall back to a copyable link instead of email
+# SMTP_HOST=smtp.example.com
+# SMTP_PORT=587
+# SMTP_SECURE=false
+# SMTP_USER=you@example.com
+# SMTP_PASS=your-password
+# SMTP_FROM=NutriTrace <noreply@example.com>
 ```
 
 Generate a JWT secret:
