@@ -2068,7 +2068,7 @@
         <div class="card settings-card" style="padding:16px;display:flex;flex-direction:column;gap:12px">
           <div class="form-group">
             <label class="form-label">SMTP Host</label>
-            <input class="input" type="text" placeholder="smtp.gmail.com"
+            <input class="input" type="text" placeholder="e.g. smtp.example.com"
               bind:value={smtpHost} />
           </div>
           <div style="display:flex;gap:10px">
