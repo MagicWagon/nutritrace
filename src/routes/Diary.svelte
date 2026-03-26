@@ -718,9 +718,19 @@
 <Sheet bind:open={showEditSheet} title={editItem ? editItem.name : ''} on:close={() => showEditSheet = false}>
   {#if editItem}
     <div class="edit-sheet-body">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface-2);border-radius:var(--radius-md);margin-bottom:16px">
-        <span style="font-size:13px;color:var(--text-3)">Serving Size</span>
-        <span style="font-size:14px;font-weight:500">{editPortion}{editUnit}</span>
+      <div style="display:flex;gap:12px;margin-bottom:16px">
+        <div style="flex:1">
+          <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:4px">Serving Size</label>
+          <input class="input" type="number" min="0.1" step="0.1" bind:value={editPortion} style="width:100%" />
+        </div>
+        <div style="width:80px">
+          <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:4px">Unit</label>
+          <select class="select" bind:value={editUnit} style="width:100%">
+            {#each ['g','ml','oz','lb','cup','tbsp','tsp','piece','slice','serving'] as u}
+              <option value={u}>{u}</option>
+            {/each}
+          </select>
+        </div>
       </div>
       <div style="margin-bottom:16px">
         <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:4px">Number of Servings</label>
@@ -728,7 +738,7 @@
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface-2);border-radius:var(--radius-md);margin-bottom:16px">
         <span style="font-size:13px;color:var(--text-3)">Total Amount</span>
-        <span style="font-size:14px;font-weight:500">{Math.round(editPortion * (parseFloat(editQuantity) || 1) * 10) / 10}{editUnit}</span>
+        <span style="font-size:14px;font-weight:500">{Math.round((parseFloat(editPortion) || 100) * (parseFloat(editQuantity) || 1) * 10) / 10}{editUnit}</span>
       </div>
       <div class="edit-macros">
         <div class="edit-macro-pill">

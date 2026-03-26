@@ -68,6 +68,8 @@
   let showQtyPrompt = false;
   let promptFood = null;
   let promptServings = 1;
+  let promptPortion = 100;
+  let promptUnit = 'g';
   let activeCategoryFilter = ''; // '' = all
   let yesterdayMeals = []; // { mealIdx, mealName, items, totalKcal } — only in pick mode
 
@@ -178,6 +180,8 @@
     if ($diaryPromptQuantity) {
       promptFood = food;
       promptServings = 1;
+      promptPortion = food.portion || 100;
+      promptUnit = food.unit || 'g';
       showQtyPrompt = true;
       return;
     }
@@ -213,7 +217,8 @@
 
   async function confirmQtyPrompt() {
     if (!promptFood) return;
-    await _addFoodToDiary(promptFood, parseFloat(promptServings) || 1);
+    const food = { ...promptFood, portion: parseFloat(promptPortion) || promptFood.portion || 100, unit: promptUnit || promptFood.unit || 'g' };
+    await _addFoodToDiary(food, parseFloat(promptServings) || 1);
   }
 
   async function deleteItem(item) {
@@ -513,9 +518,20 @@
 <!-- Quantity prompt sheet -->
 <Sheet bind:open={showQtyPrompt} title={promptFood ? promptFood.name : 'Add to Diary'}>
   <div style="display:flex;flex-direction:column;gap:16px;padding-top:8px">
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface-2);border-radius:var(--radius-md)">
-      <span style="font-size:13px;color:var(--text-3)">Serving Size</span>
-      <span style="font-size:14px;font-weight:500">{promptFood?.portion || 100}{promptFood?.unit || 'g'}</span>
+    <div style="display:flex;gap:12px">
+      <div style="flex:1">
+        <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:6px">Serving Size</label>
+        <input class="input" type="number" min="0.1" step="0.1" bind:value={promptPortion}
+          style="font-size:16px;width:100%" />
+      </div>
+      <div style="width:80px">
+        <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:6px">Unit</label>
+        <select class="select" bind:value={promptUnit} style="width:100%">
+          {#each ['g','ml','oz','lb','cup','tbsp','tsp','piece','slice','serving'] as u}
+            <option value={u}>{u}</option>
+          {/each}
+        </select>
+      </div>
     </div>
     <div>
       <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:6px">Number of Servings</label>
@@ -524,7 +540,7 @@
     </div>
     <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface-2);border-radius:var(--radius-md)">
       <span style="font-size:13px;color:var(--text-3)">Total Amount</span>
-      <span style="font-size:14px;font-weight:500">{Math.round((promptFood?.portion || 100) * (parseFloat(promptServings) || 1) * 10) / 10}{promptFood?.unit || 'g'}</span>
+      <span style="font-size:14px;font-weight:500">{Math.round((parseFloat(promptPortion) || 100) * (parseFloat(promptServings) || 1) * 10) / 10}{promptUnit || 'g'}</span>
     </div>
     <button class="btn btn-primary w-full" on:click={confirmQtyPrompt}>Add to Diary</button>
   </div>
