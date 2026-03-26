@@ -537,19 +537,19 @@
 <!-- ── Camera overlay ── -->
 {#if cameraOpen}
   <div class="cam-overlay" role="dialog" aria-modal="true" use:portal>
-    <div class="cam-panel">
+    <div class="cam-popup">
       <div class="cam-header">
-        <span style="font-weight:600">Take Photo</span>
+        <span class="cam-title">Take Photo</span>
         <button class="btn-icon" on:click={closeCamera}>
           <span class="material-symbols-rounded">close</span>
         </button>
       </div>
       <!-- svelte-ignore a11y-media-has-caption -->
       <video bind:this={videoEl} autoplay playsinline muted class="cam-video"></video>
-      <div style="padding:16px">
-        <button class="btn btn-primary w-full" on:click={capturePhoto}>
-          <span class="material-symbols-rounded" style="font-size:18px;vertical-align:middle;margin-right:6px">camera_alt</span>
-          Capture Photo
+      <div class="cam-footer">
+        <button class="btn btn-primary cam-capture-btn" on:click={capturePhoto}>
+          <span class="material-symbols-rounded">camera_alt</span>
+          Capture
         </button>
       </div>
     </div>
@@ -559,14 +559,14 @@
 <!-- ── Crop overlay ── -->
 {#if cropOpen}
   <div class="cam-overlay" role="dialog" aria-modal="true" use:portal>
-    <div class="cam-panel">
+    <div class="cam-popup">
       <div class="cam-header">
-        <span style="font-weight:600">Crop Photo</span>
+        <span class="cam-title">Crop Photo</span>
         <button class="btn-icon" on:click={() => { cropOpen = false; cropSrc = ''; }}>
           <span class="material-symbols-rounded">close</span>
         </button>
       </div>
-      <div class="crop-area"
+      <div class="crop-container"
         on:mousemove={onCropMouseMove}
         on:mouseup={onCropMouseUp}
         on:mouseleave={onCropMouseUp}
@@ -579,8 +579,8 @@
           aria-label="Drag to reposition crop"
           on:keydown={() => {}}></div>
       </div>
-      <div style="padding:16px">
-        <button class="btn btn-primary w-full" on:click={confirmCrop}>Use This Crop</button>
+      <div class="cam-footer">
+        <button class="btn btn-primary cam-capture-btn" on:click={confirmCrop}>Use This Crop</button>
       </div>
     </div>
   </div>
@@ -684,26 +684,7 @@
   }
   .portion-body { padding: 0 16px; display: flex; flex-direction: column; gap: 8px; flex: 1; overflow-y: auto; }
 
-  /* Camera / Crop overlays */
-  :global(.cam-overlay) {
-    position: fixed; inset: 0; z-index: 9999;
-    background: rgba(0,0,0,0.9);
-    display: flex; align-items: center; justify-content: center;
-  }
-  :global(.cam-panel) {
-    background: var(--surface-1);
-    border-radius: var(--radius-xl);
-    width: min(480px, 96vw);
-    overflow: hidden;
-    display: flex; flex-direction: column;
-  }
-  :global(.cam-header) {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 16px; border-bottom: 1px solid var(--border);
-  }
-  :global(.cam-video) { width: 100%; max-height: 50vh; background: #000; }
-  :global(.crop-area) { position: relative; overflow: hidden; max-height: 60vh; }
-  :global(.crop-img) { width: 100%; display: block; user-select: none; }
+  /* Camera / Crop overlays — shared styles live in FoodEditor's :global CSS */
   :global(.crop-box) {
     position: absolute;
     border: 2px solid var(--accent);

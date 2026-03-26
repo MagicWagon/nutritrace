@@ -602,49 +602,78 @@
     position: fixed;
     inset: 0;
     z-index: 9999;
-    background: rgba(0,0,0,0.85);
+    background: #000;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: env(safe-area-inset-top, 16px) 16px 16px;
   }
   :global(.cam-popup) {
     width: 100%;
-    max-width: 480px;
+    height: 100%;
     background: var(--surface-1);
-    border-radius: var(--radius-xl);
-    overflow: hidden;
     display: flex;
     flex-direction: column;
-    max-height: min(600px, calc(100dvh - 32px));
   }
   :global(.cam-header) {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 14px 16px;
+    padding: max(env(safe-area-inset-top), 14px) 16px 14px;
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
+    background: var(--surface-1);
   }
   :global(.cam-title) { font-size: 17px; font-weight: 600; }
   :global(.cam-video) {
     width: 100%;
-    max-height: 55vh;
-    object-fit: contain;
+    flex: 1;
+    object-fit: cover;
     background: #000;
     display: block;
+    min-height: 0;
   }
   :global(.cam-footer) {
-    padding: 14px 16px;
+    padding: 20px 16px max(env(safe-area-inset-bottom), 20px);
     border-top: 1px solid var(--border);
     display: flex;
     justify-content: center;
     flex-shrink: 0;
+    background: var(--surface-1);
   }
-  :global(.cam-capture-btn) { gap: 6px; min-width: 140px; }
+  :global(.cam-capture-btn) { gap: 6px; min-width: 160px; height: 48px; font-size: 16px; }
   :global(.crop-hint) { padding: 8px 16px 0; font-size: 12px; color: var(--text-3); }
-  :global(.crop-container) { position: relative; overflow: hidden; user-select: none; touch-action: none; }
-  :global(.crop-img) { display: block; max-width: 100%; max-height: 55vh; }
+  :global(.crop-container) { position: relative; overflow: hidden; user-select: none; touch-action: none; flex: 1; min-height: 0; }
+  :global(.crop-img) { display: block; width: 100%; height: 100%; object-fit: contain; }
+
+  /* On larger screens keep it as a centered card */
+  @media (min-width: 600px) {
+    :global(.cam-overlay) {
+      background: rgba(0,0,0,0.85);
+      padding: 16px;
+    }
+    :global(.cam-popup) {
+      width: auto;
+      height: auto;
+      max-width: 520px;
+      max-height: min(700px, calc(100dvh - 32px));
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+    }
+    :global(.cam-header) {
+      padding: 14px 16px;
+    }
+    :global(.cam-video) {
+      flex: none;
+      max-height: 60vh;
+      object-fit: contain;
+    }
+    :global(.cam-footer) {
+      padding: 14px 16px;
+    }
+    :global(.cam-capture-btn) { min-width: 140px; height: auto; font-size: inherit; }
+    :global(.crop-container) { flex: none; }
+    :global(.crop-img) { width: auto; height: auto; max-width: 100%; max-height: 55vh; object-fit: contain; }
+  }
   :global(.crop-box) {
     position: absolute;
     border: 2px solid #fff;
