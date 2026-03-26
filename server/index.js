@@ -44,9 +44,11 @@ app.use((req, res, next) => {
   next();
 });
 
-// Serve uploaded images
+// Serve uploaded images (short cache — user images can change)
 const uploadsPath = process.env.UPLOADS_PATH || './uploads';
-app.use('/uploads', express.static(uploadsPath));
+app.use('/uploads', express.static(uploadsPath, {
+  setHeaders(res) { res.set('Cache-Control', 'public, max-age=3600'); }
+}));
 
 // Prevent browser/proxy caching of all API responses
 app.use('/api', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
@@ -66,10 +68,21 @@ app.use('/api/full-backup', fullBackupRoutes);
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 // Serve Svelte frontend (production build)
-app.use(express.static(path.join(__dirname, 'dist')));
+// Content-hashed assets (in /assets/) are safe to cache forever — new deploy = new filename
+// index.html must never be cached so the browser always loads the latest app version
+app.use(express.static(path.join(__dirname, 'dist'), {
+  setHeaders(res, filePath) {
+    if (filePath.includes('/assets/')) {
+      res.set('Cache-Control', 'public, max-age=31536000, immutable');
+    } else {
+      res.set('Cache-Control', 'no-store');
+    }
+  }
+}));
 
-// SPA fallback — all non-API routes return index.html
+// SPA fallback — index.html, never cached
 app.get('*', (req, res) => {
+  res.set('Cache-Control', 'no-store');
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 

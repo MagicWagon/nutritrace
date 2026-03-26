@@ -1,5 +1,13 @@
 <script>
   import { onMount } from 'svelte';
+
+  function modalPortal(node) {
+    document.body.appendChild(node);
+    document.body.style.overflow = 'hidden';
+    return {
+      destroy() { node.remove(); document.body.style.overflow = ''; }
+    };
+  }
   import { pop, push } from 'svelte-spa-router';
   import { NtApi } from '../lib/api.js';
   import { NUTRIMENTS } from '../lib/nutrition.js';
@@ -371,7 +379,7 @@
 
     <!-- Camera popup -->
     {#if showCamera}
-      <div class="cam-overlay" role="dialog" aria-modal="true">
+      <div class="cam-overlay" role="dialog" aria-modal="true" use:modalPortal>
         <div class="cam-popup">
           <div class="cam-header">
             <span class="cam-title">Take Photo</span>
@@ -393,7 +401,7 @@
 
     <!-- Crop popup -->
     {#if showCrop}
-      <div class="cam-overlay" role="dialog" aria-modal="true">
+      <div class="cam-overlay" role="dialog" aria-modal="true" use:modalPortal>
         <div class="cam-popup">
           <div class="cam-header">
             <span class="cam-title">Crop Photo</span>

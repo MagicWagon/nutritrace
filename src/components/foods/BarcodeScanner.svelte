@@ -1,6 +1,19 @@
 <script>
   import { onMount, onDestroy, createEventDispatcher } from 'svelte';
   import { fly } from 'svelte/transition';
+
+  // Portal to document.body — prevents position:fixed being trapped by
+  // ancestor transforms or opacity transitions (common iOS issue)
+  function modalPortal(node) {
+    document.body.appendChild(node);
+    document.body.style.overflow = 'hidden';
+    return {
+      destroy() {
+        node.remove();
+        document.body.style.overflow = '';
+      }
+    };
+  }
   import { barcodeBeep, barcodeFlashlight } from '../../stores/settings.js';
 
   export let open = false;
@@ -323,7 +336,7 @@
 </script>
 
 {#if open}
-  <div class="scanner-backdrop" on:click={close} transition:fly={{ y: 20, duration: 220 }}>
+  <div class="scanner-backdrop" use:modalPortal on:click={close} transition:fly={{ y: 20, duration: 220 }}>
     <div class="scanner-panel" on:click|stopPropagation>
       <!-- Header -->
       <div class="scanner-header">
