@@ -66,7 +66,32 @@ NutriTrace runs entirely in a single Docker container on your own hardware. No a
 
 ### Quick Start
 
-1. Download the `docker-compose.yml` from this repo. It pulls the latest image from GitHub Container Registry and mounts your two data directories. No changes to the file are needed — everything is driven by `.env`. If you want to pin to a specific version, change the image tag from `latest` to a release tag.
+1. Download the `docker-compose.yml` from this repo, or copy it directly:
+
+```yaml
+services:
+  nutritrace:
+    image: ghcr.io/thebigjoe1/nutritrace:latest
+    container_name: nutritrace
+    ports:
+      - "3000:3001"
+    volumes:
+      - ${DATA_DB_PATH}:/data/db
+      - ${DATA_UPLOADS_PATH}:/data/uploads
+    environment:
+      - DB_PATH=/data/db/nutritrace.db
+      - UPLOADS_PATH=/data/uploads
+      - JWT_SECRET=${JWT_SECRET}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_SECURE=${SMTP_SECURE:-false}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - SMTP_FROM=${SMTP_FROM:-}
+    restart: unless-stopped
+```
+
+No changes to this file are needed — everything is driven by `.env`. If you want to pin to a specific version, change `latest` to a release tag.
 
 2. Copy `.env.example` to `.env` and fill in your paths:
 
