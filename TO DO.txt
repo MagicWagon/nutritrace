@@ -23,8 +23,6 @@ create readme
 
 future considerations
 
-/wizard for login page?
-
 enable mfa/oath future?
 
 mobile app... identical to webapp...but with option to store data local
@@ -34,10 +32,20 @@ api key to pull data out of here elsewhere?
 
 admin password resets for other users?
 
-calculation settings - sparky?
+bmi calculation settings - sparky?
 
 steps/sleep tracker?
 
 remove water section and have it in dairy somewhere?
 
 test various backup/restores
+
+test uploading off
+
+email should/can be setup in the yml/env files
+
+if multiple users enabled, then maybe an option so that the integrations automatically flow to them without them needing to mnanage? maybe they can just enabled disable the integration, but the api keys, settings for them etc they dont get access to?
+
+test upload to off
+
+meal default icon change, fork and spoon maybe....move to meal option in diary for individual food item?...maybe have top level menu to create meal from breakfast or int he meal section... have to think what is more natural.
