@@ -7,7 +7,8 @@
   import { NtApi } from '../lib/api.js';
   import { NUTRIMENTS, Nutrition } from '../lib/nutrition.js';
   import { goals, energyUnit, weightUnit, lengthUnit, statsChartType, statsYZero,
-           statsAvgLine, statsGoalLine, statsTrendLine, hiddenBodyStats, dateFormat } from '../stores/settings.js';
+           statsAvgLine, statsGoalLine, statsTrendLine, hiddenBodyStats, dateFormat, pageBanners } from '../stores/settings.js';
+  import StatsBanner from '../components/banners/StatsBanner.svelte';
   let _waterShowInStats = DB.getSetting('waterShowInStats', true);
   let _waterUnit        = DB.getSetting('waterUnit', 'ml');
   // Reload when settings change
@@ -338,7 +339,8 @@
 </script>
 
 <div class="page-shell">
-  <header class="page-header">
+  <header class="page-header" class:has-banner={$pageBanners}>
+    {#if $pageBanners}<StatsBanner />{/if}
     <h1>Statistics</h1>
   </header>
 

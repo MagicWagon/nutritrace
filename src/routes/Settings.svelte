@@ -20,7 +20,7 @@
     foodCategories, visibleNutriments, nutrimentsOrder, customNutriments,
     bodyStatsOrder, hiddenBodyStats,
     dateFormat, timeFormat,
-    sidebarPersistent, goalCelebrations,
+    sidebarPersistent, goalCelebrations, pageBanners,
     aiEnabled, aiProvider, aiApiKey, aiModel, aiAssistantName,
     waterGoalMl, waterUnit, waterContainers, waterShowInStats, waterShowInDiary,
   } from '../stores/settings.js';
@@ -46,7 +46,7 @@
   $: settingsQuery = settingsSearch.toLowerCase().trim();
 
   const SECTION_KEYWORDS = {
-    appearance:        ['appearance','theme','dark','light','accent','color','navigation','sidebar','persistent','start page','animations','celebrations','reduce motion'],
+    appearance:        ['appearance','theme','dark','light','accent','color','navigation','sidebar','persistent','start page','animations','celebrations','reduce motion','banner','page banner'],
     regional:          ['regional','date format','time format','locale','date','time','12h','24h'],
     diary:             ['diary','brands','timestamps','thumbnails','nutrients','nutrition units','macros','macro summary','prompt quantity','portion size','nutrition bar','goals progress','meal names','meals'],
     foods:             ['foods','thumbnails','category','notes','yesterday meals','sort order','sort','barcode','scan','beep','flashlight','crop photos'],
@@ -1250,6 +1250,14 @@
               <span class="setting-hint">Pulse animation when hitting your calorie or water goal</span>
             </div>
             <Toggle checked={$goalCelebrations} on:change={e => goalCelebrations.set(e.detail)} />
+          </div>
+          <div class="setting-divider"></div>
+          <div class="setting-row">
+            <div>
+              <span class="setting-label">Page banners</span>
+              <span class="setting-hint">Animated illustrated backdrop behind each page title</span>
+            </div>
+            <Toggle checked={$pageBanners} on:change={e => pageBanners.set(e.detail)} />
           </div>
         </div>
       </div>

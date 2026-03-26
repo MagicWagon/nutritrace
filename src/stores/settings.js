@@ -25,7 +25,7 @@ const SERVER_SETTINGS = new Set([
   'mealieEnabled','mealieBaseUrl','mealieApiToken',
   // Appearance / UI prefs — included so full backups restore the full look-and-feel
   'appearance','accentColor',
-  'navStyle','sidebarPersistent','startPage','disableAnimations','goalCelebrations',
+  'navStyle','sidebarPersistent','startPage','disableAnimations','goalCelebrations','pageBanners',
 ]);
 
 const _saveQueue = {};
@@ -213,6 +213,9 @@ export const offPassword = createSettingStore('offPassword', '');
 export const catName    = c => typeof c === 'string' ? c : (c?.name    || '');
 export const catLabel   = c => typeof c === 'string' ? '' : (c?.label  || '');
 export const catDisplay = c => { const l = catLabel(c); return l ? `${l} ${catName(c)}` : catName(c); };
+
+// Page banners
+export const pageBanners = createSettingStore('pageBanners', false);
 
 // FitBot AI
 export const aiEnabled       = createSettingStore('aiEnabled',       false);

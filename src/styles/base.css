@@ -112,6 +112,19 @@ input, select, textarea { font-family: inherit; }
   background-clip: text;
 }
 
+/* Banner variant — taller header with illustrated SVG backdrop */
+.page-header.has-banner {
+  overflow: hidden;          /* clip the SVG to the header bounds */
+  padding-bottom: 52px;      /* extend downward to give the illustration room */
+  align-items: flex-end;     /* push h1 (and any action buttons) to the bottom */
+}
+/* Ensure h1 gradient text is legible over the illustration */
+.page-header.has-banner h1 {
+  position: relative;        /* stack above the absolute SVG */
+  z-index: 1;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.35);
+}
+
 /* Page shell — used by all route pages */
 .page-shell {
   display: block;
