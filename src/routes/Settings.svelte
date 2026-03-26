@@ -22,6 +22,7 @@
     dateFormat, timeFormat,
     sidebarPersistent, goalCelebrations,
     aiEnabled, aiProvider, aiApiKey, aiModel, aiAssistantName,
+    waterGoalMl, waterUnit, waterContainers, waterShowInStats, waterShowInDiary,
   } from '../stores/settings.js';
   import { mealIcon } from '../lib/mealIcon.js';
   import { DB } from '../lib/db.js';
@@ -197,17 +198,6 @@
   let sidebarPersistentVal     = DB.getSetting('sidebarPersistent', false);
 
   // ── Water ──────────────────────────────────────────────────────────────────
-  let waterGoalMl      = DB.getSetting('waterGoalMl',      2000);
-  let waterUnit        = DB.getSetting('waterUnit',        'ml');
-  let waterContainers  = DB.getSetting('waterContainers',  [
-    { id: '1', name: 'Small Bottle',     volumeMl: 250  },
-    { id: '2', name: 'Standard Bottle', volumeMl: 500  },
-    { id: '3', name: 'Large Bottle',    volumeMl: 1000 },
-    { id: '4', name: 'Gallon Jug',       volumeMl: 3785 },
-  ]);
-  let waterShowInStats = DB.getSetting('waterShowInStats', true);
-  let waterShowInDiary = DB.getSetting('waterShowInDiary', true);
-
   function _mlToDisplay(ml, unit) {
     if (unit === 'oz') return +(ml / 29.5735).toFixed(1);
     if (unit === 'L')  return +(ml / 1000).toFixed(2);
@@ -221,8 +211,8 @@
     if (unit === 'G')  return Math.round(n * 3785.41);
     return Math.round(n);
   }
-  $: _waterGoalDisplay = _mlToDisplay(waterGoalMl, waterUnit);
-  function _updateWaterGoal(val) { waterGoalMl = _displayToMl(val, waterUnit); }
+  $: _waterGoalDisplay = _mlToDisplay($waterGoalMl, $waterUnit);
+  function _updateWaterGoal(val) { waterGoalMl.set(_displayToMl(val, $waterUnit)); }
 
   let _newContName   = '';
   let _newContVolume = '';
@@ -231,10 +221,10 @@
     const name = _newContName.trim();
     const vol  = Number(_newContVolume);
     if (!name || !vol || vol <= 0) { showError('Enter a valid name and volume'); return; }
-    waterContainers = [...waterContainers, { id: Date.now().toString(), name, volumeMl: _displayToMl(vol, _newContUnit) }];
+    waterContainers.set([...$waterContainers, { id: Date.now().toString(), name, volumeMl: _displayToMl(vol, _newContUnit) }]);
     _newContName = ''; _newContVolume = '';
   }
-  function removeContainer(id) { waterContainers = waterContainers.filter(c => c.id !== id); }
+  function removeContainer(id) { waterContainers.set($waterContainers.filter(c => c.id !== id)); }
 
   // ── Statistics ─────────────────────────────────────────────────────────────
   let statsChartType = DB.getSetting('statsChartType', 'bar');
@@ -1115,11 +1105,7 @@
   }
 
   // ── Reactive saves ─────────────────────────────────────────────────────────
-  $: set('waterGoalMl',       waterGoalMl);
-  $: set('waterUnit',         waterUnit);
-  $: set('waterContainers',   waterContainers);
-  $: set('waterShowInStats',  waterShowInStats);
-  $: set('waterShowInDiary',  waterShowInDiary);
+
   $: set('navStyle',          navStyle);
   $: set('startPage',          startPage);
   $: set('disableAnimations',  disableAnimations);
@@ -1412,7 +1398,7 @@
         <div class="card settings-card">
           <div class="setting-row">
             <span class="setting-label">Display unit</span>
-            <select class="select sel-sm" bind:value={waterUnit}>
+            <select class="select sel-sm" value={$waterUnit} on:change={e => waterUnit.set(e.target.value)}>
               <option value="ml">Milliliters (ml)</option>
               <option value="oz">Fluid ounces (fl oz)</option>
               <option value="L">Liters (L)</option>
@@ -1422,12 +1408,12 @@
           <div class="setting-divider"></div>
           <div class="setting-row">
             <span class="setting-label">Show in Diary</span>
-            <Toggle checked={waterShowInDiary} on:change={e => waterShowInDiary = e.detail} />
+            <Toggle checked={$waterShowInDiary} on:change={e => waterShowInDiary.set(e.detail)} />
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
             <span class="setting-label">Show in Statistics</span>
-            <Toggle checked={waterShowInStats} on:change={e => waterShowInStats = e.detail} />
+            <Toggle checked={$waterShowInStats} on:change={e => waterShowInStats.set(e.detail)} />
           </div>
         </div>
 
@@ -1435,14 +1421,14 @@
         <p class="section-title" style="margin-top:14px">Water Containers</p>
         <p class="setting-desc" style="padding:0 var(--page-px) 10px">Define bottles, cups, or glasses for one-tap quick-add</p>
         <div class="card settings-card">
-          {#each waterContainers as container, i}
+          {#each $waterContainers as container, i}
             {#if i > 0}<div class="setting-divider"></div>{/if}
             <div class="setting-row">
               <div style="display:flex;align-items:center;gap:10px;min-width:0">
                 <span class="material-symbols-rounded" style="color:var(--accent);font-size:20px;flex-shrink:0">water_drop</span>
                 <div style="min-width:0">
                   <div class="setting-label">{container.name}</div>
-                  <div class="setting-desc">{_mlToDisplay(container.volumeMl, waterUnit)} {waterUnit}</div>
+                  <div class="setting-desc">{_mlToDisplay(container.volumeMl, $waterUnit)} {$waterUnit}</div>
                 </div>
               </div>
               <button class="btn-icon" on:click={() => removeContainer(container.id)} title="Remove">
@@ -1450,7 +1436,7 @@
               </button>
             </div>
           {/each}
-          {#if waterContainers.length === 0}
+          {#if $waterContainers.length === 0}
             <p class="text-3 text-sm" style="padding:16px;text-align:center">No containers yet</p>
           {/if}
         </div>

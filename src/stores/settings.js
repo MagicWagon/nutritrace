@@ -192,6 +192,16 @@ export const heightUnit = createSettingStore('heightUnit', 'ft');
 export const lengthUnit = createSettingStore('lengthUnit', 'in');
 export const distUnit   = createSettingStore('distUnit',   'km');
 
+// Water
+export const waterGoalMl      = createSettingStore('waterGoalMl',      2000);
+export const waterUnit         = createSettingStore('waterUnit',         'ml');
+export const waterContainers   = createSettingStore('waterContainers',   [
+  { id: '1', name: 'Small Bottle',    volumeMl: 250 },
+  { id: '2', name: 'Standard Bottle', volumeMl: 500 },
+]);
+export const waterShowInStats  = createSettingStore('waterShowInStats',  true);
+export const waterShowInDiary  = createSettingStore('waterShowInDiary',  true);
+
 // USDA / OFF API keys
 export const usdaApiKey  = createSettingStore('usdaApiKey',  '');
 export const usdaEnabled = createSettingStore('usdaEnabled', false);
