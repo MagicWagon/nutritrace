@@ -12,10 +12,10 @@
 </script>
 
 <!--
-  Foods page banner — floating place setting: fork, knife, spoon, and plate.
-  All elements are realistic, recognizable utensil/dishware shapes.
-  Absolutely positioned behind the page-header content.
-  All elements use var(--accent) at low opacity so it works with any theme.
+  Foods page banner — floating place setting silhouettes.
+  Each utensil is drawn as a filled silhouette path so it reads as the
+  real object at banner scale: proper tines on the fork, a belly curve
+  on the knife blade, a rounded bowl on the spoon, and rimmed plates.
 -->
 <svg
   class="foods-banner-svg"
@@ -27,66 +27,89 @@
   aria-hidden="true"
 >
   <defs>
-    <radialGradient id="fb-glow" cx="50%" cy="50%" r="50%" gradientUnits="objectBoundingBox">
-      <stop offset="0%"   stop-color="var(--accent)" stop-opacity="0.16" />
-      <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"    />
+    <radialGradient id="fb-glow" cx="50%" cy="50%" r="55%" gradientUnits="objectBoundingBox">
+      <stop offset="0%"   stop-color="var(--accent)" stop-opacity="0.16"/>
+      <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/>
     </radialGradient>
   </defs>
 
-  <!-- Ambient glow -->
-  <rect x="0" y="0" width="500" height="120" fill="url(#fb-glow)" />
+  <rect x="0" y="0" width="500" height="120" fill="url(#fb-glow)"/>
 
-  <!-- Plate 1 (left) -->
+  <!-- ── Plate 1 (left) centred at 80,60 ──────────────────────────────────── -->
   <g class="fb-item fbi1">
-    <circle class="fb-plate" cx="80" cy="50" r="22" fill="none" stroke-width="1.8" />
-    <circle class="fb-plate-rim" cx="80" cy="50" r="16" fill="none" stroke-width="0.9" />
+    <!-- Subtle plate fill -->
+    <circle class="fb-plate-fill" cx="80" cy="60" r="27"/>
+    <!-- Outer rim -->
+    <circle class="fb-plate-rim-outer" cx="80" cy="60" r="27"/>
+    <!-- Inner well ring -->
+    <circle class="fb-plate-rim-inner" cx="80" cy="60" r="21"/>
   </g>
 
-  <!-- Fork (upper right) -->
+  <!-- ── Fork centred at x=186, tines start at y=12 ────────────────────────── -->
   <g class="fb-item fbi2">
-    <line class="fb-utensil" x1="380" y1="85" x2="380" y2="15" stroke-width="2.2" stroke-linecap="round" />
-    <!-- Tines -->
-    <line class="fb-tine" x1="365" y1="15" x2="365" y2="30" stroke-width="1.4" stroke-linecap="round" />
-    <line class="fb-tine" x1="373" y1="15" x2="373" y2="30" stroke-width="1.4" stroke-linecap="round" />
-    <line class="fb-tine" x1="381" y1="15" x2="381" y2="30" stroke-width="1.4" stroke-linecap="round" />
-    <line class="fb-tine" x1="389" y1="15" x2="389" y2="30" stroke-width="1.4" stroke-linecap="round" />
-    <!-- Tine connector -->
-    <line class="fb-utensil-conn" x1="363" y1="32" x2="391" y2="32" stroke-width="1" stroke-linecap="round" />
+    <!-- Tine 1 -->
+    <rect class="fb-silhouette" x="177"   y="12" width="2.6" height="34" rx="1.3"/>
+    <!-- Tine 2 -->
+    <rect class="fb-silhouette" x="181.8" y="12" width="2.6" height="34" rx="1.3"/>
+    <!-- Tine 3 -->
+    <rect class="fb-silhouette" x="186.6" y="12" width="2.6" height="34" rx="1.3"/>
+    <!-- Tine 4 -->
+    <rect class="fb-silhouette" x="191.4" y="12" width="2.6" height="34" rx="1.3"/>
+    <!-- Shoulder: tapers from tine-width (18 px) down to handle-width (10 px) -->
+    <path class="fb-silhouette" d="M 175,44 L 182,54 L 194,54 L 201,44 Z"/>
+    <!-- Handle -->
+    <rect class="fb-silhouette" x="182" y="53" width="10" height="50" rx="5"/>
   </g>
 
-  <!-- Knife (center-right) -->
+  <!-- ── Knife centred around x=268, blade tip at y=12 ─────────────────────── -->
   <g class="fb-item fbi3">
-    <line class="fb-utensil" x1="280" y1="90" x2="280" y2="18" stroke-width="2.4" stroke-linecap="round" />
-    <!-- Blade -->
-    <path class="fb-blade" d="M 280,18 L 292,35 L 280,40 Z" />
+    <!--
+      Blade silhouette:
+        left edge  = spine (straight)
+        right edge = cutting edge with chef's-knife belly curve
+      M 262,44   bottom-left (spine meets bolster)
+      L 262,16   spine goes straight up
+      Q 264,12 266,13  spine curves to a sharp tip
+      Q 276,22 272,44  cutting-edge belly back down to heel
+      Z
+    -->
+    <path class="fb-blade" d="M 262,44 L 262,16 Q 264,12 266,13 Q 276,22 272,44 Z"/>
+    <!-- Bolster: slight width break between blade and handle -->
+    <rect class="fb-silhouette" x="260" y="43" width="13" height="7" rx="2"/>
+    <!-- Handle: slightly wider than bolster, rounded ends -->
+    <rect class="fb-silhouette" x="260" y="49" width="12" height="50" rx="6"/>
   </g>
 
-  <!-- Spoon (left-center) -->
+  <!-- ── Spoon centred at x=351, bowl top at y=10 ──────────────────────────── -->
   <g class="fb-item fbi4">
-    <line class="fb-utensil" x1="180" y1="88" x2="180" y2="38" stroke-width="2" stroke-linecap="round" />
-    <!-- Bowl -->
-    <ellipse class="fb-spoon-bowl" cx="180" cy="25" rx="13" ry="16" fill="none" stroke-width="1.6" />
+    <!--
+      Bowl: filled ellipse — wider than the handle, clearly a spoon bowl.
+      rx=12 ry=14 gives a slightly taller-than-wide oval, like a real spoon bowl.
+    -->
+    <ellipse class="fb-silhouette" cx="351" cy="26" rx="12" ry="15"/>
+    <!-- Handle: connects from bottom of bowl, tapers slightly -->
+    <rect class="fb-silhouette" x="347.5" y="37" width="7" height="60" rx="3.5"/>
   </g>
 
-  <!-- Plate 2 (right) -->
+  <!-- ── Plate 2 (right) centred at 443,66 ─────────────────────────────────── -->
   <g class="fb-item fbi5">
-    <circle class="fb-plate" cx="440" cy="70" r="20" fill="none" stroke-width="1.6" />
-    <circle class="fb-plate-rim" cx="440" cy="70" r="14" fill="none" stroke-width="0.8" />
+    <circle class="fb-plate-fill"      cx="443" cy="66" r="23"/>
+    <circle class="fb-plate-rim-outer" cx="443" cy="66" r="23"/>
+    <circle class="fb-plate-rim-inner" cx="443" cy="66" r="18"/>
   </g>
 
-  <!-- Sparkles -->
-  <g class="fb-sparkles">
-    <!-- 4-point star sparkle 1 -->
-    <line class="fb-sparkle sp1" x1="120" y1="25" x2="120" y2="35" stroke-width="1" stroke-linecap="round" />
-    <line class="fb-sparkle sp1" x1="115" y1="30" x2="125" y2="30" stroke-width="1" stroke-linecap="round" />
-
-    <!-- 4-point star sparkle 2 -->
-    <line class="fb-sparkle sp2" x1="320" y1="55" x2="320" y2="63" stroke-width="0.8" stroke-linecap="round" />
-    <line class="fb-sparkle sp2" x1="316" y1="59" x2="324" y2="59" stroke-width="0.8" stroke-linecap="round" />
-
-    <!-- 4-point star sparkle 3 -->
-    <line class="fb-sparkle sp3" x1="420" y1="15" x2="420" y2="24" stroke-width="0.9" stroke-linecap="round" />
-    <line class="fb-sparkle sp3" x1="415.5" y1="19.5" x2="424.5" y2="19.5" stroke-width="0.9" stroke-linecap="round" />
+  <!-- ── Sparkles (4-point star crosses) ──────────────────────────────────── -->
+  <g class="fb-sparkle sp1">
+    <line x1="138" y1="27" x2="138" y2="38" stroke-linecap="round"/>
+    <line x1="132" y1="32" x2="144" y2="32" stroke-linecap="round"/>
+  </g>
+  <g class="fb-sparkle sp2">
+    <line x1="315" y1="56" x2="315" y2="65" stroke-linecap="round"/>
+    <line x1="310" y1="60" x2="320" y2="60" stroke-linecap="round"/>
+  </g>
+  <g class="fb-sparkle sp3">
+    <line x1="408" y1="18" x2="408" y2="27" stroke-linecap="round"/>
+    <line x1="403" y1="22" x2="413" y2="22" stroke-linecap="round"/>
   </g>
 </svg>
 
@@ -99,92 +122,104 @@
     pointer-events: none;
   }
 
-  /* ── Utensil base styling ───────────────────────────────────────────────── */
-  .fb-utensil {
-    stroke: var(--accent);
-    stroke-opacity: 0.65;
-  }
-  .fb-utensil-conn {
-    stroke: var(--accent);
-    stroke-opacity: 0.65;
-  }
-  .fb-tine {
-    stroke: var(--accent);
-    stroke-opacity: 0.65;
-  }
-  .fb-plate {
-    stroke: var(--accent);
-    stroke-opacity: 0.40;
-  }
-  .fb-plate-rim {
-    stroke: var(--accent);
-    stroke-opacity: 0.25;
-  }
-  .fb-spoon-bowl {
-    stroke: var(--accent);
-    stroke-opacity: 0.65;
-  }
-  .fb-blade {
+  /* ── Plate styles ───────────────────────────────────────────────────────── */
+  .fb-plate-fill {
     fill: var(--accent);
-    opacity: 0.35;
+    opacity: 0.06;
+  }
+  .fb-plate-rim-outer {
+    fill: none;
+    stroke: var(--accent);
+    stroke-opacity: 0.45;
+    stroke-width: 2;
+  }
+  .fb-plate-rim-inner {
+    fill: none;
+    stroke: var(--accent);
+    stroke-opacity: 0.28;
+    stroke-width: 1.2;
   }
 
-  /* ── Floating items ────────────────────────────────────────────────────── */
+  /* ── Utensil silhouettes (filled) ───────────────────────────────────────── */
+  .fb-silhouette {
+    fill: var(--accent);
+    opacity: 0.52;
+  }
+
+  /* Knife blade slightly more transparent so the profile reads clearly */
+  .fb-blade {
+    fill: var(--accent);
+    opacity: 0.42;
+  }
+
+  /* ── Float animation ─────────────────────────────────────────────────────── */
   .fb-item {
     transform-box: fill-box;
     transform-origin: center;
-    animation: fb-float 4s ease-in-out infinite;
+    animation: fb-appear 0.45s cubic-bezier(0.34, 1.3, 0.64, 1) both,
+               fb-float  4s ease-in-out infinite;
   }
-  .fbi1 { animation-delay: 0.0s;  animation-duration: 4.2s; }
-  .fbi2 { animation-delay: 0.8s;  animation-duration: 4.8s; }
-  .fbi3 { animation-delay: 0.4s;  animation-duration: 4.0s; }
-  .fbi4 { animation-delay: 1.2s;  animation-duration: 3.9s; }
-  .fbi5 { animation-delay: 0.6s;  animation-duration: 4.5s; }
+  /* appear delay, float delay */
+  .fbi1 { animation-delay: 0.00s, 0.55s; animation-duration: 0.45s, 4.2s; }
+  .fbi2 { animation-delay: 0.07s, 0.62s; animation-duration: 0.45s, 4.8s; }
+  .fbi3 { animation-delay: 0.14s, 0.69s; animation-duration: 0.45s, 4.0s; }
+  .fbi4 { animation-delay: 0.21s, 0.76s; animation-duration: 0.45s, 3.9s; }
+  .fbi5 { animation-delay: 0.10s, 0.65s; animation-duration: 0.45s, 4.5s; }
 
+  @keyframes fb-appear {
+    from { opacity: 0; transform: scale(0.7) translateY(8px); }
+    to   { opacity: 1; transform: scale(1)   translateY(0);   }
+  }
   @keyframes fb-float {
-    0%, 100% {
-      transform: translateY(0px) rotateZ(0deg);
-    }
-    50% {
-      transform: translateY(-8px) rotateZ(3deg);
-    }
+    0%,100% { transform: translateY(0px);  }
+    50%      { transform: translateY(-7px); }
   }
 
-  /* ── Sparkles ──────────────────────────────────────────────────────────── */
-  .fb-sparkle {
+  /* ── Sparkles ────────────────────────────────────────────────────────────── */
+  .fb-sparkle line {
     stroke: var(--accent);
-    opacity: 0.15;
-    animation: fb-sparkle-twinkle 2.5s ease-in-out infinite;
+    stroke-opacity: 0.30;
+    stroke-width: 1.2;
+  }
+  .fb-sparkle {
+    animation: fb-twinkle 2.5s ease-in-out infinite;
   }
   .sp1 { animation-delay: 0.0s;  animation-duration: 2.8s; }
   .sp2 { animation-delay: 0.9s;  animation-duration: 2.3s; }
   .sp3 { animation-delay: 1.6s;  animation-duration: 3.1s; }
 
-  @keyframes fb-sparkle-twinkle {
-    0%, 100% { opacity: 0.08; }
-    50%       { opacity: 0.25; }
+  @keyframes fb-twinkle {
+    0%,100% { opacity: 0.4; }
+    50%      { opacity: 1.0; }
   }
 
-  /* ── No-loop: items and sparkles play once then stop ───────────────────── */
-  .foods-banner-svg.no-loop .fb-item,
+  /* ── No-loop: ambient float plays once then stops ────────────────────────── */
+  .foods-banner-svg.no-loop .fb-item {
+    animation-name: fb-appear, fb-float-once;
+    animation-iteration-count: 1, 1;
+    animation-fill-mode: both, forwards;
+  }
   .foods-banner-svg.no-loop .fb-sparkle {
     animation-iteration-count: 1;
     animation-fill-mode: forwards;
+  }
+  @keyframes fb-float-once {
+    0%   { transform: translateY(0px);  }
+    50%  { transform: translateY(-7px); }
+    100% { transform: translateY(0px);  }
   }
 
   /* ── Disable all animations ──────────────────────────────────────────────── */
   .foods-banner-svg.no-anim .fb-item,
   .foods-banner-svg.no-anim .fb-sparkle {
     animation: none;
-    transform: none;
     opacity: 1;
-  }
-  .foods-banner-svg.no-anim .fb-sparkle {
-    opacity: 0.15;
+    transform: none;
   }
   @media (prefers-reduced-motion: reduce) {
     .fb-item, .fb-sparkle {
       animation: none !important;
+      opacity: 1   !important;
       transform: none !important;
     }
   }
