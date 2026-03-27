@@ -1,9 +1,10 @@
 import { writable, derived } from 'svelte/store';
 import { NtApi } from '../lib/api.js';
 import { Nutrition } from '../lib/nutrition.js';
+import { localDateStr } from '../lib/db.js';
 
 function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+  return localDateStr();
 }
 
 export const currentDate  = writable(todayStr());
@@ -109,7 +110,7 @@ export function prevDay() {
   currentDate.subscribe(v => d = v)();
   const dt = new Date(d + 'T12:00:00');
   dt.setDate(dt.getDate() - 1);
-  loadEntry(dt.toISOString().slice(0, 10));
+  loadEntry(localDateStr(dt));
 }
 
 export function nextDay() {
@@ -117,5 +118,5 @@ export function nextDay() {
   currentDate.subscribe(v => d = v)();
   const dt = new Date(d + 'T12:00:00');
   dt.setDate(dt.getDate() + 1);
-  loadEntry(dt.toISOString().slice(0, 10));
+  loadEntry(localDateStr(dt));
 }

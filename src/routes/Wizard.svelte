@@ -2,7 +2,7 @@
   import { push } from 'svelte-spa-router';
   import { fly, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
-  import { DB } from '../lib/db.js';
+  import { DB, localDateStr } from '../lib/db.js';
   import { Nutrition } from '../lib/nutrition.js';
   import { mealNames, energyUnit, goals, weightUnit, heightUnit } from '../stores/settings.js';
   import { currentUser, userMgmtActive, loadAuthState } from '../stores/auth.js';
@@ -257,7 +257,7 @@
               <div class="form-group">
                 <label class="form-label">Birthday</label>
                 <input class="input" type="date" bind:value={adminBirthday}
-                  max={new Date().toISOString().slice(0,10)} />
+                  max={localDateStr()} />
               </div>
               <div class="form-group">
                 <label class="form-label">Gender</label>
@@ -318,7 +318,7 @@
         <h2 class="step-title">When were you born?</h2>
         <p class="step-desc">Your age affects your metabolic rate.</p>
         <input class="input" type="date" bind:value={dob}
-          max={new Date().toISOString().slice(0,10)}
+          max={localDateStr()}
           style="margin-top:24px;font-size:16px" />
 
       <!-- ── Height ── -->

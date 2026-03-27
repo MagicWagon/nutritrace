@@ -1,13 +1,13 @@
 <script>
   import { onMount } from 'svelte';
   import { slide, fade } from 'svelte/transition';
-  import { DB } from '../lib/db.js';
+  import { DB, localDateStr } from '../lib/db.js';
   import { NtApi } from '../lib/api.js';
   import { showSuccess, showError } from '../stores/toast.js';
   import { pageBanners } from '../stores/settings.js';
   import WaterBanner from '../components/banners/WaterBanner.svelte';
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateStr();
 
   // ── Settings ───────────────────────────────────────────────────────────────
   let goalMl     = DB.getSetting('waterGoalMl',     2000);

@@ -377,3 +377,15 @@ const DB = (() => {
 })();
 
 export { DB };
+
+/**
+ * Returns today's date as YYYY-MM-DD in the user's LOCAL timezone.
+ * Unlike new Date().toISOString().slice(0,10) which uses UTC and gives
+ * tomorrow's date for US timezones after ~7-8 pm local time.
+ */
+export function localDateStr(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}

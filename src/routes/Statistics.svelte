@@ -3,7 +3,7 @@
   import { slide } from 'svelte/transition';
   import { portal } from '../lib/portal.js';
   import Chart from 'chart.js/auto';
-  import { DB } from '../lib/db.js';
+  import { DB, localDateStr } from '../lib/db.js';
   import { NtApi } from '../lib/api.js';
   import { NUTRIMENTS, Nutrition } from '../lib/nutrition.js';
   import { goals, energyUnit, weightUnit, lengthUnit, statsChartType, statsYZero,
@@ -23,7 +23,7 @@
   let chart = null;
   let range = '30';   // '7','14','30','90','180','365','all','custom'
   let customStart = '';
-  let customEnd   = new Date().toISOString().slice(0, 10); // today
+  let customEnd   = localDateStr(); // today
   let metric = 'calories';
   let data   = [];    // [{ date, val }]
   let loading = false;
@@ -74,7 +74,7 @@
       if (start > end) { loading = false; return; }
       const d = new Date(start);
       while (d <= end) {
-        dates.push(d.toISOString().slice(0, 10));
+        dates.push(localDateStr(d));
         d.setDate(d.getDate() + 1);
       }
     } else {
@@ -82,7 +82,7 @@
       for (let i = n - 1; i >= 0; i--) {
         const d = new Date(now);
         d.setDate(d.getDate() - i);
-        dates.push(d.toISOString().slice(0, 10));
+        dates.push(localDateStr(d));
       }
     }
 
@@ -305,7 +305,7 @@
     {idx:8,s:'Sep'},{idx:9,s:'Oct'},{idx:10,s:'Nov'},{idx:11,s:'Dec'},
   ];
 
-  function _todayStr() { return new Date().toISOString().slice(0, 10); }
+  function _todayStr() { return localDateStr(); }
   function fmtDate(iso) {
     if (!iso) return 'Pick date';
     return new Date(iso + 'T12:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });

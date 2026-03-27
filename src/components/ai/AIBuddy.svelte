@@ -3,6 +3,7 @@
   import { fly, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import { NtApi }     from '../../lib/api.js';
+  import { localDateStr } from '../../lib/db.js';
   import { Nutrition } from '../../lib/nutrition.js';
   import { callAI, callAIProxy } from '../../lib/aiChat.js';
   import { aiEnabled, aiAssistantName, aiApiKey, aiProvider, aiModel, goals, mealNames, energyUnit } from '../../stores/settings.js';
@@ -85,7 +86,7 @@
 
   // ── Chat ───────────────────────────────────────────────────────────────────
   async function buildContext() {
-    const today  = new Date().toISOString().slice(0, 10);
+    const today  = localDateStr();
     const entry  = await NtApi.getDiaryDate(today).catch(() => null);
     const g      = goals.get();
     const mNames = mealNames.get();

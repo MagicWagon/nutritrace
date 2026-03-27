@@ -24,7 +24,7 @@
            dateFormat, timeFormat, disableAnimations, goalCelebrations, pageBanners } from '../stores/settings.js';
   import DiaryBanner from '../components/banners/DiaryBanner.svelte';
   import { NtApi } from '../lib/api.js';
-  import { DB } from '../lib/db.js';
+  import { DB, localDateStr } from '../lib/db.js';
   import { portal } from '../lib/portal.js';
   import { Nutrition, NUTRIMENTS } from '../lib/nutrition.js';
 
@@ -154,8 +154,8 @@
   function formatDate(d) {
     if (!d) return '';
     const dt = new Date(d + 'T12:00:00');
-    const today = new Date().toISOString().slice(0,10);
-    const yest  = new Date(Date.now() - 86400000).toISOString().slice(0,10);
+    const today = localDateStr();
+    const yest  = localDateStr(new Date(Date.now() - 86400000));
     if (d === today) return 'Today';
     if (d === yest)  return 'Yesterday';
     return dt.toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' });
@@ -241,7 +241,7 @@
     {idx:6,short:'Jul'},{idx:7,short:'Aug'},{idx:8,short:'Sep'},
     {idx:9,short:'Oct'},{idx:10,short:'Nov'},{idx:11,short:'Dec'},
   ];
-  function _todayStr() { return new Date().toISOString().slice(0, 10); }
+  function _todayStr() { return localDateStr(); }
   function calPrevMonth() {
     showYearPicker = false; showMonthPicker = false;
     if (calMonth === 0) { calMonth = 11; calYear--; } else calMonth--;
@@ -433,7 +433,7 @@
   }
 
   onMount(async () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDateStr();
     let storedDate;
     currentDate.subscribe(v => storedDate = v)();
     await loadEntry(storedDate || today);
@@ -444,7 +444,7 @@
     // Detect when user returns to the app on a new day (tab left open overnight)
     function _onVisibility() {
       if (document.visibilityState !== 'visible') return;
-      const newToday = new Date().toISOString().slice(0, 10);
+      const newToday = localDateStr();
       let stored = null;
       currentDate.subscribe(v => stored = v)();
       if (newToday !== stored) loadEntry(newToday);
