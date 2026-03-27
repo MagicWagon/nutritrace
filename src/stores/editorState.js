@@ -8,6 +8,7 @@ export const editorState = {
   foodDiaryCtx:  null,
   mealPrefill:   null,
   mealIsRecipe:  false,
+  lastMealAdded: null,  // meal index to scroll to after adding food
 };
 
 export function clearFoodEditorState() {

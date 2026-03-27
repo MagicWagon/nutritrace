@@ -199,6 +199,7 @@
       );
     }
     import('../stores/toast.js').then(m => m.showSuccess('Added to diary'));
+    editorState.lastMealAdded = Number(pickMeal) || 0;
     history.back();
   }
 
@@ -213,6 +214,7 @@
     }
     await addDiaryItem({ ...savedFood, portion: savedFood.portion || 100, unit: savedFood.unit || 'g', quantity: qty }, Number(pickMeal) || 0, pickDate || undefined);
     import('../stores/toast.js').then(m => m.showSuccess('Added to diary'));
+    editorState.lastMealAdded = Number(pickMeal) || 0;
     history.back();
   }
 
@@ -309,6 +311,7 @@
       await addDiaryItem({ ...item }, group.mealIdx, pickDate);
     }
     import('../stores/toast.js').then(m => m.showSuccess('Added ' + group.mealName));
+    editorState.lastMealAdded = group.mealIdx;
     history.back();
   }
 

@@ -23,6 +23,7 @@
            diaryShowAllNutrients, diaryShowNutritionUnits, visibleNutriments, hiddenBodyStats,
            dateFormat, timeFormat, disableAnimations, goalCelebrations, pageBanners } from '../stores/settings.js';
   import DiaryBanner from '../components/banners/DiaryBanner.svelte';
+  import { editorState } from '../stores/editorState.js';
   import { NtApi } from '../lib/api.js';
   import { DB, localDateStr } from '../lib/db.js';
   import { portal } from '../lib/portal.js';
@@ -106,6 +107,15 @@
   const _carbTween = tweened(0, { duration: 400, easing: cubicOut });
   const _fatTween  = tweened(0, { duration: 400, easing: cubicOut });
   $: _calTween.set(Math.round(totals.calories || 0),       { duration: $disableAnimations ? 0 : 500 });
+
+  // Scroll to meal after food added from Foods page
+  $: if (editorState.lastMealAdded != null) {
+    requestAnimationFrame(() => {
+      const mealEl = document.getElementById(`meal-${editorState.lastMealAdded}`);
+      if (mealEl) mealEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      editorState.lastMealAdded = null;  // reset so it only scrolls once per add
+    });
+  }
   $: _protTween.set(Math.round((totals.proteins||0)*10)/10,       { duration: $disableAnimations ? 0 : 400 });
   $: _carbTween.set(Math.round((totals.carbohydrates||0)*10)/10,  { duration: $disableAnimations ? 0 : 400 });
   $: _fatTween.set(Math.round((totals.fat||0)*10)/10,             { duration: $disableAnimations ? 0 : 400 });
@@ -497,7 +507,7 @@
     <!-- Meal groups -->
     {#each meals as meal, mealIdx}
       {@const items = getMealItems(entry.items, mealIdx)}
-      <section class="meal-group card" in:fly={{ y: 18, duration: 280, delay: 60 + mealIdx * 55 }}>
+      <section class="meal-group card" id="meal-{mealIdx}" in:fly={{ y: 18, duration: 280, delay: 60 + mealIdx * 55 }}>
         <div class="meal-header" style="--meal-color:{mealColor(mealIdx)}">
           <span class="meal-type-icon material-symbols-rounded">{mealIcon(meal)}</span>
           <span class="meal-name">{meal}</span>
