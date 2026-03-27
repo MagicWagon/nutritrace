@@ -174,11 +174,24 @@
 
   function confirmPortion() {
     if (!portionFood) return;
+    const newPortion = parseFloat(portionAmount) || portionFood.portion || 100;
+    const origPortion = parseFloat(portionFood.portion) || 100;
+
+    // Scale nutrition if portion changed (e.g., adding 2299g instead of 100g)
+    let scaledNutrition = portionFood.nutrition;
+    if (newPortion !== origPortion && portionFood.nutrition) {
+      const factor = newPortion / origPortion;
+      scaledNutrition = Object.fromEntries(
+        Object.entries(portionFood.nutrition).map(([k, v]) => [k, (parseFloat(v)||0) * factor])
+      );
+    }
+
     const item = {
       ...portionFood,
-      portion: parseFloat(portionAmount) || portionFood.portion || 100,
+      portion: newPortion,
       unit: portionUnit,
-      quantity: parseFloat(portionQty) || 1
+      quantity: parseFloat(portionQty) || 1,
+      nutrition: scaledNutrition
     };
     meal = { ...meal, items: [...meal.items, item] };
     portionSheet = false;
