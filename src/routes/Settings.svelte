@@ -673,13 +673,15 @@
 
         const resolveItems = items => (items||[]).map(item => {
           const food = foodMap[item.id]; if(!food) return null;
-          const origPortion = parseFloat(food.portion) || 100;
-          const newPortion  = parseFloat(item.portion)  || origPortion;
-          const factor = newPortion / origPortion;
-          const scaledNutrition = food.nutrition && factor !== 1
+          const fPortion  = parseFloat(food.portion) || 100;
+          const iPortion  = parseFloat(item.portion) || fPortion;
+          const iQty      = parseFloat(item.quantity) || 1;
+          // Normalise to total portion × qty=1 so Nutrition.calculate is always simple
+          const factor    = (iPortion / fPortion) * iQty;
+          const totalNutrition = food.nutrition
             ? Object.fromEntries(Object.entries(food.nutrition).map(([k,v]) => [k, (parseFloat(v)||0) * factor]))
             : food.nutrition;
-          return { ...food, portion: newPortion, quantity: parseFloat(item.quantity)||1, nutrition: scaledNutrition };
+          return { ...food, portion: iPortion * iQty, quantity: 1, nutrition: totalNutrition };
         }).filter(Boolean);
 
         const meals = await Promise.all((raw.meals||[]).map(async m => {
@@ -714,32 +716,53 @@
     repairBusy = true;
     try {
       const [recipes, foods] = await Promise.all([NtApi.getRecipes(), NtApi.getFoods()]);
-      // Import reassigns IDs, so match by name instead
-      const foodByName = new Map(foods.map(f => [(f.name||'').toLowerCase().trim(), f]));
+      // Import reassigns IDs — match by normalised name
+      const norm = s => (s||'').toLowerCase().replace(/[^a-z0-9]/g,' ').replace(/\s+/g,' ').trim();
+      const foodByName = new Map(foods.map(f => [norm(f.name), f]));
+
       let fixed = 0;
       for (const recipe of recipes) {
         if (!recipe.items?.length) continue;
         let changed = false;
+
         const fixedItems = recipe.items.map(item => {
-          if (!item.nutrition) return item;
-          const food = foodByName.get((item.name||'').toLowerCase().trim());
-          if (!food?.nutrition) return item;
-          const foodCal  = parseFloat(food.nutrition.calories) || 0;
-          const itemCal  = parseFloat(item.nutrition.calories) || 0;
-          if (foodCal <= 0) return item;
-          // Only fix if item nutrition closely matches the food's per-serving nutrition
-          // (meaning it was never scaled to the recipe portion)
-          if (Math.abs(itemCal - foodCal) / foodCal > 0.01) return item;
-          const origPortion = parseFloat(food.portion) || 100;
-          const itemPortion = parseFloat(item.portion) || origPortion;
-          if (Math.abs(itemPortion - origPortion) < 0.001) return item;
-          const factor = itemPortion / origPortion;
-          const scaledNutrition = Object.fromEntries(
-            Object.entries(item.nutrition).map(([k,v]) => [k, (parseFloat(v)||0) * factor])
+          const qty      = parseFloat(item.quantity) || 1;
+          const iPortion = parseFloat(item.portion)  || 100;
+
+          // Already normalised (quantity === 1 and no food lookup needed) — skip
+          // We detect "already done" by qty==1 and nutrition already scaled
+          // Instead, always normalise: total_portion = iPortion * qty, qty = 1
+          // Scale nutrition if we can find the food's original portion
+          const food     = foodByName.get(norm(item.name));
+          const fPortion = food ? (parseFloat(food.portion) || 100) : iPortion;
+          const fNutr    = food?.nutrition;
+
+          // Compute the scaling factor: (item_portion / food_portion) × quantity
+          const factor = (iPortion / fPortion) * qty;
+
+          // Build scaled nutrition from food's per-serving values (most accurate)
+          // or fall back to scaling whatever is currently on the item
+          const baseNutrition = fNutr || item.nutrition;
+          if (!baseNutrition) return item;
+
+          const totalNutrition = Object.fromEntries(
+            Object.entries(baseNutrition).map(([k,v]) => [k, (parseFloat(v)||0) * factor])
           );
+
+          const totalPortion = iPortion * qty;
+
+          // Only mark changed if something actually differs
+          const currentCal = parseFloat(item.nutrition?.calories) || 0;
+          const newCal     = parseFloat(totalNutrition.calories)   || 0;
+          const qtyChanged = Math.abs(qty - 1) > 0.001;
+          const calChanged = Math.abs(currentCal - newCal) / (newCal || 1) > 0.01;
+
+          if (!qtyChanged && !calChanged) return item;
+
           changed = true;
-          return { ...item, nutrition: scaledNutrition };
+          return { ...item, portion: totalPortion, quantity: 1, nutrition: totalNutrition };
         });
+
         if (changed) {
           const totals = Nutrition.sum(fixedItems.map(i => Nutrition.calculate(i)));
           await NtApi.updateMeal(recipe.id, { ...recipe, items: fixedItems, nutrition: totals });
