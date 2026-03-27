@@ -714,18 +714,21 @@
     repairBusy = true;
     try {
       const [recipes, foods] = await Promise.all([NtApi.getRecipes(), NtApi.getFoods()]);
-      const foodMap = Object.fromEntries(foods.map(f => [f.id, f]));
+      // Import reassigns IDs, so match by name instead
+      const foodByName = new Map(foods.map(f => [(f.name||'').toLowerCase().trim(), f]));
       let fixed = 0;
       for (const recipe of recipes) {
         if (!recipe.items?.length) continue;
         let changed = false;
         const fixedItems = recipe.items.map(item => {
-          const food = foodMap[item.id];
-          if (!food?.nutrition || !item.nutrition) return item;
-          const foodCal   = parseFloat(food.nutrition.calories) || 0;
-          const itemCal   = parseFloat(item.nutrition.calories) || 0;
+          if (!item.nutrition) return item;
+          const food = foodByName.get((item.name||'').toLowerCase().trim());
+          if (!food?.nutrition) return item;
+          const foodCal  = parseFloat(food.nutrition.calories) || 0;
+          const itemCal  = parseFloat(item.nutrition.calories) || 0;
           if (foodCal <= 0) return item;
-          // Only scale if item nutrition matches food nutrition (i.e. was never scaled)
+          // Only fix if item nutrition closely matches the food's per-serving nutrition
+          // (meaning it was never scaled to the recipe portion)
           if (Math.abs(itemCal - foodCal) / foodCal > 0.01) return item;
           const origPortion = parseFloat(food.portion) || 100;
           const itemPortion = parseFloat(item.portion) || origPortion;
