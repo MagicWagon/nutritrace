@@ -1249,7 +1249,7 @@
           <div class="setting-row">
             <div>
               <span class="setting-label">Celebrate goals</span>
-              <span class="setting-hint">Pulse animation when hitting your calorie or water goal</span>
+              <span class="setting-hint">Pulse effect when you reach goals</span>
             </div>
             <Toggle checked={$goalCelebrations} on:change={e => goalCelebrations.set(e.detail)} />
           </div>
@@ -1257,7 +1257,7 @@
           <div class="setting-row">
             <div>
               <span class="setting-label">Page banners</span>
-              <span class="setting-hint">Animated illustrated backdrop behind each page title</span>
+              <span class="setting-hint">Animated page header illustrations</span>
             </div>
             <Toggle checked={$pageBanners} on:change={e => pageBanners.set(e.detail)} />
           </div>
@@ -1266,7 +1266,7 @@
           <div class="setting-row">
             <div>
               <span class="setting-label">Loop banner animations</span>
-              <span class="setting-hint">Keep ambient animations running continuously</span>
+              <span class="setting-hint">Looping background animations</span>
             </div>
             <Toggle checked={$loopBannerAnimations} on:change={e => loopBannerAnimations.set(e.detail)} />
           </div>
