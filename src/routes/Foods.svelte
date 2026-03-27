@@ -172,12 +172,12 @@
       openEditor(food, 'foodList');
       return;
     }
-    // Meals: always expand ingredients at saved portions — no quantity prompt
-    if (activeTab === 1 && food.items && food.items.length > 0) {
+    // Meals & Recipes: always expand ingredients at saved portions — no quantity prompt
+    if ((activeTab === 1 || activeTab === 2) && food.items && food.items.length > 0) {
       await _expandMealToDiary(food);
       return;
     }
-    // Foods & Recipes: prompt for quantity if setting enabled
+    // Foods: prompt for quantity if setting enabled
     if ($diaryPromptQuantity) {
       promptFood = food;
       promptServings = 1;
