@@ -172,12 +172,12 @@
       openEditor(food, 'foodList');
       return;
     }
-    // Meals & Recipes: always expand ingredients at saved portions — no quantity prompt
-    if ((activeTab === 1 || activeTab === 2) && food.items && food.items.length > 0) {
+    // Meals: always expand ingredients at saved portions — no quantity prompt
+    if (activeTab === 1 && food.items && food.items.length > 0) {
       await _expandMealToDiary(food);
       return;
     }
-    // Foods: prompt for quantity if setting enabled
+    // Foods & Recipes: prompt for quantity if setting enabled
     if ($diaryPromptQuantity) {
       promptFood = food;
       promptServings = 1;
@@ -212,7 +212,15 @@
       const { id: _drop, ...rest } = food;
       savedFood = await NtApi.createFood({ ...rest, created_at: food.dateTime || new Date().toISOString() });
     }
-    await addDiaryItem({ ...savedFood, portion: savedFood.portion || 100, unit: savedFood.unit || 'g', quantity: qty }, Number(pickMeal) || 0, pickDate || undefined);
+    // Preserve pre-calculated nutrition for recipes, or food's nutrition if present
+    const item = {
+      ...savedFood,
+      portion: savedFood.portion || 100,
+      unit: savedFood.unit || 'g',
+      quantity: qty,
+      nutrition: savedFood.nutrition // Ensure nutrition field is included (recipes have this)
+    };
+    await addDiaryItem(item, Number(pickMeal) || 0, pickDate || undefined);
     import('../stores/toast.js').then(m => m.showSuccess('Added to diary'));
     editorState.lastMealAdded = Number(pickMeal) || 0;
     history.back();
