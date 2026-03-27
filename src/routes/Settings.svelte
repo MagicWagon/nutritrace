@@ -673,7 +673,13 @@
 
         const resolveItems = items => (items||[]).map(item => {
           const food = foodMap[item.id]; if(!food) return null;
-          return { ...food, portion: parseFloat(item.portion)||food.portion||100, quantity: parseFloat(item.quantity)||1 };
+          const origPortion = parseFloat(food.portion) || 100;
+          const newPortion  = parseFloat(item.portion)  || origPortion;
+          const factor = newPortion / origPortion;
+          const scaledNutrition = food.nutrition && factor !== 1
+            ? Object.fromEntries(Object.entries(food.nutrition).map(([k,v]) => [k, (parseFloat(v)||0) * factor]))
+            : food.nutrition;
+          return { ...food, portion: newPortion, quantity: parseFloat(item.quantity)||1, nutrition: scaledNutrition };
         }).filter(Boolean);
 
         const meals = await Promise.all((raw.meals||[]).map(async m => {
@@ -701,6 +707,45 @@
       } catch(err) { showError('Import failed: ' + err.message); }
     };
     input.click();
+  }
+
+  let repairBusy = false;
+  async function repairRecipeNutrition() {
+    repairBusy = true;
+    try {
+      const [recipes, foods] = await Promise.all([NtApi.getRecipes(), NtApi.getFoods()]);
+      const foodMap = Object.fromEntries(foods.map(f => [f.id, f]));
+      let fixed = 0;
+      for (const recipe of recipes) {
+        if (!recipe.items?.length) continue;
+        let changed = false;
+        const fixedItems = recipe.items.map(item => {
+          const food = foodMap[item.id];
+          if (!food?.nutrition || !item.nutrition) return item;
+          const foodCal   = parseFloat(food.nutrition.calories) || 0;
+          const itemCal   = parseFloat(item.nutrition.calories) || 0;
+          if (foodCal <= 0) return item;
+          // Only scale if item nutrition matches food nutrition (i.e. was never scaled)
+          if (Math.abs(itemCal - foodCal) / foodCal > 0.01) return item;
+          const origPortion = parseFloat(food.portion) || 100;
+          const itemPortion = parseFloat(item.portion) || origPortion;
+          if (Math.abs(itemPortion - origPortion) < 0.001) return item;
+          const factor = itemPortion / origPortion;
+          const scaledNutrition = Object.fromEntries(
+            Object.entries(item.nutrition).map(([k,v]) => [k, (parseFloat(v)||0) * factor])
+          );
+          changed = true;
+          return { ...item, nutrition: scaledNutrition };
+        });
+        if (changed) {
+          const totals = Nutrition.sum(fixedItems.map(i => Nutrition.calculate(i)));
+          await NtApi.updateMeal(recipe.id, { ...recipe, items: fixedItems, nutrition: totals });
+          fixed++;
+        }
+      }
+      showSuccess(fixed > 0 ? `Fixed ${fixed} recipe${fixed !== 1 ? 's' : ''}` : 'Nothing needed fixing');
+    } catch(e) { showError('Repair failed: ' + e.message); }
+    finally { repairBusy = false; }
   }
 
   async function exportCSV() {
@@ -2058,6 +2103,19 @@
               <div class="setting-desc">Import foods, meals &amp; recipes from the Waistline Android app</div>
             </div>
             <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
+          </button>
+          <div class="setting-divider"></div>
+          <button class="setting-row setting-action" on:click={repairRecipeNutrition} disabled={repairBusy}>
+            <span class="material-symbols-rounded si" style="color:var(--accent)">build</span>
+            <div>
+              <span class="setting-label">Repair recipe nutrition</span>
+              <div class="setting-desc">Fixes calorie/macro totals for recipes imported from Waistline where ingredient nutrition wasn't scaled to portion size.</div>
+            </div>
+            {#if repairBusy}
+              <span class="material-symbols-rounded spin text-3" style="font-size:18px;flex-shrink:0">autorenew</span>
+            {:else}
+              <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
+            {/if}
           </button>
           <div class="setting-divider"></div>
           <button class="setting-row setting-action" on:click={exportCSV}>
