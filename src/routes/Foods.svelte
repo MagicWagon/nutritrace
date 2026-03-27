@@ -228,7 +228,21 @@
 
   async function confirmQtyPrompt() {
     if (!promptFood) return;
-    const food = { ...promptFood, portion: parseFloat(promptPortion) || promptFood.portion || 100, unit: promptUnit || promptFood.unit || 'g' };
+    const newPortion = parseFloat(promptPortion) || promptFood.portion || 100;
+    const origPortion = parseFloat(promptFood.portion) || 100;
+
+    // If portion changed (e.g. user is adding half the recipe), scale nutrition proportionally
+    const portionFactor = newPortion / origPortion;
+    const scaledNutrition = promptFood.nutrition ?
+      Object.fromEntries(Object.entries(promptFood.nutrition).map(([k,v]) => [k, (parseFloat(v)||0) * portionFactor])) :
+      promptFood.nutrition;
+
+    const food = {
+      ...promptFood,
+      portion: newPortion,
+      unit: promptUnit || promptFood.unit || 'g',
+      nutrition: scaledNutrition
+    };
     await _addFoodToDiary(food, parseFloat(promptServings) || 1);
   }
 
