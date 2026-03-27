@@ -12,8 +12,8 @@
 </script>
 
 <!--
-  Foods page banner — ingredient scatter: circles of varying sizes connected
-  by thin lines, like a nutritional breakdown or food-web map.
+  Foods page banner — floating place setting: fork, knife, spoon, and plate.
+  All elements are realistic, recognizable utensil/dishware shapes.
   Absolutely positioned behind the page-header content.
   All elements use var(--accent) at low opacity so it works with any theme.
 -->
@@ -27,55 +27,67 @@
   aria-hidden="true"
 >
   <defs>
-    <radialGradient id="fb-glow" cx="55%" cy="45%" r="50%" gradientUnits="objectBoundingBox">
-      <stop offset="0%"   stop-color="var(--accent)" stop-opacity="0.18" />
+    <radialGradient id="fb-glow" cx="50%" cy="50%" r="50%" gradientUnits="objectBoundingBox">
+      <stop offset="0%"   stop-color="var(--accent)" stop-opacity="0.16" />
       <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"    />
-    </radialGradient>
-    <radialGradient id="fb-node-grad" cx="35%" cy="30%" r="65%" gradientUnits="objectBoundingBox">
-      <stop offset="0%"   stop-color="var(--accent)" stop-opacity="0.35" />
-      <stop offset="100%" stop-color="var(--accent)" stop-opacity="0.08" />
     </radialGradient>
   </defs>
 
   <!-- Ambient glow -->
   <rect x="0" y="0" width="500" height="120" fill="url(#fb-glow)" />
 
-  <!-- Connecting lines (drawn first, behind nodes) -->
-  <g class="fb-lines">
-    <line class="fb-line fl1" x1="155" y1="28" x2="248" y2="48" />
-    <line class="fb-line fl2" x1="248" y1="48" x2="338" y2="22" />
-    <line class="fb-line fl3" x1="338" y1="22" x2="418" y2="48" />
-    <line class="fb-line fl4" x1="418" y1="48" x2="338" y2="22" />
-    <line class="fb-line fl5" x1="278" y1="78" x2="338" y2="22" />
-    <line class="fb-line fl6" x1="278" y1="78" x2="418" y2="48" />
-    <line class="fb-line fl7" x1="155" y1="28" x2="108" y2="58" />
-    <line class="fb-line fl8" x1="108" y1="58" x2="278" y2="78" />
-    <line class="fb-line fl9" x1="278" y1="78" x2="195" y2="95" />
-    <line class="fb-line fl10" x1="418" y1="48" x2="468" y2="88" />
+  <!-- Plate 1 (left) -->
+  <g class="fb-item fbi1">
+    <circle class="fb-plate" cx="80" cy="50" r="22" fill="none" stroke-width="1.8" />
+    <circle class="fb-plate-rim" cx="80" cy="50" r="16" fill="none" stroke-width="0.9" />
   </g>
 
-  <!-- Ingredient nodes — large (proteins / main ingredients) -->
-  <circle class="fb-node fn-lg fn1" cx="418" cy="48"  r="22" fill="url(#fb-node-grad)" />
-  <circle class="fb-node fn-lg fn2" cx="155" cy="28"  r="19" fill="url(#fb-node-grad)" />
-  <circle class="fb-node fn-lg fn3" cx="278" cy="78"  r="17" fill="url(#fb-node-grad)" />
+  <!-- Fork (upper right) -->
+  <g class="fb-item fbi2">
+    <line class="fb-utensil" x1="380" y1="85" x2="380" y2="15" stroke-width="2.2" stroke-linecap="round" />
+    <!-- Tines -->
+    <line class="fb-tine" x1="365" y1="15" x2="365" y2="30" stroke-width="1.4" stroke-linecap="round" />
+    <line class="fb-tine" x1="373" y1="15" x2="373" y2="30" stroke-width="1.4" stroke-linecap="round" />
+    <line class="fb-tine" x1="381" y1="15" x2="381" y2="30" stroke-width="1.4" stroke-linecap="round" />
+    <line class="fb-tine" x1="389" y1="15" x2="389" y2="30" stroke-width="1.4" stroke-linecap="round" />
+    <!-- Tine connector -->
+    <line class="fb-utensil-conn" x1="363" y1="32" x2="391" y2="32" stroke-width="1" stroke-linecap="round" />
+  </g>
 
-  <!-- Ingredient nodes — medium (fruits / vegetables) -->
-  <circle class="fb-node fn-md fn4" cx="338" cy="22"  r="13" fill="url(#fb-node-grad)" />
-  <circle class="fb-node fn-md fn5" cx="108" cy="58"  r="11" fill="url(#fb-node-grad)" />
-  <circle class="fb-node fn-md fn6" cx="468" cy="88"  r="12" fill="url(#fb-node-grad)" />
-  <circle class="fb-node fn-md fn7" cx="195" cy="95"  r="10" fill="url(#fb-node-grad)" />
+  <!-- Knife (center-right) -->
+  <g class="fb-item fbi3">
+    <line class="fb-utensil" x1="280" y1="90" x2="280" y2="18" stroke-width="2.4" stroke-linecap="round" />
+    <!-- Blade -->
+    <path class="fb-blade" d="M 280,18 L 292,35 L 280,40 Z" />
+  </g>
 
-  <!-- Ingredient nodes — small (grains / spices) -->
-  <circle class="fb-node fn-sm fn8"  cx="248" cy="48"  r="7" fill="url(#fb-node-grad)" />
-  <circle class="fb-node fn-sm fn9"  cx="55"  cy="32"  r="6" fill="url(#fb-node-grad)" />
-  <circle class="fb-node fn-sm fn10" cx="378" cy="88"  r="5" fill="url(#fb-node-grad)" />
-  <circle class="fb-node fn-sm fn11" cx="60"  cy="100" r="5" fill="url(#fb-node-grad)" />
-  <circle class="fb-node fn-sm fn12" cx="490" cy="28"  r="4" fill="url(#fb-node-grad)" />
+  <!-- Spoon (left-center) -->
+  <g class="fb-item fbi4">
+    <line class="fb-utensil" x1="180" y1="88" x2="180" y2="38" stroke-width="2" stroke-linecap="round" />
+    <!-- Bowl -->
+    <ellipse class="fb-spoon-bowl" cx="180" cy="25" rx="13" ry="16" fill="none" stroke-width="1.6" />
+  </g>
 
-  <!-- Pulse rings on the three large nodes (ambient loop) -->
-  <circle class="fb-pulse fp1" cx="418" cy="48"  r="22" fill="none" />
-  <circle class="fb-pulse fp2" cx="155" cy="28"  r="19" fill="none" />
-  <circle class="fb-pulse fp3" cx="278" cy="78"  r="17" fill="none" />
+  <!-- Plate 2 (right) -->
+  <g class="fb-item fbi5">
+    <circle class="fb-plate" cx="440" cy="70" r="20" fill="none" stroke-width="1.6" />
+    <circle class="fb-plate-rim" cx="440" cy="70" r="14" fill="none" stroke-width="0.8" />
+  </g>
+
+  <!-- Sparkles -->
+  <g class="fb-sparkles">
+    <!-- 4-point star sparkle 1 -->
+    <line class="fb-sparkle sp1" x1="120" y1="25" x2="120" y2="35" stroke-width="1" stroke-linecap="round" />
+    <line class="fb-sparkle sp1" x1="115" y1="30" x2="125" y2="30" stroke-width="1" stroke-linecap="round" />
+
+    <!-- 4-point star sparkle 2 -->
+    <line class="fb-sparkle sp2" x1="320" y1="55" x2="320" y2="63" stroke-width="0.8" stroke-linecap="round" />
+    <line class="fb-sparkle sp2" x1="316" y1="59" x2="324" y2="59" stroke-width="0.8" stroke-linecap="round" />
+
+    <!-- 4-point star sparkle 3 -->
+    <line class="fb-sparkle sp3" x1="420" y1="15" x2="420" y2="24" stroke-width="0.9" stroke-linecap="round" />
+    <line class="fb-sparkle sp3" x1="415.5" y1="19.5" x2="424.5" y2="19.5" stroke-width="0.9" stroke-linecap="round" />
+  </g>
 </svg>
 
 <style>
@@ -87,97 +99,93 @@
     pointer-events: none;
   }
 
-  /* ── Connecting lines ────────────────────────────────────────────────────── */
-  .fb-line {
+  /* ── Utensil base styling ───────────────────────────────────────────────── */
+  .fb-utensil {
     stroke: var(--accent);
-    stroke-opacity: 0.12;
-    stroke-width: 0.8;
-    stroke-dasharray: 180;
-    stroke-dashoffset: 180;
-    animation: fb-line-draw 0.5s ease both;
+    stroke-opacity: 0.65;
   }
-  .fl1  { animation-delay: 0.40s; }
-  .fl2  { animation-delay: 0.48s; }
-  .fl3  { animation-delay: 0.52s; }
-  .fl4  { animation-delay: 0.56s; }
-  .fl5  { animation-delay: 0.60s; }
-  .fl6  { animation-delay: 0.64s; }
-  .fl7  { animation-delay: 0.44s; }
-  .fl8  { animation-delay: 0.68s; }
-  .fl9  { animation-delay: 0.72s; }
-  .fl10 { animation-delay: 0.76s; }
-
-  @keyframes fb-line-draw {
-    to { stroke-dashoffset: 0; }
-  }
-
-  /* ── Nodes ───────────────────────────────────────────────────────────────── */
-  .fb-node {
+  .fb-utensil-conn {
     stroke: var(--accent);
-    stroke-opacity: 0.20;
-    stroke-width: 1;
+    stroke-opacity: 0.65;
+  }
+  .fb-tine {
+    stroke: var(--accent);
+    stroke-opacity: 0.65;
+  }
+  .fb-plate {
+    stroke: var(--accent);
+    stroke-opacity: 0.40;
+  }
+  .fb-plate-rim {
+    stroke: var(--accent);
+    stroke-opacity: 0.25;
+  }
+  .fb-spoon-bowl {
+    stroke: var(--accent);
+    stroke-opacity: 0.65;
+  }
+  .fb-blade {
+    fill: var(--accent);
+    opacity: 0.35;
+  }
+
+  /* ── Floating items ────────────────────────────────────────────────────── */
+  .fb-item {
     transform-box: fill-box;
     transform-origin: center;
-    animation: fb-node-pop 0.45s cubic-bezier(0.34, 1.3, 0.64, 1) both;
+    animation: fb-float 4s ease-in-out infinite;
   }
-  /* Large nodes */
-  .fn1 { animation-delay: 0.06s; }
-  .fn2 { animation-delay: 0.00s; }
-  .fn3 { animation-delay: 0.12s; }
-  /* Medium nodes */
-  .fn4 { animation-delay: 0.18s; }
-  .fn5 { animation-delay: 0.24s; }
-  .fn6 { animation-delay: 0.28s; }
-  .fn7 { animation-delay: 0.32s; }
-  /* Small nodes */
-  .fn8  { animation-delay: 0.36s; }
-  .fn9  { animation-delay: 0.20s; }
-  .fn10 { animation-delay: 0.38s; }
-  .fn11 { animation-delay: 0.42s; }
-  .fn12 { animation-delay: 0.16s; }
+  .fbi1 { animation-delay: 0.0s;  animation-duration: 4.2s; }
+  .fbi2 { animation-delay: 0.8s;  animation-duration: 4.8s; }
+  .fbi3 { animation-delay: 0.4s;  animation-duration: 4.0s; }
+  .fbi4 { animation-delay: 1.2s;  animation-duration: 3.9s; }
+  .fbi5 { animation-delay: 0.6s;  animation-duration: 4.5s; }
 
-  @keyframes fb-node-pop {
-    from { transform: scale(0); opacity: 0; }
-    to   { transform: scale(1); opacity: 1; }
+  @keyframes fb-float {
+    0%, 100% {
+      transform: translateY(0px) rotateZ(0deg);
+    }
+    50% {
+      transform: translateY(-8px) rotateZ(3deg);
+    }
   }
 
-  /* ── Pulse rings (ambient loop on large nodes) ───────────────────────────── */
-  .fb-pulse {
+  /* ── Sparkles ──────────────────────────────────────────────────────────── */
+  .fb-sparkle {
     stroke: var(--accent);
-    stroke-width: 1;
-    opacity: 0;
-    transform-box: fill-box;
-    transform-origin: center;
-    animation: fb-pulse-ring 3s ease-out infinite;
+    opacity: 0.15;
+    animation: fb-sparkle-twinkle 2.5s ease-in-out infinite;
   }
-  .fp1 { animation-delay: 0.0s;  animation-duration: 3.2s; }
-  .fp2 { animation-delay: 1.1s;  animation-duration: 3.6s; }
-  .fp3 { animation-delay: 2.0s;  animation-duration: 2.9s; }
+  .sp1 { animation-delay: 0.0s;  animation-duration: 2.8s; }
+  .sp2 { animation-delay: 0.9s;  animation-duration: 2.3s; }
+  .sp3 { animation-delay: 1.6s;  animation-duration: 3.1s; }
 
-  @keyframes fb-pulse-ring {
-    0%   { transform: scale(1.0); opacity: 0.30; }
-    100% { transform: scale(2.0); opacity: 0;    }
+  @keyframes fb-sparkle-twinkle {
+    0%, 100% { opacity: 0.08; }
+    50%       { opacity: 0.25; }
   }
 
-  /* ── No-loop: pulse rings play once then stop ────────────────────────────── */
-  .foods-banner-svg.no-loop .fb-pulse {
+  /* ── No-loop: items and sparkles play once then stop ───────────────────── */
+  .foods-banner-svg.no-loop .fb-item,
+  .foods-banner-svg.no-loop .fb-sparkle {
     animation-iteration-count: 1;
     animation-fill-mode: forwards;
   }
 
   /* ── Disable all animations ──────────────────────────────────────────────── */
-  .foods-banner-svg.no-anim .fb-line,
-  .foods-banner-svg.no-anim .fb-node,
-  .foods-banner-svg.no-anim .fb-pulse {
+  .foods-banner-svg.no-anim .fb-item,
+  .foods-banner-svg.no-anim .fb-sparkle {
     animation: none;
     transform: none;
     opacity: 1;
   }
-  .foods-banner-svg.no-anim .fb-line  { stroke-dashoffset: 0; opacity: 1; }
-  .foods-banner-svg.no-anim .fb-pulse { opacity: 0; }
+  .foods-banner-svg.no-anim .fb-sparkle {
+    opacity: 0.15;
+  }
   @media (prefers-reduced-motion: reduce) {
-    .fb-line  { animation: none !important; stroke-dashoffset: 0 !important; }
-    .fb-node  { animation: none !important; opacity: 1 !important; transform: none !important; }
-    .fb-pulse { animation: none !important; opacity: 0 !important; }
+    .fb-item, .fb-sparkle {
+      animation: none !important;
+      transform: none !important;
+    }
   }
 </style>
