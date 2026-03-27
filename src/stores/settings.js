@@ -25,7 +25,7 @@ const SERVER_SETTINGS = new Set([
   'mealieEnabled','mealieBaseUrl','mealieApiToken',
   // Appearance / UI prefs — included so full backups restore the full look-and-feel
   'appearance','accentColor',
-  'navStyle','sidebarPersistent','startPage','disableAnimations','goalCelebrations','pageBanners',
+  'navStyle','sidebarPersistent','startPage','disableAnimations','goalCelebrations','pageBanners','loopBannerAnimations',
 ]);
 
 const _saveQueue = {};
@@ -215,7 +215,8 @@ export const catLabel   = c => typeof c === 'string' ? '' : (c?.label  || '');
 export const catDisplay = c => { const l = catLabel(c); return l ? `${l} ${catName(c)}` : catName(c); };
 
 // Page banners
-export const pageBanners = createSettingStore('pageBanners', false);
+export const pageBanners          = createSettingStore('pageBanners',          false);
+export const loopBannerAnimations = createSettingStore('loopBannerAnimations', true);
 
 // FitBot AI
 export const aiEnabled       = createSettingStore('aiEnabled',       false);

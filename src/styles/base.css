@@ -114,7 +114,8 @@ input, select, textarea { font-family: inherit; }
 
 /* Banner variant — taller header with illustrated SVG backdrop */
 .page-header.has-banner {
-  overflow: hidden;          /* clip the SVG to the header bounds */
+  clip-path: inset(0);       /* clip the SVG to the header bounds — avoids iOS Safari
+                                 bug where overflow:hidden on sticky stops child animations */
   padding-bottom: 52px;      /* extend downward to give the illustration room */
   align-items: flex-end;     /* push h1 (and any action buttons) to the bottom */
 }

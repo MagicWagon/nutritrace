@@ -21,7 +21,7 @@
     foodCategories, visibleNutriments, nutrimentsOrder, customNutriments,
     bodyStatsOrder, hiddenBodyStats,
     dateFormat, timeFormat,
-    sidebarPersistent, goalCelebrations, pageBanners,
+    sidebarPersistent, goalCelebrations, pageBanners, loopBannerAnimations,
     aiEnabled, aiProvider, aiApiKey, aiModel, aiAssistantName,
     waterGoalMl, waterUnit, waterContainers, waterShowInStats, waterShowInDiary,
   } from '../stores/settings.js';
@@ -47,7 +47,7 @@
   $: settingsQuery = settingsSearch.toLowerCase().trim();
 
   const SECTION_KEYWORDS = {
-    appearance:        ['appearance','theme','dark','light','accent','color','navigation','sidebar','persistent','start page','animations','celebrations','reduce motion','banner','page banner'],
+    appearance:        ['appearance','theme','dark','light','accent','color','navigation','sidebar','persistent','start page','animations','celebrations','reduce motion','banner','page banner','loop','looping'],
     regional:          ['regional','date format','time format','locale','date','time','12h','24h'],
     diary:             ['diary','brands','timestamps','thumbnails','nutrients','nutrition units','macros','macro summary','prompt quantity','portion size','nutrition bar','goals progress','meal names','meals'],
     foods:             ['foods','thumbnails','category','notes','yesterday meals','sort order','sort','barcode','scan','beep','flashlight','crop photos'],
@@ -1261,6 +1261,16 @@
             </div>
             <Toggle checked={$pageBanners} on:change={e => pageBanners.set(e.detail)} />
           </div>
+          {#if $pageBanners}
+          <div class="setting-divider"></div>
+          <div class="setting-row">
+            <div>
+              <span class="setting-label">Loop banner animations</span>
+              <span class="setting-hint">Keep ambient animations running continuously</span>
+            </div>
+            <Toggle checked={$loopBannerAnimations} on:change={e => loopBannerAnimations.set(e.detail)} />
+          </div>
+          {/if}
         </div>
       </div>
     {/if}

@@ -2,33 +2,37 @@
   import { DB } from '../../lib/db.js';
 
   let noAnim = DB.getSetting('disableAnimations', false);
+  let noLoop = !DB.getSetting('loopBannerAnimations', true);
   if (typeof window !== 'undefined') {
     window.addEventListener('wl:setting', () => {
       noAnim = DB.getSetting('disableAnimations', false);
+      noLoop = !DB.getSetting('loopBannerAnimations', true);
     });
   }
 </script>
 
 <!--
-  Foods page banner — vine stem with leaves, produce circles, and sparkle diamonds.
+  Foods page banner — ingredient scatter: circles of varying sizes connected
+  by thin lines, like a nutritional breakdown or food-web map.
   Absolutely positioned behind the page-header content.
   All elements use var(--accent) at low opacity so it works with any theme.
 -->
 <svg
   class="foods-banner-svg"
   class:no-anim={noAnim}
+  class:no-loop={noLoop}
   viewBox="0 0 500 120"
   preserveAspectRatio="xMidYMid slice"
   xmlns="http://www.w3.org/2000/svg"
   aria-hidden="true"
 >
   <defs>
-    <radialGradient id="fb-glow" cx="30%" cy="60%" r="45%" gradientUnits="objectBoundingBox">
-      <stop offset="0%"   stop-color="var(--accent)" stop-opacity="0.20" />
+    <radialGradient id="fb-glow" cx="55%" cy="45%" r="50%" gradientUnits="objectBoundingBox">
+      <stop offset="0%"   stop-color="var(--accent)" stop-opacity="0.18" />
       <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"    />
     </radialGradient>
-    <radialGradient id="fb-produce-grad" cx="35%" cy="35%" r="65%" gradientUnits="objectBoundingBox">
-      <stop offset="0%"   stop-color="var(--accent)" stop-opacity="0.28" />
+    <radialGradient id="fb-node-grad" cx="35%" cy="30%" r="65%" gradientUnits="objectBoundingBox">
+      <stop offset="0%"   stop-color="var(--accent)" stop-opacity="0.35" />
       <stop offset="100%" stop-color="var(--accent)" stop-opacity="0.08" />
     </radialGradient>
   </defs>
@@ -36,52 +40,42 @@
   <!-- Ambient glow -->
   <rect x="0" y="0" width="500" height="120" fill="url(#fb-glow)" />
 
-  <!-- Main vine stem — sweeping S-curve across the banner -->
-  <path
-    class="fb-vine"
-    d="M -10,100 C 40,80 80,30 140,55
-       C 200,80 240,20 310,45
-       C 380,70 430,25 510,40"
-    fill="none"
-  />
+  <!-- Connecting lines (drawn first, behind nodes) -->
+  <g class="fb-lines">
+    <line class="fb-line fl1" x1="155" y1="28" x2="248" y2="48" />
+    <line class="fb-line fl2" x1="248" y1="48" x2="338" y2="22" />
+    <line class="fb-line fl3" x1="338" y1="22" x2="418" y2="48" />
+    <line class="fb-line fl4" x1="418" y1="48" x2="338" y2="22" />
+    <line class="fb-line fl5" x1="278" y1="78" x2="338" y2="22" />
+    <line class="fb-line fl6" x1="278" y1="78" x2="418" y2="48" />
+    <line class="fb-line fl7" x1="155" y1="28" x2="108" y2="58" />
+    <line class="fb-line fl8" x1="108" y1="58" x2="278" y2="78" />
+    <line class="fb-line fl9" x1="278" y1="78" x2="195" y2="95" />
+    <line class="fb-line fl10" x1="418" y1="48" x2="468" y2="88" />
+  </g>
 
-  <!-- Secondary vine tendril -->
-  <path
-    class="fb-vine fb-vine-2"
-    d="M 60,110 C 80,90 100,70 130,60"
-    fill="none"
-  />
-  <path
-    class="fb-vine fb-vine-2"
-    d="M 290,55 C 310,35 340,28 360,38"
-    fill="none"
-  />
+  <!-- Ingredient nodes — large (proteins / main ingredients) -->
+  <circle class="fb-node fn-lg fn1" cx="418" cy="48"  r="22" fill="url(#fb-node-grad)" />
+  <circle class="fb-node fn-lg fn2" cx="155" cy="28"  r="19" fill="url(#fb-node-grad)" />
+  <circle class="fb-node fn-lg fn3" cx="278" cy="78"  r="17" fill="url(#fb-node-grad)" />
 
-  <!-- Leaves (ellipses rotated along the vine) -->
-  <ellipse class="fb-leaf fl1" cx="90"  cy="42"  rx="18" ry="9"  transform="rotate(-35, 90, 42)"  />
-  <ellipse class="fb-leaf fl2" cx="175" cy="68"  rx="16" ry="8"  transform="rotate(25, 175, 68)"  />
-  <ellipse class="fb-leaf fl3" cx="255" cy="32"  rx="20" ry="9"  transform="rotate(-50, 255, 32)" />
-  <ellipse class="fb-leaf fl4" cx="345" cy="58"  rx="17" ry="8"  transform="rotate(30, 345, 58)"  />
-  <ellipse class="fb-leaf fl5" cx="430" cy="30"  rx="15" ry="7"  transform="rotate(-40, 430, 30)" />
-  <!-- Small accent leaves -->
-  <ellipse class="fb-leaf fl6" cx="130" cy="60"  rx="11" ry="5"  transform="rotate(15, 130, 60)"  />
-  <ellipse class="fb-leaf fl7" cx="390" cy="42"  rx="12" ry="5"  transform="rotate(-20, 390, 42)" />
+  <!-- Ingredient nodes — medium (fruits / vegetables) -->
+  <circle class="fb-node fn-md fn4" cx="338" cy="22"  r="13" fill="url(#fb-node-grad)" />
+  <circle class="fb-node fn-md fn5" cx="108" cy="58"  r="11" fill="url(#fb-node-grad)" />
+  <circle class="fb-node fn-md fn6" cx="468" cy="88"  r="12" fill="url(#fb-node-grad)" />
+  <circle class="fb-node fn-md fn7" cx="195" cy="95"  r="10" fill="url(#fb-node-grad)" />
 
-  <!-- Produce circles (stylized: tomato, orange, apple silhouettes) -->
-  <circle class="fb-produce fp1" cx="50"  cy="82" r="16" fill="url(#fb-produce-grad)" />
-  <circle class="fb-produce fp2" cx="220" cy="90" r="19" fill="url(#fb-produce-grad)" />
-  <circle class="fb-produce fp3" cx="380" cy="78" r="15" fill="url(#fb-produce-grad)" />
-  <circle class="fb-produce fp4" cx="460" cy="95" r="13" fill="url(#fb-produce-grad)" />
-  <!-- Tiny stem on produce circles -->
-  <line class="fb-stem"  x1="50"  y1="66" x2="50"  y2="59" />
-  <line class="fb-stem"  x1="220" y1="71" x2="222" y2="64" />
-  <line class="fb-stem"  x1="380" y1="63" x2="381" y2="57" />
+  <!-- Ingredient nodes — small (grains / spices) -->
+  <circle class="fb-node fn-sm fn8"  cx="248" cy="48"  r="7" fill="url(#fb-node-grad)" />
+  <circle class="fb-node fn-sm fn9"  cx="55"  cy="32"  r="6" fill="url(#fb-node-grad)" />
+  <circle class="fb-node fn-sm fn10" cx="378" cy="88"  r="5" fill="url(#fb-node-grad)" />
+  <circle class="fb-node fn-sm fn11" cx="60"  cy="100" r="5" fill="url(#fb-node-grad)" />
+  <circle class="fb-node fn-sm fn12" cx="490" cy="28"  r="4" fill="url(#fb-node-grad)" />
 
-  <!-- 4-point sparkle diamonds -->
-  <path class="fb-sparkle fs1" d="M 155,20 L 158,27 L 155,34 L 152,27 Z" />
-  <path class="fb-sparkle fs2" d="M 310,15 L 313,23 L 310,31 L 307,23 Z" />
-  <path class="fb-sparkle fs3" d="M 470,55 L 473,62 L 470,69 L 467,62 Z" />
-  <path class="fb-sparkle fs4" d="M 20,50  L 23,57  L 20,64  L 17,57  Z" />
+  <!-- Pulse rings on the three large nodes (ambient loop) -->
+  <circle class="fb-pulse fp1" cx="418" cy="48"  r="22" fill="none" />
+  <circle class="fb-pulse fp2" cx="155" cy="28"  r="19" fill="none" />
+  <circle class="fb-pulse fp3" cx="278" cy="78"  r="17" fill="none" />
 </svg>
 
 <style>
@@ -93,109 +87,97 @@
     pointer-events: none;
   }
 
-  /* ── Vine stem ───────────────────────────────────────────────────────────── */
-  .fb-vine {
+  /* ── Connecting lines ────────────────────────────────────────────────────── */
+  .fb-line {
     stroke: var(--accent);
-    stroke-opacity: 0.22;
-    stroke-width: 1.8;
-    stroke-linecap: round;
-    stroke-dasharray: 800;
-    stroke-dashoffset: 800;
-    animation: fb-vine-draw 1.0s cubic-bezier(0.4, 0, 0.2, 1) 0.0s both;
+    stroke-opacity: 0.12;
+    stroke-width: 0.8;
+    stroke-dasharray: 180;
+    stroke-dashoffset: 180;
+    animation: fb-line-draw 0.5s ease both;
   }
-  .fb-vine-2 {
-    stroke-width: 1.2;
-    stroke-dasharray: 120;
-    stroke-dashoffset: 120;
-    animation-duration: 0.5s;
-    animation-delay: 0.6s;
-  }
-  @keyframes fb-vine-draw {
+  .fl1  { animation-delay: 0.40s; }
+  .fl2  { animation-delay: 0.48s; }
+  .fl3  { animation-delay: 0.52s; }
+  .fl4  { animation-delay: 0.56s; }
+  .fl5  { animation-delay: 0.60s; }
+  .fl6  { animation-delay: 0.64s; }
+  .fl7  { animation-delay: 0.44s; }
+  .fl8  { animation-delay: 0.68s; }
+  .fl9  { animation-delay: 0.72s; }
+  .fl10 { animation-delay: 0.76s; }
+
+  @keyframes fb-line-draw {
     to { stroke-dashoffset: 0; }
   }
 
-  /* ── Leaves ──────────────────────────────────────────────────────────────── */
-  .fb-leaf {
-    fill: var(--accent);
+  /* ── Nodes ───────────────────────────────────────────────────────────────── */
+  .fb-node {
+    stroke: var(--accent);
+    stroke-opacity: 0.20;
+    stroke-width: 1;
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: fb-node-pop 0.45s cubic-bezier(0.34, 1.3, 0.64, 1) both;
+  }
+  /* Large nodes */
+  .fn1 { animation-delay: 0.06s; }
+  .fn2 { animation-delay: 0.00s; }
+  .fn3 { animation-delay: 0.12s; }
+  /* Medium nodes */
+  .fn4 { animation-delay: 0.18s; }
+  .fn5 { animation-delay: 0.24s; }
+  .fn6 { animation-delay: 0.28s; }
+  .fn7 { animation-delay: 0.32s; }
+  /* Small nodes */
+  .fn8  { animation-delay: 0.36s; }
+  .fn9  { animation-delay: 0.20s; }
+  .fn10 { animation-delay: 0.38s; }
+  .fn11 { animation-delay: 0.42s; }
+  .fn12 { animation-delay: 0.16s; }
+
+  @keyframes fb-node-pop {
+    from { transform: scale(0); opacity: 0; }
+    to   { transform: scale(1); opacity: 1; }
+  }
+
+  /* ── Pulse rings (ambient loop on large nodes) ───────────────────────────── */
+  .fb-pulse {
+    stroke: var(--accent);
+    stroke-width: 1;
     opacity: 0;
     transform-box: fill-box;
     transform-origin: center;
-    animation: fb-leaf-pop 0.4s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+    animation: fb-pulse-ring 3s ease-out infinite;
   }
-  .fl1 { animation-delay: 0.20s; }
-  .fl2 { animation-delay: 0.35s; }
-  .fl3 { animation-delay: 0.28s; }
-  .fl4 { animation-delay: 0.45s; }
-  .fl5 { animation-delay: 0.38s; }
-  .fl6 { animation-delay: 0.55s; }
-  .fl7 { animation-delay: 0.50s; }
+  .fp1 { animation-delay: 0.0s;  animation-duration: 3.2s; }
+  .fp2 { animation-delay: 1.1s;  animation-duration: 3.6s; }
+  .fp3 { animation-delay: 2.0s;  animation-duration: 2.9s; }
 
-  @keyframes fb-leaf-pop {
-    from { opacity: 0; transform: scale(0); }
-    to   { opacity: 0.18; transform: scale(1); }
+  @keyframes fb-pulse-ring {
+    0%   { transform: scale(1.0); opacity: 0.30; }
+    100% { transform: scale(2.0); opacity: 0;    }
   }
 
-  /* ── Produce circles ─────────────────────────────────────────────────────── */
-  .fb-produce {
-    stroke: var(--accent);
-    stroke-opacity: 0.22;
-    stroke-width: 1.2;
-    opacity: 0;
-    transform-box: fill-box;
-    transform-origin: center;
-    animation: fb-produce-rise 0.5s cubic-bezier(0.34, 1.2, 0.64, 1) both;
-  }
-  .fp1 { animation-delay: 0.15s; }
-  .fp2 { animation-delay: 0.30s; }
-  .fp3 { animation-delay: 0.42s; }
-  .fp4 { animation-delay: 0.55s; }
-
-  @keyframes fb-produce-rise {
-    from { opacity: 0; transform: scale(0.4) translateY(8px); }
-    to   { opacity: 1; transform: scale(1)   translateY(0);   }
-  }
-
-  .fb-stem {
-    stroke: var(--accent);
-    stroke-opacity: 0.30;
-    stroke-width: 1.5;
-    stroke-linecap: round;
-  }
-
-  /* ── Sparkle diamonds ────────────────────────────────────────────────────── */
-  .fb-sparkle {
-    fill: var(--accent);
-    opacity: 0.15;
-    transform-box: fill-box;
-    transform-origin: center;
-    animation: fb-sparkle-pulse 2.5s ease-in-out infinite;
-  }
-  .fs1 { animation-delay: 0.0s;  animation-duration: 2.4s; }
-  .fs2 { animation-delay: 0.8s;  animation-duration: 3.0s; }
-  .fs3 { animation-delay: 1.5s;  animation-duration: 2.7s; }
-  .fs4 { animation-delay: 0.4s;  animation-duration: 2.2s; }
-
-  @keyframes fb-sparkle-pulse {
-    0%, 100% { opacity: 0.10; transform: scale(0.8) rotate(0deg);   }
-    50%       { opacity: 0.25; transform: scale(1.2) rotate(45deg);  }
+  /* ── No-loop: pulse rings play once then stop ────────────────────────────── */
+  .foods-banner-svg.no-loop .fb-pulse {
+    animation-iteration-count: 1;
+    animation-fill-mode: forwards;
   }
 
   /* ── Disable all animations ──────────────────────────────────────────────── */
-  .foods-banner-svg.no-anim .fb-vine,
-  .foods-banner-svg.no-anim .fb-leaf,
-  .foods-banner-svg.no-anim .fb-produce,
-  .foods-banner-svg.no-anim .fb-sparkle {
+  .foods-banner-svg.no-anim .fb-line,
+  .foods-banner-svg.no-anim .fb-node,
+  .foods-banner-svg.no-anim .fb-pulse {
     animation: none;
-    stroke-dashoffset: 0;
-    opacity: 1;
     transform: none;
+    opacity: 1;
   }
-  .foods-banner-svg.no-anim .fb-leaf    { opacity: 0.18; }
-  .foods-banner-svg.no-anim .fb-sparkle { opacity: 0.15; }
+  .foods-banner-svg.no-anim .fb-line  { stroke-dashoffset: 0; opacity: 1; }
+  .foods-banner-svg.no-anim .fb-pulse { opacity: 0; }
   @media (prefers-reduced-motion: reduce) {
-    .fb-vine    { animation: none !important; stroke-dashoffset: 0 !important; }
-    .fb-leaf    { animation: none !important; opacity: 0.18 !important; transform: none !important; }
-    .fb-produce { animation: none !important; opacity: 1    !important; transform: none !important; }
-    .fb-sparkle { animation: none !important; opacity: 0.15 !important; transform: none !important; }
+    .fb-line  { animation: none !important; stroke-dashoffset: 0 !important; }
+    .fb-node  { animation: none !important; opacity: 1 !important; transform: none !important; }
+    .fb-pulse { animation: none !important; opacity: 0 !important; }
   }
 </style>

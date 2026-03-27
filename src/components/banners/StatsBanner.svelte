@@ -2,9 +2,11 @@
   import { DB } from '../../lib/db.js';
 
   let noAnim = DB.getSetting('disableAnimations', false);
+  let noLoop = !DB.getSetting('loopBannerAnimations', true);
   if (typeof window !== 'undefined') {
     window.addEventListener('wl:setting', () => {
       noAnim = DB.getSetting('disableAnimations', false);
+      noLoop = !DB.getSetting('loopBannerAnimations', true);
     });
   }
 </script>
@@ -17,6 +19,7 @@
 <svg
   class="stats-banner-svg"
   class:no-anim={noAnim}
+  class:no-loop={noLoop}
   viewBox="0 0 500 120"
   preserveAspectRatio="xMidYMid slice"
   xmlns="http://www.w3.org/2000/svg"
@@ -181,6 +184,12 @@
   @keyframes sb-float {
     0%, 100% { transform: translateY(0px);  }
     50%       { transform: translateY(-5px); }
+  }
+
+  /* ── No-loop: particles play once then stop ──────────────────────────── */
+  .stats-banner-svg.no-loop .sb-particle {
+    animation-iteration-count: 1;
+    animation-fill-mode: forwards;
   }
 
   /* ── Disable all animations (app setting + system preference) ────────── */

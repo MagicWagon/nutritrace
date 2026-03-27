@@ -2,9 +2,11 @@
   import { DB } from '../../lib/db.js';
 
   let noAnim = DB.getSetting('disableAnimations', false);
+  let noLoop = !DB.getSetting('loopBannerAnimations', true);
   if (typeof window !== 'undefined') {
     window.addEventListener('wl:setting', () => {
       noAnim = DB.getSetting('disableAnimations', false);
+      noLoop = !DB.getSetting('loopBannerAnimations', true);
     });
   }
 </script>
@@ -17,6 +19,7 @@
 <svg
   class="water-banner-svg"
   class:no-anim={noAnim}
+  class:no-loop={noLoop}
   viewBox="0 0 500 120"
   preserveAspectRatio="xMidYMid slice"
   xmlns="http://www.w3.org/2000/svg"
@@ -182,6 +185,14 @@
     0%   { transform: translateY(0);     opacity: 0.12; }
     80%  { transform: translateY(-55px); opacity: 0.20; }
     100% { transform: translateY(-65px); opacity: 0;    }
+  }
+
+  /* ── No-loop: ambient animations play once then stop ────────────────────── */
+  .water-banner-svg.no-loop .wb-wave,
+  .water-banner-svg.no-loop .wb-ripple,
+  .water-banner-svg.no-loop .wb-bubble {
+    animation-iteration-count: 1;
+    animation-fill-mode: forwards;
   }
 
   /* ── Disable all animations ──────────────────────────────────────────────── */

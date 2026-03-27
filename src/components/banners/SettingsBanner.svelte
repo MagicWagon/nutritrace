@@ -2,9 +2,11 @@
   import { DB } from '../../lib/db.js';
 
   let noAnim = DB.getSetting('disableAnimations', false);
+  let noLoop = !DB.getSetting('loopBannerAnimations', true);
   if (typeof window !== 'undefined') {
     window.addEventListener('wl:setting', () => {
       noAnim = DB.getSetting('disableAnimations', false);
+      noLoop = !DB.getSetting('loopBannerAnimations', true);
     });
   }
 </script>
@@ -17,6 +19,7 @@
 <svg
   class="settings-banner-svg"
   class:no-anim={noAnim}
+  class:no-loop={noLoop}
   viewBox="0 0 500 120"
   preserveAspectRatio="xMidYMid slice"
   xmlns="http://www.w3.org/2000/svg"
@@ -187,6 +190,13 @@
   @keyframes stb-float {
     0%, 100% { transform: translateY(0);    opacity: 0.10; }
     50%       { transform: translateY(-5px); opacity: 0.20; }
+  }
+
+  /* ── No-loop: ambient animations play once then stop ────────────────────── */
+  .settings-banner-svg.no-loop .stb-gear,
+  .settings-banner-svg.no-loop .stb-particle {
+    animation-iteration-count: 1;
+    animation-fill-mode: forwards;
   }
 
   /* ── Disable all animations ──────────────────────────────────────────────── */

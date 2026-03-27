@@ -1,8 +1,5 @@
 Multiple photos, 1 main, then addition if desired - all areas
 
-Food banner?
--> can maybe be just in menu for foods, meals and recipes, different from eatch… possibly randomly rotating pics or a collage of them of actuall items there? If non present use preset?
-
 floating add buttons instead of at top?
 
 maybe change ai bot a bit, to be a muscular robot or something
@@ -49,3 +46,5 @@ move to meal option in diary for individual food item?...maybe have top level me
 other then in about section remove all traces of waistline/sparky in code without breaking anything if possible.
 
 show weight in or under the weight checkin icon up top? like in v1
+
+different banner for meals/recipes?
