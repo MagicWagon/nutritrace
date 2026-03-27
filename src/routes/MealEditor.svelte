@@ -39,10 +39,15 @@
   let recipeUnit = 'g';
   const UNITS = ['g','ml','oz','cup','tbsp','tsp','piece','serving'];
 
-  // Search
-  let searchQuery = '';
-  let searchResults = [];
-  let showSearch = false;
+  // Ingredient picker
+  let showPicker = false;
+  let pickerTab = 0; // 0=Foods, 1=Meals, 2=Recipes
+  let pickerSearch = '';
+  let pickerFoods = [];
+  let pickerMeals = [];
+  let pickerRecipes = [];
+  let pickerLoading = false;
+  const PICKER_TABS = ['Foods', 'Meals', 'Recipes'];
 
   // Portion picker
   let portionFood = null;
@@ -50,6 +55,7 @@
   let portionQty = 1;
   let portionUnit = 'g';
   let portionSheet = false;
+  let editingIndex = null; // null = adding new, number = editing existing
 
   onMount(async () => {
     isRecipe = editorState.mealIsRecipe || false;
@@ -134,30 +140,29 @@
   }
   function onCropMouseUp() { cropDragging = false; }
 
-  // ── Ingredient search ──────────────────────────────────────────────────────
-  async function searchFoods() {
-    const [foods, recipeItems] = await Promise.all([
-      NtApi.getFoods(),
-      isRecipe ? Promise.resolve([]) : NtApi.getRecipes(),
-    ]);
-    const combined = [
-      ...foods.map(f => ({ ...f, _source: 'food' })),
-      ...recipeItems.map(r => ({ ...r, _source: 'recipe' }))
-    ];
-    if (!searchQuery.trim()) {
-      searchResults = combined.slice().reverse().slice(0, 40);
-      return;
+  // ── Ingredient picker ──────────────────────────────────────────────────────
+  async function openPicker() {
+    showPicker = true;
+    pickerTab = 0;
+    pickerSearch = '';
+    pickerLoading = true;
+    try {
+      [pickerFoods, pickerMeals, pickerRecipes] = await Promise.all([
+        NtApi.getFoods(),
+        NtApi.getMeals(),
+        NtApi.getRecipes(),
+      ]);
+    } finally {
+      pickerLoading = false;
     }
-    const q = searchQuery.toLowerCase();
-    searchResults = combined.filter(f =>
-      (f.name||'').toLowerCase().includes(q) ||
-      (f.brand||'').toLowerCase().includes(q)
-    ).slice(0, 40);
   }
 
-  $: { searchQuery; if (showSearch) searchFoods(); }
-
-  function openSearch() { showSearch = true; searchFoods(); }
+  $: _pickerList = pickerTab === 0 ? pickerFoods : pickerTab === 1 ? pickerMeals : pickerRecipes;
+  $: pickerFiltered = pickerSearch
+    ? _pickerList.filter(f =>
+        (f.name||'').toLowerCase().includes(pickerSearch.toLowerCase()) ||
+        (f.brand||'').toLowerCase().includes(pickerSearch.toLowerCase()))
+    : _pickerList;
 
   let _meLock = false;
   let _meLockTimer;
@@ -172,32 +177,58 @@
     _meLockTimer = setTimeout(() => _meLock = false, 400);
   }
 
+  function openEditIngredient(i) {
+    const item = meal.items[i];
+    editingIndex = i;
+    portionFood = item;
+    portionAmount = item.portion || 100;
+    portionUnit = item.unit || 'g';
+    portionQty = item.quantity || 1;
+    clearTimeout(_meLockTimer);
+    _meLock = true;
+    portionSheet = true;
+    _meLockTimer = setTimeout(() => _meLock = false, 400);
+  }
+
   function confirmPortion() {
     if (!portionFood) return;
-    const newPortion = parseFloat(portionAmount) || portionFood.portion || 100;
-    const origPortion = parseFloat(portionFood.portion) || 100;
+    const newPortion = parseFloat(portionAmount) || 100;
+    const newQty     = parseFloat(portionQty) || 1;
+    const newTotal   = newPortion * newQty;
 
-    // Scale nutrition if portion changed (e.g., adding 2299g instead of 100g)
-    let scaledNutrition = portionFood.nutrition;
-    if (newPortion !== origPortion && portionFood.nutrition) {
-      const factor = newPortion / origPortion;
-      scaledNutrition = Object.fromEntries(
-        Object.entries(portionFood.nutrition).map(([k, v]) => [k, (parseFloat(v)||0) * factor])
-      );
+    if (editingIndex !== null) {
+      // Editing existing item — rescale nutrition proportionally from current total
+      const item = meal.items[editingIndex];
+      const oldTotal = (parseFloat(item.portion) || 100) * (parseFloat(item.quantity) || 1);
+      let newNutrition = item.nutrition;
+      if (item.nutrition && oldTotal > 0) {
+        const factor = newTotal / oldTotal;
+        newNutrition = Object.fromEntries(
+          Object.entries(item.nutrition).map(([k, v]) => [k, (parseFloat(v)||0) * factor])
+        );
+      }
+      const items = [...meal.items];
+      items[editingIndex] = { ...item, portion: newTotal, unit: portionUnit, quantity: 1, nutrition: newNutrition };
+      meal = { ...meal, items };
+      editingIndex = null;
+    } else {
+      // Adding new item
+      const origPortion = parseFloat(portionFood.portion) || 100;
+      let scaledNutrition = portionFood.nutrition;
+      if (portionFood.nutrition) {
+        const factor = (newPortion / origPortion) * newQty;
+        scaledNutrition = Object.fromEntries(
+          Object.entries(portionFood.nutrition).map(([k, v]) => [k, (parseFloat(v)||0) * factor])
+        );
+      }
+      const item = { ...portionFood, portion: newTotal, unit: portionUnit, quantity: 1, nutrition: scaledNutrition };
+      meal = { ...meal, items: [...meal.items, item] };
     }
 
-    const item = {
-      ...portionFood,
-      portion: newPortion,
-      unit: portionUnit,
-      quantity: parseFloat(portionQty) || 1,
-      nutrition: scaledNutrition
-    };
-    meal = { ...meal, items: [...meal.items, item] };
     portionSheet = false;
     portionFood = null;
-    showSearch = false;
-    searchQuery = '';
+    showPicker = false;
+    pickerSearch = '';
     if (isRecipe) autoUpdateRecipeAmount();
   }
 
@@ -420,7 +451,7 @@
           {/if}
         </div>
         <button class="btn btn-ghost" style="font-size:13px;height:32px;padding:0 12px"
-          on:click={openSearch}>
+          on:click={openPicker}>
           + Add
         </button>
       </div>
@@ -453,6 +484,10 @@
                 <span class="text-3" style="font-size:12px">{item.portion} {item.unit}</span>
               </div>
               <span class="text-3 text-sm">{Math.round((Nutrition.calculate(item).calories)||0)} kcal</span>
+              <button class="btn-icon btn-sm" on:click={() => openEditIngredient(i)}
+                style="color:var(--text-3)">
+                <span class="material-symbols-rounded" style="font-size:18px">edit</span>
+              </button>
               <button class="btn-icon btn-sm" on:click={() => removeIngredient(i)}
                 style="color:var(--text-3)">
                 <span class="material-symbols-rounded" style="font-size:18px">remove_circle</span>
@@ -484,37 +519,53 @@
   </div>
 </div>
 
-<!-- ── Ingredient search overlay ── -->
-{#if showSearch}
-  <div class="search-overlay" role="dialog" aria-modal="true">
-    <div class="search-panel">
-      <div class="search-header">
-        <input class="input" placeholder="{isRecipe ? 'Search foods…' : 'Search foods & recipes…'}" bind:value={searchQuery} autofocus />
-        <button class="btn btn-ghost" on:click={() => { showSearch = false; searchQuery = ''; }}>Cancel</button>
-      </div>
-      <div class="search-results">
-        {#if searchResults.length === 0}
-          <p class="text-3 text-sm" style="padding:16px;text-align:center">No {isRecipe ? 'foods' : 'foods or recipes'} found. Add some in the Foods tab first.</p>
-        {:else}
-          {#each searchResults as food}
-            <button class="search-result-row" on:click={() => pickIngredient(food)}>
-              {#if food.imgUrl}
-                <img src={food.imgUrl} alt={food.name} class="ing-thumb" />
-              {:else}
-                <div class="ing-thumb ing-thumb-placeholder">
-                  <span class="material-symbols-rounded" style="font-size:18px;opacity:0.3">fastfood</span>
-                </div>
-              {/if}
-              <div class="ing-info">
-                <span style="font-weight:500">{food.name}</span>
-                {#if food.brand}<span class="text-3" style="font-size:12px">{food.brand}</span>{/if}
+<!-- ── Ingredient picker overlay ── -->
+{#if showPicker}
+  <div class="picker-overlay" role="dialog" aria-modal="true">
+    <div class="picker-header">
+      <button class="btn-icon" on:click={() => { showPicker = false; pickerSearch = ''; }}>
+        <span class="material-symbols-rounded">arrow_back</span>
+      </button>
+      <input class="input picker-search-input" placeholder="Search…" bind:value={pickerSearch} autofocus />
+    </div>
+    <div class="picker-tabs-row">
+      {#each PICKER_TABS as label, idx}
+        <button class="picker-tab-btn" class:active={pickerTab === idx}
+          on:click={() => { pickerTab = idx; pickerSearch = ''; }}>
+          {label}
+        </button>
+      {/each}
+    </div>
+    <div class="picker-list">
+      {#if pickerLoading}
+        <div class="picker-empty">Loading…</div>
+      {:else if pickerFiltered.length === 0}
+        <div class="picker-empty">{pickerSearch ? 'No results found' : 'No items yet. Add some in the Foods tab first.'}</div>
+      {:else}
+        {#each pickerFiltered as food (food.id)}
+          <button class="picker-item-btn" on:click={() => { showPicker = false; pickerSearch = ''; pickIngredient(food); }}>
+            {#if food.imgUrl}
+              <img src={food.imgUrl} alt={food.name} class="picker-thumb" />
+            {:else}
+              <div class="picker-thumb picker-thumb-ph">
+                <span class="material-symbols-rounded" style="font-size:20px">
+                  {pickerTab === 0 ? 'restaurant' : pickerTab === 1 ? 'dinner_dining' : 'menu_book'}
+                </span>
               </div>
-              {#if food._source === 'recipe'}<span class="chip" style="font-size:11px;flex-shrink:0">Recipe</span>{/if}
-              <span class="text-3 text-sm">{Math.round(food.nutrition?.calories || food.calories || 0)} kcal</span>
-            </button>
-          {/each}
-        {/if}
-      </div>
+            {/if}
+            <div class="picker-info">
+              <span class="picker-name">{food.name}</span>
+              {#if food.brand}<span class="text-3" style="font-size:12px">{food.brand}</span>{/if}
+              {#if pickerTab === 0}
+                <span class="text-3" style="font-size:12px">{food.portion||100}{food.unit||'g'} · {Math.round(food.nutrition?.calories||0)} kcal</span>
+              {:else}
+                <span class="text-3" style="font-size:12px">{Math.round(food.nutrition?.calories||0)} kcal</span>
+              {/if}
+            </div>
+            <span class="material-symbols-rounded" style="font-size:18px;color:var(--accent);flex-shrink:0">add_circle</span>
+          </button>
+        {/each}
+      {/if}
     </div>
   </div>
 {/if}
@@ -522,11 +573,11 @@
 <!-- ── Portion picker sheet ── -->
 {#if portionSheet && portionFood}
   <div use:portal class="overlay-backdrop" role="dialog" aria-modal="true"
-    on:click={() => { if (!_meLock) portionSheet = false; }} on:keydown={() => {}}>
+    on:click={() => { if (!_meLock) { portionSheet = false; editingIndex = null; } }} on:keydown={() => {}}>
     <div class="portion-sheet" on:click|stopPropagation on:keydown={() => {}}>
       <div class="portion-header">
         <span style="font-weight:600">{portionFood.name}</span>
-        <button class="btn-icon" on:click={() => portionSheet = false}>
+        <button class="btn-icon" on:click={() => { portionSheet = false; editingIndex = null; }}>
           <span class="material-symbols-rounded">close</span>
         </button>
       </div>
@@ -541,7 +592,7 @@
         <input class="input" type="number" min="0.01" step="any" bind:value={portionQty} />
       </div>
       <div style="padding:16px;flex-shrink:0">
-        <button class="btn btn-primary w-full" on:click={confirmPortion}>Add Ingredient</button>
+        <button class="btn btn-primary w-full" on:click={confirmPortion}>{editingIndex !== null ? 'Save Changes' : 'Add Ingredient'}</button>
       </div>
     </div>
   </div>
@@ -654,28 +705,55 @@
   .ingredient-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .btn-sm { width: 32px; height: 32px; }
 
-  /* Search overlay */
-  :global(.search-overlay) {
+  /* Ingredient picker overlay */
+  .picker-overlay {
     position: fixed; inset: 0; z-index: 200;
     background: var(--surface-0, var(--surface-1));
     display: flex; flex-direction: column;
   }
-  .search-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-  .search-header {
+  .picker-header {
     display: flex; gap: 8px; align-items: center;
     padding: calc(var(--safe-top) + 12px) 16px 12px;
     border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
   }
-  .search-header .input { flex: 1; }
-  .search-results { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
-  .search-result-row {
-    display: flex; align-items: center; gap: 10px;
-    padding: 12px 16px; border-bottom: 1px solid var(--border);
-    background: none; border-left: none; border-right: none; border-top: none;
-    cursor: pointer; color: var(--text-1); text-align: left;
+  .picker-search-input { flex: 1; }
+  .picker-tabs-row {
+    display: flex; gap: 4px; padding: 10px 16px 0;
+    flex-shrink: 0;
+  }
+  .picker-tab-btn {
+    flex: 1; padding: 8px 0; border-radius: var(--radius-md);
+    border: 1.5px solid var(--border); background: none;
+    font-size: 13px; font-weight: 500; cursor: pointer;
+    color: var(--text-2); transition: all var(--dur-fast);
+  }
+  .picker-tab-btn.active {
+    background: var(--accent); border-color: var(--accent);
+    color: var(--surface-1); font-weight: 600;
+  }
+  .picker-list { flex: 1; overflow-y: auto; padding: 8px 0; }
+  .picker-empty { padding: 48px 24px; text-align: center; color: var(--text-3); font-size: 14px; }
+  .picker-item-btn {
+    display: flex; align-items: center; gap: 12px;
+    width: 100%; padding: 10px 16px;
+    background: none; border: none; cursor: pointer;
+    text-align: left; color: var(--text-1);
+    border-bottom: 1px solid var(--border);
     transition: background var(--dur-fast);
   }
-  .search-result-row:active { background: var(--surface-2); }
+  .picker-item-btn:last-child { border-bottom: none; }
+  .picker-item-btn:active { background: var(--surface-2); }
+  .picker-thumb {
+    width: 44px; height: 44px; border-radius: var(--radius-sm);
+    object-fit: cover; flex-shrink: 0;
+  }
+  .picker-thumb-ph {
+    background: var(--accent-dim); display: flex;
+    align-items: center; justify-content: center; color: var(--accent);
+  }
+  .picker-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .picker-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
   /* Portion sheet */
   :global(.overlay-backdrop) {

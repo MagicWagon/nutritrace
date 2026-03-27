@@ -97,7 +97,13 @@
     <div class="sidebar-footer">
       {#if $userMgmtActive && $currentUser}
         <div class="sidebar-user">
-          <div class="user-avatar">{getInitial($currentUser)}</div>
+          <div class="user-avatar">
+            {#if $currentUser.avatar_url}
+              <img src={$currentUser.avatar_url} alt="" class="user-avatar-img" />
+            {:else}
+              {getInitial($currentUser)}
+            {/if}
+          </div>
           <div class="user-info">
             <span class="user-name">{$currentUser.full_name || $currentUser.username}</span>
             <span class="sidebar-version">v0.10.0-alpha</span>
@@ -242,6 +248,13 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    overflow: hidden;
+  }
+  .user-avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
   }
   .user-info {
     flex: 1;
