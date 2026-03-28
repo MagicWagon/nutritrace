@@ -65,65 +65,35 @@
   onDestroy(() => clearTimeout(timer));
 </script>
 
+<!--
+  Each silhouette is its own sized SVG absolutely positioned within the banner.
+  This prevents the clipping that happens when one large SVG uses slice scaling
+  across very different screen aspect ratios (mobile portrait vs wide desktop).
+-->
 <div class="tw-banner" class:no-anim={noAnim} aria-hidden="true">
 
-  <!--
-    Silhouette layer — fork, apple, carrot, spoon.
-    ViewBox 0 0 500 100 maps to the banner's full width/height.
-    Silhouettes sit on the far left/right so the centre is clear for text.
-  -->
-  <svg class="tw-sil-svg" viewBox="0 0 500 100"
-       preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+  <!-- Left silhouettes: fork + apple -->
+  <div class="sil-group sil-left">
+    <div class="sil-wrap sw1">
+      <!-- Fork: single closed path, 3 tines -->
+      <svg viewBox="0 0 16 68" fill="var(--accent)" aria-hidden="true">
+        <path d="M6,68 L6,36 L2,28 L2,0 L4,0 L4,24 L7,24 L7,0
+                 L9,0 L9,24 L12,24 L12,0 L14,0 L14,28 L10,36 L10,68 Z"/>
+      </svg>
+    </div>
+    <div class="sil-wrap sw2">
+      <!-- Apple: body + stem + leaf -->
+      <svg viewBox="0 0 42 58" fill="var(--accent)" aria-hidden="true">
+        <path d="M21,10 C9,10 2,20 3,31 C4,44 12,54 21,54
+                 C30,54 38,44 39,31 C40,20 33,10 21,10 Z"/>
+        <rect x="19.5" y="0" width="3" height="12" rx="1.5"
+              transform="rotate(10,21,6)"/>
+        <path d="M22,6 C28,0 36,4 34,11 C29,13 22,11 22,6 Z"/>
+      </svg>
+    </div>
+  </div>
 
-    <!-- ── Fork (far left, centred ≈ x42, y50) ─────────────────────── -->
-    <g class="sil sf1">
-      <!-- single outline path so tines, shoulder and handle read as one shape -->
-      <path d="M38,82 L38,52 L34,44 L34,14 L36,14 L36,40 L39,40 L39,14
-               L41,14 L41,40 L44,40 L44,14 L46,14 L46,44 L42,52 L42,82 Z"/>
-    </g>
-
-    <!-- ── Apple (left side, centred ≈ x125, y50) ──────────────────── -->
-    <g class="sil sf2">
-      <!-- body -->
-      <path d="M125,28 C113,28 105,38 106,50 C107,63 115,73 125,73
-               C135,73 143,63 144,50 C145,38 137,28 125,28 Z"/>
-      <!-- stem -->
-      <rect x="123.5" y="17" width="3" height="13" rx="1.5"
-            transform="rotate(12,125,23)"/>
-      <!-- leaf -->
-      <path d="M126,23 C133,15 142,19 139,27 C134,29 127,27 126,23 Z"/>
-    </g>
-
-    <!-- ── Bell pepper (right side, centred ≈ x373, y50) ──────────────── -->
-    <g class="sil sf3">
-      <!-- stem -->
-      <rect x="371" y="8" width="4" height="10" rx="2"/>
-      <!-- left lobe -->
-      <path d="M373,18 C360,18 355,26 356,38 C357,52 364,62 368,70
-               C370,75 372,78 373,80 C374,78 376,75 378,70
-               C382,62 389,52 390,38 C391,26 386,18 373,18 Z"/>
-      <!-- left side bump -->
-      <path d="M358,34 C352,34 350,40 352,46 C354,52 359,54 363,50
-               C361,44 360,38 358,34 Z"/>
-      <!-- right side bump -->
-      <path d="M388,34 C394,34 396,40 394,46 C392,52 387,54 383,50
-               C385,44 386,38 388,34 Z"/>
-    </g>
-
-    <!-- ── Spoon (far right, centred ≈ x458, y50) ──────────────────── -->
-    <g class="sil sf4">
-      <!-- single closed path: oval bowl widening from handle, tapering back -->
-      <path d="M455,82 C452,82 451,80 451,77
-               L451,52 C447,47 445,40 445,30
-               C445,19 451,14 458,14
-               C465,14 471,19 471,30
-               C471,40 469,47 465,52
-               L465,77 C465,80 464,82 461,82 Z"/>
-    </g>
-
-  </svg>
-
-  <!-- Centre text content -->
+  <!-- Centre text -->
   <div class="tw-inner">
     <div class="tw-decoration">
       <span class="tw-rule"></span>
@@ -136,6 +106,33 @@
         class="tw-cursor" class:no-anim={noAnim}>|</span>
     </div>
   </div>
+
+  <!-- Right silhouettes: bell pepper + spoon -->
+  <div class="sil-group sil-right">
+    <div class="sil-wrap sw3">
+      <!-- Bell pepper: stem + body + side lobes -->
+      <svg viewBox="0 0 50 76" fill="var(--accent)" aria-hidden="true">
+        <rect x="22" y="0" width="4" height="10" rx="2"/>
+        <path d="M25,10 C12,10 7,18 8,30 C9,44 16,54 20,62
+                 C22,67 24,70 25,72 C26,70 28,67 30,62
+                 C34,54 41,44 42,30 C43,18 38,10 25,10 Z"/>
+        <path d="M9,26 C3,26 1,32 3,38 C5,44 10,46 14,42
+                 C12,36 11,30 9,26 Z"/>
+        <path d="M41,26 C47,26 49,32 47,38 C45,44 40,46 36,42
+                 C38,36 39,30 41,26 Z"/>
+      </svg>
+    </div>
+    <div class="sil-wrap sw4">
+      <!-- Spoon: single closed path, oval bowl into handle -->
+      <svg viewBox="0 0 26 68" fill="var(--accent)" aria-hidden="true">
+        <path d="M9,68 C7,68 6,66 6,63 L6,30
+                 C3,25 1,20 1,14 C1,6 6,0 13,0
+                 C20,0 25,6 25,14 C25,20 23,25 20,30
+                 L20,63 C20,66 19,68 17,68 Z"/>
+      </svg>
+    </div>
+  </div>
+
 </div>
 
 <style>
@@ -149,38 +146,38 @@
     overflow: hidden;
   }
 
-  /* ── Silhouettes ─────────────────────────────────────────────────── */
-  .tw-sil-svg {
+  /* ── Silhouette groups ───────────────────────────────────────────── */
+  .sil-group {
     position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
+    top: 0; bottom: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
   }
+  .sil-left  { left:  3%; }
+  .sil-right { right: 3%; }
 
-  .sil {
-    fill: var(--accent);
+  .sil-wrap {
     opacity: 0.22;
-    transform-box: fill-box;
-    transform-origin: center;
+    display: flex;
+    align-items: center;
+  }
+  /* Height scales with the banner; clamp keeps it in a sensible range */
+  .sil-wrap svg {
+    height: clamp(30px, 55%, 52px);
+    width: auto;
+    fill: var(--accent);
   }
 
-  .tw-banner:not(.no-anim) .sil {
-    animation: sil-appear 0.7s cubic-bezier(0.34,1.2,0.64,1) both,
-               sil-float  4s ease-in-out infinite;
-  }
-  /* stagger each silhouette's appear + float phase */
-  .sf1 { animation-delay: 0.05s, 0.60s; animation-duration: 0.7s, 4.6s; }
-  .sf2 { animation-delay: 0.15s, 0.70s; animation-duration: 0.7s, 3.9s; }
-  .sf3 { animation-delay: 0.10s, 0.65s; animation-duration: 0.7s, 4.3s; }
-  .sf4 { animation-delay: 0.20s, 0.75s; animation-duration: 0.7s, 5.0s; }
+  /* Float animations — each silhouette on its own phase/speed */
+  .tw-banner:not(.no-anim) .sw1 { animation: sil-float 4.5s ease-in-out 0.1s  infinite; }
+  .tw-banner:not(.no-anim) .sw2 { animation: sil-float 3.8s ease-in-out 0.8s  infinite; }
+  .tw-banner:not(.no-anim) .sw3 { animation: sil-float 4.2s ease-in-out 0.45s infinite; }
+  .tw-banner:not(.no-anim) .sw4 { animation: sil-float 5.0s ease-in-out 1.2s  infinite; }
 
-  @keyframes sil-appear {
-    from { opacity: 0;    transform: translateY(10px) scale(0.9); }
-    to   { opacity: 0.22; transform: translateY(0)    scale(1);   }
-  }
   @keyframes sil-float {
     0%, 100% { transform: translateY(0);   }
-    50%      { transform: translateY(-7px); }
+    50%      { transform: translateY(-6px); }
   }
 
   /* ── Centre content ──────────────────────────────────────────────── */
@@ -297,16 +294,13 @@
     50%      { opacity: 0; }
   }
 
-  /* ── Reduced motion ───────────────────────────────────────────────── */
+  /* ── Reduced motion ──────────────────────────────────────────────── */
   @media (prefers-reduced-motion: reduce) {
-    .sil        { animation: none !important; opacity: 0.22 !important; }
-    .tw-rule,
-    .tw-diamond,
-    .tw-label,
-    .tw-typed,
-    .tw-cursor  { animation: none !important; }
-    .tw-cursor  { opacity: 0; }
-    .tw-typed   { -webkit-text-fill-color: var(--accent); background: none; opacity: 0.75; }
-    .tw-text    { filter: none; }
+    .sil-wrap,
+    .tw-rule, .tw-diamond, .tw-label,
+    .tw-typed, .tw-cursor { animation: none !important; }
+    .tw-cursor { opacity: 0; }
+    .tw-typed  { -webkit-text-fill-color: var(--accent); background: none; opacity: 0.75; }
+    .tw-text   { filter: none; }
   }
 </style>
