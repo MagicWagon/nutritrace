@@ -1226,9 +1226,13 @@
     background: var(--surface-2);
     border-radius: var(--radius-md);
     margin-bottom: 12px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
   }
+  .tab-bar::-webkit-scrollbar { display: none; }
   .tab-btn {
-    flex: 1;
+    flex: 0 0 auto;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1443,8 +1447,6 @@
 
   @media (max-width: 400px) {
     .metric-grid { grid-template-columns: 1fr 1fr; }
-    .tab-btn { font-size: 12px; padding: 7px 6px; }
-    .tab-icon { display: none; }
   }
 
   /* ── Sheet backdrop + bottom sheet (must be defined here; Diary's are scoped there) ── */
