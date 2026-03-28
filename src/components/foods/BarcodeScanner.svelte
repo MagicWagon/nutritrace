@@ -341,7 +341,7 @@
       <!-- Header -->
       <div class="scanner-header">
         <span class="scanner-title">Scan Barcode</span>
-        <button class="btn-icon" on:click={close} aria-label="Close">
+        <button class="btn-icon" on:click={close} aria-label="Close" title="Close scanner">
           <span class="material-symbols-rounded">close</span>
         </button>
       </div>

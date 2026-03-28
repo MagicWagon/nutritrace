@@ -474,7 +474,7 @@
       <div class="cal-title">{showCalFor === 'start' ? 'From' : 'To'} date</div>
       <!-- Month / year nav -->
       <div class="dp-nav">
-        <button class="btn-icon dp-nav-btn" on:click={calPrevMonth} aria-label="Previous month">
+        <button class="btn-icon dp-nav-btn" on:click={calPrevMonth} aria-label="Previous month" title="Previous month">
           <span class="material-symbols-rounded">chevron_left</span>
         </button>
         <div class="dp-month-year">
@@ -485,7 +485,7 @@
             {calYear}<span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle;margin-left:2px">{showYearPicker ? 'expand_less' : 'expand_more'}</span>
           </button>
         </div>
-        <button class="btn-icon dp-nav-btn" on:click={calNextMonth} aria-label="Next month">
+        <button class="btn-icon dp-nav-btn" on:click={calNextMonth} aria-label="Next month" title="Next month">
           <span class="material-symbols-rounded">chevron_right</span>
         </button>
       </div>

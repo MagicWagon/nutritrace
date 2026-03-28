@@ -1242,7 +1242,7 @@
     <input class="settings-search-input" type="search" placeholder="Search settings…"
       bind:value={settingsSearch} />
     {#if settingsSearch}
-      <button class="settings-search-clear btn-icon" on:click={() => settingsSearch = ''}>
+      <button class="settings-search-clear btn-icon" on:click={() => settingsSearch = ''} title="Clear search">>
         <span class="material-symbols-rounded" style="font-size:18px">close</span>
       </button>
     {/if}
@@ -1656,7 +1656,7 @@
             <div class="setting-row">
               <span class="setting-label">{cn.label} ({cn.unit})</span>
               <button class="btn-icon" style="width:32px;height:32px;color:var(--danger)"
-                on:click={() => removeCustomNutrient(cn.id)}>
+                on:click={() => removeCustomNutrient(cn.id)} title="Remove nutrient">
                 <span class="material-symbols-rounded" style="font-size:18px">delete</span>
               </button>
             </div>
@@ -2095,7 +2095,7 @@
                     <span class="material-symbols-rounded" style="font-size:15px">restore</span> Restore
                   </button>
                   <button class="btn-icon" style="color:var(--danger);padding:0 4px"
-                    on:click={() => { deleteTarget = bk.filename; showDeleteBkDialog = true; }}>
+                    on:click={() => { deleteTarget = bk.filename; showDeleteBkDialog = true; }} title="Delete backup">
                     <span class="material-symbols-rounded" style="font-size:20px">delete</span>
                   </button>
                 </div>

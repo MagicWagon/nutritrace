@@ -341,7 +341,7 @@
 
 <div class="page-shell editor-page">
   <header class="editor-header">
-    <button class="btn-icon" on:click={pop} aria-label="Back">
+    <button class="btn-icon" on:click={pop} aria-label="Back" title="Back">
       <span class="material-symbols-rounded">arrow_back</span>
     </button>
     <h2 class="editor-title">{params && params.id ? 'Edit' : 'New'} {isRecipe ? 'Recipe' : 'Meal'}</h2>
@@ -490,11 +490,11 @@
               </div>
               <span class="text-3 text-sm">{Math.round((Nutrition.calculate(item).calories)||0)} kcal</span>
               <button class="btn-icon btn-sm" on:click={() => openEditIngredient(i)}
-                style="color:var(--text-3)">
+                style="color:var(--text-3)" title="Edit ingredient">
                 <span class="material-symbols-rounded" style="font-size:18px">edit</span>
               </button>
               <button class="btn-icon btn-sm" on:click={() => removeIngredient(i)}
-                style="color:var(--text-3)">
+                style="color:var(--text-3)" title="Remove ingredient">
                 <span class="material-symbols-rounded" style="font-size:18px">remove_circle</span>
               </button>
             </div>
@@ -528,7 +528,7 @@
 {#if showPicker}
   <div class="picker-overlay" role="dialog" aria-modal="true">
     <div class="picker-header">
-      <button class="btn-icon" on:click={() => { showPicker = false; pickerSearch = ''; }}>
+      <button class="btn-icon" on:click={() => { showPicker = false; pickerSearch = ''; }} title="Back">
         <span class="material-symbols-rounded">arrow_back</span>
       </button>
       <input class="input picker-search-input" placeholder="Search…" bind:value={pickerSearch} autofocus />
@@ -583,7 +583,7 @@
     <div class="portion-sheet" on:click|stopPropagation on:keydown={() => {}}>
       <div class="portion-header">
         <span style="font-weight:600">{portionFood.name}</span>
-        <button class="btn-icon" on:click={() => { portionSheet = false; editingIndex = null; }}>
+        <button class="btn-icon" on:click={() => { portionSheet = false; editingIndex = null; }} title="Close">
           <span class="material-symbols-rounded">close</span>
         </button>
       </div>
@@ -610,7 +610,7 @@
     <div class="cam-popup">
       <div class="cam-header">
         <span class="cam-title">Take Photo</span>
-        <button class="btn-icon" on:click={closeCamera}>
+        <button class="btn-icon" on:click={closeCamera} title="Close camera">
           <span class="material-symbols-rounded">close</span>
         </button>
       </div>
@@ -632,7 +632,7 @@
     <div class="cam-popup">
       <div class="cam-header">
         <span class="cam-title">Crop Photo</span>
-        <button class="btn-icon" on:click={() => { cropOpen = false; cropSrc = ''; }}>
+        <button class="btn-icon" on:click={() => { cropOpen = false; cropSrc = ''; }} title="Cancel">
           <span class="material-symbols-rounded">close</span>
         </button>
       </div>

@@ -535,11 +535,11 @@
   <!-- Action icons — fixed at top-right, same level as hamburger -->
   <div use:portal class="diary-topbar-actions">
     {#if selectMode}
-      <button class="btn-icon" on:click={exitSelectMode} aria-label="Cancel selection">
+      <button class="btn-icon" on:click={exitSelectMode} aria-label="Cancel selection" title="Cancel selection">
         <span class="material-symbols-rounded">close</span>
       </button>
       <button class="btn-icon" style="color:var(--danger)" disabled={selectedItems.size === 0}
-        on:click={() => showMultiDeleteDialog = true} aria-label="Delete selected items">
+        on:click={() => showMultiDeleteDialog = true} aria-label="Delete selected items" title="Delete selected">
         <span class="material-symbols-rounded">delete</span>
       </button>
     {:else}
@@ -569,14 +569,14 @@
 
   <!-- Date navigation — sticky sub-bar directly below the header -->
   <div class="diary-date-bar" class:has-banner={$pageBanners}>
-    <button class="btn-icon accent" on:click={prevDay} aria-label="Previous day">
+    <button class="btn-icon accent" on:click={prevDay} aria-label="Previous day" title="Previous day">
       <span class="material-symbols-rounded">chevron_left</span>
     </button>
     <button class="date-btn" on:click={openDatePicker} title="Jump to date">
       <span class="date-label">{formatDate($currentDate)}</span>
       <span class="date-sub">{formatDateSub($currentDate, $dateFormat)}</span>
     </button>
-    <button class="btn-icon accent" on:click={nextDay} aria-label="Next day">
+    <button class="btn-icon accent" on:click={nextDay} aria-label="Next day" title="Next day">
       <span class="material-symbols-rounded">chevron_right</span>
     </button>
   </div>
@@ -594,7 +594,7 @@
               {items.reduce((s,it) => s + formatKcal(it), 0)} kcal
             </span>
           {/if}
-          <button class="btn-icon accent ml-auto" on:click={() => openAddFood(mealIdx)} aria-label="Add food to {meal}">
+          <button class="btn-icon accent ml-auto" on:click={() => openAddFood(mealIdx)} aria-label="Add food to {meal}" title="Add food to {meal}">
             <span class="material-symbols-rounded">add</span>
           </button>
         </div>

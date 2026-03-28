@@ -49,7 +49,7 @@
       {#if title}
         <div class="sheet-header">
           <h3 class="sheet-title">{title}</h3>
-          <button class="btn-icon" on:click={close} aria-label="Close">
+          <button class="btn-icon" on:click={close} aria-label="Close" title="Close">
             <span class="material-symbols-rounded">close</span>
           </button>
         </div>

@@ -321,7 +321,7 @@
 <div class="page-shell editor-page">
   <!-- Header -->
   <header class="editor-header">
-    <button class="btn-icon" on:click={pop} aria-label="Back">
+    <button class="btn-icon" on:click={pop} aria-label="Back" title="Back">
       <span class="material-symbols-rounded">arrow_back</span>
     </button>
     <h2 class="editor-title">{params && params.id ? 'Edit Food' : 'Add Food'}</h2>
@@ -338,7 +338,7 @@
       <div class="photo-preview-wrap">
         {#if food.imgUrl}
           <img class="photo-preview-img" src={food.imgUrl} alt="Food" />
-          <button class="photo-remove-btn btn-icon" on:click={removePhoto} aria-label="Remove photo">
+          <button class="photo-remove-btn btn-icon" on:click={removePhoto} aria-label="Remove photo" title="Remove photo">
             <span class="material-symbols-rounded" style="font-size:18px">close</span>
           </button>
         {:else}
@@ -377,7 +377,7 @@
         <div class="cam-popup">
           <div class="cam-header">
             <span class="cam-title">Take Photo</span>
-            <button class="btn-icon" on:click={stopCamera} aria-label="Cancel">
+            <button class="btn-icon" on:click={stopCamera} aria-label="Cancel" title="Close camera">
               <span class="material-symbols-rounded">close</span>
             </button>
           </div>
@@ -399,7 +399,7 @@
         <div class="cam-popup">
           <div class="cam-header">
             <span class="cam-title">Crop Photo</span>
-            <button class="btn-icon" on:click={() => { showCrop = false; cropSrc = ''; }} aria-label="Cancel">
+            <button class="btn-icon" on:click={() => { showCrop = false; cropSrc = ''; }} aria-label="Cancel" title="Cancel">
               <span class="material-symbols-rounded">close</span>
             </button>
           </div>

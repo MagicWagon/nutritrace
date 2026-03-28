@@ -449,7 +449,7 @@
                 <button class="btn btn-ghost tpl-btn" on:click={() => showApplyConfirm = tpl}>
                   Apply
                 </button>
-                <button class="btn-icon" style="color:var(--text-3)" on:click={() => deleteTemplate(tpl.id)}>
+                <button class="btn-icon" style="color:var(--text-3)" on:click={() => deleteTemplate(tpl.id)} title="Delete template">
                   <span class="material-symbols-rounded" style="font-size:20px">delete</span>
                 </button>
               </div>

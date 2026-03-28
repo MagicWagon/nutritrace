@@ -96,7 +96,7 @@
 
 <div class="page-wrap">
   <div class="page-header sticky-header">
-    <button class="btn-icon" on:click={pop}>
+    <button class="btn-icon" on:click={pop} title="Back">
       <span class="material-symbols-rounded">arrow_back</span>
     </button>
     <h2 class="page-title">Profile</h2>

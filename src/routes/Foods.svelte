@@ -443,7 +443,7 @@
     {#if $pageBanners}<FoodsBanner />{/if}
     {#if pickMode && selectedFoods.size > 0}
       <h1 class="pick-count-title">{selectedFoods.size} selected</h1>
-      <button class="btn-icon accent" on:click={confirmMultiAdd} disabled={multiAdding} aria-label="Add selected to diary">
+      <button class="btn-icon accent" on:click={confirmMultiAdd} disabled={multiAdding} aria-label="Add selected to diary" title="Add selected to diary">
         {#if multiAdding}
           <span class="material-symbols-rounded spin">refresh</span>
         {:else}
@@ -456,7 +456,7 @@
         if (activeTab === 0) openEditor(null, 'foodList');
         else if (activeTab === 1) openMealEditor(null, false);
         else openMealEditor(null, true);
-      }} aria-label="Add new">
+      }} aria-label="Add new" title="Add new">
         <span class="material-symbols-rounded">add</span>
       </button>
     {/if}
@@ -477,7 +477,7 @@
         placeholder="Search foods or scan barcode..."
         bind:value={search}
       />
-      <button class="btn-icon scan-btn" on:click={() => scannerOpen = true} aria-label="Scan barcode">
+      <button class="btn-icon scan-btn" on:click={() => scannerOpen = true} aria-label="Scan barcode" title="Scan barcode">
         <span class="material-symbols-rounded">barcode_scanner</span>
       </button>
     </div>
