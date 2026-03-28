@@ -102,21 +102,6 @@
     return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
   }
 
-  // ── URL query handling (post-OAuth redirect) ───────────────────────────────
-  $: {
-    const hash = window.location.hash;
-    const qStr = hash.includes('?') ? hash.split('?')[1] : '';
-    const params = new URLSearchParams(qStr);
-    if (params.get('connected') === '1') {
-      window.location.hash = '#/wellness';
-      showSuccess('Fitbit connected!');
-      init();
-    } else if (params.get('error')) {
-      showError('Fitbit: ' + params.get('error'));
-      window.location.hash = '#/wellness';
-    }
-  }
-
   // ── Init ───────────────────────────────────────────────────────────────────
   async function init() {
     try {
@@ -202,7 +187,20 @@
     } catch (e) { showError(e.message); }
   }
 
-  onMount(init);
+  onMount(() => {
+    // Handle post-OAuth redirect query params BEFORE init so status is fresh
+    const hash = window.location.hash;
+    const qStr = hash.includes('?') ? hash.split('?')[1] : '';
+    const params = new URLSearchParams(qStr);
+    if (params.get('connected') === '1') {
+      window.location.hash = '#/wellness';
+      showSuccess('Fitbit connected!');
+    } else if (params.get('error')) {
+      showError('Fitbit: ' + decodeURIComponent(params.get('error')));
+      window.location.hash = '#/wellness';
+    }
+    init();
+  });
 
   // ── Sleep stage breakdown ──────────────────────────────────────────────────
   $: sleepTotal = (data.sleep_deep_min || 0) + (data.sleep_light_min || 0) + (data.sleep_rem_min || 0) + (data.sleep_wake_min || 0);
