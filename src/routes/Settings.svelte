@@ -757,10 +757,21 @@
           const qtyChanged = Math.abs(qty - 1) > 0.001;
           const calChanged = Math.abs(currentCal - newCal) / (newCal || 1) > 0.01;
 
-          if (!qtyChanged && !calChanged) return item;
+          // Sync imgUrl from the current food record — fixes stale/broken image paths
+          // (e.g. Android local paths from Waistline imports)
+          const correctImgUrl = food?.imgUrl ?? item.imgUrl;
+          const imgChanged = correctImgUrl !== item.imgUrl;
+
+          if (!qtyChanged && !calChanged && !imgChanged) return item;
 
           changed = true;
-          return { ...item, portion: totalPortion, quantity: 1, nutrition: totalNutrition };
+          return {
+            ...item,
+            portion: totalPortion,
+            quantity: 1,
+            nutrition: totalNutrition,
+            imgUrl: correctImgUrl,
+          };
         });
 
         if (changed) {

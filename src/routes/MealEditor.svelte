@@ -164,6 +164,10 @@
         (f.brand||'').toLowerCase().includes(pickerSearch.toLowerCase()))
     : _pickerList;
 
+  // Track ingredient images that fail to load so we fall back to the placeholder
+  let failedImgs = new Set();
+  function onImgError(url) { failedImgs.add(url); failedImgs = failedImgs; }
+
   let _meLock = false;
   let _meLockTimer;
   function pickIngredient(food) {
@@ -472,8 +476,9 @@
                 on:pointerdown={e => onDragHandleDown(e, i)}>
                 drag_indicator
               </span>
-              {#if item.imgUrl}
-                <img src={item.imgUrl} alt={item.name} class="ing-thumb" />
+              {#if item.imgUrl && !failedImgs.has(item.imgUrl)}
+                <img src={item.imgUrl} alt={item.name} class="ing-thumb"
+                     on:error={() => onImgError(item.imgUrl)} />
               {:else}
                 <div class="ing-thumb ing-thumb-placeholder">
                   <span class="material-symbols-rounded" style="font-size:20px;opacity:0.3">fastfood</span>
@@ -544,8 +549,9 @@
       {:else}
         {#each pickerFiltered as food (food.id)}
           <button class="picker-item-btn" on:click={() => { showPicker = false; pickerSearch = ''; pickIngredient(food); }}>
-            {#if food.imgUrl}
-              <img src={food.imgUrl} alt={food.name} class="picker-thumb" />
+            {#if food.imgUrl && !failedImgs.has(food.imgUrl)}
+              <img src={food.imgUrl} alt={food.name} class="picker-thumb"
+                   on:error={() => onImgError(food.imgUrl)} />
             {:else}
               <div class="picker-thumb picker-thumb-ph">
                 <span class="material-symbols-rounded" style="font-size:20px">
