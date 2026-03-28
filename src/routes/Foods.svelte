@@ -81,8 +81,8 @@
   let multiPortionItems = [];         // [{ food, portion, unit, servings }]
   let multiAdding = false;
 
-  // Clear selection when tab or search changes
-  $: { activeTab; search; selectedFoods = new Set(); }
+  // Clear selection when tab changes (different list context); search does NOT clear selection
+  $: { activeTab; selectedFoods = new Set(); }
 
   // Convert item portions to grams for total serving display
   const _toG = { g:1, ml:1, oz:28.35, lb:453.59, cup:240, tbsp:15, tsp:5 };

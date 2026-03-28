@@ -218,7 +218,6 @@
     {#if $pageBanners}<WellnessBanner />{/if}
     <div class="wellness-header-row">
       <div class="wellness-title-block">
-        <span class="material-symbols-rounded wellness-title-icon">monitor_heart</span>
         <h1>Wellness</h1>
       </div>
 
