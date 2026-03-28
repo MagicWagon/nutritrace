@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { wellnessMetrics, wellnessSyncMode, distUnit, pageBanners } from '../stores/settings.js';
+  import { wellnessMetrics, wellnessSyncMode, wellnessSyncRange, distUnit, pageBanners } from '../stores/settings.js';
   import WellnessBanner from '../components/banners/WellnessBanner.svelte';
   import { showSuccess, showError } from '../stores/toast.js';
   import { localDateStr } from '../lib/db.js';
@@ -152,11 +152,30 @@
     if (syncing) return;
     syncing = true;
     try {
-      const result = await NtApi.post('/api/wellness/fitbit/sync', { date: dateStr });
-      data = result.metrics || {};
-      lastSync = new Date();
-      localStorage.setItem(`wl_wellness_lastSync_${dateStr}`, String(Date.now()));
-      if (!silent) showSuccess('Synced');
+      const range = $wellnessSyncRange || 1;
+      let result;
+      if (!silent && range > 1) {
+        // Manual sync with range: fetch from (dateStr - range + 1) to dateStr
+        const end   = new Date(dateStr + 'T12:00:00');
+        const start = new Date(end);
+        start.setDate(start.getDate() - (range - 1));
+        const from = start.toISOString().slice(0, 10);
+        result = await NtApi.post('/api/wellness/fitbit/sync', { from, to: dateStr });
+        await loadData(); // reload displayed date from DB after range sync
+        lastSync = new Date();
+        localStorage.setItem(`wl_wellness_lastSync_${dateStr}`, String(Date.now()));
+        const msg = result.rateLimited
+          ? `Synced ${result.synced} days (rate limited — try again later for the rest)`
+          : `Synced ${result.synced} day${result.synced === 1 ? '' : 's'}`;
+        showSuccess(msg);
+      } else {
+        // Auto-sync or 1-day range: single day
+        result = await NtApi.post('/api/wellness/fitbit/sync', { date: dateStr });
+        data = result.metrics || {};
+        lastSync = new Date();
+        localStorage.setItem(`wl_wellness_lastSync_${dateStr}`, String(Date.now()));
+        if (!silent) showSuccess('Synced');
+      }
     } catch (e) {
       if (!silent) showError('Sync failed: ' + e.message);
     }

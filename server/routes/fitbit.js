@@ -174,11 +174,8 @@ router.get('/callback', wrap(async (req, res) => {
   res.redirect('/#/wellness?connected=1');
 }));
 
-// ── POST /sync — fetch all Fitbit metrics for a date ─────────────────────────
-router.post('/sync', wrap(async (req, res) => {
-  const u = uid(req);
-  const dateStr = (req.body.date || new Date().toISOString().slice(0, 10));
-
+// ── Helper: sync a single date, return { metrics, errors } ───────────────────
+async function _syncDate(u, dateStr) {
   const metrics = {};
   const errors  = [];
 
@@ -245,7 +242,57 @@ router.post('/sync', wrap(async (req, res) => {
     }
   })();
 
-  res.json({ ok: true, date: dateStr, metrics, errors });
+  return { metrics, errors };
+}
+
+// ── POST /sync — fetch Fitbit metrics for a date or date range ────────────────
+// Body: { date? } for single day  OR  { from, to } for a range
+// Rate limit: Fitbit allows 150 req/hr (6 req/day → max 25 days/hr).
+// For range syncs we delay 250ms between days; on 429 we stop early.
+router.post('/sync', wrap(async (req, res) => {
+  const u = uid(req);
+  const today = new Date().toISOString().slice(0, 10);
+
+  const { from, to } = req.body;
+
+  // Single-day mode
+  if (!from || !to) {
+    const dateStr = req.body.date || today;
+    const { metrics, errors } = await _syncDate(u, dateStr);
+    return res.json({ ok: true, date: dateStr, metrics, errors });
+  }
+
+  // Range mode — iterate from → to inclusive
+  const start = new Date(from + 'T12:00:00');
+  const end   = new Date(to   + 'T12:00:00');
+  if (isNaN(start) || isNaN(end) || start > end) {
+    return res.status(400).json({ error: 'Invalid date range' });
+  }
+  // Cap at 365 days to prevent accidental multi-year syncs
+  const dayDiff = Math.round((end - start) / 86400000);
+  if (dayDiff > 365) return res.status(400).json({ error: 'Range cannot exceed 365 days' });
+
+  const results = { synced: 0, errors: [], rateLimited: false };
+  const cur = new Date(start);
+
+  while (cur <= end) {
+    const ds = cur.toISOString().slice(0, 10);
+    try {
+      const { errors } = await _syncDate(u, ds);
+      results.synced++;
+      if (errors.length) results.errors.push({ date: ds, errors });
+    } catch (e) {
+      if (e.message?.includes('429')) {
+        results.rateLimited = true;
+        break;
+      }
+      results.errors.push({ date: ds, errors: [e.message] });
+    }
+    cur.setDate(cur.getDate() + 1);
+    if (cur <= end) await new Promise(r => setTimeout(r, 250)); // throttle
+  }
+
+  res.json({ ok: true, from, to, ...results });
 }));
 
 // ── GET /data — return stored wellness data ───────────────────────────────────

@@ -24,7 +24,7 @@
     sidebarPersistent, goalCelebrations, pageBanners, loopBannerAnimations,
     aiEnabled, aiProvider, aiApiKey, aiModel, aiAssistantName,
     waterGoalMl, waterUnit, waterContainers, waterShowInStats, waterShowInDiary,
-    wellnessEnabled, wellnessMetrics, wellnessSyncMode,
+    wellnessEnabled, wellnessMetrics, wellnessSyncMode, wellnessSyncRange,
   } from '../stores/settings.js';
   import { mealIcon } from '../lib/mealIcon.js';
   import { DB } from '../lib/db.js';
@@ -299,8 +299,17 @@
   }
 
   // ── Labs / Wellness ────────────────────────────────────────────────────────
-  let wellnessEnabledVal = DB.getSetting('wellnessEnabled', false);
-  let wellnessSyncModeVal = DB.getSetting('wellnessSyncMode', 'auto');
+  let wellnessEnabledVal  = DB.getSetting('wellnessEnabled',   false);
+  let wellnessSyncModeVal = DB.getSetting('wellnessSyncMode',  'auto');
+  let wellnessSyncRangeVal = DB.getSetting('wellnessSyncRange', 7);
+
+  const SYNC_RANGE_OPTIONS = [
+    { value: 1,   label: '1 day'   },
+    { value: 7,   label: '1 week'  },
+    { value: 30,  label: '1 month' },
+    { value: 90,  label: '3 months'},
+    { value: 365, label: '1 year'  },
+  ];
   let labsFitbitClientId     = '';
   let labsFitbitClientSecret = '';
   let labsFitbitRedirectUri  = '';
@@ -2096,6 +2105,22 @@
                 </select>
               </div>
             </div>
+            <div class="setting-divider"></div>
+            <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px">
+              <div>
+                <span class="setting-label">Sync Range</span>
+                <div class="setting-desc">How far back the manual Sync button fetches. Auto-sync always covers today only.</div>
+              </div>
+              <div class="chip-group">
+                {#each SYNC_RANGE_OPTIONS as opt}
+                  <button
+                    class="chip"
+                    class:chip-active={wellnessSyncRangeVal === opt.value}
+                    on:click={() => { wellnessSyncRangeVal = opt.value; wellnessSyncRange.set(opt.value); }}
+                  >{opt.label}</button>
+                {/each}
+              </div>
+            </div>
           {/if}
         </div>
 
@@ -2116,8 +2141,13 @@
             <div class="form-group">
               <label class="form-label">Client Secret</label>
               <div style="display:flex;gap:6px">
-                <input class="input" type={labsFitbitShowSecret ? 'text' : 'password'} autocomplete="new-password"
-                  placeholder="••••••••" bind:value={labsFitbitClientSecret} style="flex:1" />
+                {#if labsFitbitShowSecret}
+                  <input class="input" type="text" autocomplete="new-password"
+                    placeholder="••••••••" bind:value={labsFitbitClientSecret} style="flex:1" />
+                {:else}
+                  <input class="input" type="password" autocomplete="new-password"
+                    placeholder="••••••••" bind:value={labsFitbitClientSecret} style="flex:1" />
+                {/if}
                 <button class="btn-icon" on:click={() => labsFitbitShowSecret = !labsFitbitShowSecret}
                   title={labsFitbitShowSecret ? 'Hide' : 'Show'}>
                   <span class="material-symbols-rounded">{labsFitbitShowSecret ? 'visibility_off' : 'visibility'}</span>
@@ -3064,6 +3094,28 @@
   .form-label { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); }
 
   /* Labs section */
+  .chip-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .chip {
+    padding: 4px 12px;
+    border-radius: 99px;
+    border: 1.5px solid var(--border);
+    background: transparent;
+    color: var(--text-2);
+    font-size: 13px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, color 0.15s;
+  }
+  .chip:hover { border-color: var(--accent); color: var(--text-1); }
+  .chip-active {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+    color: var(--accent);
+    font-weight: 600;
+  }
   .labs-badge {
     font-size: 10px;
     font-weight: 700;
