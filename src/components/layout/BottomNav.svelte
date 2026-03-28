@@ -1,6 +1,7 @@
 <script>
   import { location, push } from 'svelte-spa-router';
   import { wellnessEnabled } from '../../stores/settings.js';
+  import WellnessIcon from '../icons/WellnessIcon.svelte';
 
   const BASE_TABS = [
     { path: '/',            icon: 'book',          label: 'Diary'    },
@@ -10,7 +11,7 @@
     { path: '/settings',    icon: 'settings',      label: 'Settings' },
   ];
 
-  const WELLNESS_TAB = { path: '/wellness', icon: 'monitor_heart', label: 'Wellness' };
+  const WELLNESS_TAB = { path: '/wellness', customIcon: WellnessIcon, label: 'Wellness' };
 
   // Wellness tab inserted after Foods (where Water used to be) when the feature is enabled
   $: tabs = $wellnessEnabled
@@ -41,7 +42,11 @@
       aria-label={tab.label}
       aria-current={i === activeIdx ? 'page' : undefined}
     >
-      <span class="material-symbols-rounded nav-icon">{tab.icon}</span>
+      {#if tab.customIcon}
+        <span class="nav-icon custom-icon"><svelte:component this={tab.customIcon} /></span>
+      {:else}
+        <span class="material-symbols-rounded nav-icon">{tab.icon}</span>
+      {/if}
       <span class="nav-label">{tab.label}</span>
     </button>
   {/each}
@@ -102,6 +107,12 @@
     transition: transform var(--dur-fast) var(--ease-spring);
   }
   .nav-tab.active .nav-icon { transform: scale(1.1); }
+  /* Custom SVG icon: match material symbols display size */
+  .nav-icon.custom-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
 
   .nav-label {
     font-size: 10px;

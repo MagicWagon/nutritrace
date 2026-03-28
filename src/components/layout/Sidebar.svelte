@@ -5,6 +5,7 @@
   import { createEventDispatcher } from 'svelte';
   import { currentUser, userMgmtActive, logout } from '../../stores/auth.js';
   import { wellnessEnabled } from '../../stores/settings.js';
+  import WellnessIcon from '../icons/WellnessIcon.svelte';
 
   export let open = false;
   export let persistent = false;
@@ -28,7 +29,7 @@
     { path: '/settings',   icon: 'settings',       label: 'Settings'   },
   ];
 
-  const WELLNESS_NAV = { path: '/wellness', icon: 'monitor_heart', label: 'Wellness' };
+  const WELLNESS_NAV = { path: '/wellness', customIcon: WellnessIcon, label: 'Wellness' };
 
   $: navItems = $wellnessEnabled
     ? [...BASE_NAV.slice(0, 2), WELLNESS_NAV, ...BASE_NAV.slice(2)]
@@ -91,7 +92,11 @@
           class:active={activePath === item.path}
           on:click={() => go(item.path)}
         >
-          <span class="material-symbols-rounded sidebar-icon">{item.icon}</span>
+          {#if item.customIcon}
+            <span class="sidebar-icon custom-icon"><svelte:component this={item.customIcon} /></span>
+          {:else}
+            <span class="material-symbols-rounded sidebar-icon">{item.icon}</span>
+          {/if}
           <span class="sidebar-label">{item.label}</span>
           {#if activePath === item.path}
             <div class="active-indicator"></div>
@@ -214,6 +219,11 @@
   .sidebar-item:active { transform: scale(0.98); }
 
   .sidebar-icon { font-size: 22px; flex-shrink: 0; }
+  .sidebar-icon.custom-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
   .sidebar-label { flex: 1; }
 
   .active-indicator {
