@@ -210,18 +210,13 @@ async function _syncRange(userId, fromDate, toDate) {
   const startTs = Math.floor(new Date(fromDate + 'T00:00:00').getTime() / 1000);
   const endTs   = Math.floor(new Date(toDate   + 'T23:59:59').getTime() / 1000);
 
-  // Withings measure type IDs we care about (deduplicated)
-  const measTypeSet = new Set([
-    ...Object.keys(BODY_STAT_TYPES).map(Number),
-    ...Object.keys(WELLNESS_TYPES).map(Number),
-  ]);
-  const measTypes = [...measTypeSet].join(',');
-
   let body;
   try {
+    // Do NOT pass meastype — Withings only accepts a single integer there,
+    // comma-separated lists silently return 0 results. Fetch all category-1
+    // measurements and filter by type in JS using BODY_STAT_TYPES / WELLNESS_TYPES.
     body = await _wPost(userId, '/measure', {
       action:    'getmeas',
-      meastype:  measTypes,
       category:  1,
       startdate: startTs,
       enddate:   endTs,

@@ -1,6 +1,6 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
-  import { wellnessMetrics, wellnessSyncMode, wellnessSyncRange, distUnit, pageBanners, dateFormat, withingsSyncRange as withingsSyncRangeSetting, fitbitEnabled, withingsEnabled } from '../stores/settings.js';
+  import { wellnessMetrics, wellnessSyncMode, wellnessSyncRange, distUnit, pageBanners, dateFormat, withingsSyncRange as withingsSyncRangeSetting, fitbitEnabled, withingsEnabled, weightUnit } from '../stores/settings.js';
   import Chart from 'chart.js/auto';
   import WellnessBanner from '../components/banners/WellnessBanner.svelte';
   import { showSuccess, showError } from '../stores/toast.js';
@@ -111,6 +111,7 @@
 
   function fmtWeight(kg) {
     if (kg == null) return null;
+    if ($weightUnit === 'lb') return { value: (kg * 2.20462).toFixed(1), unit: 'lbs' };
     return { value: kg.toFixed(1), unit: 'kg' };
   }
 
@@ -190,22 +191,24 @@
   }
 
   // ── Trends ─────────────────────────────────────────────────────────────────
-  let trendsRange   = 7;
-  let trendsLoading = false;
-  let trendsData    = [];
-  let _trendCharts  = [];
+  let trendsRange    = 7;
+  let trendsLoading  = false;
+  let trendsData     = [];
+  let _trendCharts   = [];
+  let _trendsVersion = 0; // incremented on each loadTrends call; stale calls abort before creating charts
 
   let TREND_CHARTS = [
     { id: 'steps',              label: 'Steps',       icon: 'directions_walk', source: 'fitbit',   fmtLatest: v => Math.round(v).toLocaleString() + ' steps', canvasEl: null, hasData: false, latest: null },
     { id: 'sleep_duration_min', label: 'Sleep',       icon: 'bedtime',         source: 'fitbit',   fmtLatest: v => { const h=Math.floor(v/60); return `${h}h ${Math.round(v%60)}m`; }, canvasEl: null, hasData: false, latest: null },
     { id: 'resting_hr',         label: 'Resting HR',  icon: 'favorite',        source: 'fitbit',   fmtLatest: v => Math.round(v) + ' bpm', canvasEl: null, hasData: false, latest: null },
     { id: 'hrv_daily_rmssd',    label: 'HRV',         icon: 'monitor_heart',   source: 'fitbit',   fmtLatest: v => v.toFixed(1) + ' ms', canvasEl: null, hasData: false, latest: null },
-    { id: 'weight_kg',          label: 'Weight',      icon: 'monitor_weight',  source: 'withings', fmtLatest: v => v.toFixed(1) + ' kg', canvasEl: null, hasData: false, latest: null },
+    { id: 'weight_kg',          label: 'Weight',      icon: 'monitor_weight',  source: 'withings', fmtLatest: v => $weightUnit === 'lb' ? (v * 2.20462).toFixed(1) + ' lbs' : v.toFixed(1) + ' kg', canvasEl: null, hasData: false, latest: null },
     { id: 'body_fat_pct',       label: 'Body Fat',    icon: 'percent',         source: 'withings', fmtLatest: v => v.toFixed(1) + '%', canvasEl: null, hasData: false, latest: null },
     { id: 'muscle_mass_kg',     label: 'Muscle Mass', icon: 'fitness_center',  source: 'withings', fmtLatest: v => v.toFixed(1) + ' kg', canvasEl: null, hasData: false, latest: null },
   ];
 
   async function loadTrends() {
+    const myVersion = ++_trendsVersion;
     trendsLoading = true;
     _trendCharts.forEach(c => c.destroy?.());
     _trendCharts = [];
@@ -268,6 +271,9 @@
     // Another tick for canvases to render
     await new Promise(r => setTimeout(r, 50));
 
+    // Abort if a newer loadTrends call has started
+    if (myVersion !== _trendsVersion) return;
+
     for (const chart of TREND_CHARTS) {
       if (!chart.hasData || !chart.canvasEl) continue;
 
@@ -300,6 +306,7 @@
           }],
         },
         options: {
+          animation: false,
           responsive: true,
           maintainAspectRatio: false,
           plugins: { legend: { display: false }, tooltip: {
@@ -953,7 +960,9 @@
                       <span class="trends-latest">{chart.fmtLatest(chart.latest)}</span>
                     {/if}
                   </div>
-                  <canvas class="trends-canvas" bind:this={chart.canvasEl} height="160"></canvas>
+                  <div class="trends-canvas-wrap">
+                    <canvas bind:this={chart.canvasEl}></canvas>
+                  </div>
                 </div>
               {/if}
             {/each}
@@ -1419,9 +1428,10 @@
     color: var(--accent);
     font-weight: 600;
   }
-  .trends-canvas {
-    width: 100%;
+  .trends-canvas-wrap {
     height: 160px;
+    position: relative;
+    overflow: hidden;
   }
 
   @media (max-width: 400px) {
