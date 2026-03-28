@@ -31,6 +31,41 @@ const API = {
     }
   },
 
+  async contributeToOFF(food, settings) {
+    const { name, barcode, brand, portion, unit, nutrition } = food;
+    if (!name || !barcode) throw new Error("Name and barcode required");
+    const username = (settings && settings.offUsername) || "waistline-app";
+    const password = (settings && settings.offPassword) || "waistline";
+    const uploadCountry = (settings && settings.offUploadCountry) || "Auto";
+    const lang = (navigator.language || "en").substring(0, 2);
+    let params = "code=" + encodeURIComponent(barcode);
+    params += "&user_id=" + encodeURIComponent(username);
+    params += "&password=" + encodeURIComponent(password);
+    params += "&lang=" + lang;
+    params += "&product_name_" + lang + "=" + encodeURIComponent(name);
+    if (brand) params += "&brands=" + encodeURIComponent(brand);
+    params += "&nutrition_data_per=100g";
+    if (portion && (parseFloat(portion) !== 100 || unit !== "g"))
+      params += "&serving_size=" + encodeURIComponent(portion + " " + (unit || "g"));
+    if (uploadCountry && uploadCountry !== "Auto")
+      params += "&countries=" + encodeURIComponent(uploadCountry);
+    const nutMap = {
+      calories: "energy-kcal", kilojoules: "energy", fat: "fat",
+      "saturated-fat": "saturated-fat", carbohydrates: "carbohydrates",
+      sugars: "sugars", fiber: "fiber", proteins: "proteins",
+      salt: "salt", sodium: "sodium"
+    };
+    const nut = nutrition || {};
+    for (const [key, field] of Object.entries(nutMap)) {
+      if (nut[key] !== undefined && nut[key] !== "" && !isNaN(parseFloat(nut[key])))
+        params += "&nutriment_" + field + "=" + nut[key];
+    }
+    const res = await fetch("https://world.openfoodfacts.org/cgi/product_jqm2.pl?" + params);
+    const json = await res.json();
+    if (json.status !== 1) throw new Error(json.status_verbose || "Upload failed");
+    return true;
+  },
+
   _mapOFFProduct(p) {
     if (!p || !p.product_name) return null;
     const n = p.nutriments || {};
@@ -124,41 +159,6 @@ const _USDA_NUTRIENT_MAP = {
   1175: 'b6',              // mg
   1177: 'b9',              // mcg (folate)
   1178: 'b12',             // mcg
-  async contributeToOFF(food, settings) {
-    const { name, barcode, brand, portion, unit, nutrition } = food;
-    if (!name || !barcode) throw new Error("Name and barcode required");
-    const username = (settings && settings.offUsername) || "waistline-app";
-    const password = (settings && settings.offPassword) || "waistline";
-    const uploadCountry = (settings && settings.offUploadCountry) || "Auto";
-    const lang = (navigator.language || "en").substring(0, 2);
-    let params = "code=" + encodeURIComponent(barcode);
-    params += "&user_id=" + encodeURIComponent(username);
-    params += "&password=" + encodeURIComponent(password);
-    params += "&lang=" + lang;
-    params += "&product_name_" + lang + "=" + encodeURIComponent(name);
-    if (brand) params += "&brands=" + encodeURIComponent(brand);
-    params += "&nutrition_data_per=100g";
-    if (portion && (parseFloat(portion) !== 100 || unit !== "g"))
-      params += "&serving_size=" + encodeURIComponent(portion + " " + (unit || "g"));
-    if (uploadCountry && uploadCountry !== "Auto")
-      params += "&countries=" + encodeURIComponent(uploadCountry);
-    const nutMap = {
-      calories: "energy-kcal", kilojoules: "energy", fat: "fat",
-      "saturated-fat": "saturated-fat", carbohydrates: "carbohydrates",
-      sugars: "sugars", fiber: "fiber", proteins: "proteins",
-      salt: "salt", sodium: "sodium"
-    };
-    const nut = nutrition || {};
-    for (const [key, field] of Object.entries(nutMap)) {
-      if (nut[key] !== undefined && nut[key] !== "" && !isNaN(parseFloat(nut[key])))
-        params += "&nutriment_" + field + "=" + nut[key];
-    }
-    const res = await fetch("https://world.openfoodfacts.org/cgi/product_jqm2.pl?" + params);
-    const json = await res.json();
-    if (json.status !== 1) throw new Error(json.status_verbose || "Upload failed");
-    return true;
-  },
-
 };
 
 const USDA = {

@@ -702,7 +702,7 @@
     touch-action: none; user-select: none; -webkit-user-select: none;
   }
   .drag-handle:active { cursor: grabbing; }
-  .ing-thumb { width: 44px; height: 44px; border-radius: var(--radius-md); object-fit: cover; flex-shrink: 0; }
+  .ing-thumb { width: 52px; height: 52px; border-radius: var(--radius-md); object-fit: cover; flex-shrink: 0; }
   .ing-thumb-placeholder {
     display: flex; align-items: center; justify-content: center;
     background: var(--surface-2);

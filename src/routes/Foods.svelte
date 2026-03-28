@@ -512,7 +512,7 @@
       {#each yesterdayMeals as group, gi}
         {#if gi > 0}<div style="height:1px;background:var(--border);margin:0 16px"></div>{/if}
         <button class="food-item-btn" style="padding:12px 14px" on:click={() => addYesterdayMeal(group)}>
-          <div class="ing-thumb-placeholder" style="width:40px;height:40px;border-radius:var(--radius-sm);background:var(--accent-dim);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <div class="ing-thumb-placeholder" style="width:52px;height:52px;border-radius:var(--radius-sm);background:var(--accent-dim);display:flex;align-items:center;justify-content:center;flex-shrink:0">
             <span class="material-symbols-rounded" style="color:var(--accent);font-size:20px">restaurant</span>
           </div>
           <div class="food-info">
@@ -780,14 +780,14 @@
   }
   .food-item-btn:active { background: var(--surface-2); }
   .food-thumb {
-    width: 44px; height: 44px;
+    width: 52px; height: 52px;
     border-radius: var(--radius-sm);
     object-fit: cover;
     background: var(--surface-2);
     flex-shrink: 0;
   }
   .food-thumb-placeholder {
-    width: 44px; height: 44px;
+    width: 52px; height: 52px;
     border-radius: var(--radius-sm);
     background: var(--accent-dim);
     display: flex;

@@ -389,9 +389,49 @@
   let _lpTimer       = null;
   let showMoveToMeal = false;
 
+  // ── Multi-select / bulk delete ──────────────────────────────────────────────
+  let selectMode    = false;
+  let selectedItems = new Set(); // stores _i (original item indices)
+  let showMultiDeleteDialog = false;
+
+  function enterSelectMode(item) {
+    selectMode    = true;
+    selectedItems = new Set([item._i]);
+  }
+
+  function toggleItemSelect(item) {
+    if (selectedItems.has(item._i)) selectedItems.delete(item._i);
+    else selectedItems.add(item._i);
+    selectedItems = selectedItems;
+    if (selectedItems.size === 0) selectMode = false;
+  }
+
+  function exitSelectMode() {
+    selectMode    = false;
+    selectedItems = new Set();
+  }
+
+  async function doDeleteSelected() {
+    const count    = selectedItems.size;
+    const toDelete = new Set(selectedItems);
+    let ent = null;
+    currentEntry.subscribe(v => ent = v)();
+    if (!ent) return;
+    const updated = { ...ent, items: ent.items.filter((_, i) => !toDelete.has(i)) };
+    await NtApi.saveDiaryDate($currentDate, {
+      items:       updated.items,
+      body_stats:  updated.bodyStats || {},
+      water:       updated.water,
+    });
+    await loadEntry($currentDate);
+    showSuccess(`${count} item${count !== 1 ? 's' : ''} removed`);
+    exitSelectMode();
+  }
+
   function onItemTouchStart(e, item) {
     _lpTimer = setTimeout(() => {
       _lpTimer = null;
+      if (selectMode) return;
       actionItem = item;
       _lockAndOpen(() => showItemAction = true);
     }, 500);
@@ -408,6 +448,7 @@
     if (val === 'edit')   { openEditItem(actionItem); }
     if (val === 'delete') { confirmDelete(actionItem._i); }
     if (val === 'move')   { _lockAndOpen(() => showMoveToMeal = true); }
+    if (val === 'select') { enterSelectMode(actionItem); }
   }
   async function moveItemToMeal(e) {
     const mealIdx = e.detail?.value;
@@ -493,23 +534,37 @@
 <div class="page-shell diary-page">
   <!-- Action icons — fixed at top-right, same level as hamburger -->
   <div use:portal class="diary-topbar-actions">
-    {#if _waterShowInDiary}
-      <button class="btn-icon accent" on:click={() => showWaterQuickAdd = true} aria-label="Log water" title="Water — log your water intake">
-        <span class="material-symbols-rounded">water_drop</span>
+    {#if selectMode}
+      <button class="btn-icon" on:click={exitSelectMode} aria-label="Cancel selection">
+        <span class="material-symbols-rounded">close</span>
+      </button>
+      <button class="btn-icon" style="color:var(--danger)" disabled={selectedItems.size === 0}
+        on:click={() => showMultiDeleteDialog = true} aria-label="Delete selected items">
+        <span class="material-symbols-rounded">delete</span>
+      </button>
+    {:else}
+      {#if _waterShowInDiary}
+        <button class="btn-icon accent" on:click={() => showWaterQuickAdd = true} aria-label="Log water" title="Water — log your water intake">
+          <span class="material-symbols-rounded">water_drop</span>
+        </button>
+      {/if}
+      <button class="btn-icon accent" on:click={() => diaryShowNutritionSummary.set(true)} aria-label="Nutrition summary" title="Nutrition Summary — full breakdown of today's nutrients">
+        <span class="material-symbols-rounded">monitoring</span>
+      </button>
+      <button class="btn-icon accent" on:click={() => diaryShowBodyStats.set(true)} aria-label="Body stats" title="Body Stats — log weight, body fat, and measurements">
+        <span class="material-symbols-rounded">scale</span>
       </button>
     {/if}
-    <button class="btn-icon accent" on:click={() => diaryShowNutritionSummary.set(true)} aria-label="Nutrition summary" title="Nutrition Summary — full breakdown of today's nutrients">
-      <span class="material-symbols-rounded">monitoring</span>
-    </button>
-    <button class="btn-icon accent" on:click={() => diaryShowBodyStats.set(true)} aria-label="Body stats" title="Body Stats — log weight, body fat, and measurements">
-      <span class="material-symbols-rounded">scale</span>
-    </button>
   </div>
 
   <!-- Standard page-header — identical to every other page -->
-  <header class="page-header diary-header" class:has-banner={$pageBanners}>
-    {#if $pageBanners}<DiaryBanner />{/if}
-    <h1>Diary</h1>
+  <header class="page-header diary-header" class:has-banner={$pageBanners && !selectMode}>
+    {#if $pageBanners && !selectMode}<DiaryBanner />{/if}
+    {#if selectMode}
+      <h1 class="select-mode-title">{selectedItems.size} selected</h1>
+    {:else}
+      <h1>Diary</h1>
+    {/if}
   </header>
 
   <!-- Date navigation — sticky sub-bar directly below the header -->
@@ -553,11 +608,19 @@
           <div class="meal-items">
             {#each items as item (item._i)}
               <div class="diary-item" in:fly={{ y: 6, duration: 180 }}
+                class:item-selected={selectMode && selectedItems.has(item._i)}
                 on:touchstart|passive={e => onItemTouchStart(e, item)}
                 on:touchmove|passive={onItemTouchMove}
                 on:touchend={onItemTouchEnd}
-                on:contextmenu|preventDefault={() => { actionItem = item; _lockAndOpen(() => showItemAction = true); }}>
-                <button class="diary-item-btn" on:click={() => openEditItem(item)}>
+                on:contextmenu|preventDefault={() => { if (!selectMode) { actionItem = item; _lockAndOpen(() => showItemAction = true); } }}>
+                {#if selectMode}
+                  <button class="item-select-btn" on:click={() => toggleItemSelect(item)} aria-label="Toggle selection">
+                    <span class="item-check material-symbols-rounded" class:item-check-on={selectedItems.has(item._i)}>
+                      {selectedItems.has(item._i) ? 'check_circle' : 'radio_button_unchecked'}
+                    </span>
+                  </button>
+                {/if}
+                <button class="diary-item-btn" on:click={() => selectMode ? toggleItemSelect(item) : openEditItem(item)}>
                   {#if $diaryShowThumbnails && item.imgUrl}
                     <img class="item-thumb" src={item.imgUrl} alt="" loading="lazy" />
                   {:else if $diaryShowThumbnails}
@@ -811,14 +874,25 @@
   on:confirm={doDelete}
 />
 
+<!-- Multi-delete confirm dialog -->
+<Dialog
+  bind:open={showMultiDeleteDialog}
+  title="Delete {selectedItems.size} item{selectedItems.size !== 1 ? 's' : ''}?"
+  message="This will permanently remove the selected items from your diary."
+  confirmText="Delete"
+  dangerous
+  on:confirm={doDeleteSelected}
+/>
+
 <!-- Item long-press action sheet -->
 <ActionSheet
   bind:open={showItemAction}
   title={actionItem?.name || ''}
   actions={[
-    { label: 'Edit',         icon: 'edit',       value: 'edit'   },
-    { label: 'Move to meal', icon: 'swap_horiz', value: 'move'   },
-    { label: 'Delete',       icon: 'delete',     value: 'delete', danger: true },
+    { label: 'Edit',            icon: 'edit',       value: 'edit'   },
+    { label: 'Move to meal',    icon: 'swap_horiz', value: 'move'   },
+    { label: 'Select multiple', icon: 'checklist',  value: 'select' },
+    { label: 'Delete',          icon: 'delete',     value: 'delete', danger: true },
   ]}
   on:select={onItemAction}
 />
@@ -1240,8 +1314,29 @@
   }
   .diary-item:last-child { border-bottom: none; }
   .diary-item:active { background: var(--surface-2); }
+  .diary-item.item-selected { background: var(--accent-dim); }
+
+  /* Multi-select circle */
+  .item-select-btn {
+    padding: 0 4px 0 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+  }
+  .item-check {
+    font-size: 24px;
+    color: var(--text-3);
+    transition: color var(--dur-fast);
+  }
+  .item-check-on { color: var(--accent); }
+
+  /* Select-mode header title */
+  .select-mode-title { color: var(--accent); }
   .item-thumb {
-    width: 40px; height: 40px;
+    width: 52px; height: 52px;
     border-radius: var(--radius-sm);
     object-fit: cover;
     flex-shrink: 0;
@@ -1267,7 +1362,7 @@
     color: var(--text-1);
   }
   .item-thumb-placeholder {
-    width: 40px; height: 40px;
+    width: 52px; height: 52px;
     border-radius: var(--radius-sm);
     background: var(--accent-dim);
     display: flex;
