@@ -123,6 +123,15 @@ db.exec(`
     expires_at       TEXT NOT NULL,
     withings_user_id TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS ai_chat_history (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    role       TEXT NOT NULL,
+    content    TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_ai_chat_history_user ON ai_chat_history(user_id, created_at);
 `);
 
 // ── Migrations ─────────────────────────────────────────────────────────────

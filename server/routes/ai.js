@@ -1,9 +1,50 @@
 import { Router } from 'express';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, userMgmtActive } from '../middleware/auth.js';
 import { wrap } from '../logger.js';
 import { getAiConfig } from '../ai.js';
+import db from '../db.js';
 
 const router = Router();
+
+const uid = req => userMgmtActive() ? req.user.id : null;
+const MAX_HISTORY = 200; // rows kept per user
+
+// ── GET /api/ai/history ───────────────────────────────────────────────────────
+router.get('/history', requireAuth, wrap((req, res) => {
+  const u = uid(req);
+  const rows = u == null
+    ? db.prepare(`SELECT role, content, created_at FROM ai_chat_history WHERE user_id IS NULL ORDER BY created_at ASC LIMIT 100`).all()
+    : db.prepare(`SELECT role, content, created_at FROM ai_chat_history WHERE user_id = ? ORDER BY created_at ASC LIMIT 100`).all(u);
+  res.json(rows);
+}));
+
+// ── POST /api/ai/history ──────────────────────────────────────────────────────
+router.post('/history', requireAuth, wrap((req, res) => {
+  const { role, content } = req.body;
+  if (!role || !content) return res.status(400).json({ error: 'role and content required' });
+  const u = uid(req);
+
+  if (u == null) {
+    db.prepare(`INSERT INTO ai_chat_history (user_id, role, content) VALUES (NULL, ?, ?)`).run(role, content);
+    // Trim oldest beyond MAX_HISTORY
+    db.prepare(`DELETE FROM ai_chat_history WHERE user_id IS NULL AND id NOT IN (SELECT id FROM ai_chat_history WHERE user_id IS NULL ORDER BY created_at DESC LIMIT ?)`).run(MAX_HISTORY);
+  } else {
+    db.prepare(`INSERT INTO ai_chat_history (user_id, role, content) VALUES (?, ?, ?)`).run(u, role, content);
+    db.prepare(`DELETE FROM ai_chat_history WHERE user_id = ? AND id NOT IN (SELECT id FROM ai_chat_history WHERE user_id = ? ORDER BY created_at DESC LIMIT ?)`).run(u, u, MAX_HISTORY);
+  }
+  res.json({ ok: true });
+}));
+
+// ── DELETE /api/ai/history ────────────────────────────────────────────────────
+router.delete('/history', requireAuth, wrap((req, res) => {
+  const u = uid(req);
+  if (u == null) {
+    db.prepare(`DELETE FROM ai_chat_history WHERE user_id IS NULL`).run();
+  } else {
+    db.prepare(`DELETE FROM ai_chat_history WHERE user_id = ?`).run(u);
+  }
+  res.json({ ok: true });
+}));
 
 const AI_DEFAULT_MODELS = {
   claude: 'claude-haiku-4-5-20251001',

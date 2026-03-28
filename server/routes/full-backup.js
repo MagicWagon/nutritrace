@@ -76,6 +76,13 @@ function restoreFromZip(zip) {
       INSERT OR REPLACE INTO app_config (key, value) VALUES (@key, @value)
     `);
     for (const c of data.app_config || []) insConfig.run(c);
+
+    db.prepare('DELETE FROM ai_chat_history').run();
+    const insChat = db.prepare(`
+      INSERT OR IGNORE INTO ai_chat_history (id, user_id, role, content, created_at)
+      VALUES (@id, @user_id, @role, @content, @created_at)
+    `);
+    for (const m of data.ai_chat_history || []) insChat.run(m);
   })();
 
   // Restore images
@@ -96,12 +103,13 @@ function restoreFromZip(zip) {
 
 function dumpDatabase() {
   return {
-    users:         db.prepare('SELECT * FROM users').all(),
-    foods:         db.prepare('SELECT * FROM foods').all(),
-    meals:         db.prepare('SELECT * FROM meals').all(),
-    diary:         db.prepare('SELECT * FROM diary').all(),
-    user_settings: db.prepare('SELECT * FROM user_settings').all(),
-    app_config:    db.prepare('SELECT * FROM app_config').all(),
+    users:            db.prepare('SELECT * FROM users').all(),
+    foods:            db.prepare('SELECT * FROM foods').all(),
+    meals:            db.prepare('SELECT * FROM meals').all(),
+    diary:            db.prepare('SELECT * FROM diary').all(),
+    user_settings:    db.prepare('SELECT * FROM user_settings').all(),
+    app_config:       db.prepare('SELECT * FROM app_config').all(),
+    ai_chat_history:  db.prepare('SELECT * FROM ai_chat_history').all(),
   };
 }
 

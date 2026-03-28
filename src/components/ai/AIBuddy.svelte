@@ -31,15 +31,42 @@
   }
 
   onMount(async () => {
+    // Load history from server; fall back to localStorage for offline / migration
     try {
-      const saved = localStorage.getItem('wl:aiChatHistory');
-      if (saved) messages = JSON.parse(saved);
-    } catch {}
+      const rows = await NtApi.get('/api/ai/history');
+      if (rows.length) {
+        messages = rows.map(r => ({ role: r.role, content: r.content, time: _fmtCreatedAt(r.created_at) }));
+        localStorage.removeItem('wl:aiChatHistory'); // clear migrated local copy
+      } else {
+        const saved = localStorage.getItem('wl:aiChatHistory');
+        if (saved) {
+          const local = JSON.parse(saved);
+          if (local.length) {
+            // Migrate localStorage messages to server
+            messages = local;
+            for (const m of local) {
+              await NtApi.post('/api/ai/history', { role: m.role, content: m.content }).catch(() => {});
+            }
+            localStorage.removeItem('wl:aiChatHistory');
+          }
+        }
+      }
+    } catch {
+      try {
+        const saved = localStorage.getItem('wl:aiChatHistory');
+        if (saved) messages = JSON.parse(saved);
+      } catch {}
+    }
     try {
       const res = await fetch('/api/app-config/env-locks', { credentials: 'include' });
       if (res.ok) { const d = await res.json(); aiEnvLocked = !!d.ai; }
     } catch {}
   });
+
+  function _fmtCreatedAt(iso) {
+    if (!iso) return fmtTime();
+    return new Date(iso + 'Z').toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  }
 
   // ── Draggable FAB ──────────────────────────────────────────────────────────
   /** Saved position: { x, y } from top-left, or null → use CSS default (bottom-right) */
@@ -161,11 +188,15 @@
 
     if (!aiEnvLocked && !key) { showError('Add your API key in Settings → FitBot AI'); return; }
 
-    messages = [...messages, { role: 'user', content, time: fmtTime() }];
+    const userMsg = { role: 'user', content, time: fmtTime() };
+    messages = [...messages, userMsg];
     input    = '';
     loading  = true;
     await tick();
     _scrollBottom();
+
+    // Persist user message to server (best-effort)
+    NtApi.post('/api/ai/history', { role: 'user', content }).catch(() => {});
 
     try {
       const ctx          = await buildContext();
@@ -178,7 +209,8 @@
         ? await callAIProxy({ messages: apiMessages, systemPrompt })
         : await callAI({ provider, apiKey: key, model, messages: apiMessages, systemPrompt });
       messages = [...messages, { role: 'assistant', content: reply, time: fmtTime() }];
-      localStorage.setItem('wl:aiChatHistory', JSON.stringify(messages.slice(-100)));
+      // Persist assistant reply to server (best-effort)
+      NtApi.post('/api/ai/history', { role: 'assistant', content: reply }).catch(() => {});
       if (!panelOpen) hasUnread = true;
     } catch (e) {
       showError(e.message || 'AI request failed');
@@ -200,6 +232,7 @@
   function clearChat() {
     messages = [];
     localStorage.removeItem('wl:aiChatHistory');
+    NtApi.del('/api/ai/history').catch(() => {});
   }
 
   function quickAsk(q) { input = q; send(); }
