@@ -4,12 +4,12 @@
   import { cubicOut } from 'svelte/easing';
   import { DB, localDateStr } from '../lib/db.js';
   import { Nutrition } from '../lib/nutrition.js';
-  import { mealNames, energyUnit, goals, weightUnit, heightUnit } from '../stores/settings.js';
+  import { mealNames, energyUnit, goals, weightUnit, heightUnit, scheduleSave } from '../stores/settings.js';
   import { currentUser, userMgmtActive, loadAuthState } from '../stores/auth.js';
   import { showError } from '../stores/toast.js';
 
-  // Steps: usermgmt (optional), welcome, gender, dob, height, weight, target, activity, summary
-  const BASE_STEPS = ['welcome','gender','dob','height','weight','target','activity','summary'];
+  // Steps: usermgmt (optional), welcome, gender, dob, height, weight, target, activity, integrations, summary
+  const BASE_STEPS = ['welcome','gender','dob','height','weight','target','activity','integrations','summary'];
   const ALL_STEPS  = ['usermgmt', ...BASE_STEPS];
 
   let step = 0;
@@ -37,6 +37,31 @@
   let weight   = 70;
   let targetW  = 65;
   let activity = '';
+
+  // ── Integrations step ─────────────────────────────────────────────────────
+  let intOFFUser     = '';
+  let intOFFPass     = '';
+  let intUSDARKey    = '';
+  let intMealieUrl   = '';
+  let intMealieToken = '';
+  let intAIProvider  = 'claude';
+  let intAIKey       = '';
+
+  // Which cards are collapsed/skipped
+  let intSkipped = { off: false, usda: false, mealie: false, ai: false };
+  let intAILocked  = false;
+  let intStatusLoaded = false;
+
+  $: if (currentStepName === 'integrations' && !intStatusLoaded) {
+    intStatusLoaded = true;
+    fetch('/api/app-config/env-locks', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : {})
+      .then(d => {
+        intAILocked = d.ai === true;
+        if (intAILocked) intSkipped = { ...intSkipped, ai: true };
+      })
+      .catch(() => {});
+  }
 
   // Computed TDEE / goal / water for summary step
   let tdee      = 0;
@@ -150,6 +175,10 @@
     if (currentStepName === 'gender'   && !gender)   return;
     if (currentStepName === 'activity' && !activity) return;
 
+    if (currentStepName === 'integrations') {
+      await _saveIntegrations();
+    }
+
     dir = 1;
     step++;
     if (ALL_STEPS[step] === 'summary') calcSummary();
@@ -164,6 +193,41 @@
   function skip() {
     DB.setSetting('setupComplete', true);
     push('/');
+  }
+
+  async function _saveIntegrations() {
+    if (!intSkipped.off && (intOFFUser.trim() || intOFFPass.trim())) {
+      DB.setSetting('offUsername', intOFFUser.trim());
+      DB.setSetting('offPassword', intOFFPass.trim());
+      scheduleSave('offUsername', intOFFUser.trim());
+      scheduleSave('offPassword', intOFFPass.trim());
+    }
+    if (!intSkipped.usda && intUSDARKey.trim()) {
+      DB.setSetting('usdaApiKey',  intUSDARKey.trim());
+      DB.setSetting('usdaEnabled', true);
+      scheduleSave('usdaApiKey',  intUSDARKey.trim());
+      scheduleSave('usdaEnabled', true);
+    }
+    if (!intSkipped.mealie && (intMealieUrl.trim() || intMealieToken.trim())) {
+      DB.setSetting('mealieBaseUrl',   intMealieUrl.trim());
+      DB.setSetting('mealieApiToken',  intMealieToken.trim());
+      DB.setSetting('mealieEnabled',   true);
+      scheduleSave('mealieBaseUrl',   intMealieUrl.trim());
+      scheduleSave('mealieApiToken',  intMealieToken.trim());
+      scheduleSave('mealieEnabled',   true);
+    }
+    if (!intSkipped.ai && !intAILocked && intAIKey.trim()) {
+      const _putConfig = (key, value) => fetch('/api/app-config', {
+        method: 'PUT', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, value }),
+      }).catch(() => {});
+      await Promise.all([
+        _putConfig('ai_api_key',  intAIKey.trim()),
+        _putConfig('ai_provider', intAIProvider),
+        _putConfig('ai_enabled',  'true'),
+      ]);
+    }
   }
 
   function finish() {
@@ -375,6 +439,122 @@
           {/each}
         </div>
 
+      <!-- ── Integrations ── -->
+      {:else if currentStepName === 'integrations'}
+        <div class="step-hero compact">
+          <span class="material-symbols-rounded hero-icon">extension</span>
+          <h1 class="step-title">Integrations</h1>
+          <p class="step-desc">Connect optional services. Skip anything you don't need — you can configure these later in Settings.</p>
+        </div>
+
+        <div class="int-cards">
+
+          <!-- Open Food Facts -->
+          <div class="int-card" class:int-card-skipped={intSkipped.off}>
+            <div class="int-card-head">
+              <div class="int-card-icon">🥫</div>
+              <div class="int-card-info">
+                <div class="int-card-title">Open Food Facts</div>
+                <div class="int-card-sub">Upload foods you create to the community database</div>
+              </div>
+              {#if intSkipped.off}
+                <button class="int-restore-btn" on:click={() => intSkipped = {...intSkipped, off: false}}>Configure</button>
+              {:else}
+                <button class="int-skip-btn" on:click={() => intSkipped = {...intSkipped, off: true}}>Skip</button>
+              {/if}
+            </div>
+            {#if !intSkipped.off}
+              <div class="int-fields">
+                <input class="input" type="text"     placeholder="Username" bind:value={intOFFUser}  autocomplete="username" />
+                <input class="input" type="password" placeholder="Password" bind:value={intOFFPass}  autocomplete="current-password" />
+              </div>
+            {/if}
+          </div>
+
+          <!-- USDA FoodData Central -->
+          <div class="int-card" class:int-card-skipped={intSkipped.usda}>
+            <div class="int-card-head">
+              <div class="int-card-icon">🔬</div>
+              <div class="int-card-info">
+                <div class="int-card-title">USDA FoodData Central</div>
+                <div class="int-card-sub">Search the USDA food and nutrient database</div>
+              </div>
+              {#if intSkipped.usda}
+                <button class="int-restore-btn" on:click={() => intSkipped = {...intSkipped, usda: false}}>Configure</button>
+              {:else}
+                <button class="int-skip-btn" on:click={() => intSkipped = {...intSkipped, usda: true}}>Skip</button>
+              {/if}
+            </div>
+            {#if !intSkipped.usda}
+              <div class="int-fields">
+                <input class="input" type="text" placeholder="API Key (get free key at fdc.nal.usda.gov)" bind:value={intUSDARKey} />
+              </div>
+            {/if}
+          </div>
+
+          <!-- Mealie -->
+          <div class="int-card" class:int-card-skipped={intSkipped.mealie}>
+            <div class="int-card-head">
+              <div class="int-card-icon">🍽️</div>
+              <div class="int-card-info">
+                <div class="int-card-title">Mealie</div>
+                <div class="int-card-sub">Import recipes from your self-hosted Mealie instance</div>
+              </div>
+              {#if intSkipped.mealie}
+                <button class="int-restore-btn" on:click={() => intSkipped = {...intSkipped, mealie: false}}>Configure</button>
+              {:else}
+                <button class="int-skip-btn" on:click={() => intSkipped = {...intSkipped, mealie: true}}>Skip</button>
+              {/if}
+            </div>
+            {#if !intSkipped.mealie}
+              <div class="int-fields">
+                <input class="input" type="url"  placeholder="Mealie URL (e.g. http://mealie:9000)" bind:value={intMealieUrl} />
+                <input class="input" type="password" placeholder="API Token" bind:value={intMealieToken} autocomplete="off" />
+              </div>
+            {/if}
+          </div>
+
+          <!-- AI Buddy -->
+          {#if intAILocked}
+            <div class="int-card int-card-locked">
+              <div class="int-card-head">
+                <div class="int-card-icon">🤖</div>
+                <div class="int-card-info">
+                  <div class="int-card-title">AI Buddy</div>
+                  <div class="int-card-sub int-locked-label">Configured via environment variables</div>
+                </div>
+                <span class="material-symbols-rounded int-lock-icon">lock</span>
+              </div>
+            </div>
+          {:else}
+            <div class="int-card" class:int-card-skipped={intSkipped.ai}>
+              <div class="int-card-head">
+                <div class="int-card-icon">🤖</div>
+                <div class="int-card-info">
+                  <div class="int-card-title">AI Buddy</div>
+                  <div class="int-card-sub">A nutrition assistant powered by your own AI provider</div>
+                </div>
+                {#if intSkipped.ai}
+                  <button class="int-restore-btn" on:click={() => intSkipped = {...intSkipped, ai: false}}>Configure</button>
+                {:else}
+                  <button class="int-skip-btn" on:click={() => intSkipped = {...intSkipped, ai: true}}>Skip</button>
+                {/if}
+              </div>
+              {#if !intSkipped.ai}
+                <div class="int-fields">
+                  <select class="input" bind:value={intAIProvider}>
+                    <option value="claude">Anthropic (Claude)</option>
+                    <option value="openai">OpenAI (ChatGPT)</option>
+                    <option value="gemini">Google (Gemini)</option>
+                  </select>
+                  <input class="input" type="password" placeholder="API Key" bind:value={intAIKey} autocomplete="off" />
+                </div>
+              {/if}
+            </div>
+          {/if}
+
+        </div>
+
       <!-- ── Summary ── -->
       {:else if currentStepName === 'summary'}
         <h2 class="step-title">Your Daily Goals</h2>
@@ -554,6 +734,46 @@
     display: flex; justify-content: space-between; gap: 12px;
   }
   .wizard-nav .btn { flex: 1; }
+
+  /* Integrations step */
+  .int-cards {
+    display: flex; flex-direction: column; gap: 10px;
+    overflow-y: auto; flex: 1;
+  }
+  .int-card {
+    background: var(--surface-1); border: 1.5px solid var(--border);
+    border-radius: var(--radius-lg); overflow: hidden;
+    transition: opacity var(--dur-fast), border-color var(--dur-fast);
+  }
+  .int-card-skipped { opacity: 0.55; }
+  .int-card-locked  { border-color: var(--accent-dim); }
+  .int-card-head {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 14px;
+  }
+  .int-card-icon { font-size: 24px; line-height: 1; flex-shrink: 0; }
+  .int-card-info { flex: 1; min-width: 0; }
+  .int-card-title { font-size: 14px; font-weight: 600; }
+  .int-card-sub   { font-size: 11px; color: var(--text-3); margin-top: 1px; }
+  .int-locked-label { color: var(--accent); }
+  .int-lock-icon  { font-size: 18px; color: var(--accent); flex-shrink: 0; }
+  .int-skip-btn {
+    font-size: 12px; color: var(--text-3); background: none; border: none;
+    cursor: pointer; padding: 4px 8px; border-radius: var(--radius-sm);
+    flex-shrink: 0;
+  }
+  .int-skip-btn:hover { color: var(--text-1); background: var(--surface-2); }
+  .int-restore-btn {
+    font-size: 12px; color: var(--accent); background: none; border: none;
+    cursor: pointer; padding: 4px 8px; border-radius: var(--radius-sm);
+    font-weight: 600; flex-shrink: 0;
+  }
+  .int-restore-btn:hover { background: var(--accent-dim); }
+  .int-fields {
+    display: flex; flex-direction: column; gap: 8px;
+    padding: 0 14px 14px;
+  }
+  .int-fields .input { font-size: 14px; }
 
   @keyframes spin { to { transform: rotate(360deg); } }
   .spin { animation: spin 0.8s linear infinite; }
