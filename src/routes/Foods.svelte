@@ -27,7 +27,7 @@
     return Object.fromEntries(new URLSearchParams(hash.slice(qIdx + 1)));
   }
 
-  $: { $location; params = qs(); }
+  $: params = qs();
   $: pickMode  = params.pick === '1';
   $: pickMeal  = params.meal;
   $: pickDate  = params.date;

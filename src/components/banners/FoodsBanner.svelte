@@ -156,8 +156,8 @@
     align-items: center;
     gap: 10px;
   }
-  .sil-left  { left:  3%; }
-  .sil-right { right: 3%; }
+  .sil-left  { left:  8%; }
+  .sil-right { right: 8%; }
 
   .sil-wrap {
     opacity: 0.22;
@@ -167,7 +167,7 @@
   }
   /* Height is % of banner height (sil-group spans top:0 bottom:0 → 100% = banner height) */
   .sil-wrap svg {
-    height: clamp(28px, 55%, 52px);
+    height: clamp(34px, 62%, 62px);
     width: auto;
     fill: var(--accent);
   }
