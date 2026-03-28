@@ -22,7 +22,8 @@
            diaryShowPortionSize, diaryShowNutritionBar, diaryTotalsMode,
            diaryShowAllNutrients, diaryShowNutritionUnits, visibleNutriments, hiddenBodyStats,
            dateFormat, timeFormat, disableAnimations, goalCelebrations, pageBanners } from '../stores/settings.js';
-  import DiaryBanner from '../components/banners/DiaryBanner.svelte';
+  import DiaryBanner  from '../components/banners/DiaryBanner.svelte';
+  import WaterBanner  from '../components/banners/WaterBanner.svelte';
   import { editorState } from '../stores/editorState.js';
   import { NtApi } from '../lib/api.js';
   import { DB, localDateStr } from '../lib/db.js';
@@ -829,6 +830,10 @@
 <Sheet bind:open={showWaterQuickAdd} title="Water" on:close={() => { showWaterQuickAdd = false; _waterShowCustom = false; _waterCustomAmt = ''; }}>
   <div class="wc-body">
 
+    <!-- Banner strip -->
+    <div class="wc-banner-strip"><WaterBanner /></div>
+
+    <div class="wc-inner">
     <!-- Bottle + stats -->
     <div class="wc-bottle-section">
       <div class="wc-bottle-wrap" class:wc-overflowing={_waterOverflow}>
@@ -933,9 +938,15 @@
           </div>
         {/each}
       </div>
+    {:else}
+      <div class="wc-empty-log">
+        <span class="material-symbols-rounded wc-empty-icon">water_drop</span>
+        <p class="text-3 text-sm">No water logged yet today</p>
+      </div>
     {/if}
 
     <div style="height:16px"></div>
+    </div><!-- /.wc-inner -->
   </div>
 </Sheet>
 
@@ -1367,7 +1378,24 @@
 
   /* Water quick-add sheet */
   /* ── Water card sheet ─────────────────────────────────────────────────────── */
-  .wc-body { padding: 16px; display: flex; flex-direction: column; }
+  .wc-body { padding: 0; display: flex; flex-direction: column; }
+
+  /* Banner strip — sits flush against the sheet header, SVG fills it */
+  .wc-banner-strip {
+    position: relative;
+    height: 68px;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  /* Inner padding wrapper below the banner */
+  .wc-inner { padding: 0 16px; display: flex; flex-direction: column; }
+
+  .wc-empty-log {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 8px; padding: 28px 0;
+  }
+  .wc-empty-icon { font-size: 36px; color: var(--accent); opacity: 0.4; }
 
   /* Bottle + stats */
   .wc-bottle-section {
