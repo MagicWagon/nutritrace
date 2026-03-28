@@ -161,12 +161,13 @@
 
   .sil-wrap {
     opacity: 0.22;
+    height: 100%;
     display: flex;
     align-items: center;
   }
-  /* Height scales with the banner; clamp keeps it in a sensible range */
+  /* Height is % of banner height (sil-group spans top:0 bottom:0 → 100% = banner height) */
   .sil-wrap svg {
-    height: clamp(30px, 55%, 52px);
+    height: clamp(28px, 55%, 52px);
     width: auto;
     fill: var(--accent);
   }
