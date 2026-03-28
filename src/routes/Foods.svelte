@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { push, location } from 'svelte-spa-router';
   import { fade } from 'svelte/transition';
 
@@ -151,7 +151,7 @@
   $: { search; searchSource; onSearch(); }
 
   function _saveScrollState() {
-    editorState.foodsScrollY   = document.querySelector('.page-content')?.scrollTop ?? window.scrollY;
+    editorState.foodsScrollY   = window.scrollY;
     editorState.foodsActiveTab = activeTab;
   }
 
@@ -351,15 +351,12 @@
     }
     await load();
     await loadYesterdayMeals();
-    // Restore scroll position after the list has rendered
+    // Restore scroll position after Svelte has flushed the list to the DOM
     if (editorState.foodsScrollY != null) {
       const sy = editorState.foodsScrollY;
       editorState.foodsScrollY = null;
-      requestAnimationFrame(() => {
-        const el = document.querySelector('.page-content');
-        if (el) el.scrollTop = sy;
-        else window.scrollTo(0, sy);
-      });
+      await tick();
+      window.scrollTo(0, sy);
     }
   });
 </script>
