@@ -21,7 +21,7 @@
   class:no-anim={noAnim}
   class:no-loop={noLoop}
   viewBox="0 0 500 120"
-  preserveAspectRatio="none"
+  preserveAspectRatio="xMidYMid slice"
   xmlns="http://www.w3.org/2000/svg"
   aria-hidden="true"
 >

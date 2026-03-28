@@ -82,13 +82,13 @@
       </svg>
     </div>
     <div class="sil-wrap sw2">
-      <!-- Apple: body + stem + leaf -->
-      <svg viewBox="0 0 42 58" fill="var(--accent)" aria-hidden="true">
-        <path d="M21,10 C9,10 2,20 3,31 C4,44 12,54 21,54
-                 C30,54 38,44 39,31 C40,20 33,10 21,10 Z"/>
-        <rect x="19.5" y="0" width="3" height="12" rx="1.5"
-              transform="rotate(10,21,6)"/>
-        <path d="M22,6 C28,0 36,4 34,11 C29,13 22,11 22,6 Z"/>
+      <!-- Apple: body with top cleft + stem + leaf -->
+      <svg viewBox="0 0 44 62" fill="var(--accent)" aria-hidden="true">
+        <rect x="19" y="0" width="3" height="14" rx="1.5" transform="rotate(8,20,7)"/>
+        <path d="M22,8 C28,2 37,5 35,12 C30,14 23,12 22,8 Z"/>
+        <path d="M22,16 C22,11 18,8 13,9 C7,10 3,18 3,29
+                 C3,43 11,56 22,56 C33,56 41,43 41,29
+                 C41,18 37,10 31,9 C26,8 22,11 22,16 Z"/>
       </svg>
     </div>
   </div>
@@ -107,28 +107,30 @@
     </div>
   </div>
 
-  <!-- Right silhouettes: bell pepper + spoon -->
+  <!-- Right silhouettes: carrot + spoon -->
   <div class="sil-group sil-right">
     <div class="sil-wrap sw3">
-      <!-- Bell pepper: stem + body + side lobes -->
-      <svg viewBox="0 0 50 76" fill="var(--accent)" aria-hidden="true">
-        <rect x="22" y="0" width="4" height="10" rx="2"/>
-        <path d="M25,10 C12,10 7,18 8,30 C9,44 16,54 20,62
-                 C22,67 24,70 25,72 C26,70 28,67 30,62
-                 C34,54 41,44 42,30 C43,18 38,10 25,10 Z"/>
-        <path d="M9,26 C3,26 1,32 3,38 C5,44 10,46 14,42
-                 C12,36 11,30 9,26 Z"/>
-        <path d="M41,26 C47,26 49,32 47,38 C45,44 40,46 36,42
-                 C38,36 39,30 41,26 Z"/>
+      <!-- Carrot: tapered body + ridge lines + leafy tops -->
+      <svg viewBox="0 0 30 74" fill="var(--accent)" aria-hidden="true">
+        <path d="M15,72 C14,70 4,46 3,22 C3,14 7,9 15,9
+                 C23,9 27,14 27,22 C26,46 16,70 15,72 Z"/>
+        <path fill="none" stroke="white" stroke-opacity="0.4" stroke-width="1.8"
+              d="M7,30 C10,28 20,28 23,30"/>
+        <path fill="none" stroke="white" stroke-opacity="0.4" stroke-width="1.8"
+              d="M6,42 C9,40 21,40 24,42"/>
+        <path fill="none" stroke="white" stroke-opacity="0.4" stroke-width="1.8"
+              d="M8,54 C11,52 19,52 22,54"/>
+        <path d="M13,9 C11,5 8,0 10,0 C12,0 13,4 15,6
+                 C17,4 18,0 20,0 C22,0 19,5 17,9 Z"/>
       </svg>
     </div>
     <div class="sil-wrap sw4">
-      <!-- Spoon: single closed path, oval bowl into handle -->
-      <svg viewBox="0 0 26 68" fill="var(--accent)" aria-hidden="true">
-        <path d="M9,68 C7,68 6,66 6,63 L6,30
-                 C3,25 1,20 1,14 C1,6 6,0 13,0
-                 C20,0 25,6 25,14 C25,20 23,25 20,30
-                 L20,63 C20,66 19,68 17,68 Z"/>
+      <!-- Spoon: wide oval bowl narrowing to a thin handle -->
+      <svg viewBox="0 0 24 72" fill="var(--accent)" aria-hidden="true">
+        <path d="M12,72 C10.5,72 10,71 10,68 L10,28
+                 C7,25 2,20 2,12 C2,4 6,0 12,0
+                 C18,0 22,4 22,12 C22,20 17,25 14,28
+                 L14,68 C14,71 13.5,72 12,72 Z"/>
       </svg>
     </div>
   </div>
