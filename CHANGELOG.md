@@ -5,6 +5,36 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.14.0-alpha] — 2026-03-28
+
+### Added
+- **WellnessBanner** — animated SVG banner for the Wellness page header: footstep trail walking left→right with sequential stamp animation, floating Zzz's looping upward, and twinkling stars; dual radial glow gradients (warm left / cool right); full `no-anim` / `no-loop` class support and `prefers-reduced-motion` media query
+
+### Changed
+- Sidebar version string updated to v0.14.0-alpha
+
+### Fixed
+- Water card banner title position corrected from `padding-bottom: 52px` to `16px` — the strip is a fixed 110px tall (not the 140–180px mobile page-header height), so the same padding pushed the title to mid-strip instead of the proportional lower-third position
+
+---
+
+## [0.13.0-alpha] — 2026-03-28
+
+### Added
+- **Wellness section** — new nav entry (replaces the Stats slot in BottomNav; sits between Foods and Goals in Sidebar) with dedicated `/wellness` route; powered by Fitbit integration with full OAuth 2.0 PKCE flow
+- **Fitbit integration** — connects to Fitbit API to sync: Steps, Distance, Floors Climbed, Active Minutes, Calories Burned (Movement tab); Sleep Duration, Efficiency, Deep/Light/REM/Wake stages with visual stage breakdown bar (Sleep tab); Resting Heart Rate, HRV (RMSSD), SpO2, Respiratory Rate (Heart tab)
+- **Wellness DB tables** — `wellness_data` (source-keyed per-metric storage for future Garmin/Withings/Google Health support) and `fitbit_tokens` (per-user OAuth tokens) added to SQLite schema
+- **Settings → Labs section** — new "Experimental" section with Activity Tracking toggle, auto/manual sync mode selector, and Fitbit API credential fields (Client ID, Client Secret, Redirect URI with auto-suggested value + copy button); credential fields shown to admins only in multi-user mode
+- **Fitbit OAuth server routes** — `GET /api/wellness/fitbit/authorize` (PKCE redirect), `GET /api/wellness/fitbit/callback` (token exchange), `POST /api/wellness/fitbit/sync` (fetch all metrics), `GET /api/wellness/fitbit/data` (read stored data), `DELETE /api/wellness/fitbit/disconnect`
+- **Wellness goals** — Steps, Active Minutes, and Sleep Duration goal fields in Goals page when Wellness is enabled (both "Your Goals" and "All Fields" tabs)
+- **Date navigation on Wellness** — browse historical data by day (same UX as Diary); auto-sync on open with 15-minute cooldown when sync mode is set to auto
+
+### Changed
+- BottomNav: Stats tab replaced by Wellness (`monitor_heart` icon); Stats remains accessible via Sidebar and Settings start-page
+- BottomNav Stats tab replaced by Wellness (`monitor_heart` icon); Stats remains accessible via Sidebar
+
+---
+
 ## [0.12.0-alpha] — 2026-03-28
 
 ### Added

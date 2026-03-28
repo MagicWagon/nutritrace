@@ -24,6 +24,7 @@
   import ResetPassword  from './routes/ResetPassword.svelte';
   import AcceptInvite   from './routes/AcceptInvite.svelte';
   import AIBuddy    from './components/ai/AIBuddy.svelte';
+  import Wellness   from './routes/Wellness.svelte';
 
   const routes = {
     '/':                Diary,
@@ -33,6 +34,7 @@
     '/meal-editor':     MealEditor,
     '/meal-editor/:id': MealEditor,
     '/statistics':      Statistics,
+    '/wellness':        Wellness,
     '/goals':           Goals,
     '/settings':        Settings,
     '/wizard':          Wizard,

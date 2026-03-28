@@ -24,6 +24,7 @@
     sidebarPersistent, goalCelebrations, pageBanners, loopBannerAnimations,
     aiEnabled, aiProvider, aiApiKey, aiModel, aiAssistantName,
     waterGoalMl, waterUnit, waterContainers, waterShowInStats, waterShowInDiary,
+    wellnessEnabled, wellnessMetrics, wellnessSyncMode,
   } from '../stores/settings.js';
   import { mealIcon } from '../lib/mealIcon.js';
   import { DB } from '../lib/db.js';
@@ -35,7 +36,7 @@
   $: isDark = $appearance === 'dark' || ($appearance === 'system' && (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches));
   let openSections = { appearance: true, regional: false, diary: false, foods: false, water: false,
                        categories: false, nutrients: false, bodyStats: false, statistics: false,
-                       units: false, connectedServices: false, ai: false,
+                       units: false, connectedServices: false, ai: false, labs: false,
                        backup: false, email: false, users: false, about: false };
 
   function toggleSection(key) {
@@ -60,6 +61,7 @@
     units:             ['units','energy unit','weight unit','height','circumference','imperial','metric'],
     connectedServices: ['connected services','usda','open food facts','mealie','recipe','search language','country','api key','credentials','username','password'],
     ai:                ['ai','fitbot','assistant','provider','model','api key','artificial intelligence','chat'],
+    labs:              ['labs','experimental','wellness','activity tracking','fitbit','fitness tracker','steps','sleep','heart rate','hrv','spo2','client id','client secret','redirect uri','sync mode'],
     backup:            ['backup','export','import','restore','waistline','csv','clear data','json','full backup','images','zip'],
     email:             ['email','smtp','mail','password reset','invites','notifications'],
     users:             ['users','user management','accounts','login','password','admin','register','profile'],
@@ -108,6 +110,7 @@
     { value: '/',           label: 'Diary'      },
     { value: '/foods',      label: 'Foods'      },
     { value: '/statistics', label: 'Statistics' },
+    { value: '/wellness',   label: 'Wellness'   },
     { value: '/goals',      label: 'Goals'      },
     { value: '/settings',   label: 'Settings'   },
   ];
@@ -293,6 +296,43 @@
   // Reset model to provider default when provider changes
   $: if (aiModelVal && !AI_MODELS[aiProviderVal]?.find(m => m.value === aiModelVal)) {
     aiModelVal = AI_DEFAULT_MODELS[aiProviderVal] || '';
+  }
+
+  // ── Labs / Wellness ────────────────────────────────────────────────────────
+  let wellnessEnabledVal = DB.getSetting('wellnessEnabled', false);
+  let wellnessSyncModeVal = DB.getSetting('wellnessSyncMode', 'auto');
+  let labsFitbitClientId     = '';
+  let labsFitbitClientSecret = '';
+  let labsFitbitRedirectUri  = '';
+  let labsFitbitShowSecret   = false;
+  let labsFitbitRedirectSuggested = '';
+  let labsLoaded = false;
+
+  async function loadLabsConfig() {
+    if (labsLoaded) return;
+    labsLoaded = true;
+    labsFitbitRedirectSuggested = `${window.location.origin}/api/wellness/fitbit/callback`;
+    try {
+      const cfg = await NtApi.get('/api/app-config');
+      labsFitbitClientId     = cfg.fitbit_client_id     || '';
+      labsFitbitClientSecret = cfg.fitbit_client_secret || '';
+      labsFitbitRedirectUri  = cfg.fitbit_redirect_uri  || labsFitbitRedirectSuggested;
+    } catch { /* non-admin users can't fetch app-config; hide fields below */ }
+  }
+
+  async function saveLabsFitbit() {
+    try {
+      await Promise.all([
+        NtApi.put('/api/app-config', { key: 'fitbit_client_id',     value: labsFitbitClientId }),
+        NtApi.put('/api/app-config', { key: 'fitbit_client_secret', value: labsFitbitClientSecret }),
+        NtApi.put('/api/app-config', { key: 'fitbit_redirect_uri',  value: labsFitbitRedirectUri }),
+      ]);
+      showSuccess('Fitbit settings saved');
+    } catch (e) { showError('Failed to save: ' + e.message); }
+  }
+
+  function copyRedirectUri() {
+    navigator.clipboard.writeText(labsFitbitRedirectUri || labsFitbitRedirectSuggested).then(() => showSuccess('Copied'));
   }
 
   // ── Meal names ─────────────────────────────────────────────────────────────
@@ -2025,6 +2065,98 @@
       </div>
     {/if}
 
+    <!-- ── Labs ─────────────────────────────────────────────────────────────── -->
+    <button class="section-toggle labs-toggle" class:hidden={!sectionVisible(settingsQuery, 'labs')} on:click={() => { toggleSection('labs'); loadLabsConfig(); }}>
+      <span class="material-symbols-rounded si">science</span>
+      <span>Labs <span class="labs-badge">Experimental</span></span>
+      <span class="material-symbols-rounded chevron" class:rotated={openSections.labs}>expand_more</span>
+    </button>
+    {#if sectionOpen(openSections, settingsQuery, 'labs') && sectionVisible(settingsQuery, 'labs')}
+      <div class="section-body" transition:slide={{ duration: 180 }}>
+        <p class="sub-label" style="padding-bottom:4px">Experimental features that may change in future versions</p>
+
+        <!-- Wellness toggle -->
+        <div class="card settings-card">
+          <div class="setting-row">
+            <div>
+              <span class="setting-label">Activity Tracking (Wellness)</span>
+              <div class="setting-desc">Adds a Wellness section to sync steps, sleep, heart rate, and more from your fitness tracker</div>
+            </div>
+            <Toggle checked={wellnessEnabledVal} on:change={e => { wellnessEnabledVal = e.detail; wellnessEnabled.set(e.detail); }} />
+          </div>
+
+          {#if wellnessEnabledVal}
+            <div class="setting-divider"></div>
+            <div class="setting-row">
+              <span class="setting-label">Sync Mode</span>
+              <div class="select-wrap" style="width:150px">
+                <select class="select sel-sm" bind:value={wellnessSyncModeVal} on:change={e => wellnessSyncMode.set(e.target.value)}>
+                  <option value="auto">Auto (on open)</option>
+                  <option value="manual">Manual only</option>
+                </select>
+              </div>
+            </div>
+          {/if}
+        </div>
+
+        <!-- Fitbit API credentials (admin only) -->
+        {#if $currentUser?.role === 'admin' || !$userMgmtActive}
+          <p class="sub-label" style="padding-top:12px">Fitbit API Credentials</p>
+          <p class="sub-label" style="font-size:11px;padding-bottom:6px;opacity:0.7">
+            Create a Fitbit app at <strong>dev.fitbit.com</strong>, set OAuth 2.0 Application Type to "Personal",
+            and copy the Client ID and Secret below.
+          </p>
+          <div class="card settings-card" style="padding:16px;display:flex;flex-direction:column;gap:12px">
+            <div class="form-group">
+              <label class="form-label">Client ID</label>
+              <input class="input" type="text" autocomplete="off" placeholder="e.g. 23ABC123"
+                bind:value={labsFitbitClientId} />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Client Secret</label>
+              <div style="display:flex;gap:6px">
+                <input class="input" type={labsFitbitShowSecret ? 'text' : 'password'} autocomplete="new-password"
+                  placeholder="••••••••" bind:value={labsFitbitClientSecret} style="flex:1" />
+                <button class="btn-icon" on:click={() => labsFitbitShowSecret = !labsFitbitShowSecret}
+                  title={labsFitbitShowSecret ? 'Hide' : 'Show'}>
+                  <span class="material-symbols-rounded">{labsFitbitShowSecret ? 'visibility_off' : 'visibility'}</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Redirect URI</label>
+              <div class="setting-desc" style="margin-bottom:4px">
+                Add this exact URI to your Fitbit app's "Redirect URL" list
+              </div>
+              <div style="display:flex;gap:6px">
+                <input class="input" type="url" placeholder={labsFitbitRedirectSuggested}
+                  bind:value={labsFitbitRedirectUri} style="flex:1;font-size:12px" />
+                <button class="btn-icon" on:click={copyRedirectUri} title="Copy URI" aria-label="Copy redirect URI">
+                  <span class="material-symbols-rounded">content_copy</span>
+                </button>
+              </div>
+              {#if labsFitbitRedirectSuggested}
+                <div class="setting-desc" style="font-size:11px;margin-top:2px">
+                  Suggested: <code style="font-size:11px">{labsFitbitRedirectSuggested}</code>
+                </div>
+              {/if}
+            </div>
+
+            <button class="btn btn-primary" style="align-self:flex-end" on:click={saveLabsFitbit}>Save Fitbit Settings</button>
+          </div>
+        {:else if $userMgmtActive}
+          <div class="card settings-card" style="padding:14px">
+            <div style="display:flex;align-items:center;gap:8px;color:var(--text-2)">
+              <span class="material-symbols-rounded" style="font-size:18px">admin_panel_settings</span>
+              <span style="font-size:13px">Fitbit API credentials are configured by your administrator.</span>
+            </div>
+          </div>
+        {/if}
+      </div>
+    {/if}
+
     <p class="settings-group-label">App</p>
     <!-- ── Backup & Restore ────────────────────────────────────────────────── -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'backup')} on:click={() => toggleSection('backup')}>
@@ -2930,6 +3062,20 @@
 
   .form-group { display: flex; flex-direction: column; gap: 6px; }
   .form-label { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); }
+
+  /* Labs section */
+  .labs-badge {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    background: linear-gradient(135deg, #f59e0b, #ef4444);
+    color: #fff;
+    padding: 2px 6px;
+    border-radius: 99px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
   .about-hero {
     display: flex; align-items: center; gap: 16px; padding: 16px;
   }

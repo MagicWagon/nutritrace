@@ -11,6 +11,7 @@ const ALLOWED_KEYS = new Set([
   'smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_pass', 'smtp_from',
   'ai_enabled', 'ai_provider', 'ai_api_key', 'ai_model',
   'session_hours',
+  'fitbit_client_id', 'fitbit_client_secret', 'fitbit_redirect_uri',
 ]);
 
 // ── GET /api/app-config/env-locks — which sections are locked by env vars ──
@@ -24,7 +25,7 @@ router.get('/', requireAuth, requireAdmin, wrap((req, res) => {
   const rows = db.prepare('SELECT key, value FROM app_config').all();
   const out = {};
   for (const { key, value } of rows) {
-    const redacted = key === 'smtp_pass' || key === 'ai_api_key';
+    const redacted = key === 'smtp_pass' || key === 'ai_api_key' || key === 'fitbit_client_secret';
     out[key] = redacted ? (value ? '••••••••' : '') : (value || '');
   }
   res.json(out);
@@ -38,7 +39,7 @@ router.put('/', requireAuth, requireAdmin, wrap((req, res) => {
   if (key.startsWith('smtp_') && isSmtpEnvLocked()) return res.status(403).json({ error: 'SMTP is configured via environment variables and cannot be changed here.' });
   if (key.startsWith('ai_')   && isAiEnvLocked())   return res.status(403).json({ error: 'AI is configured via environment variables and cannot be changed here.' });
   // Don't overwrite secrets with the redaction placeholder
-  if ((key === 'smtp_pass' || key === 'ai_api_key') && value === '••••••••') return res.json({ ok: true });
+  if ((key === 'smtp_pass' || key === 'ai_api_key' || key === 'fitbit_client_secret') && value === '••••••••') return res.json({ ok: true });
   db.prepare('INSERT INTO app_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
     .run(key, value || null);
   res.json({ ok: true });

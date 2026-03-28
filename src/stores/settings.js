@@ -23,6 +23,7 @@ const SERVER_SETTINGS = new Set([
   'aiEnabled','aiProvider','aiApiKey','aiModel','aiAssistantName',
   'usdaEnabled','usdaApiKey','offUsername','offPassword',
   'mealieEnabled','mealieBaseUrl','mealieApiToken',
+  'wellnessEnabled','wellnessMetrics','wellnessSyncMode',
   // Appearance / UI prefs — included so full backups restore the full look-and-feel
   'appearance','accentColor',
   'navStyle','sidebarPersistent','startPage','disableAnimations','goalCelebrations','pageBanners','loopBannerAnimations',
@@ -217,6 +218,11 @@ export const catDisplay = c => { const l = catLabel(c); return l ? `${l} ${catNa
 // Page banners
 export const pageBanners          = createSettingStore('pageBanners',          false);
 export const loopBannerAnimations = createSettingStore('loopBannerAnimations', true);
+
+// Wellness (Activity Tracking)
+export const wellnessEnabled    = createSettingStore('wellnessEnabled',    false);
+export const wellnessMetrics    = createSettingStore('wellnessMetrics',    null); // null = all visible
+export const wellnessSyncMode   = createSettingStore('wellnessSyncMode',   'auto'); // 'auto' | 'manual'
 
 // FitBot AI
 export const aiEnabled       = createSettingStore('aiEnabled',       false);

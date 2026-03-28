@@ -93,6 +93,30 @@ db.exec(`
   );
 `);
 
+// ── Wellness tables ────────────────────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS wellness_data (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER,
+    date        TEXT NOT NULL,
+    source      TEXT NOT NULL DEFAULT 'fitbit',
+    metric_type TEXT NOT NULL,
+    value       REAL,
+    metadata    TEXT DEFAULT '{}',
+    synced_at   TEXT DEFAULT (datetime('now')),
+    UNIQUE(user_id, date, source, metric_type)
+  );
+
+  -- user_id = NULL in single-user mode; INTEGER PRIMARY KEY allows any value incl. 0
+  CREATE TABLE IF NOT EXISTS fitbit_tokens (
+    user_id        INTEGER PRIMARY KEY,
+    access_token   TEXT NOT NULL,
+    refresh_token  TEXT NOT NULL,
+    expires_at     TEXT NOT NULL,
+    fitbit_user_id TEXT
+  );
+`);
+
 // ── Migrations ─────────────────────────────────────────────────────────────
 function columnExists(table, col) {
   return db.prepare(`PRAGMA table_info(${table})`).all().some(r => r.name === col);

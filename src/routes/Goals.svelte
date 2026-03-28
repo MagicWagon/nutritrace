@@ -3,7 +3,7 @@
   import { DB, localDateStr } from '../lib/db.js';
   import { NtApi } from '../lib/api.js';
   import { portal } from '../lib/portal.js';
-  import { goals, goalTemplates, energyUnit, weightUnit, heightUnit, lengthUnit, visibleNutriments, hiddenBodyStats, waterGoalMl, waterUnit, pageBanners } from '../stores/settings.js';
+  import { goals, goalTemplates, energyUnit, weightUnit, heightUnit, lengthUnit, visibleNutriments, hiddenBodyStats, waterGoalMl, waterUnit, pageBanners, wellnessEnabled } from '../stores/settings.js';
   import GoalsBanner from '../components/banners/GoalsBanner.svelte';
   import { NUTRIMENTS, Nutrition } from '../lib/nutrition.js';
   import { loadEntry } from '../stores/diary.js';
@@ -37,12 +37,21 @@
     return true;
   });
 
-  // All fields for goal-setting: all body stats + all nutrients
-  $: allFields = [...bodyStatsWithUnit, ...allNutrients];
+  // Wellness goal fields (shown when wellness is enabled)
+  const WELLNESS_GOALS = [
+    { id: 'steps',              label: 'Daily Steps',       unit: 'steps', isWellness: true },
+    { id: 'active_minutes',     label: 'Active Minutes',    unit: 'min',   isWellness: true },
+    { id: 'sleep_duration_min', label: 'Sleep Duration',    unit: 'min',   isWellness: true },
+  ];
+
+  // All fields for goal-setting: all body stats + all nutrients + wellness if enabled
+  $: wellnessFields = $wellnessEnabled ? WELLNESS_GOALS : [];
+  $: allFields = [...bodyStatsWithUnit, ...allNutrients, ...wellnessFields];
   // Your Goals: categorized
   $: configuredBodyStats = bodyStatsWithUnit.filter(s => $goals[s.id]);
   $: configuredNutrients = allNutrients.filter(s => $goals[s.id]);
-  $: hasAnyGoal = configuredBodyStats.length > 0 || configuredNutrients.length > 0;
+  $: configuredWellness  = wellnessFields.filter(s => $goals[s.id]);
+  $: hasAnyGoal = configuredBodyStats.length > 0 || configuredNutrients.length > 0 || configuredWellness.length > 0;
 
   let activeTab = 'yours'; // 'yours' | 'all' | 'templates'
 
@@ -334,6 +343,27 @@
             {/each}
           </div>
         {/if}
+
+        {#if configuredWellness.length > 0}
+          <p class="section-title">Wellness</p>
+          <div class="card">
+            {#each configuredWellness as stat, i}
+              {#if i > 0}<div class="divider"></div>{/if}
+              <button class="goal-row" on:click={() => openEdit(stat)}>
+                <div class="goal-info">
+                  <span class="font-medium">{stat.label}</span>
+                  {#if getTarget(stat) != null}
+                    {@const tgt = getTarget(stat)}
+                    <span class="text-3 text-sm">Goal: {tgt} {stat.unit}</span>
+                  {:else}
+                    <span class="text-3 text-sm">Not set</span>
+                  {/if}
+                </div>
+                <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
+              </button>
+            {/each}
+          </div>
+        {/if}
       {/if}
 
       <!-- Water Goal -->
@@ -419,6 +449,28 @@
           <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
         </button>
       </div>
+
+      <!-- Wellness (when enabled) -->
+      {#if $wellnessEnabled}
+        <p class="section-title">Wellness</p>
+        <div class="card">
+          {#each WELLNESS_GOALS as stat, i}
+            {#if i > 0}<div class="divider"></div>{/if}
+            <button class="goal-row" on:click={() => openEdit(stat)}>
+              <div class="goal-info">
+                <span class="font-medium">{stat.label}</span>
+                {#if $goals[stat.id]}
+                  {@const tgt = getTarget(stat)}
+                  <span class="text-3 text-sm">Goal: {tgt} {stat.unit}</span>
+                {:else}
+                  <span class="text-3 text-sm" style="opacity:0.4">No goal</span>
+                {/if}
+              </div>
+              <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
+            </button>
+          {/each}
+        </div>
+      {/if}
 
     <!-- ── Templates tab ── -->
     {:else if activeTab === 'templates'}

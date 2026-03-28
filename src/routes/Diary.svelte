@@ -1387,7 +1387,10 @@
   /* ── Water card sheet ─────────────────────────────────────────────────────── */
   .wc-body { padding: 0; display: flex; flex-direction: column; }
 
-  /* Banner strip — flush against the sheet top, SVG fills it, title sits at bottom-left */
+  /* Banner strip — flush against the sheet top, SVG fills it, title sits at bottom-left.
+     The page-header.has-banner uses padding-bottom:52px but on a ~150px header (safe area
+     adds significant padding-top). On our fixed 110px strip that same value pushes the
+     title to the middle; 16px keeps it in the natural bottom-third like other banners. */
   .wc-banner-strip {
     position: relative;
     height: 110px;
@@ -1396,7 +1399,7 @@
     clip-path: inset(0);
     display: flex;
     align-items: flex-end;
-    padding: 0 20px 52px;
+    padding: 0 20px 16px;
   }
   .wc-banner-title {
     position: relative;
