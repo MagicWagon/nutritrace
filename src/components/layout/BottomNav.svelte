@@ -1,6 +1,6 @@
 <script>
   import { location, push } from 'svelte-spa-router';
-  import { wellnessEnabled } from '../../stores/settings.js';
+  import { wellnessEnabled, fitbitEnabled, withingsEnabled } from '../../stores/settings.js';
   import WellnessIcon from '../icons/WellnessIcon.svelte';
 
   const BASE_TABS = [
@@ -14,7 +14,8 @@
   const WELLNESS_TAB = { path: '/wellness', customIcon: WellnessIcon, label: 'Wellness' };
 
   // Wellness tab inserted after Foods (where Water used to be) when the feature is enabled
-  $: tabs = $wellnessEnabled
+  $: showWellness = $wellnessEnabled && ($fitbitEnabled || $withingsEnabled);
+  $: tabs = showWellness
     ? [...BASE_TABS.slice(0, 2), WELLNESS_TAB, ...BASE_TABS.slice(2)]
     : BASE_TABS;
 

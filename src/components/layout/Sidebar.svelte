@@ -4,7 +4,7 @@
   import { location, push } from 'svelte-spa-router';
   import { createEventDispatcher } from 'svelte';
   import { currentUser, userMgmtActive, logout } from '../../stores/auth.js';
-  import { wellnessEnabled } from '../../stores/settings.js';
+  import { wellnessEnabled, fitbitEnabled, withingsEnabled } from '../../stores/settings.js';
   import WellnessIcon from '../icons/WellnessIcon.svelte';
 
   export let open = false;
@@ -31,7 +31,8 @@
 
   const WELLNESS_NAV = { path: '/wellness', customIcon: WellnessIcon, label: 'Wellness' };
 
-  $: navItems = $wellnessEnabled
+  $: showWellness = $wellnessEnabled && ($fitbitEnabled || $withingsEnabled);
+  $: navItems = showWellness
     ? [...BASE_NAV.slice(0, 2), WELLNESS_NAV, ...BASE_NAV.slice(2)]
     : BASE_NAV;
 

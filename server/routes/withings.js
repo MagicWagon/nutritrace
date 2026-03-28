@@ -191,6 +191,8 @@ const WELLNESS_TYPES = {
   169: 'muscle_mass_torso_kg',
   170: 'muscle_mass_left_leg_kg',
   171: 'muscle_mass_right_leg_kg',
+  // Fat mass segmental
+  174: 'visceral_fat_mass_kg',  // NOTE: 174 also used above — last definition wins (visceral_fat_mass_kg)
 };
 
 function _withingsValue(measure) {
@@ -204,36 +206,52 @@ function _dateFromUnix(ts) {
 
 // ── Sync measurements for a date range ────────────────────────────────────────
 async function _syncRange(userId, fromDate, toDate) {
+  // Use local midnight → end-of-day timestamps
   const startTs = Math.floor(new Date(fromDate + 'T00:00:00').getTime() / 1000);
   const endTs   = Math.floor(new Date(toDate   + 'T23:59:59').getTime() / 1000);
 
-  // Fetch all relevant measurement types in one call
-  const measTypes = [
-    ...Object.keys(BODY_STAT_TYPES),
-    ...Object.keys(WELLNESS_TYPES),
-  ].filter((v, i, a) => a.indexOf(v) === i).join(',');
+  // Withings measure type IDs we care about (deduplicated)
+  const measTypeSet = new Set([
+    ...Object.keys(BODY_STAT_TYPES).map(Number),
+    ...Object.keys(WELLNESS_TYPES).map(Number),
+  ]);
+  const measTypes = [...measTypeSet].join(',');
 
-  const body = await _wPost(userId, '/measure', {
-    action:    'getmeas',
-    meastype:  measTypes,
-    category:  1,
-    startdate: startTs,
-    enddate:   endTs,
-  });
+  let body;
+  try {
+    body = await _wPost(userId, '/measure', {
+      action:    'getmeas',
+      meastype:  measTypes,
+      category:  1,
+      startdate: startTs,
+      enddate:   endTs,
+    });
+  } catch (err) {
+    // Log full error for debugging; re-throw so the caller surfaces it
+    console.error('[withings] /measure failed:', err.message);
+    throw err;
+  }
 
   const grps = body.measuregrps || [];
-  let synced = 0;
+  console.log(`[withings] /measure returned ${grps.length} groups for ${fromDate}→${toDate} (ts ${startTs}→${endTs})`);
 
-  // Get list of paired devices for model names
+  // Get device model names (GET endpoint, not POST)
   let deviceModels = {};
   try {
-    const deviceBody = await _wPost(userId, '/v2/user', { action: 'getdevice' });
-    for (const d of deviceBody.devices || []) {
-      deviceModels[d.deviceid] = d.model || d.type || 'Withings';
+    const tok = await _token(userId);
+    const devRes = await fetch('https://wbsapi.withings.net/v2/user?action=getdevice', {
+      headers: { Authorization: `Bearer ${tok}` },
+    });
+    const devJson = await devRes.json();
+    for (const d of devJson.body?.devices || []) {
+      deviceModels[d.deviceid] = d.model_id ? `Withings ${d.model}` : (d.model || 'Withings');
     }
-  } catch { /* device list is optional — don't fail sync */ }
+  } catch { /* device list optional */ }
 
-  // Group by date
+  // Use single user_id value — 0 for single-user (never null, to match read queries)
+  const uid = userId ?? 0;
+
+  // Group measurements by date
   const byDate = {};
   for (const grp of grps) {
     const date = _dateFromUnix(grp.date);
@@ -249,7 +267,6 @@ async function _syncRange(userId, fromDate, toDate) {
   `);
 
   for (const [date, entries] of Object.entries(byDate)) {
-    // Collect body_stat values to merge into diary
     const bodyStatUpdates = {};
 
     for (const { grp, deviceModel } of entries) {
@@ -257,15 +274,13 @@ async function _syncRange(userId, fromDate, toDate) {
         const type = measure.type;
         const value = _withingsValue(measure);
 
-        // Store in wellness_data
-        const wellnessMetric = WELLNESS_TYPES[type] ||
-          (BODY_STAT_TYPES[type] ? `withings_${BODY_STAT_TYPES[type].metric}` : null);
-        if (wellnessMetric || BODY_STAT_TYPES[type]) {
-          const metricKey = WELLNESS_TYPES[type] || BODY_STAT_TYPES[type].metric;
-          upsertWellness.run(userId || null, date, metricKey, value, deviceModel);
+        // Determine metric key — BODY_STAT_TYPES takes priority for diary auto-fill
+        const metricKey = BODY_STAT_TYPES[type]?.metric || WELLNESS_TYPES[type];
+        if (metricKey) {
+          upsertWellness.run(uid, date, metricKey, value, deviceModel);
         }
 
-        // Collect for diary body_stats merge
+        // Collect body stats to merge into diary
         if (BODY_STAT_TYPES[type]) {
           const stat = BODY_STAT_TYPES[type];
           if (!bodyStatUpdates[stat.metric] || grp.date > (bodyStatUpdates[stat.metric]._ts || 0)) {
@@ -275,41 +290,39 @@ async function _syncRange(userId, fromDate, toDate) {
       }
     }
 
-    // Merge into diary body_stats (don't overwrite manual entries)
     if (Object.keys(bodyStatUpdates).length > 0) {
-      _mergeDiaryBodyStats(userId, date, bodyStatUpdates);
+      _mergeDiaryBodyStats(uid, date, bodyStatUpdates);
     }
-    synced++;
   }
 
-  return { synced, dates: Object.keys(byDate).length };
+  const dates = Object.keys(byDate).length;
+  console.log(`[withings] stored data for ${dates} date(s)`);
+  return { synced: dates, dates };
 }
 
 function _mergeDiaryBodyStats(userId, date, updates) {
-  // Read existing diary entry
-  const u = userId;
-  const row = u === 0 || u == null
+  // Diary uses user_id = NULL for single-user (consistent with diary route)
+  // wellness_data uses 0 for single-user — convert here
+  const u = (userId === 0 || userId == null) ? null : userId;
+
+  const row = u == null
     ? db.prepare('SELECT body_stats FROM diary WHERE date = ? AND user_id IS NULL').get(date)
-      || db.prepare('SELECT body_stats FROM diary WHERE date = ?').get(date)
     : db.prepare('SELECT body_stats FROM diary WHERE date = ? AND user_id = ?').get(date, u);
 
   const existing = JSON.parse(row?.body_stats || '{}');
 
-  // Only write metrics that have no existing manual value
-  // (we identify Withings-sourced values by also being in wellness_data)
   let changed = false;
   for (const [key, { value }] of Object.entries(updates)) {
+    // Only fill if no existing value — don't overwrite manual entries
     if (existing[key] == null) {
       existing[key] = value;
       changed = true;
     }
-    // If already has a value, leave it — user may have entered it manually
   }
 
   if (!changed) return;
 
-  // Upsert diary with merged body_stats
-  if (u === 0 || u == null) {
+  if (u == null) {
     db.prepare(`
       INSERT INTO diary (date, items, body_stats, water, updated_at)
       VALUES (?, '[]', ?, '[]', datetime('now'))
