@@ -827,11 +827,18 @@
 </div>
 
 <!-- Water card sheet -->
-<Sheet bind:open={showWaterQuickAdd} title="Water" on:close={() => { showWaterQuickAdd = false; _waterShowCustom = false; _waterCustomAmt = ''; }}>
+<Sheet bind:open={showWaterQuickAdd} title="" on:close={() => { showWaterQuickAdd = false; _waterShowCustom = false; _waterCustomAmt = ''; }}>
   <div class="wc-body">
 
-    <!-- Banner strip -->
-    <div class="wc-banner-strip"><WaterBanner /></div>
+    <!-- Banner strip with title at bottom-left and close button at top-right -->
+    <div class="wc-banner-strip">
+      <WaterBanner />
+      <h2 class="wc-banner-title">Water</h2>
+      <button class="wc-banner-close btn-icon" on:click={() => { showWaterQuickAdd = false; _waterShowCustom = false; _waterCustomAmt = ''; }}
+        aria-label="Close" title="Close">
+        <span class="material-symbols-rounded">close</span>
+      </button>
+    </div>
 
     <div class="wc-inner">
     <!-- Bottle + stats -->
@@ -887,7 +894,7 @@
     </div>
 
     <!-- Quick-add grid -->
-    <p class="section-title" style="padding:4px 0 8px">Quick Add</p>
+    <p class="section-title" style="padding:4px 0 8px;text-align:center">Quick Add</p>
     <div class="wc-grid">
       {#if _waterContainers.length > 0}
         {#each _waterContainers as cont (cont.id)}
@@ -1380,12 +1387,38 @@
   /* ── Water card sheet ─────────────────────────────────────────────────────── */
   .wc-body { padding: 0; display: flex; flex-direction: column; }
 
-  /* Banner strip — sits flush against the sheet header, SVG fills it */
+  /* Banner strip — flush against the sheet top, SVG fills it, title sits at bottom-left */
   .wc-banner-strip {
     position: relative;
-    height: 68px;
+    height: 110px;
     overflow: hidden;
     flex-shrink: 0;
+    clip-path: inset(0);
+    display: flex;
+    align-items: flex-end;
+    padding: 0 20px 14px;
+  }
+  .wc-banner-title {
+    position: relative;
+    z-index: 1;
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    margin: 0;
+    flex: 1;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    filter: drop-shadow(0 2px 8px rgba(0,0,0,0.35));
+  }
+  .wc-banner-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 2;
+    color: var(--text-2);
   }
 
   /* Inner padding wrapper below the banner */
@@ -1442,8 +1475,9 @@
   .wc-progress-fill { height:100%; background:linear-gradient(90deg,var(--accent),var(--accent-2)); border-radius:var(--radius-full); transition:width 0.5s cubic-bezier(0.34,1.56,0.64,1); }
 
   /* Quick-add grid */
-  .wc-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(100px,1fr)); gap:8px; }
+  .wc-grid { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; }
   .wc-btn {
+    width:100px;
     display:flex; flex-direction:column; align-items:center; gap:6px;
     padding:18px 8px; border-radius:var(--radius-lg);
     background:var(--surface-2); border:1px solid var(--border);
