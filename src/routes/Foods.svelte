@@ -441,14 +441,25 @@
   <!-- Header -->
   <header class="page-header" class:has-banner={$pageBanners}>
     {#if $pageBanners}<FoodsBanner />{/if}
-    <h1>Foods</h1>
-    <button class="btn-icon accent" on:click={() => {
-      if (activeTab === 0) openEditor(null, 'foodList');
-      else if (activeTab === 1) openMealEditor(null, false);
-      else openMealEditor(null, true);
-    }} aria-label="Add new">
-      <span class="material-symbols-rounded">add</span>
-    </button>
+    {#if pickMode && selectedFoods.size > 0}
+      <h1 class="pick-count-title">{selectedFoods.size} selected</h1>
+      <button class="btn-icon accent" on:click={confirmMultiAdd} disabled={multiAdding} aria-label="Add selected to diary">
+        {#if multiAdding}
+          <span class="material-symbols-rounded spin">refresh</span>
+        {:else}
+          <span class="material-symbols-rounded">check</span>
+        {/if}
+      </button>
+    {:else}
+      <h1>Foods</h1>
+      <button class="btn-icon accent" on:click={() => {
+        if (activeTab === 0) openEditor(null, 'foodList');
+        else if (activeTab === 1) openMealEditor(null, false);
+        else openMealEditor(null, true);
+      }} aria-label="Add new">
+        <span class="material-symbols-rounded">add</span>
+      </button>
+    {/if}
   </header>
 
   <!-- Tabs -->
@@ -531,18 +542,20 @@
           </button>
         </div>
       {:else}
-        <ul class="food-list" class:pick-list={pickMode}>
+        <ul class="food-list">
           {#each filteredList as food (food.id)}
             {@const _sel = selectedFoods.has(food)}
             <li class="food-item card" class:food-selected={_sel} in:fade={{ duration: 160 }}>
-              <button class="food-item-btn"
-                on:click={() => pickMode ? toggleSelect(food) : pickFood(food)}
-                on:contextmenu|preventDefault={() => longPress(food)}>
-                {#if pickMode}
+              {#if pickMode}
+                <button class="food-select-btn" on:click={() => toggleSelect(food)} aria-label="Select">
                   <span class="food-check material-symbols-rounded" class:food-check-on={_sel}>
                     {_sel ? 'check_circle' : 'radio_button_unchecked'}
                   </span>
-                {/if}
+                </button>
+              {/if}
+              <button class="food-item-btn"
+                on:click={() => pickFood(food)}
+                on:contextmenu|preventDefault={() => longPress(food)}>
                 {#if $foodsShowThumbnails && food.imgUrl}
                   <img class="food-thumb" src={food.imgUrl} alt="" loading="lazy" />
                 {:else}
@@ -561,9 +574,7 @@
                     <span class="food-kcal text-sm">{_kcal} kcal</span>
                   {/if}
                 </div>
-                {#if !pickMode}
-                  <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
-                {/if}
+                <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
               </button>
             </li>
           {/each}
@@ -593,18 +604,20 @@
       {:else}
         <!-- OFF / USDA results -->
         {#if apiResults.length > 0}
-          <ul class="food-list" class:pick-list={pickMode}>
+          <ul class="food-list">
             {#each apiResults as food (food.id || food.barcode)}
               {@const _sel = selectedFoods.has(food)}
               <li class="food-item card" class:food-selected={_sel}>
-                <button class="food-item-btn"
-                  on:click={() => pickMode ? toggleSelect(food) : pickFood(food)}
-                  on:contextmenu|preventDefault={() => longPress(food)}>
-                  {#if pickMode}
+                {#if pickMode}
+                  <button class="food-select-btn" on:click={() => toggleSelect(food)} aria-label="Select">
                     <span class="food-check material-symbols-rounded" class:food-check-on={_sel}>
                       {_sel ? 'check_circle' : 'radio_button_unchecked'}
                     </span>
-                  {/if}
+                  </button>
+                {/if}
+                <button class="food-item-btn"
+                  on:click={() => pickFood(food)}
+                  on:contextmenu|preventDefault={() => longPress(food)}>
                   {#if food.imgUrl}
                     <img class="food-thumb" src={food.imgUrl} alt="" loading="lazy" />
                   {:else}
@@ -652,22 +665,6 @@
     {/if}
   </div>
 </div>
-
-<!-- Multi-select bottom action bar -->
-{#if pickMode && selectedFoods.size > 0}
-  <div class="multi-add-bar" transition:fly={{ y: 80, duration: 220 }}>
-    <span class="multi-add-label">
-      {selectedFoods.size} item{selectedFoods.size > 1 ? 's' : ''} selected
-    </span>
-    <button class="btn btn-primary multi-add-btn" on:click={confirmMultiAdd} disabled={multiAdding}>
-      {#if multiAdding}
-        <span class="material-symbols-rounded spin" style="font-size:18px">refresh</span>
-      {:else}
-        Add to Diary
-      {/if}
-    </button>
-  </div>
-{/if}
 
 <!-- Multi-item portion sheet -->
 <Sheet bind:open={showMultiPortionSheet} title="Set Portions ({multiPortionItems.length} items)">
@@ -858,48 +855,27 @@
     -webkit-overflow-scrolling: touch;
   }
   /* ── Multi-select ─────────────────────────────────────────────────────── */
-  .food-check {
-    font-size: 22px;
+  .food-item { display: flex; align-items: stretch; }
+
+  .food-select-btn {
+    display: flex;
+    align-items: center;
+    padding: 0 4px 0 14px;
+    background: none;
+    border: none;
+    cursor: pointer;
     flex-shrink: 0;
     color: var(--text-3);
+  }
+  .food-check {
+    font-size: 22px;
     transition: color var(--dur-fast);
   }
   .food-check-on { color: var(--accent); }
 
-  .food-selected { background: var(--accent-dim); }
-  .food-selected .food-item-btn:active { background: transparent; }
+  .food-item.food-selected { background: var(--accent-dim); }
 
-  /* Extra bottom padding when bar is visible — prevents last item hiding behind bar */
-  .pick-list { padding-bottom: 80px; }
-
-  .multi-add-bar {
-    position: fixed;
-    bottom: calc(var(--nav-h) + var(--safe-bottom) + 8px);
-    left: var(--sidebar-w, 0px);
-    right: 0;
-    margin: 0 var(--page-px);
-    background: var(--glass-surface);
-    backdrop-filter: blur(20px) saturate(160%);
-    -webkit-backdrop-filter: blur(20px) saturate(160%);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: 10px 14px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    z-index: 45;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.18);
-  }
-  .multi-add-label {
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--text-1);
-  }
-  .multi-add-btn {
-    flex-shrink: 0;
-    min-width: 120px;
-  }
+  .pick-count-title { color: var(--accent); }
 
   .source-chip-row::-webkit-scrollbar { display: none; }
   .source-chip {
