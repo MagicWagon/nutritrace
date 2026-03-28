@@ -1396,7 +1396,7 @@
     clip-path: inset(0);
     display: flex;
     align-items: flex-end;
-    padding: 0 20px 14px;
+    padding: 0 20px 52px;
   }
   .wc-banner-title {
     position: relative;

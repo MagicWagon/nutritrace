@@ -18,7 +18,6 @@
   import Goals      from './routes/Goals.svelte';
   import Settings   from './routes/Settings.svelte';
   import Wizard     from './routes/Wizard.svelte';
-  import Water      from './routes/Water.svelte';
   import Login          from './routes/Login.svelte';
   import Profile        from './routes/Profile.svelte';
   import ForgotPassword from './routes/ForgotPassword.svelte';
@@ -33,7 +32,6 @@
     '/foods/edit/:id':  FoodEditor,
     '/meal-editor':     MealEditor,
     '/meal-editor/:id': MealEditor,
-    '/water':           Water,
     '/statistics':      Statistics,
     '/goals':           Goals,
     '/settings':        Settings,

@@ -1,7 +1,7 @@
 # NutriTrace — Project Reference
 
 **App name**: NutriTrace
-**Version**: 0.11.0-alpha
+**Version**: 0.12.0-alpha
 **Location**: `/home/papa/Documents/claude_code/nutritrace/`
 **GitHub**: `git@github.com:thebigjoe1/nutritrace.git`
 **Stack**: Svelte 4, svelte-spa-router v4 (hash routing), Vite, IndexedDB, PWA (service worker)

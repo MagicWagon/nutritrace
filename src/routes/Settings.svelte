@@ -107,7 +107,6 @@
   const START_PAGE_OPTS = [
     { value: '/',           label: 'Diary'      },
     { value: '/foods',      label: 'Foods'      },
-    { value: '/water',      label: 'Water'      },
     { value: '/statistics', label: 'Statistics' },
     { value: '/goals',      label: 'Goals'      },
     { value: '/settings',   label: 'Settings'   },

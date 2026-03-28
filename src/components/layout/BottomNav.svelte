@@ -4,7 +4,6 @@
   const tabs = [
     { path: '/',           icon: 'book',          label: 'Diary'     },
     { path: '/foods',      icon: 'restaurant',    label: 'Foods'     },
-    { path: '/water',      icon: 'water_drop',    label: 'Water'     },
     { path: '/statistics', icon: 'bar_chart',     label: 'Stats'     },
     { path: '/goals',      icon: 'flag',          label: 'Goals'     },
     { path: '/settings',   icon: 'settings',      label: 'Settings'  },

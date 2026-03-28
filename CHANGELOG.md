@@ -5,6 +5,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.12.0-alpha] — 2026-03-28
+
+### Added
+- **Water card in Diary** — the `water_drop` topbar button now opens a full-featured sheet: animated SVG bottle (fill, wave, overflow drip effects), amount/goal stats, progress bar, quick-add container grid with custom-amount input, and a deletable per-entry log; works for any diary date (not just today)
+- **Water card banner** — WaterBanner (waves, drops, bubbles) rendered as a 110px strip at the top of the sheet, matching the visual style of all other page banners; "Water" title overlaid at bottom-left in gradient text, consistent with every other page header
+- **Water card empty state** — faded water drop icon + "No water logged yet today" message shown when no water has been logged, matching the standalone Water page
+- **First-run integrations step** — new wizard step between activity and summary; cards for Open Food Facts, USDA FoodData Central, Mealie, and AI Buddy; each individually skippable; AI card auto-hidden if configured via env vars; all saved values written to `user_settings` (included in backup)
+- **PWA offline fallback** — `public/offline.html` served by the service worker when the server is unreachable during a cold open; branded "Can't reach your server / Try again" page instead of a browser error
+- **Server-error banners** — Diary and Foods show a subtle inline "Could not reach server — retry" banner when the initial data load fails; Foods suppresses the "no items" empty state during an error
+
+### Changed
+- Water page removed — standalone `/water` route, nav entry (bottom nav, sidebar), and Settings start-page option all removed; all functionality lives in the Diary water card
+- `alert()` calls replaced with `showError()` toasts in FoodEditor (camera denied, OFF upload failures)
+
+### Fixed
+- Water card banner title position matches page-header banner proportions (`padding-bottom: 52px`, title at bottom-left)
+- Quick-add container buttons centered in the sheet (flex-wrap with `justify-content: center`)
+
+---
+
 ## [0.11.0-alpha] — 2026-03-28
 
 ### Added
