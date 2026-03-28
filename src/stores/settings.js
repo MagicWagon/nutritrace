@@ -23,7 +23,7 @@ const SERVER_SETTINGS = new Set([
   'aiEnabled','aiProvider','aiApiKey','aiModel','aiAssistantName',
   'usdaEnabled','usdaApiKey','offUsername','offPassword',
   'mealieEnabled','mealieBaseUrl','mealieApiToken',
-  'wellnessEnabled','wellnessMetrics','wellnessSyncMode','wellnessSyncRange',
+  'wellnessEnabled','fitbitEnabled','wellnessMetrics','wellnessSyncMode','wellnessSyncRange',
   'withingsEnabled','withingsSyncRange','withingsDataPriority',
   // Appearance / UI prefs — included so full backups restore the full look-and-feel
   'appearance','accentColor',
@@ -222,6 +222,7 @@ export const loopBannerAnimations = createSettingStore('loopBannerAnimations', t
 
 // Wellness (Activity Tracking)
 export const wellnessEnabled    = createSettingStore('wellnessEnabled',    false);
+export const fitbitEnabled      = createSettingStore('fitbitEnabled',      false);
 export const wellnessMetrics    = createSettingStore('wellnessMetrics',    null); // null = all visible
 export const wellnessSyncMode   = createSettingStore('wellnessSyncMode',   'auto'); // 'auto' | 'manual'
 export const wellnessSyncRange  = createSettingStore('wellnessSyncRange',  7);    // days: 1|7|30|90|365

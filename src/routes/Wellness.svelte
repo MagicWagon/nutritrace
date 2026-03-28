@@ -1,6 +1,6 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
-  import { wellnessMetrics, wellnessSyncMode, wellnessSyncRange, distUnit, pageBanners, dateFormat, withingsSyncRange as withingsSyncRangeSetting } from '../stores/settings.js';
+  import { wellnessMetrics, wellnessSyncMode, wellnessSyncRange, distUnit, pageBanners, dateFormat, withingsSyncRange as withingsSyncRangeSetting, fitbitEnabled, withingsEnabled } from '../stores/settings.js';
   import Chart from 'chart.js/auto';
   import WellnessBanner from '../components/banners/WellnessBanner.svelte';
   import { showSuccess, showError } from '../stores/toast.js';
@@ -319,8 +319,10 @@
   $: if (activeTab === 'trends') { trendsRange; loadTrends(); }
 
   // ── Integration availability ───────────────────────────────────────────────
-  $: fitbitAvailable   = !!(status?.configured || status?.connected);
-  $: withingsAvailable = !!(withingsStatus?.configured || withingsStatus?.connected);
+  // Tab visibility: driven by the Settings toggle (enabled) not connection state.
+  // Connection state is handled per-tab (shows connect card when toggled on but not yet auth'd).
+  $: fitbitAvailable   = $fitbitEnabled;
+  $: withingsAvailable = $withingsEnabled;
   $: anyAvailable      = fitbitAvailable || withingsAvailable;
 
   // Auto-correct activeTab when an integration's availability changes
