@@ -318,6 +318,18 @@
   // Reload trends when tab becomes active or range changes
   $: if (activeTab === 'trends') { trendsRange; loadTrends(); }
 
+  // ── Integration availability ───────────────────────────────────────────────
+  $: fitbitAvailable   = !!(status?.configured || status?.connected);
+  $: withingsAvailable = !!(withingsStatus?.configured || withingsStatus?.connected);
+  $: anyAvailable      = fitbitAvailable || withingsAvailable;
+
+  // Auto-correct activeTab when an integration's availability changes
+  $: if (status !== null && withingsStatus !== null) {
+    const isFitbitTab = activeTab === 'movement' || activeTab === 'sleep' || activeTab === 'heart';
+    if (isFitbitTab && !fitbitAvailable) activeTab = withingsAvailable ? 'body' : 'trends';
+    if (activeTab === 'body' && !withingsAvailable) activeTab = fitbitAvailable ? 'movement' : 'trends';
+  }
+
   // ── Date navigation ────────────────────────────────────────────────────────
   function prevDay() {
     const d = new Date(dateStr + 'T12:00:00');
@@ -569,213 +581,244 @@
 
 <div class="page-content wl-content">
 
-    <!-- ── Not configured ── -->
-    {#if !status}
+    <!-- ── Loading ── -->
+    {#if !status || !withingsStatus}
       <div class="wellness-loading">
         <span class="material-symbols-rounded spin">sync</span>
       </div>
 
-    {:else if !status.configured && !status.connected}
-      <!-- Fitbit not set up by admin -->
+    <!-- ── Nothing configured ── -->
+    {:else if !anyAvailable}
       <div class="connect-card">
         <div class="connect-icon-wrap">
           <span class="material-symbols-rounded connect-icon">monitor_heart</span>
         </div>
-        <h2 class="connect-title">Connect a Fitness Tracker</h2>
+        <h2 class="connect-title">No integrations enabled</h2>
         <p class="connect-desc">
-          Sync steps, sleep, heart rate, and more from your Fitbit.
-          An administrator needs to configure Fitbit API credentials in
-          <strong>Settings → Labs</strong> before you can connect.
+          Enable Fitbit or Withings in <strong>Settings → Labs</strong> to start syncing health data.
         </p>
         <div class="connect-chips">
-          <span class="connect-chip"><span class="material-symbols-rounded">directions_walk</span> Steps</span>
+          <span class="connect-chip"><span class="material-symbols-rounded">directions_walk</span> Activity</span>
           <span class="connect-chip"><span class="material-symbols-rounded">bedtime</span> Sleep</span>
           <span class="connect-chip"><span class="material-symbols-rounded">favorite</span> Heart</span>
-          <span class="connect-chip"><span class="material-symbols-rounded">water_drop</span> SpO2</span>
+          <span class="connect-chip"><span class="material-symbols-rounded">scale</span> Body</span>
         </div>
-      </div>
-
-    {:else if status.configured && !status.connected}
-      <!-- Configured but not connected — show Connect button -->
-      <div class="connect-card">
-        <div class="connect-icon-wrap">
-          <span class="material-symbols-rounded connect-icon">monitor_heart</span>
-        </div>
-        <h2 class="connect-title">Connect Fitbit</h2>
-        <p class="connect-desc">
-          Authorize NutriTrace to read your Fitbit data. You'll be redirected to
-          Fitbit to approve access, then brought back here.
-        </p>
-        <div class="connect-chips">
-          <span class="connect-chip"><span class="material-symbols-rounded">directions_walk</span> Steps &amp; Activity</span>
-          <span class="connect-chip"><span class="material-symbols-rounded">bedtime</span> Sleep</span>
-          <span class="connect-chip"><span class="material-symbols-rounded">favorite</span> Heart Rate &amp; HRV</span>
-          <span class="connect-chip"><span class="material-symbols-rounded">water_drop</span> SpO2</span>
-          <span class="connect-chip"><span class="material-symbols-rounded">air</span> Breathing Rate</span>
-        </div>
-        <button class="btn btn-primary connect-btn" on:click={connect} disabled={connecting}>
-          {#if connecting}
-            <span class="material-symbols-rounded spin">sync</span> Connecting…
-          {:else}
-            <span class="material-symbols-rounded">link</span> Connect Fitbit
-          {/if}
-        </button>
       </div>
 
     {:else}
-      <!-- Connected — main wellness UI -->
+      <!-- ── At least one integration configured — main UI ── -->
 
-      <!-- Source + sync row -->
-      <div class="sync-bar">
-        <div class="sync-info">
-          <span class="material-symbols-rounded sync-source-icon">fitbit</span>
-          <div class="sync-source-text">
-            <span class="sync-source-label">Fitbit</span>
-            {#if lastSync}
-              <span class="sync-time">Synced {lastSync.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-            {:else if status.fitbitUserId}
-              <span class="sync-time">{status.fitbitUserId}</span>
-            {/if}
+      <!-- Fitbit sync bar (only when connected) -->
+      {#if status.connected}
+        <div class="sync-bar">
+          <div class="sync-info">
+            <span class="material-symbols-rounded sync-source-icon">fitbit</span>
+            <div class="sync-source-text">
+              <span class="sync-source-label">Fitbit</span>
+              {#if lastSync}
+                <span class="sync-time">Synced {lastSync.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+              {:else if status.fitbitUserId}
+                <span class="sync-time">{status.fitbitUserId}</span>
+              {/if}
+            </div>
+          </div>
+          <div class="sync-actions">
+            <button class="sync-btn" class:syncing on:click={() => sync()} disabled={syncing} title="Sync Fitbit data" aria-label="Sync now">
+              <span class="material-symbols-rounded sync-btn-icon">sync</span>
+              <span>{syncing ? 'Syncing…' : 'Sync'}</span>
+            </button>
+            <button class="btn-icon text-danger" on:click={disconnect} title="Disconnect Fitbit" aria-label="Disconnect">
+              <span class="material-symbols-rounded">link_off</span>
+            </button>
           </div>
         </div>
-        <div class="sync-actions">
-          <button class="sync-btn" class:syncing on:click={() => sync()} disabled={syncing} title="Sync Fitbit data" aria-label="Sync now">
-            <span class="material-symbols-rounded sync-btn-icon">sync</span>
-            <span>{syncing ? 'Syncing…' : 'Sync'}</span>
-          </button>
-          <button class="btn-icon text-danger" on:click={disconnect} title="Disconnect Fitbit" aria-label="Disconnect">
-            <span class="material-symbols-rounded">link_off</span>
-          </button>
-        </div>
-      </div>
+      {/if}
 
-      <!-- Tabs -->
+      <!-- Tab bar — only tabs for configured integrations -->
       <div class="tab-bar">
-        <button class="tab-btn" class:active={activeTab === 'movement'} on:click={() => activeTab = 'movement'}>
-          <span class="material-symbols-rounded tab-icon">directions_walk</span> Movement
-        </button>
-        <button class="tab-btn" class:active={activeTab === 'sleep'} on:click={() => activeTab = 'sleep'}>
-          <span class="material-symbols-rounded tab-icon">bedtime</span> Sleep
-        </button>
-        <button class="tab-btn" class:active={activeTab === 'heart'} on:click={() => activeTab = 'heart'}>
-          <span class="material-symbols-rounded tab-icon">favorite</span> Heart
-        </button>
-        <button class="tab-btn" class:active={activeTab === 'body'} on:click={() => activeTab = 'body'}>
-          <span class="material-symbols-rounded tab-icon">monitor_weight</span> Body
-        </button>
+        {#if fitbitAvailable}
+          <button class="tab-btn" class:active={activeTab === 'movement'} on:click={() => activeTab = 'movement'}>
+            <span class="material-symbols-rounded tab-icon">directions_walk</span> Movement
+          </button>
+          <button class="tab-btn" class:active={activeTab === 'sleep'} on:click={() => activeTab = 'sleep'}>
+            <span class="material-symbols-rounded tab-icon">bedtime</span> Sleep
+          </button>
+          <button class="tab-btn" class:active={activeTab === 'heart'} on:click={() => activeTab = 'heart'}>
+            <span class="material-symbols-rounded tab-icon">favorite</span> Heart
+          </button>
+        {/if}
+        {#if withingsAvailable}
+          <button class="tab-btn" class:active={activeTab === 'body'} on:click={() => activeTab = 'body'}>
+            <span class="material-symbols-rounded tab-icon">monitor_weight</span> Body
+          </button>
+        {/if}
         <button class="tab-btn" class:active={activeTab === 'trends'} on:click={() => activeTab = 'trends'}>
           <span class="material-symbols-rounded tab-icon">show_chart</span> Trends
         </button>
       </div>
 
-      <!-- ── Movement tab ── -->
-      {#if activeTab === 'movement'}
-        <div class="metric-grid">
-          {#each ALL_METRICS.filter(m => m.group === 'movement' && isVisible(m.id)) as m}
-            {@const fmt = fmtMetric(m, data[m.id])}
-            <div class="metric-card" class:no-data={fmt == null && !loadingData}>
-              <div class="metric-icon-wrap">
-                <span class="material-symbols-rounded metric-icon">{m.icon}</span>
-              </div>
-              <div class="metric-body">
-                <span class="metric-label">{m.label}</span>
-                {#if loadingData}
-                  <span class="metric-value skeleton">—</span>
-                {:else if fmt}
-                  <span class="metric-value">{fmt.value}<span class="metric-unit">{fmt.unit}</span></span>
-                {:else}
-                  <span class="metric-value no-val">—</span>
-                {/if}
-              </div>
-            </div>
-          {/each}
-        </div>
+      <!-- ── Fitbit tabs (Movement / Sleep / Heart) ── -->
+      {#if activeTab === 'movement' || activeTab === 'sleep' || activeTab === 'heart'}
 
-      <!-- ── Sleep tab ── -->
-      {:else if activeTab === 'sleep'}
-        {#if !loadingData && data.sleep_duration_min != null}
-          <!-- Sleep stage breakdown bar -->
-          <div class="card sleep-stages-card">
-            <div class="sleep-stages-header">
-              <span class="material-symbols-rounded" style="color:var(--accent)">bar_chart</span>
-              <span class="sleep-stages-title">Sleep Stages</span>
-              {#if data.sleep_duration_min != null}
-                {@const s = fmtSleep(data.sleep_duration_min)}
-                <span class="sleep-total">{s.value}</span>
-              {/if}
-            </div>
-            {#if sleepTotal > 0}
-              <div class="stage-bar">
-                {#each sleepStages as stage}
-                  {@const pct = sleepTotal > 0 ? ((data[stage.key] || 0) / sleepTotal * 100) : 0}
-                  {#if pct > 0}
-                    <div class="stage-seg" style="width:{pct.toFixed(1)}%;background:{stage.color}" title="{stage.label}: {Math.round(data[stage.key] || 0)} min"></div>
-                  {/if}
-                {/each}
+        {#if !status.connected}
+          <!-- Fitbit configured but not yet connected -->
+          {#if !status.configured}
+            <div class="connect-card">
+              <div class="connect-icon-wrap">
+                <span class="material-symbols-rounded connect-icon">monitor_heart</span>
               </div>
-              <div class="stage-legend">
-                {#each sleepStages as stage}
-                  <div class="stage-legend-item">
-                    <span class="stage-dot" style="background:{stage.color}"></span>
-                    <span class="stage-leg-label">{stage.label}</span>
-                    <span class="stage-leg-val">{data[stage.key] != null ? Math.round(data[stage.key]) + ' min' : '—'}</span>
+              <h2 class="connect-title">Fitbit Setup Required</h2>
+              <p class="connect-desc">
+                An administrator needs to configure Fitbit API credentials in
+                <strong>Settings → Labs</strong> before you can connect.
+              </p>
+            </div>
+          {:else}
+            <div class="connect-card">
+              <div class="connect-icon-wrap">
+                <span class="material-symbols-rounded connect-icon">monitor_heart</span>
+              </div>
+              <h2 class="connect-title">Connect Fitbit</h2>
+              <p class="connect-desc">
+                Authorize NutriTrace to read your Fitbit data. You'll be redirected to
+                Fitbit to approve access, then brought back here.
+              </p>
+              <div class="connect-chips">
+                <span class="connect-chip"><span class="material-symbols-rounded">directions_walk</span> Steps &amp; Activity</span>
+                <span class="connect-chip"><span class="material-symbols-rounded">bedtime</span> Sleep</span>
+                <span class="connect-chip"><span class="material-symbols-rounded">favorite</span> Heart Rate &amp; HRV</span>
+                <span class="connect-chip"><span class="material-symbols-rounded">water_drop</span> SpO2</span>
+                <span class="connect-chip"><span class="material-symbols-rounded">air</span> Breathing Rate</span>
+              </div>
+              <button class="btn btn-primary connect-btn" on:click={connect} disabled={connecting}>
+                {#if connecting}
+                  <span class="material-symbols-rounded spin">sync</span> Connecting…
+                {:else}
+                  <span class="material-symbols-rounded">link</span> Connect Fitbit
+                {/if}
+              </button>
+            </div>
+          {/if}
+
+        {:else}
+          <!-- Fitbit connected — metric content -->
+
+          <!-- ── Movement tab ── -->
+          {#if activeTab === 'movement'}
+            <div class="metric-grid">
+              {#each ALL_METRICS.filter(m => m.group === 'movement' && isVisible(m.id)) as m}
+                {@const fmt = fmtMetric(m, data[m.id])}
+                <div class="metric-card" class:no-data={fmt == null && !loadingData}>
+                  <div class="metric-icon-wrap">
+                    <span class="material-symbols-rounded metric-icon">{m.icon}</span>
                   </div>
-                {/each}
+                  <div class="metric-body">
+                    <span class="metric-label">{m.label}</span>
+                    {#if loadingData}
+                      <span class="metric-value skeleton">—</span>
+                    {:else if fmt}
+                      <span class="metric-value">{fmt.value}<span class="metric-unit">{fmt.unit}</span></span>
+                    {:else}
+                      <span class="metric-value no-val">—</span>
+                    {/if}
+                  </div>
+                </div>
+              {/each}
+            </div>
+
+          <!-- ── Sleep tab ── -->
+          {:else if activeTab === 'sleep'}
+            {#if !loadingData && data.sleep_duration_min != null}
+              <div class="card sleep-stages-card">
+                <div class="sleep-stages-header">
+                  <span class="material-symbols-rounded" style="color:var(--accent)">bar_chart</span>
+                  <span class="sleep-stages-title">Sleep Stages</span>
+                  {#if data.sleep_duration_min != null}
+                    {@const s = fmtSleep(data.sleep_duration_min)}
+                    <span class="sleep-total">{s.value}</span>
+                  {/if}
+                </div>
+                {#if sleepTotal > 0}
+                  <div class="stage-bar">
+                    {#each sleepStages as stage}
+                      {@const pct = sleepTotal > 0 ? ((data[stage.key] || 0) / sleepTotal * 100) : 0}
+                      {#if pct > 0}
+                        <div class="stage-seg" style="width:{pct.toFixed(1)}%;background:{stage.color}" title="{stage.label}: {Math.round(data[stage.key] || 0)} min"></div>
+                      {/if}
+                    {/each}
+                  </div>
+                  <div class="stage-legend">
+                    {#each sleepStages as stage}
+                      <div class="stage-legend-item">
+                        <span class="stage-dot" style="background:{stage.color}"></span>
+                        <span class="stage-leg-label">{stage.label}</span>
+                        <span class="stage-leg-val">{data[stage.key] != null ? Math.round(data[stage.key]) + ' min' : '—'}</span>
+                      </div>
+                    {/each}
+                  </div>
+                {:else}
+                  <p class="text-3 text-sm" style="padding:0 0 8px">No stage data available</p>
+                {/if}
               </div>
-            {:else}
-              <p class="text-3 text-sm" style="padding:0 0 8px">No stage data available</p>
             {/if}
-          </div>
+            <div class="metric-grid">
+              {#each ALL_METRICS.filter(m => m.group === 'sleep' && isVisible(m.id)) as m}
+                {@const fmt = fmtMetric(m, data[m.id])}
+                <div class="metric-card" class:no-data={fmt == null && !loadingData}>
+                  <div class="metric-icon-wrap">
+                    <span class="material-symbols-rounded metric-icon">{m.icon}</span>
+                  </div>
+                  <div class="metric-body">
+                    <span class="metric-label">{m.label}</span>
+                    {#if loadingData}
+                      <span class="metric-value skeleton">—</span>
+                    {:else if fmt}
+                      <span class="metric-value">{fmt.value}<span class="metric-unit">{fmt.unit}</span></span>
+                    {:else}
+                      <span class="metric-value no-val">—</span>
+                    {/if}
+                  </div>
+                </div>
+              {/each}
+            </div>
+
+          <!-- ── Heart tab ── -->
+          {:else if activeTab === 'heart'}
+            <div class="metric-grid">
+              {#each ALL_METRICS.filter(m => m.group === 'heart' && isVisible(m.id)) as m}
+                {@const fmt = fmtMetric(m, data[m.id])}
+                <div class="metric-card" class:no-data={fmt == null && !loadingData}>
+                  <div class="metric-icon-wrap">
+                    <span class="material-symbols-rounded metric-icon" style="color:#ef4444">{m.icon}</span>
+                  </div>
+                  <div class="metric-body">
+                    <span class="metric-label">{m.label}</span>
+                    {#if loadingData}
+                      <span class="metric-value skeleton">—</span>
+                    {:else if fmt}
+                      <span class="metric-value">{fmt.value}<span class="metric-unit">{fmt.unit}</span></span>
+                    {:else}
+                      <span class="metric-value no-val">—</span>
+                    {/if}
+                  </div>
+                </div>
+              {/each}
+            </div>
+          {/if}
+
+          <!-- Empty state for Fitbit tabs -->
+          {#if !loadingData && Object.keys(data).length === 0}
+            <div class="empty-state">
+              <span class="material-symbols-rounded" style="font-size:48px;opacity:0.18">monitor_heart</span>
+              <p>No data for {isToday ? 'today' : fmtDate(dateStr)}.</p>
+              <p class="text-3 text-sm">Tap <strong>Sync</strong> to pull the latest from Fitbit.</p>
+            </div>
+          {/if}
         {/if}
-
-        <div class="metric-grid">
-          {#each ALL_METRICS.filter(m => m.group === 'sleep' && isVisible(m.id)) as m}
-            {@const fmt = fmtMetric(m, data[m.id])}
-            <div class="metric-card" class:no-data={fmt == null && !loadingData}>
-              <div class="metric-icon-wrap">
-                <span class="material-symbols-rounded metric-icon">{m.icon}</span>
-              </div>
-              <div class="metric-body">
-                <span class="metric-label">{m.label}</span>
-                {#if loadingData}
-                  <span class="metric-value skeleton">—</span>
-                {:else if fmt}
-                  <span class="metric-value">{fmt.value}<span class="metric-unit">{fmt.unit}</span></span>
-                {:else}
-                  <span class="metric-value no-val">—</span>
-                {/if}
-              </div>
-            </div>
-          {/each}
-        </div>
-
-      <!-- ── Heart tab ── -->
-      {:else if activeTab === 'heart'}
-        <div class="metric-grid">
-          {#each ALL_METRICS.filter(m => m.group === 'heart' && isVisible(m.id)) as m}
-            {@const fmt = fmtMetric(m, data[m.id])}
-            <div class="metric-card" class:no-data={fmt == null && !loadingData}>
-              <div class="metric-icon-wrap">
-                <span class="material-symbols-rounded metric-icon" style="color:#ef4444">{m.icon}</span>
-              </div>
-              <div class="metric-body">
-                <span class="metric-label">{m.label}</span>
-                {#if loadingData}
-                  <span class="metric-value skeleton">—</span>
-                {:else if fmt}
-                  <span class="metric-value">{fmt.value}<span class="metric-unit">{fmt.unit}</span></span>
-                {:else}
-                  <span class="metric-value no-val">—</span>
-                {/if}
-              </div>
-            </div>
-          {/each}
-        </div>
 
       <!-- ── Body tab (Withings) ── -->
       {:else if activeTab === 'body'}
-        {#if withingsStatus?.connected}
-          <!-- Withings sync bar -->
+        {#if withingsStatus.connected}
           <div class="sync-bar" style="margin-bottom:8px">
             <div class="sync-info">
               <span class="material-symbols-rounded sync-source-icon">scale</span>
@@ -799,7 +842,6 @@
             </div>
           </div>
 
-          <!-- Body composition metrics -->
           <div class="metric-grid">
             {#each BODY_METRICS as m}
               {@const raw = withingsData[m.id]}
@@ -822,7 +864,6 @@
             {/each}
           </div>
 
-          <!-- Body Scan score metrics -->
           {#if BODY_SCORE_METRICS.some(m => withingsData[m.id] != null)}
             <div class="card" style="margin-top:12px;padding:16px">
               <div class="sleep-stages-header" style="margin-bottom:12px">
@@ -856,8 +897,7 @@
             </div>
           {/if}
 
-        {:else if withingsStatus?.configured}
-          <!-- Configured but not connected -->
+        {:else if withingsStatus.configured}
           <div class="connect-card">
             <div class="connect-icon-wrap">
               <span class="material-symbols-rounded connect-icon">scale</span>
@@ -880,18 +920,6 @@
                 <span class="material-symbols-rounded">link</span> Connect Withings
               {/if}
             </button>
-          </div>
-
-        {:else}
-          <div class="connect-card">
-            <div class="connect-icon-wrap">
-              <span class="material-symbols-rounded connect-icon">scale</span>
-            </div>
-            <h2 class="connect-title">Withings Integration</h2>
-            <p class="connect-desc">
-              Connect your Withings scale or device to automatically sync body composition data.
-              An administrator needs to configure Withings API credentials in <strong>Settings → Labs</strong>.
-            </p>
           </div>
         {/if}
 
@@ -929,15 +957,6 @@
             {/each}
           </div>
         {/if}
-      {/if}
-
-      <!-- Empty state when no Fitbit data (only show on Fitbit tabs) -->
-      {#if !loadingData && Object.keys(data).length === 0 && (activeTab === 'movement' || activeTab === 'sleep' || activeTab === 'heart')}
-        <div class="empty-state">
-          <span class="material-symbols-rounded" style="font-size:48px;opacity:0.18">monitor_heart</span>
-          <p>No data for {isToday ? 'today' : fmtDate(dateStr)}.</p>
-          <p class="text-3 text-sm">Tap <strong>Sync</strong> to pull the latest from Fitbit.</p>
-        </div>
       {/if}
 
     {/if}
