@@ -1,10 +1,11 @@
 <script>
   import { onMount } from 'svelte';
-  import { wellnessMetrics, wellnessSyncMode, wellnessSyncRange, distUnit, pageBanners } from '../stores/settings.js';
+  import { wellnessMetrics, wellnessSyncMode, wellnessSyncRange, distUnit, pageBanners, dateFormat } from '../stores/settings.js';
   import WellnessBanner from '../components/banners/WellnessBanner.svelte';
   import { showSuccess, showError } from '../stores/toast.js';
   import { localDateStr } from '../lib/db.js';
   import { NtApi } from '../lib/api.js';
+  import { portal } from '../lib/portal.js';
 
   // ── Metric definitions ─────────────────────────────────────────────────────
   const ALL_METRICS = [
@@ -100,6 +101,80 @@
   function fmtDate(ds) {
     const d = new Date(ds + 'T12:00:00');
     return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  }
+
+  function fmtDateSub(ds) {
+    const d = new Date(ds + 'T12:00:00');
+    const fmt = $dateFormat || 'ISO';
+    if (fmt === 'US') return (d.getMonth()+1) + '/' + d.getDate() + '/' + d.getFullYear();
+    if (fmt === 'EU') return d.getDate() + '/' + (d.getMonth()+1) + '/' + d.getFullYear();
+    return ds;
+  }
+
+  // ── Calendar / date picker ─────────────────────────────────────────────────
+  let showDatePicker  = false;
+  let pickerDate      = '';
+  let calYear         = new Date().getFullYear();
+  let calMonth        = new Date().getMonth();
+  let showYearPicker  = false;
+  let showMonthPicker = false;
+  let _sheetLock = false;
+  let _sheetLockTimer;
+
+  $: calFirstDay    = new Date(calYear, calMonth, 1).getDay();
+  $: calDaysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  $: calAtMax = (() => { const n = new Date(); return calYear > n.getFullYear() || (calYear === n.getFullYear() && calMonth >= n.getMonth()); })();
+  $: calMonthName   = new Date(calYear, calMonth, 1).toLocaleDateString(undefined, { month: 'long' });
+  $: yearRange      = Array.from({length: 22}, (_, i) => (new Date().getFullYear() - 10) + i);
+  const monthNames  = [
+    {idx:0,short:'Jan'},{idx:1,short:'Feb'},{idx:2,short:'Mar'},
+    {idx:3,short:'Apr'},{idx:4,short:'May'},{idx:5,short:'Jun'},
+    {idx:6,short:'Jul'},{idx:7,short:'Aug'},{idx:8,short:'Sep'},
+    {idx:9,short:'Oct'},{idx:10,short:'Nov'},{idx:11,short:'Dec'},
+  ];
+
+  function _lockAndOpen(setter) {
+    clearTimeout(_sheetLockTimer);
+    _sheetLock = true;
+    setter();
+    _sheetLockTimer = setTimeout(() => _sheetLock = false, 400);
+  }
+
+  function calPrevMonth() {
+    showYearPicker = false; showMonthPicker = false;
+    if (calMonth === 0) { calMonth = 11; calYear--; } else calMonth--;
+  }
+  function calNextMonth() {
+    showYearPicker = false; showMonthPicker = false;
+    if (calAtMax) return;
+    if (calMonth === 11) { calMonth = 0; calYear++; } else calMonth++;
+  }
+
+  function openDatePicker() {
+    const dt = new Date(dateStr + 'T12:00:00');
+    calYear  = dt.getFullYear();
+    calMonth = dt.getMonth();
+    pickerDate = dateStr;
+    _lockAndOpen(() => showDatePicker = true);
+  }
+
+  function goToDate() {
+    let iso = null;
+    if (pickerDate) {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(pickerDate)) {
+        iso = pickerDate;
+      } else if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(pickerDate)) {
+        const [m,d,y] = pickerDate.split('/');
+        iso = y + '-' + m.padStart(2,'0') + '-' + d.padStart(2,'0');
+      }
+    }
+    if (iso) {
+      dateStr = iso;
+      loadData();
+      showDatePicker = false;
+    } else if (!pickerDate) {
+      showDatePicker = false;
+    }
   }
 
   // ── Init ───────────────────────────────────────────────────────────────────
@@ -215,23 +290,22 @@
   <!-- Header -->
   <header class="page-header" class:has-banner={$pageBanners}>
     {#if $pageBanners}<WellnessBanner />{/if}
-    <div class="wellness-header-row">
-      <div class="wellness-title-block">
-        <h1>Wellness</h1>
-      </div>
-
-      <!-- Date nav -->
-      <div class="date-nav">
-        <button class="btn-icon" on:click={prevDay} title="Previous day" aria-label="Previous day">
-          <span class="material-symbols-rounded">chevron_left</span>
-        </button>
-        <span class="date-label">{isToday ? 'Today' : fmtDate(dateStr)}</span>
-        <button class="btn-icon" on:click={nextDay} disabled={isToday} title="Next day" aria-label="Next day">
-          <span class="material-symbols-rounded">chevron_right</span>
-        </button>
-      </div>
-    </div>
+    <h1>Wellness</h1>
   </header>
+
+  <!-- Date navigation sub-bar — same pattern as Diary -->
+  <div class="wl-date-bar" class:has-banner={$pageBanners}>
+    <button class="btn-icon accent" on:click={prevDay} aria-label="Previous day" title="Previous day">
+      <span class="material-symbols-rounded">chevron_left</span>
+    </button>
+    <button class="date-btn" on:click={openDatePicker} title="Jump to date">
+      <span class="date-label">{isToday ? 'Today' : fmtDate(dateStr)}</span>
+      <span class="date-sub">{fmtDateSub(dateStr)}</span>
+    </button>
+    <button class="btn-icon accent" on:click={nextDay} disabled={isToday} aria-label="Next day" title="Next day">
+      <span class="material-symbols-rounded">chevron_right</span>
+    </button>
+  </div>
 
   <div class="page-content">
 
@@ -291,24 +365,25 @@
     {:else}
       <!-- Connected — main wellness UI -->
 
-      <!-- Sync status bar -->
+      <!-- Source + sync row -->
       <div class="sync-bar">
         <div class="sync-info">
           <span class="material-symbols-rounded sync-source-icon">fitbit</span>
-          <span class="sync-source-label">Fitbit</span>
-          {#if status.fitbitUserId}
-            <span class="sync-user">· {status.fitbitUserId}</span>
-          {/if}
+          <div class="sync-source-text">
+            <span class="sync-source-label">Fitbit</span>
+            {#if lastSync}
+              <span class="sync-time">Synced {lastSync.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+            {:else if status.fitbitUserId}
+              <span class="sync-time">{status.fitbitUserId}</span>
+            {/if}
+          </div>
         </div>
         <div class="sync-actions">
-          {#if lastSync}
-            <span class="sync-time">Synced {lastSync.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-          {/if}
-          <button class="btn btn-sm" on:click={() => sync()} disabled={syncing} title="Sync now" aria-label="Sync now">
-            <span class="material-symbols-rounded" class:spin={syncing}>sync</span>
-            {syncing ? 'Syncing…' : 'Sync'}
+          <button class="sync-btn" class:syncing on:click={() => sync()} disabled={syncing} title="Sync Fitbit data" aria-label="Sync now">
+            <span class="material-symbols-rounded sync-btn-icon">sync</span>
+            <span>{syncing ? 'Syncing…' : 'Sync'}</span>
           </button>
-          <button class="btn btn-sm btn-danger-ghost" on:click={disconnect} title="Disconnect Fitbit" aria-label="Disconnect">
+          <button class="btn-icon text-danger" on:click={disconnect} title="Disconnect Fitbit" aria-label="Disconnect">
             <span class="material-symbols-rounded">link_off</span>
           </button>
         </div>
@@ -446,38 +521,105 @@
   </div>
 </div>
 
-<style>
-  .wellness-header-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    flex-wrap: wrap;
-  }
-  .wellness-title-block {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  .wellness-title-icon {
-    font-size: 28px;
-    color: var(--accent);
-  }
-  .wellness-header-row h1 { margin: 0; }
+<!-- Date picker calendar sheet -->
+{#if showDatePicker}
+  <div use:portal class="sheet-backdrop" role="dialog" aria-modal="true"
+    on:click={() => { if (!_sheetLock) showDatePicker = false; }} on:keydown={() => {}}>
+    <div class="bs-sheet dp-sheet" on:click|stopPropagation on:keydown={() => {}}>
+      <div class="sheet-handle"></div>
+      <div class="dp-nav">
+        <button class="btn-icon dp-nav-btn" on:click={calPrevMonth} aria-label="Previous month">
+          <span class="material-symbols-rounded">chevron_left</span>
+        </button>
+        <div class="dp-month-year">
+          <button class="dp-month-btn" on:click={() => { showMonthPicker = !showMonthPicker; showYearPicker = false; }}>
+            {calMonthName}<span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle;margin-left:2px">{showMonthPicker ? 'expand_less' : 'expand_more'}</span>
+          </button>
+          <button class="dp-year-btn" on:click={() => { showYearPicker = !showYearPicker; showMonthPicker = false; }}>
+            {calYear}<span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle;margin-left:2px">{showYearPicker ? 'expand_less' : 'expand_more'}</span>
+          </button>
+        </div>
+        <button class="btn-icon dp-nav-btn" on:click={calNextMonth} disabled={calAtMax} aria-label="Next month">
+          <span class="material-symbols-rounded">chevron_right</span>
+        </button>
+      </div>
+      {#if showYearPicker}
+        <div class="dp-year-grid">
+          {#each yearRange as yr}
+            <button class="dp-yr-btn" class:dp-yr-sel={yr === calYear}
+              on:click={() => { calYear = yr; showYearPicker = false; }}>{yr}</button>
+          {/each}
+        </div>
+      {:else if showMonthPicker}
+        <div class="dp-month-grid">
+          {#each monthNames as m}
+            <button class="dp-mo-btn" class:dp-mo-sel={m.idx === calMonth}
+              on:click={() => { calMonth = m.idx; showMonthPicker = false; }}>{m.short}</button>
+          {/each}
+        </div>
+      {:else}
+        <div class="dp-grid">
+          {#each ['Su','Mo','Tu','We','Th','Fr','Sa'] as dh}
+            <div class="dp-dh">{dh}</div>
+          {/each}
+          {#each {length: calFirstDay} as _}<div></div>{/each}
+          {#each {length: calDaysInMonth} as _, di}
+            {@const day = di + 1}
+            {@const ds = calYear + '-' + String(calMonth+1).padStart(2,'0') + '-' + String(day).padStart(2,'0')}
+            <button class="dp-day"
+              class:dp-today={ds === localDateStr()}
+              class:dp-sel={ds === dateStr}
+              class:dp-future={ds > localDateStr()}
+              on:click={() => { pickerDate = ds; goToDate(); }}>
+              {day}
+            </button>
+          {/each}
+        </div>
+        <div class="dp-manual">
+          <input class="input" type="text" bind:value={pickerDate}
+            placeholder="YYYY-MM-DD" style="flex:1;font-size:14px;height:40px" />
+          <button class="btn btn-primary" style="height:40px;padding:0 18px" on:click={goToDate}>Go</button>
+        </div>
+      {/if}
+    </div>
+  </div>
+{/if}
 
-  /* Date nav */
-  .date-nav {
+<style>
+  /* Date sub-bar — same pattern as Diary */
+  .wl-date-bar {
+    position: sticky;
+    top: calc(var(--page-top, var(--safe-top)) + 62px);
+    z-index: 9;
+    background: var(--glass-surface);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
+    padding: 8px var(--page-px);
   }
-  .date-label {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--text-1);
-    min-width: 120px;
-    text-align: center;
+  .wl-date-bar.has-banner {
+    top: calc(var(--page-top, var(--safe-top)) + 102px);
   }
+  .date-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    -webkit-tap-highlight-color: transparent;
+    transition: background var(--dur-fast);
+  }
+  .date-btn:hover { background: var(--surface-2); }
+  .date-label { font-size: 17px; font-weight: 700; color: var(--accent); }
+  .date-sub   { font-size: 12px; color: var(--text-3); }
 
   /* Loading spinner */
   .wellness-loading {
@@ -565,27 +707,45 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     margin-bottom: 4px;
-    flex-wrap: wrap;
   }
   .sync-info {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 10px;
   }
-  .sync-source-icon { font-size: 18px; color: var(--accent); }
-  .sync-source-label { font-size: 13px; font-weight: 600; color: var(--text-1); }
-  .sync-user { font-size: 12px; color: var(--text-3); }
-  .sync-actions {
+  .sync-source-icon { font-size: 22px; color: var(--accent); }
+  .sync-source-text { display: flex; flex-direction: column; gap: 1px; }
+  .sync-source-label { font-size: 14px; font-weight: 600; color: var(--text-1); }
+  .sync-time { font-size: 11px; color: var(--text-3); }
+  .sync-actions { display: flex; align-items: center; gap: 8px; }
+
+  /* Prominent sync button */
+  .sync-btn {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
+    padding: 8px 18px;
+    background: var(--accent);
+    color: var(--accent-text, #fff);
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity var(--dur-fast), transform var(--dur-fast);
+    -webkit-tap-highlight-color: transparent;
   }
-  .sync-time { font-size: 12px; color: var(--text-3); }
-  .btn-danger-ghost {
-    color: var(--text-3);
-    background: none;
+  .sync-btn:hover:not(:disabled) { opacity: 0.88; }
+  .sync-btn:active:not(:disabled) { transform: scale(0.96); }
+  .sync-btn:disabled { opacity: 0.6; cursor: default; }
+  .sync-btn-icon { font-size: 18px; }
+  .sync-btn.syncing .sync-btn-icon {
+    animation: wl-spin 0.8s linear infinite;
   }
-  .btn-danger-ghost:hover { color: var(--error, #f87171); }
+  @keyframes wl-spin { to { transform: rotate(360deg); } }
+
+  .text-danger { color: var(--text-3); }
+  .text-danger:hover { color: var(--error, #f87171); }
 
   /* Tabs */
   .tab-bar {
@@ -758,5 +918,69 @@
     .metric-grid { grid-template-columns: 1fr 1fr; }
     .tab-btn { font-size: 12px; padding: 7px 6px; }
     .tab-icon { display: none; }
+  }
+
+  /* ── Date picker calendar (mirrors Diary) ────────────────────────────────── */
+  .dp-sheet { padding-bottom: 4px; }
+  .dp-nav { display: flex; align-items: center; justify-content: space-between; padding: 12px 8px 8px; }
+  .dp-nav-btn { color: var(--text-2); }
+  .dp-nav-btn:disabled { opacity: 0.3; cursor: default; }
+  .dp-month-year { display: flex; align-items: center; gap: 6px; }
+  .dp-month-btn {
+    font-size: 16px; font-weight: 700; color: var(--text-1);
+    background: var(--surface-2); border: none; cursor: pointer;
+    border-radius: var(--radius-sm); padding: 2px 8px;
+    display: flex; align-items: center; transition: background var(--dur-fast);
+  }
+  .dp-month-btn:hover { background: var(--surface-3); }
+  .dp-year-btn {
+    font-size: 16px; font-weight: 700; color: var(--accent);
+    background: var(--accent-dim); border: none; cursor: pointer;
+    border-radius: var(--radius-sm); padding: 2px 8px;
+    display: flex; align-items: center; transition: background var(--dur-fast);
+  }
+  .dp-year-btn:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+  .dp-year-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 4px; padding: 4px 8px 8px; max-height: 220px; overflow-y: auto;
+  }
+  .dp-yr-btn {
+    padding: 8px 4px; font-size: 14px; font-weight: 500;
+    border-radius: var(--radius-sm); background: none; border: none;
+    cursor: pointer; color: var(--text-1); transition: background var(--dur-fast); text-align: center;
+  }
+  .dp-yr-btn:hover { background: var(--surface-2); }
+  .dp-yr-btn.dp-yr-sel { background: var(--accent); color: #fff; font-weight: 700; }
+  .dp-month-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 4px; padding: 4px 8px 8px;
+  }
+  .dp-mo-btn {
+    padding: 10px 4px; font-size: 14px; font-weight: 500;
+    border-radius: var(--radius-sm); background: none; border: none;
+    cursor: pointer; color: var(--text-1); transition: background var(--dur-fast); text-align: center;
+  }
+  .dp-mo-btn:hover { background: var(--surface-2); }
+  .dp-mo-btn.dp-mo-sel { background: var(--accent); color: #fff; font-weight: 700; }
+  .dp-grid {
+    display: grid; grid-template-columns: repeat(7, 1fr);
+    gap: 2px; padding: 0 8px 4px;
+  }
+  .dp-dh { text-align: center; font-size: 11px; font-weight: 600; color: var(--text-3); padding: 4px 0; }
+  .dp-day {
+    aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+    font-size: 14px; border-radius: var(--radius-full);
+    background: none; border: none; cursor: pointer;
+    color: var(--text-1); transition: background var(--dur-fast);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .dp-day:hover:not(:disabled) { background: var(--surface-2); }
+  .dp-day.dp-future { color: var(--text-3); }
+  .dp-day.dp-future:hover { background: var(--surface-2); color: var(--text-2); }
+  .dp-day.dp-today { color: var(--accent); font-weight: 700; }
+  .dp-day.dp-sel { background: var(--accent) !important; color: #fff; font-weight: 600; }
+  .dp-manual {
+    display: flex; gap: 8px; padding: 8px 16px 16px; align-items: center;
+    border-top: 1px solid var(--border); margin-top: 4px;
   }
 </style>
