@@ -572,10 +572,9 @@
     {#if $pageBanners}<WellnessBanner />{/if}
     <h1>Wellness</h1>
   </header>
-</div>
 
-<!-- Date navigation sub-bar — outside page-shell, same as Diary -->
-<div class="wl-date-bar" class:has-banner={$pageBanners}>
+  <!-- Date navigation sub-bar — sticky below header, same pattern as Diary -->
+  <div class="wl-date-bar" class:has-banner={$pageBanners}>
     <button class="btn-icon accent" on:click={prevDay} aria-label="Previous day" title="Previous day">
       <span class="material-symbols-rounded">chevron_left</span>
     </button>
@@ -586,9 +585,9 @@
     <button class="btn-icon accent" on:click={nextDay} disabled={isToday} aria-label="Next day" title="Next day">
       <span class="material-symbols-rounded">chevron_right</span>
     </button>
-</div>
+  </div>
 
-<div class="page-content wl-content">
+  <div class="page-content wl-content">
 
     <!-- ── Loading ── -->
     {#if !status || !withingsStatus}
@@ -972,6 +971,7 @@
 
     {/if}
 
+  </div>
 </div>
 
 <!-- Date picker calendar sheet -->
@@ -1045,14 +1045,9 @@
     outside siblings), so the global min-height would balloon the shell to full
     viewport height and shove the date bar way off screen.
   */
-  .wl-shell {
-    min-height: unset !important;
-    padding-bottom: 0 !important;
-  }
-
-  /* Standalone content area (outside page-shell, same as Diary) */
+  /* Content area inside page-shell — shell already handles bottom padding */
   .wl-content {
-    padding-bottom: calc(var(--nav-h) + var(--safe-bottom) + 16px);
+    padding-bottom: 16px;
   }
 
   /* Date sub-bar — same pattern as Diary */

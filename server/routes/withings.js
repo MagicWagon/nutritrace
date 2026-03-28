@@ -254,14 +254,21 @@ async function _syncRange(userId, fromDate, toDate) {
     byDate[date].push({ grp, deviceModel: deviceModels[grp.deviceid] || 'Withings' });
   }
 
-  const upsertWellness = db.prepare(`
+  // Delete-then-reinsert strategy: if a measurement was removed in the Withings app,
+  // it won't appear in this sync and should be removed from our local store too.
+  // Only wipe dates that Withings actually returned data for (don't clear dates with no response).
+  const deleteWellnessDate = db.prepare(
+    `DELETE FROM wellness_data WHERE user_id = ? AND date = ? AND source = 'withings'`
+  );
+
+  const insertWellness = db.prepare(`
     INSERT INTO wellness_data (user_id, date, source, metric_type, value, device_model, synced_at)
     VALUES (?, ?, 'withings', ?, ?, ?, datetime('now'))
-    ON CONFLICT(user_id, date, source, metric_type) DO UPDATE SET
-      value=excluded.value, device_model=excluded.device_model, synced_at=excluded.synced_at
   `);
 
   for (const [date, entries] of Object.entries(byDate)) {
+    // Clear existing Withings data for this date before reinserting
+    deleteWellnessDate.run(uid, date);
     const bodyStatUpdates = {};
 
     for (const { grp, deviceModel } of entries) {
@@ -272,7 +279,7 @@ async function _syncRange(userId, fromDate, toDate) {
         // Determine metric key — BODY_STAT_TYPES takes priority for diary auto-fill
         const metricKey = BODY_STAT_TYPES[type]?.metric || WELLNESS_TYPES[type];
         if (metricKey) {
-          upsertWellness.run(uid, date, metricKey, value, deviceModel);
+          insertWellness.run(uid, date, metricKey, value, deviceModel);
         }
 
         // Collect body stats to merge into diary
