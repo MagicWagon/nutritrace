@@ -469,6 +469,15 @@
   ]);
   let _waterShowInDiary = DB.getSetting('waterShowInDiary', true);
 
+  // Water card state
+  let _waterCustomAmt  = '';
+  let _waterShowCustom = false;
+
+  // SVG bottle fill geometry (fillable interior y=50→182, 132 units tall)
+  const _WB_TOP = 50, _WB_BOTTOM = 182, _WB_H = 132;
+  $: _waterFillY     = _WB_BOTTOM - (_waterPct / 100) * _WB_H;
+  $: _waterOverflow  = _waterRawPct >= 100;
+
   function _reloadWaterSettings() {
     _waterGoalMl      = DB.getSetting('waterGoalMl',      2000);
     _waterUnit        = DB.getSetting('waterUnit',        'ml');
@@ -476,15 +485,22 @@
     _waterShowInDiary = DB.getSetting('waterShowInDiary', true);
   }
 
-  $: _waterLogs  = entry?.water || [];
-  $: _waterTotal = _waterLogs.reduce((s, l) => s + (l.amount || 0), 0);
-  $: _waterPct   = _waterGoalMl > 0 ? Math.min(100, Math.round(_waterTotal / _waterGoalMl * 100)) : 0;
+  $: _waterLogs    = entry?.water || [];
+  $: _waterTotal   = _waterLogs.reduce((s, l) => s + (l.amount || 0), 0);
+  $: _waterRawPct  = _waterGoalMl > 0 ? Math.round(_waterTotal / _waterGoalMl * 100) : 0;
+  $: _waterPct     = Math.min(100, _waterRawPct);
 
   function _waterDisplay(ml) {
     if (_waterUnit === 'oz') return (ml / 29.5735).toFixed(0)  + ' fl oz';
     if (_waterUnit === 'L')  return (ml / 1000).toFixed(2)     + ' L';
     if (_waterUnit === 'G')  return (ml / 3785.41).toFixed(3)  + ' G';
     return ml + ' ml';
+  }
+  function _waterDisplayGoal() {
+    if (_waterUnit === 'oz') return Math.round(_waterGoalMl / 29.5735)    + ' fl oz';
+    if (_waterUnit === 'L')  return (_waterGoalMl / 1000).toFixed(1)      + ' L';
+    if (_waterUnit === 'G')  return (_waterGoalMl / 3785.41).toFixed(2)   + ' G';
+    return _waterGoalMl + ' ml';
   }
   function _contDisplay(cont) {
     if (_waterUnit === 'oz') return (cont.volumeMl / 29.5735).toFixed(0) + ' fl oz';
@@ -494,14 +510,31 @@
   }
 
   async function _addWaterFromDiary(volumeMl) {
-    let entry = null;
-    currentEntry.subscribe(v => entry = v)();
-    const log = { amount: volumeMl, time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) };
-    const updated = { ...entry, water: [...(entry?.water || []), log] };
+    const ml = Number(volumeMl);
+    if (!ml || ml <= 0) return;
+    let ent = null;
+    currentEntry.subscribe(v => ent = v)();
+    const log = { amount: ml, time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) };
+    const updated = { ...ent, water: [...(ent?.water || []), log] };
     await NtApi.saveDiaryDate($currentDate, {
       items: updated.items || [],
       body_stats: updated.bodyStats || {},
       water: updated.water,
+    });
+    await loadEntry($currentDate);
+    _waterCustomAmt  = '';
+    _waterShowCustom = false;
+  }
+
+  async function _removeWaterLog(index) {
+    let ent = null;
+    currentEntry.subscribe(v => ent = v)();
+    if (!ent) return;
+    const water = (ent.water || []).filter((_, i) => i !== index);
+    await NtApi.saveDiaryDate($currentDate, {
+      items: ent.items || [],
+      body_stats: ent.bodyStats || {},
+      water,
     });
     await loadEntry($currentDate);
   }
@@ -792,32 +825,117 @@
   {/if}
 </div>
 
-<!-- Water quick-add sheet -->
-<Sheet bind:open={showWaterQuickAdd} title="Log Water" on:close={() => showWaterQuickAdd = false}>
-  <div class="wqa-body">
-    <div class="wqa-progress">
-      <div class="wqa-progress-bar">
-        <div class="wqa-progress-fill" style="width:{_waterPct}%"></div>
+<!-- Water card sheet -->
+<Sheet bind:open={showWaterQuickAdd} title="Water" on:close={() => { showWaterQuickAdd = false; _waterShowCustom = false; _waterCustomAmt = ''; }}>
+  <div class="wc-body">
+
+    <!-- Bottle + stats -->
+    <div class="wc-bottle-section">
+      <div class="wc-bottle-wrap" class:wc-overflowing={_waterOverflow}>
+        <svg class="wc-bottle-svg" class:wc-overflowing={_waterOverflow}
+          viewBox="0 0 120 200" xmlns="http://www.w3.org/2000/svg"
+          aria-label="Water bottle, {_waterRawPct}% full">
+          <defs>
+            <clipPath id="wc-clip-d">
+              <path d="M 46 16 L 46 38 C 32 44 22 56 22 68 L 22 168 Q 22 184 37 184 L 83 184 Q 98 184 98 168 L 98 68 C 98 56 88 44 74 38 L 74 16 Z" />
+            </clipPath>
+          </defs>
+          <!-- Bottle body background -->
+          <path d="M 46 16 L 46 38 C 32 44 22 56 22 68 L 22 168 Q 22 184 37 184 L 83 184 Q 98 184 98 168 L 98 68 C 98 56 88 44 74 38 L 74 16 Z" class="wc-bottle-bg" />
+          <!-- Water fill -->
+          {#if _waterPct > 0}
+            <g clip-path="url(#wc-clip-d)">
+              <rect x="-5" y={_waterFillY + 10} width="130" height={_WB_BOTTOM - _waterFillY + 10} class="wc-water-body" />
+              <g transform="translate(0, {_waterFillY})">
+                <path class="wc-water-wave" d="M -120,10 C -90,2 -60,18 -30,10 C 0,2 30,18 60,10 C 90,2 120,18 150,10 C 180,2 210,18 240,10 L 240,30 L -120,30 Z" />
+              </g>
+            </g>
+          {/if}
+          <!-- Bottle outline -->
+          <path d="M 46 16 L 46 38 C 32 44 22 56 22 68 L 22 168 Q 22 184 37 184 L 83 184 Q 98 184 98 168 L 98 68 C 98 56 88 44 74 38 L 74 16 Z"
+            class="wc-bottle-outline" class:wc-full={_waterPct >= 100} />
+          <rect x="44" y="2" width="32" height="16" rx="5" class="wc-bottle-cap" />
+          <line x1="44" y1="16" x2="76" y2="16" class="wc-cap-line" />
+          {#if _waterOverflow}
+            <ellipse class="wc-overflow-spill" cx="60" cy="5" rx="19" ry="4" />
+            <circle class="wc-overflow-drip wc-drip-1" cx="43" cy="14" r="3" />
+            <circle class="wc-overflow-drip wc-drip-2" cx="42" cy="13" r="2.5" />
+            <circle class="wc-overflow-drip wc-drip-3" cx="77" cy="14" r="3" />
+            <circle class="wc-overflow-drip wc-drip-4" cx="78" cy="13" r="2.5" />
+          {/if}
+        </svg>
       </div>
-      <span class="wqa-stats text-3 text-sm">{_waterDisplay(_waterTotal)} / {_waterDisplay(_waterGoalMl)} · {_waterPct}%</span>
+
+      <div class="wc-stats">
+        <div class="wc-amount">
+          <span class="wc-current">{_waterDisplay(_waterTotal)}</span>
+          <span class="wc-sep">/</span>
+          <span class="wc-goal">{_waterDisplayGoal()}</span>
+        </div>
+        <div class="wc-pct" class:wc-goal-met={_waterOverflow}>
+          {_waterRawPct}%{_waterOverflow ? ' 🎉' : ''}
+        </div>
+        <div class="wc-progress-bar">
+          <div class="wc-progress-fill" style="width:{_waterPct}%"></div>
+        </div>
+      </div>
     </div>
-    <div class="wqa-grid">
-      {#each _waterContainers as cont (cont.id)}
-        <button class="wqa-btn" on:click={() => { _addWaterFromDiary(cont.volumeMl); showWaterQuickAdd = false; }}>
-          <span class="material-symbols-rounded" style="color:var(--accent);font-size:22px">water_drop</span>
-          <span class="wqa-name">{cont.name}</span>
-          <span class="wqa-vol text-3">{_contDisplay(cont)}</span>
-        </button>
-      {/each}
-      {#if _waterContainers.length === 0}
+
+    <!-- Quick-add grid -->
+    <p class="section-title" style="padding:4px 0 8px">Quick Add</p>
+    <div class="wc-grid">
+      {#if _waterContainers.length > 0}
+        {#each _waterContainers as cont (cont.id)}
+          <button class="wc-btn" on:click={() => _addWaterFromDiary(cont.volumeMl)}>
+            <span class="material-symbols-rounded">water_drop</span>
+            <span class="wc-btn-name">{cont.name}</span>
+            <span class="wc-btn-vol">{_contDisplay(cont)}</span>
+          </button>
+        {/each}
+      {:else}
         {#each [250, 500, 1000] as ml}
-          <button class="wqa-btn" on:click={() => { _addWaterFromDiary(ml); showWaterQuickAdd = false; }}>
-            <span class="material-symbols-rounded" style="color:var(--accent);font-size:22px">water_drop</span>
-            <span class="wqa-vol text-3">{_waterDisplay(ml)}</span>
+          <button class="wc-btn" on:click={() => _addWaterFromDiary(ml)}>
+            <span class="material-symbols-rounded">water_drop</span>
+            <span class="wc-btn-vol">{_waterDisplay(ml)}</span>
           </button>
         {/each}
       {/if}
+      <button class="wc-btn wc-btn-custom" on:click={() => _waterShowCustom = !_waterShowCustom}>
+        <span class="material-symbols-rounded">edit</span>
+        <span class="wc-btn-name">Custom</span>
+      </button>
     </div>
+
+    {#if _waterShowCustom}
+      <div class="wc-custom-row" transition:slide={{ duration: 160 }}>
+        <input class="input" type="number" min="1" step="1" placeholder="Amount (ml)"
+          bind:value={_waterCustomAmt}
+          on:keydown={e => e.key === 'Enter' && _addWaterFromDiary(_waterCustomAmt)} />
+        <button class="btn btn-primary" on:click={() => _addWaterFromDiary(_waterCustomAmt)}>Add</button>
+      </div>
+    {/if}
+
+    <!-- Today's log -->
+    {#if _waterLogs.length > 0}
+      <p class="section-title" style="padding:12px 0 8px">Today's Log</p>
+      <div class="card wc-log-card">
+        {#each _waterLogs as log, i}
+          {#if i > 0}<div class="wc-divider"></div>{/if}
+          <div class="wc-log-row">
+            <span class="material-symbols-rounded wc-log-icon">water_drop</span>
+            <div class="wc-log-info">
+              <span class="font-medium">{_waterDisplay(log.amount)}</span>
+              {#if log.time}<span class="text-3 text-sm">{log.time}</span>{/if}
+            </div>
+            <button class="btn-icon" on:click={() => _removeWaterLog(i)} title="Remove">
+              <span class="material-symbols-rounded" style="font-size:18px;color:var(--text-3)">delete</span>
+            </button>
+          </div>
+        {/each}
+      </div>
+    {/if}
+
+    <div style="height:16px"></div>
   </div>
 </Sheet>
 
@@ -1248,22 +1366,78 @@
   .dbb-water-pct  { font-size: 11px; font-weight: 600; color: var(--water-blue); flex-shrink: 0; min-width: 36px; text-align: right; }
 
   /* Water quick-add sheet */
-  .wqa-body     { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
-  .wqa-progress { display: flex; flex-direction: column; gap: 6px; }
-  .wqa-progress-bar  { height: 6px; background: var(--surface-3); border-radius: var(--radius-full); overflow: hidden; }
-  .wqa-progress-fill { height: 100%; background: var(--water-blue); border-radius: var(--radius-full); transition: width 0.4s ease; }
-  .wqa-stats    { text-align: center; }
-  .wqa-grid     { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-  .wqa-btn      {
-    display: flex; flex-direction: column; align-items: center; gap: 4px;
-    padding: 14px 10px; border-radius: var(--radius-md);
-    background: var(--surface-2); border: 1px solid var(--border);
-    cursor: pointer; transition: background var(--dur-fast), border-color var(--dur-fast);
+  /* ── Water card sheet ─────────────────────────────────────────────────────── */
+  .wc-body { padding: 16px; display: flex; flex-direction: column; }
+
+  /* Bottle + stats */
+  .wc-bottle-section {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 16px; padding: 8px 0 16px;
   }
-  .wqa-btn:hover  { background: var(--accent-dim); border-color: var(--accent); }
-  .wqa-btn:active { transform: scale(0.95); }
-  .wqa-name { font-size: 13px; font-weight: 600; color: var(--text-1); text-align: center; }
-  .wqa-vol  { font-size: 12px; text-align: center; }
+  .wc-bottle-wrap {
+    width: 120px; height: auto;
+    filter: drop-shadow(0 8px 24px rgba(0,0,0,0.3));
+  }
+  .wc-bottle-wrap.wc-overflowing { animation: wc-overflow-glow 1.8s ease-in-out infinite; }
+  @keyframes wc-overflow-glow {
+    0%,100% { filter: drop-shadow(0 8px 24px rgba(0,0,0,0.3)); }
+    50%      { filter: drop-shadow(0 0 22px rgba(79,255,176,0.55)) drop-shadow(0 8px 24px rgba(0,0,0,0.2)); }
+  }
+  .wc-bottle-svg { width: 100%; height: auto; overflow: visible; }
+  .wc-bottle-svg.wc-overflowing .wc-water-wave { animation-duration: 0.65s; }
+  .wc-bottle-bg      { fill: var(--surface-3); }
+  .wc-bottle-outline { fill: none; stroke: var(--border-strong); stroke-width: 2; transition: stroke 0.4s; }
+  .wc-bottle-outline.wc-full { stroke: var(--accent); filter: drop-shadow(0 0 4px var(--accent)); }
+  .wc-bottle-cap     { fill: var(--accent); }
+  .wc-cap-line       { stroke: var(--border-strong); stroke-width: 1; }
+  .wc-water-body     { fill: var(--accent); opacity: 0.55; transition: y 0.6s ease, height 0.6s ease; }
+  .wc-water-wave     { fill: var(--accent); opacity: 0.75; animation: wc-wave-flow 1.8s linear infinite; }
+  @keyframes wc-wave-flow { from { transform: translateX(0); } to { transform: translateX(-120px); } }
+  .wc-overflow-spill { fill: var(--accent); animation: wc-spill-pulse 1.6s ease-in-out infinite; }
+  @keyframes wc-spill-pulse { 0%,100% { opacity: 0.35; } 50% { opacity: 0.65; } }
+  .wc-overflow-drip  { fill: var(--accent); }
+  .wc-drip-1 { animation: wc-drip-l 1.4s ease-in 0s    infinite; }
+  .wc-drip-2 { animation: wc-drip-l 1.4s ease-in 0.7s  infinite; }
+  .wc-drip-3 { animation: wc-drip-r 1.4s ease-in 0.35s infinite; }
+  .wc-drip-4 { animation: wc-drip-r 1.4s ease-in 1.05s infinite; }
+  @keyframes wc-drip-l { 0% { transform:translate(0,0);    opacity:0; } 8% { opacity:0.85; } 100% { transform:translate(-10px,34px); opacity:0; } }
+  @keyframes wc-drip-r { 0% { transform:translate(0,0);    opacity:0; } 8% { opacity:0.85; } 100% { transform:translate(10px, 34px); opacity:0; } }
+
+  .wc-stats { display:flex; flex-direction:column; align-items:center; gap:8px; width:100%; max-width:280px; }
+  .wc-amount { display:flex; align-items:baseline; gap:6px; }
+  .wc-current { font-size:28px; font-weight:700; color:var(--accent); line-height:1; }
+  .wc-sep     { font-size:20px; color:var(--text-3); }
+  .wc-goal    { font-size:18px; font-weight:500; color:var(--text-2); }
+  .wc-pct     { font-size:14px; font-weight:600; color:var(--text-3); }
+  .wc-pct.wc-goal-met { color:var(--accent); }
+  .wc-progress-bar  { width:100%; height:8px; background:var(--surface-3); border-radius:var(--radius-full); overflow:hidden; }
+  .wc-progress-fill { height:100%; background:linear-gradient(90deg,var(--accent),var(--accent-2)); border-radius:var(--radius-full); transition:width 0.5s cubic-bezier(0.34,1.56,0.64,1); }
+
+  /* Quick-add grid */
+  .wc-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(100px,1fr)); gap:8px; }
+  .wc-btn {
+    display:flex; flex-direction:column; align-items:center; gap:6px;
+    padding:18px 8px; border-radius:var(--radius-lg);
+    background:var(--surface-2); border:1px solid var(--border);
+    color:var(--text-1); cursor:pointer;
+    transition:background var(--dur-fast), border-color var(--dur-fast), transform var(--dur-fast);
+  }
+  .wc-btn .material-symbols-rounded { font-size:26px; color:var(--accent); }
+  .wc-btn:hover  { background:var(--accent-dim); border-color:var(--accent); }
+  .wc-btn:active { transform:scale(0.94); }
+  .wc-btn-custom { border-style:dashed; }
+  .wc-btn-name { font-size:12px; font-weight:600; }
+  .wc-btn-vol  { font-size:12px; color:var(--text-3); font-weight:500; }
+
+  .wc-custom-row { display:flex; gap:8px; margin-top:10px; align-items:center; }
+  .wc-custom-row .input { flex:1; }
+
+  /* Log */
+  .wc-log-card { border-left:3px solid var(--accent); }
+  .wc-log-row  { display:flex; align-items:center; gap:12px; padding:12px 16px; }
+  .wc-log-icon { color:var(--accent); font-size:20px; flex-shrink:0; }
+  .wc-log-info { flex:1; display:flex; flex-direction:column; gap:2px; }
+  .wc-divider  { height:1px; background:var(--border); margin:0 16px; }
 
 
   .meal-group { overflow: visible; border-left: 3px solid var(--meal-color, var(--accent)); }
