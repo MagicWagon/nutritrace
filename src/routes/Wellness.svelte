@@ -136,7 +136,7 @@
 
   $: calFirstDay    = new Date(calYear, calMonth, 1).getDay();
   $: calDaysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
-  $: calAtMax = (() => { const n = new Date(); return calYear > n.getFullYear() || (calYear === n.getFullYear() && calMonth >= n.getMonth()); })();
+  $: calAtMax = (() => { const n = new Date(); return calYear > n.getFullYear() + 1 || (calYear === n.getFullYear() + 1 && calMonth > n.getMonth()); })();
   $: calMonthName   = new Date(calYear, calMonth, 1).toLocaleDateString(undefined, { month: 'long' });
   $: yearRange      = Array.from({length: 22}, (_, i) => (new Date().getFullYear() - 10) + i);
   const monthNames  = [
@@ -305,9 +305,10 @@
     {#if $pageBanners}<WellnessBanner />{/if}
     <h1>Wellness</h1>
   </header>
+</div>
 
-  <!-- Date navigation sub-bar — same pattern as Diary -->
-  <div class="wl-date-bar" class:has-banner={$pageBanners}>
+<!-- Date navigation sub-bar — outside page-shell, same as Diary -->
+<div class="wl-date-bar" class:has-banner={$pageBanners}>
     <button class="btn-icon accent" on:click={prevDay} aria-label="Previous day" title="Previous day">
       <span class="material-symbols-rounded">chevron_left</span>
     </button>
@@ -318,9 +319,9 @@
     <button class="btn-icon accent" on:click={nextDay} disabled={isToday} aria-label="Next day" title="Next day">
       <span class="material-symbols-rounded">chevron_right</span>
     </button>
-  </div>
+</div>
 
-  <div class="page-content">
+<div class="page-content wl-content">
 
     <!-- ── Not configured ── -->
     {#if !status}
@@ -531,7 +532,6 @@
 
     {/if}
 
-  </div>
 </div>
 
 <!-- Date picker calendar sheet -->
@@ -599,6 +599,11 @@
 {/if}
 
 <style>
+  /* Standalone content area (outside page-shell, same as Diary) */
+  .wl-content {
+    padding-bottom: calc(var(--nav-h) + var(--safe-bottom) + 16px);
+  }
+
   /* Date sub-bar — same pattern as Diary */
   .wl-date-bar {
     position: sticky;
