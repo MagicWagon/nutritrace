@@ -4,6 +4,7 @@
   import { location, push } from 'svelte-spa-router';
   import { createEventDispatcher } from 'svelte';
   import { currentUser, userMgmtActive, logout } from '../../stores/auth.js';
+  import { wellnessEnabled } from '../../stores/settings.js';
 
   export let open = false;
   export let persistent = false;
@@ -19,14 +20,19 @@
     return (user?.full_name || user?.username || '?')[0].toUpperCase();
   }
 
-  const navItems = [
+  const BASE_NAV = [
     { path: '/',           icon: 'book',           label: 'Diary'      },
     { path: '/foods',      icon: 'restaurant',     label: 'Foods'      },
     { path: '/statistics', icon: 'bar_chart',      label: 'Statistics' },
-    { path: '/wellness',   icon: 'monitor_heart',  label: 'Wellness'   },
     { path: '/goals',      icon: 'flag',           label: 'Goals'      },
     { path: '/settings',   icon: 'settings',       label: 'Settings'   },
   ];
+
+  const WELLNESS_NAV = { path: '/wellness', icon: 'monitor_heart', label: 'Wellness' };
+
+  $: navItems = $wellnessEnabled
+    ? [...BASE_NAV.slice(0, 2), WELLNESS_NAV, ...BASE_NAV.slice(2)]
+    : BASE_NAV;
 
   function go(path) {
     push(path);

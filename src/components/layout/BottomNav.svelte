@@ -1,13 +1,21 @@
 <script>
   import { location, push } from 'svelte-spa-router';
+  import { wellnessEnabled } from '../../stores/settings.js';
 
-  const tabs = [
-    { path: '/',           icon: 'book',              label: 'Diary'    },
-    { path: '/foods',      icon: 'restaurant',        label: 'Foods'    },
-    { path: '/wellness',   icon: 'monitor_heart',     label: 'Wellness' },
-    { path: '/goals',      icon: 'flag',              label: 'Goals'    },
-    { path: '/settings',   icon: 'settings',          label: 'Settings' },
+  const BASE_TABS = [
+    { path: '/',            icon: 'book',          label: 'Diary'    },
+    { path: '/foods',       icon: 'restaurant',    label: 'Foods'    },
+    { path: '/statistics',  icon: 'bar_chart',     label: 'Stats'    },
+    { path: '/goals',       icon: 'flag',          label: 'Goals'    },
+    { path: '/settings',    icon: 'settings',      label: 'Settings' },
   ];
+
+  const WELLNESS_TAB = { path: '/wellness', icon: 'monitor_heart', label: 'Wellness' };
+
+  // Wellness tab inserted after Foods (where Water used to be) when the feature is enabled
+  $: tabs = $wellnessEnabled
+    ? [...BASE_TABS.slice(0, 2), WELLNESS_TAB, ...BASE_TABS.slice(2)]
+    : BASE_TABS;
 
   $: activeIdx = (() => {
     const base = $location.split('?')[0];
