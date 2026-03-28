@@ -58,7 +58,7 @@
       if (cameraVideo) { cameraVideo.srcObject = cameraStream; cameraVideo.play(); }
     } catch(err) {
       showCamera = false;
-      alert('Camera access denied or unavailable.');
+      showError('Camera access denied or unavailable.');
     }
   }
 
@@ -170,7 +170,7 @@
       }
       await _doUploadToOFF(API);
     } catch(e) {
-      alert('Could not upload to Open Food Facts: ' + e.message);
+      showError('Could not upload to Open Food Facts: ' + e.message);
       contributing = false;
     }
   }
@@ -182,7 +182,7 @@
       const { API } = await import('../lib/api.js');
       await _doUploadToOFF(API);
     } catch(e) {
-      alert('Could not upload to Open Food Facts: ' + e.message);
+      showError('Could not upload to Open Food Facts: ' + e.message);
       contributing = false;
     }
   }

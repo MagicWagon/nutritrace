@@ -14,7 +14,7 @@
   import {
     currentDate, currentEntry, diaryTotals, macroPercents,
     prevDay, nextDay, loadEntry, removeDiaryItem, updateDiaryItem, saveBodyStats,
-    diaryShowNutritionSummary, diaryShowBodyStats
+    diaryShowNutritionSummary, diaryShowBodyStats, diaryLoadError
   } from '../stores/diary.js';
   import { mealNames, goals, energyUnit, weightUnit, lengthUnit, navStyle,
            diaryShowBrands, diaryShowThumbnails,
@@ -582,6 +582,12 @@
   </div>
 
   <div class="page-content diary-content" style="padding-bottom:{contentPad}">
+    {#if $diaryLoadError}
+      <div class="server-error-banner">
+        <span class="material-symbols-rounded">cloud_off</span>
+        <span>Could not reach server — <button class="server-error-retry" on:click={() => loadEntry($currentDate)}>retry</button></span>
+      </div>
+    {/if}
     <!-- Meal groups -->
     {#each meals as meal, mealIdx}
       {@const items = getMealItems(entry.items, mealIdx)}
@@ -1332,6 +1338,23 @@
     transition: color var(--dur-fast);
   }
   .item-check-on { color: var(--accent); }
+
+  /* Server error banner */
+  .server-error-banner {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px;
+    margin-bottom: 8px;
+    background: rgba(255, 100, 80, 0.08);
+    border: 1px solid rgba(255, 100, 80, 0.2);
+    border-radius: var(--radius-lg);
+    font-size: 14px; color: var(--text-2);
+  }
+  .server-error-banner .material-symbols-rounded { font-size: 18px; color: #ff6450; flex-shrink: 0; }
+  .server-error-retry {
+    background: none; border: none; padding: 0;
+    color: var(--accent); font-size: 14px; font-weight: 600;
+    cursor: pointer; text-decoration: underline;
+  }
 
   /* Select-mode header title */
   .select-mode-title { color: var(--accent); }

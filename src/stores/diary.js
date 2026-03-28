@@ -9,6 +9,7 @@ function todayStr() {
 
 export const currentDate  = writable(todayStr());
 export const currentEntry = writable(null);
+export const diaryLoadError = writable(false);
 // UI state — controlled from App.svelte topbar buttons, consumed in Diary.svelte
 export const diaryShowNutritionSummary = writable(false);
 export const diaryShowBodyStats        = writable(false);
@@ -40,15 +41,18 @@ function _toApi(entry) {
 export async function loadEntry(dateStr) {
   currentDate.set(dateStr);
   let entry = null;
+  let failed = false;
   try {
     const raw = await NtApi.getDiaryDate(dateStr);
     entry = _fromApi(raw);
   } catch(e) {
     console.error('[diary] loadEntry error:', e);
+    failed = true;
   }
   let curDate = null;
   currentDate.subscribe(v => curDate = v)();
   if (curDate === dateStr) {
+    diaryLoadError.set(failed);
     currentEntry.set(entry || { date: dateStr, items: [], bodyStats: {}, water: [] });
   }
   return entry || null;

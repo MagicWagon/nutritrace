@@ -14,13 +14,14 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       workbox: {
-        // No precaching — HTTP Cache-Control headers handle all asset caching:
-        //   index.html → no-store (always fresh)
-        //   /assets/*.js|css → immutable (content-hashed, cached forever)
+        // Precache only the offline fallback page — everything else is handled
+        // by HTTP Cache-Control headers (index.html: no-cache, /assets/*: immutable).
         // Precaching JS/CSS caused stale UI after deploys because the old SW
         // kept serving old bundles until the new SW fully activated.
-        globPatterns: [],
-        navigateFallback: null,
+        globPatterns: ['offline.html'],
+        navigateFallback: '/offline.html',
+        // Only use the offline fallback for navigation requests that aren't API calls
+        navigateFallbackDenylist: [/^\/api\//],
         cleanupOutdatedCaches: true,
         runtimeCaching: [
           {

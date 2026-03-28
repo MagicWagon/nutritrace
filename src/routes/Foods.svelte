@@ -59,6 +59,7 @@
   let apiResults = [];
   let mealieResults = [];
   let loading = false;
+  let loadError = false;
   let mealieLoading = false;
   let searchTimeout = null;
 
@@ -103,15 +104,21 @@
     : filteredBySearch;
 
   async function load() {
-    [localFoods, localMeals, localRecipes] = await Promise.all([
-      NtApi.getFoods(),
-      NtApi.getMeals(),
-      NtApi.getRecipes(),
-    ]);
-    const sort = foodsSort.get();
-    if (sort === 'alpha') {
-      [localFoods, localMeals, localRecipes].forEach(arr =>
-        arr.sort((a,b) => (a.name||'').localeCompare(b.name||'')));
+    loadError = false;
+    try {
+      [localFoods, localMeals, localRecipes] = await Promise.all([
+        NtApi.getFoods(),
+        NtApi.getMeals(),
+        NtApi.getRecipes(),
+      ]);
+      const sort = foodsSort.get();
+      if (sort === 'alpha') {
+        [localFoods, localMeals, localRecipes].forEach(arr =>
+          arr.sort((a,b) => (a.name||'').localeCompare(b.name||'')));
+      }
+    } catch(e) {
+      console.error('[foods] load error:', e);
+      loadError = true;
     }
   }
 
@@ -525,10 +532,17 @@
     </div>
   {/if}
 
+  {#if loadError}
+    <div class="server-error-banner">
+      <span class="material-symbols-rounded">cloud_off</span>
+      <span>Could not reach server — <button class="server-error-retry" on:click={load}>retry</button></span>
+    </div>
+  {/if}
+
   <div class="page-content">
     {#if searchSource === 'local' || activeTab !== 0}
       <!-- ── Local list ─────────────────────────────────────────────────────── -->
-      {#if filteredList.length === 0 && !search}
+      {#if filteredList.length === 0 && !search && !loadError}
         <div class="empty-state">
           <span class="material-symbols-rounded empty-icon">
             {activeTab === 0 ? 'restaurant' : activeTab === 1 ? 'dinner_dining' : 'book'}
@@ -801,6 +815,22 @@
   .food-name  { font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .food-brand { }
   .food-kcal  { color: var(--text-2); }
+
+  .server-error-banner {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px;
+    margin: 0 0 8px;
+    background: rgba(255, 100, 80, 0.08);
+    border: 1px solid rgba(255, 100, 80, 0.2);
+    border-radius: var(--radius-lg);
+    font-size: 14px; color: var(--text-2);
+  }
+  .server-error-banner .material-symbols-rounded { font-size: 18px; color: #ff6450; flex-shrink: 0; }
+  .server-error-retry {
+    background: none; border: none; padding: 0;
+    color: var(--accent); font-size: 14px; font-weight: 600;
+    cursor: pointer; text-decoration: underline;
+  }
 
   .empty-state {
     display: flex;
