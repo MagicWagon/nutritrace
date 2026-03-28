@@ -267,8 +267,9 @@ async function _syncRange(userId, fromDate, toDate) {
   `);
 
   for (const [date, entries] of Object.entries(byDate)) {
-    // Clear existing Withings data for this date before reinserting
-    deleteWellnessDate.run(uid, date);
+    // Collect the most recent value per metric across all measurement groups for this date.
+    // Withings may return multiple weigh-ins per day; we keep the latest (highest grp.date ts).
+    const latestByMetric = {}; // metricKey → { value, deviceModel, ts }
     const bodyStatUpdates = {};
 
     for (const { grp, deviceModel } of entries) {
@@ -276,13 +277,13 @@ async function _syncRange(userId, fromDate, toDate) {
         const type = measure.type;
         const value = _withingsValue(measure);
 
-        // Determine metric key — BODY_STAT_TYPES takes priority for diary auto-fill
         const metricKey = BODY_STAT_TYPES[type]?.metric || WELLNESS_TYPES[type];
         if (metricKey) {
-          insertWellness.run(uid, date, metricKey, value, deviceModel);
+          if (!latestByMetric[metricKey] || grp.date > latestByMetric[metricKey].ts) {
+            latestByMetric[metricKey] = { value, deviceModel, ts: grp.date };
+          }
         }
 
-        // Collect body stats to merge into diary
         if (BODY_STAT_TYPES[type]) {
           const stat = BODY_STAT_TYPES[type];
           if (!bodyStatUpdates[stat.metric] || grp.date > (bodyStatUpdates[stat.metric]._ts || 0)) {
@@ -290,6 +291,12 @@ async function _syncRange(userId, fromDate, toDate) {
           }
         }
       }
+    }
+
+    // Replace existing Withings data for this date with the latest values
+    deleteWellnessDate.run(uid, date);
+    for (const [metricKey, { value, deviceModel }] of Object.entries(latestByMetric)) {
+      insertWellness.run(uid, date, metricKey, value, deviceModel);
     }
 
     if (Object.keys(bodyStatUpdates).length > 0) {
