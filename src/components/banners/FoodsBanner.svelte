@@ -22,18 +22,6 @@
     'Berry Smoothie Bowl',
   ];
 
-  // Sparkle positions — fixed so they don't re-randomise on each render
-  const SPARKLES = [
-    { x:  8, y: 22, s: 7,  d: 0.0,  dur: 2.8 },
-    { x: 18, y: 68, s: 5,  d: 0.7,  dur: 3.4 },
-    { x: 32, y: 40, s: 9,  d: 1.4,  dur: 2.5 },
-    { x: 50, y: 15, s: 6,  d: 0.3,  dur: 3.1 },
-    { x: 65, y: 75, s: 8,  d: 1.9,  dur: 2.9 },
-    { x: 74, y: 35, s: 5,  d: 0.9,  dur: 3.6 },
-    { x: 83, y: 58, s: 7,  d: 2.2,  dur: 2.7 },
-    { x: 92, y: 20, s: 6,  d: 0.5,  dur: 3.2 },
-  ];
-
   let displayText = '';
   let itemIndex = 0;
   let charIndex = 0;
@@ -79,23 +67,57 @@
 
 <div class="tw-banner" class:no-anim={noAnim} aria-hidden="true">
 
-  <!-- Sparkle layer -->
-  {#if !noAnim}
-    <svg class="tw-sparkles" viewBox="0 0 100 100" preserveAspectRatio="none">
-      {#each SPARKLES as sp, i}
-        <g class="sp sp{i}" style="--d:{sp.d}s; --dur:{sp.dur}s;">
-          <!-- 4-point star -->
-          <line x1={sp.x}       y1={sp.y - sp.s/2} x2={sp.x}       y2={sp.y + sp.s/2} stroke-width="0.8" stroke-linecap="round"/>
-          <line x1={sp.x - sp.s/2} y1={sp.y}       x2={sp.x + sp.s/2} y2={sp.y}       stroke-width="0.8" stroke-linecap="round"/>
-          <!-- diagonal arms (smaller) -->
-          <line x1={sp.x - sp.s*0.28} y1={sp.y - sp.s*0.28} x2={sp.x + sp.s*0.28} y2={sp.y + sp.s*0.28} stroke-width="0.5" stroke-linecap="round"/>
-          <line x1={sp.x + sp.s*0.28} y1={sp.y - sp.s*0.28} x2={sp.x - sp.s*0.28} y2={sp.y + sp.s*0.28} stroke-width="0.5" stroke-linecap="round"/>
-        </g>
-      {/each}
-    </svg>
-  {/if}
+  <!--
+    Silhouette layer — fork, apple, carrot, spoon.
+    ViewBox 0 0 500 100 maps to the banner's full width/height.
+    Silhouettes sit on the far left/right so the centre is clear for text.
+  -->
+  <svg class="tw-sil-svg" viewBox="0 0 500 100"
+       preserveAspectRatio="xMidYMid slice" aria-hidden="true">
 
-  <!-- Text content -->
+    <!-- ── Fork (far left, centred ≈ x42, y50) ─────────────────────── -->
+    <g class="sil sf1">
+      <rect x="30"   y="16" width="2.5" height="22" rx="1.25"/>
+      <rect x="35.5" y="16" width="2.5" height="22" rx="1.25"/>
+      <rect x="41"   y="16" width="2.5" height="22" rx="1.25"/>
+      <rect x="46.5" y="16" width="2.5" height="22" rx="1.25"/>
+      <path d="M28,38 L33,50 L49,50 L54,38 Z"/>
+      <rect x="34" y="49" width="10" height="32" rx="5"/>
+    </g>
+
+    <!-- ── Apple (left side, centred ≈ x125, y50) ──────────────────── -->
+    <g class="sil sf2">
+      <!-- body -->
+      <path d="M125,28 C113,28 105,38 106,50 C107,63 115,73 125,73
+               C135,73 143,63 144,50 C145,38 137,28 125,28 Z"/>
+      <!-- stem -->
+      <rect x="123.5" y="17" width="3" height="13" rx="1.5"
+            transform="rotate(12,125,23)"/>
+      <!-- leaf -->
+      <path d="M126,23 C133,15 142,19 139,27 C134,29 127,27 126,23 Z"/>
+    </g>
+
+    <!-- ── Carrot (right side, centred ≈ x375, y50) ─────────────────── -->
+    <g class="sil sf3">
+      <!-- body -->
+      <path d="M365,20 L385,20 L376,78 Z"/>
+      <!-- greens — three small filled leaves -->
+      <path d="M375,20 C372,10 367,6  366,11 C365,16 369,18 375,20 Z"/>
+      <path d="M375,20 C377,9  382,6  383,12 C384,17 379,19 375,20 Z"/>
+      <path d="M375,20 C370,12 364,12 363,17 C362,22 367,21 375,20 Z"/>
+    </g>
+
+    <!-- ── Spoon (far right, centred ≈ x458, y50) ──────────────────── -->
+    <g class="sil sf4">
+      <!-- bowl -->
+      <ellipse cx="458" cy="30" rx="10" ry="13"/>
+      <!-- handle -->
+      <rect x="455" y="41" width="6" height="40" rx="3"/>
+    </g>
+
+  </svg>
+
+  <!-- Centre text content -->
   <div class="tw-inner">
     <div class="tw-decoration">
       <span class="tw-rule"></span>
@@ -104,7 +126,8 @@
     </div>
     <div class="tw-label">Today's Menu</div>
     <div class="tw-text">
-      <span class="tw-typed" class:no-anim={noAnim}>{displayText}</span><span class="tw-cursor" class:no-anim={noAnim}>|</span>
+      <span class="tw-typed" class:no-anim={noAnim}>{displayText}</span><span
+        class="tw-cursor" class:no-anim={noAnim}>|</span>
     </div>
   </div>
 </div>
@@ -120,27 +143,41 @@
     overflow: hidden;
   }
 
-  /* ── Sparkle SVG ─────────────────────────────────────────────── */
-  .tw-sparkles {
+  /* ── Silhouettes ─────────────────────────────────────────────────── */
+  .tw-sil-svg {
     position: absolute;
     inset: 0;
     width: 100%;
     height: 100%;
   }
-  .tw-sparkles .sp line {
-    stroke: var(--accent);
-  }
-  .tw-sparkles .sp {
-    animation: sp-pulse var(--dur, 3s) ease-in-out var(--d, 0s) infinite;
+
+  .sil {
+    fill: var(--accent);
+    opacity: 0.22;
     transform-box: fill-box;
     transform-origin: center;
   }
-  @keyframes sp-pulse {
-    0%,100% { opacity: 0.12; transform: scale(0.8) translateY(0);  }
-    50%      { opacity: 0.55; transform: scale(1.2) translateY(-3%); }
+
+  .tw-banner:not(.no-anim) .sil {
+    animation: sil-appear 0.7s cubic-bezier(0.34,1.2,0.64,1) both,
+               sil-float  4s ease-in-out infinite;
+  }
+  /* stagger each silhouette's appear + float phase */
+  .sf1 { animation-delay: 0.05s, 0.60s; animation-duration: 0.7s, 4.6s; }
+  .sf2 { animation-delay: 0.15s, 0.70s; animation-duration: 0.7s, 3.9s; }
+  .sf3 { animation-delay: 0.10s, 0.65s; animation-duration: 0.7s, 4.3s; }
+  .sf4 { animation-delay: 0.20s, 0.75s; animation-duration: 0.7s, 5.0s; }
+
+  @keyframes sil-appear {
+    from { opacity: 0;    transform: translateY(10px) scale(0.9); }
+    to   { opacity: 0.22; transform: translateY(0)    scale(1);   }
+  }
+  @keyframes sil-float {
+    0%, 100% { transform: translateY(0);   }
+    50%      { transform: translateY(-7px); }
   }
 
-  /* ── Decoration ──────────────────────────────────────────────── */
+  /* ── Centre content ──────────────────────────────────────────────── */
   .tw-inner {
     display: flex;
     flex-direction: column;
@@ -153,49 +190,54 @@
   .tw-decoration {
     display: flex;
     align-items: center;
-    gap: 8px;
-    opacity: 0.45;
+    gap: 10px;
+    opacity: 0.5;
   }
   .tw-rule {
     display: block;
-    width: 44px;
+    width: 48px;
     height: 1px;
     background: var(--accent);
-    animation: rule-shimmer 3s ease-in-out infinite;
   }
-  @keyframes rule-shimmer {
-    0%,100% { opacity: 0.5; width: 36px; }
-    50%      { opacity: 1.0; width: 52px; }
+  .tw-banner:not(.no-anim) .tw-rule {
+    animation: rule-breathe 3.5s ease-in-out infinite;
+  }
+  @keyframes rule-breathe {
+    0%, 100% { width: 38px; opacity: 0.5; }
+    50%      { width: 58px; opacity: 0.9; }
   }
 
   .tw-diamond {
-    font-size: 9px;
+    font-size: 10px;
     color: var(--accent);
     line-height: 1;
-    animation: diamond-spin 6s linear infinite;
     display: inline-block;
   }
-  .tw-diamond.no-anim { animation: none; }
+  .tw-banner:not(.no-anim) .tw-diamond:not(.no-anim) {
+    animation: diamond-spin 7s linear infinite;
+  }
   @keyframes diamond-spin {
-    from { transform: rotate(0deg);   }
+    from { transform: rotate(0deg); }
     to   { transform: rotate(360deg); }
   }
 
   .tw-label {
-    font-size: 9px;
+    font-size: 11px;
     font-weight: 700;
-    letter-spacing: 0.20em;
+    letter-spacing: 0.22em;
     text-transform: uppercase;
     color: var(--accent);
-    opacity: 0.55;
-    animation: label-fade 4s ease-in-out infinite;
+    opacity: 0.6;
   }
-  @keyframes label-fade {
-    0%,100% { opacity: 0.45; }
-    50%      { opacity: 0.70; }
+  .tw-banner:not(.no-anim) .tw-label {
+    animation: label-pulse 4s ease-in-out infinite;
+  }
+  @keyframes label-pulse {
+    0%, 100% { opacity: 0.5; }
+    50%      { opacity: 0.75; }
   }
 
-  /* ── Typewriter text ─────────────────────────────────────────── */
+  /* ── Typewriter text ─────────────────────────────────────────────── */
   .tw-text {
     font-size: 23px;
     font-weight: 700;
@@ -203,25 +245,25 @@
     min-height: 1.4em;
     display: flex;
     align-items: center;
-    color: var(--accent);
-    filter: drop-shadow(0 0 8px color-mix(in srgb, var(--accent) 40%, transparent));
+    filter: drop-shadow(0 0 8px color-mix(in srgb, var(--accent) 35%, transparent));
   }
 
   .tw-typed {
     background: linear-gradient(
       90deg,
       var(--accent) 0%,
-      color-mix(in srgb, var(--accent) 70%, white) 50%,
+      color-mix(in srgb, var(--accent) 65%, white) 50%,
       var(--accent) 100%
     );
     background-size: 200% 100%;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+  }
+  .tw-banner:not(.no-anim) .tw-typed:not(.no-anim) {
     animation: shimmer 2.8s linear infinite;
   }
   .tw-typed.no-anim {
-    animation: none;
     background: none;
     -webkit-text-fill-color: var(--accent);
     color: var(--accent);
@@ -238,33 +280,27 @@
     color: var(--accent);
     -webkit-text-fill-color: var(--accent);
     font-weight: 200;
-    animation: tw-blink 0.9s step-end infinite;
   }
-  .tw-cursor.no-anim { animation: none; opacity: 0; }
+  .tw-banner:not(.no-anim) .tw-cursor:not(.no-anim) {
+    animation: blink 0.9s step-end infinite;
+  }
+  .tw-cursor.no-anim { opacity: 0; }
 
-  @keyframes tw-blink {
-    0%,100% { opacity: 1; }
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
     50%      { opacity: 0; }
   }
 
-  /* ── Disable all animations ──────────────────────────────────── */
-  .tw-banner.no-anim .tw-rule,
-  .tw-banner.no-anim .tw-label {
-    animation: none;
-  }
-  .tw-banner.no-anim .tw-text {
-    filter: none;
-  }
-
+  /* ── Reduced motion ───────────────────────────────────────────────── */
   @media (prefers-reduced-motion: reduce) {
-    .tw-sparkles .sp,
-    .tw-diamond,
+    .sil        { animation: none !important; opacity: 0.22 !important; }
     .tw-rule,
+    .tw-diamond,
     .tw-label,
     .tw-typed,
-    .tw-cursor { animation: none !important; }
-    .tw-cursor { opacity: 0; }
-    .tw-typed  { -webkit-text-fill-color: var(--accent); background: none; opacity: 0.75; }
-    .tw-text   { filter: none; }
+    .tw-cursor  { animation: none !important; }
+    .tw-cursor  { opacity: 0; }
+    .tw-typed   { -webkit-text-fill-color: var(--accent); background: none; opacity: 0.75; }
+    .tw-text    { filter: none; }
   }
 </style>
