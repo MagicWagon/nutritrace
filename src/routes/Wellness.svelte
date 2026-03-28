@@ -99,15 +99,28 @@
   $: isToday = dateStr === localDateStr();
 
   function fmtDate(ds) {
-    const d = new Date(ds + 'T12:00:00');
-    return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    if (!ds) return '';
+    const dt   = new Date(ds + 'T12:00:00');
+    const today = localDateStr();
+    const yest  = (() => { const d = new Date(Date.now() - 86400000); return localDateStr(d); })();
+    if (ds === today) return 'Today';
+    if (ds === yest)  return 'Yesterday';
+    return dt.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
   }
 
   function fmtDateSub(ds) {
-    const d = new Date(ds + 'T12:00:00');
+    if (!ds) return '';
+    const dt  = new Date(ds + 'T12:00:00');
     const fmt = $dateFormat || 'ISO';
-    if (fmt === 'US') return (d.getMonth()+1) + '/' + d.getDate() + '/' + d.getFullYear();
-    if (fmt === 'EU') return d.getDate() + '/' + (d.getMonth()+1) + '/' + d.getFullYear();
+    if (fmt === 'US') {
+      const m  = String(dt.getMonth()+1).padStart(2,'0');
+      const dy = String(dt.getDate()).padStart(2,'0');
+      return m + '/' + dy + '/' + dt.getFullYear();
+    } else if (fmt === 'EU') {
+      const m  = String(dt.getMonth()+1).padStart(2,'0');
+      const dy = String(dt.getDate()).padStart(2,'0');
+      return dy + '/' + m + '/' + dt.getFullYear();
+    }
     return ds;
   }
 
@@ -299,7 +312,7 @@
       <span class="material-symbols-rounded">chevron_left</span>
     </button>
     <button class="date-btn" on:click={openDatePicker} title="Jump to date">
-      <span class="date-label">{isToday ? 'Today' : fmtDate(dateStr)}</span>
+      <span class="date-label">{fmtDate(dateStr)}</span>
       <span class="date-sub">{fmtDateSub(dateStr)}</span>
     </button>
     <button class="btn-icon accent" on:click={nextDay} disabled={isToday} aria-label="Next day" title="Next day">
@@ -612,12 +625,7 @@
     background: none;
     border: none;
     cursor: pointer;
-    padding: 4px 8px;
-    border-radius: var(--radius-sm);
-    -webkit-tap-highlight-color: transparent;
-    transition: background var(--dur-fast);
   }
-  .date-btn:hover { background: var(--surface-2); }
   .date-label { font-size: 17px; font-weight: 700; color: var(--accent); }
   .date-sub   { font-size: 12px; color: var(--text-3); }
 
