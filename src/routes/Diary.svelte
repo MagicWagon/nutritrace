@@ -72,14 +72,37 @@
 
   async function saveEditItem() {
     if (!editItem) return;
-    await updateDiaryItem(editItem._i, { portion: editPortion, unit: editUnit, quantity: editQuantity });
+    const origPortion = parseFloat(editItem.portion) || 100;
+    const newPortion  = parseFloat(editPortion)      || 100;
+    const portionFactor = newPortion / origPortion;
+    let newNutrition = editItem.nutrition;
+    if (editItem.nutrition && origPortion > 0) {
+      newNutrition = Object.fromEntries(
+        Object.entries(editItem.nutrition).map(([k, v]) => [k, (parseFloat(v) || 0) * portionFactor])
+      );
+    }
+    await updateDiaryItem(editItem._i, {
+      portion:   newPortion,
+      unit:      editUnit,
+      quantity:  parseFloat(editQuantity) || 1,
+      nutrition: newNutrition,
+    });
     showEditSheet = false;
     editItem = null;
     showSuccess('Updated');
   }
 
   $: meals = $mealNames || ['Breakfast','Lunch','Dinner','Snacks'];
-  $: editCalc = editItem ? Nutrition.calculate({ ...editItem, quantity: editQuantity || 1 }) : {};
+  $: editCalc = (() => {
+    if (!editItem) return {};
+    const origPortion   = parseFloat(editItem.portion) || 100;
+    const newPortion    = parseFloat(editPortion)      || origPortion;
+    const portionFactor = newPortion / origPortion;
+    const scaledNutrition = editItem.nutrition
+      ? Object.fromEntries(Object.entries(editItem.nutrition).map(([k, v]) => [k, (parseFloat(v) || 0) * portionFactor]))
+      : editItem.nutrition;
+    return Nutrition.calculate({ ...editItem, nutrition: scaledNutrition, quantity: parseFloat(editQuantity) || 1 });
+  })();
   // Only use currentEntry if it belongs to the currently-displayed date;
   // this prevents stale data from a previous date from showing when navigating
   $: entry = ($currentEntry && $currentEntry.date === $currentDate)
