@@ -344,30 +344,10 @@
           </div>
         {/if}
 
-        {#if configuredWellness.length > 0}
-          <p class="section-title">Wellness</p>
-          <div class="card">
-            {#each configuredWellness as stat, i}
-              {#if i > 0}<div class="divider"></div>{/if}
-              <button class="goal-row" on:click={() => openEdit(stat)}>
-                <div class="goal-info">
-                  <span class="font-medium">{stat.label}</span>
-                  {#if getTarget(stat) != null}
-                    {@const tgt = getTarget(stat)}
-                    <span class="text-3 text-sm">Goal: {tgt} {stat.unit}</span>
-                  {:else}
-                    <span class="text-3 text-sm">Not set</span>
-                  {/if}
-                </div>
-                <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
-              </button>
-            {/each}
-          </div>
-        {/if}
       {/if}
 
-      <!-- Water Goal -->
-      <p class="section-title" style="margin-top:{hasAnyGoal ? 0 : 16}px">Water</p>
+      <!-- Water Goal — alphabetically before Wellness -->
+      <p class="section-title">Water</p>
       <div class="card">
         <button class="goal-row" on:click={openEditWater}>
           <div class="goal-info">
@@ -380,6 +360,27 @@
           <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
         </button>
       </div>
+
+      {#if configuredWellness.length > 0}
+        <p class="section-title">Wellness</p>
+        <div class="card">
+          {#each configuredWellness as stat, i}
+            {#if i > 0}<div class="divider"></div>{/if}
+            <button class="goal-row" on:click={() => openEdit(stat)}>
+              <div class="goal-info">
+                <span class="font-medium">{stat.label}</span>
+                {#if getTarget(stat) != null}
+                  {@const tgt = getTarget(stat)}
+                  <span class="text-3 text-sm">Goal: {tgt} {stat.unit}</span>
+                {:else}
+                  <span class="text-3 text-sm">Not set</span>
+                {/if}
+              </div>
+              <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
+            </button>
+          {/each}
+        </div>
+      {/if}
 
     <!-- ── All Fields tab ── -->
     {:else if activeTab === 'all'}
@@ -527,6 +528,7 @@
       <div class="sheet-body">
 
         <!-- Options -->
+        {#if !editStat?.isWellness}
         <div class="toggle-row">
           <label class="toggle-label">Show in Diary</label>
           <label class="toggle-switch">
@@ -541,6 +543,7 @@
             <span class="toggle-track"></span>
           </label>
         </div>
+        {/if}
         <div class="toggle-row">
           <label class="toggle-label">Same goal every day</label>
           <label class="toggle-switch">
