@@ -77,12 +77,9 @@
 
     <!-- ── Fork (far left, centred ≈ x42, y50) ─────────────────────── -->
     <g class="sil sf1">
-      <rect x="30"   y="16" width="2.5" height="22" rx="1.25"/>
-      <rect x="35.5" y="16" width="2.5" height="22" rx="1.25"/>
-      <rect x="41"   y="16" width="2.5" height="22" rx="1.25"/>
-      <rect x="46.5" y="16" width="2.5" height="22" rx="1.25"/>
-      <path d="M28,38 L33,50 L49,50 L54,38 Z"/>
-      <rect x="34" y="49" width="10" height="32" rx="5"/>
+      <!-- single outline path so tines, shoulder and handle read as one shape -->
+      <path d="M38,82 L38,52 L34,44 L34,14 L36,14 L36,40 L39,40 L39,14
+               L41,14 L41,40 L44,40 L44,14 L46,14 L46,44 L42,52 L42,82 Z"/>
     </g>
 
     <!-- ── Apple (left side, centred ≈ x125, y50) ──────────────────── -->
@@ -97,14 +94,17 @@
       <path d="M126,23 C133,15 142,19 139,27 C134,29 127,27 126,23 Z"/>
     </g>
 
-    <!-- ── Carrot (right side, centred ≈ x375, y50) ─────────────────── -->
+    <!-- ── Carrot (right side, centred ≈ x373, y50) ─────────────────── -->
     <g class="sil sf3">
-      <!-- body -->
-      <path d="M365,20 L385,20 L376,78 Z"/>
-      <!-- greens — three small filled leaves -->
-      <path d="M375,20 C372,10 367,6  366,11 C365,16 369,18 375,20 Z"/>
-      <path d="M375,20 C377,9  382,6  383,12 C384,17 379,19 375,20 Z"/>
-      <path d="M375,20 C370,12 364,12 363,17 C362,22 367,21 375,20 Z"/>
+      <!-- body: rounded shoulders tapering to a point -->
+      <path d="M361,28 C360,21 365,16 373,16 C381,16 386,21 385,28 L373,84 Z"/>
+      <!-- centre leaf (tallest) -->
+      <path d="M373,16 C372,8 368,4 370,2 C373,0 376,3 376,8
+               C379,3 383,3 382,8 C380,13 376,15 373,16 Z"/>
+      <!-- left leaf -->
+      <path d="M373,16 C368,10 361,9 360,14 C359,19 365,20 373,16 Z"/>
+      <!-- right leaf -->
+      <path d="M373,16 C378,10 385,9 386,14 C387,19 381,20 373,16 Z"/>
     </g>
 
     <!-- ── Spoon (far right, centred ≈ x458, y50) ──────────────────── -->

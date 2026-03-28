@@ -150,15 +150,21 @@
 
   $: { search; searchSource; onSearch(); }
 
+  function _saveScrollState() {
+    editorState.foodsScrollY   = document.querySelector('.page-content')?.scrollTop ?? window.scrollY;
+    editorState.foodsActiveTab = activeTab;
+  }
+
   function openEditor(item, store) {
+    _saveScrollState();
     editorState.foodPrefill = item ? { ...item } : null;
     editorState.foodStore   = store || currentStore;
     if (pickMode) editorState.foodDiaryCtx = { date: pickDate, meal: pickMeal };
-    // Always navigate to /foods/edit; prefill carries the data
     push('/foods/edit');
   }
 
   function openMealEditor(item, isRecipe) {
+    _saveScrollState();
     editorState.mealPrefill  = item ? { ...item } : null;
     editorState.mealIsRecipe = isRecipe;
     push(item ? '/meal-editor/' + item.id : '/meal-editor');
@@ -337,7 +343,25 @@
     history.back();
   }
 
-  onMount(async () => { await load(); await loadYesterdayMeals(); });
+  onMount(async () => {
+    // Restore tab before load so the right list is fetched
+    if (editorState.foodsActiveTab != null) {
+      activeTab = editorState.foodsActiveTab;
+      editorState.foodsActiveTab = null;
+    }
+    await load();
+    await loadYesterdayMeals();
+    // Restore scroll position after the list has rendered
+    if (editorState.foodsScrollY != null) {
+      const sy = editorState.foodsScrollY;
+      editorState.foodsScrollY = null;
+      requestAnimationFrame(() => {
+        const el = document.querySelector('.page-content');
+        if (el) el.scrollTop = sy;
+        else window.scrollTo(0, sy);
+      });
+    }
+  });
 </script>
 
 <div class="page-shell">
