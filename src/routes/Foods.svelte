@@ -11,7 +11,7 @@
   import { diaryPromptQuantity } from '../stores/settings.js';
   import { showSuccess, showError } from '../stores/toast.js';
   import { editorState, clearFoodEditorState } from '../stores/editorState.js';
-  import { DB } from '../lib/db.js';
+  import { DB, localDateStr } from '../lib/db.js';
   import { loadEntry } from '../stores/diary.js';
   import { API, USDA, NtApi } from '../lib/api.js';
   import { Nutrition } from '../lib/nutrition.js';
@@ -388,7 +388,7 @@
     if (!pickMode || !$foodsShowYesterdayMeals) { yesterdayMeals = []; return; }
     const yDate = new Date();
     yDate.setDate(yDate.getDate() - 1);
-    const yStr = yDate.toISOString().slice(0, 10);
+    const yStr = localDateStr(yDate);
     const entry = await NtApi.getDiaryDate(yStr);
     if (!entry || !entry.items || !entry.items.length) { yesterdayMeals = []; return; }
     const names = $mealNames || ['Breakfast','Lunch','Dinner','Snacks'];

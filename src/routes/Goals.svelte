@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { DB } from '../lib/db.js';
+  import { DB, localDateStr } from '../lib/db.js';
   import { NtApi } from '../lib/api.js';
   import { portal } from '../lib/portal.js';
   import { goals, goalTemplates, energyUnit, weightUnit, heightUnit, lengthUnit, visibleNutriments, hiddenBodyStats, waterGoalMl, waterUnit, pageBanners } from '../stores/settings.js';
@@ -84,7 +84,7 @@
   function formatDate(iso) {
     return new Date(iso).toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' });
   }
-  let today = new Date().toISOString().slice(0,10);
+  let today = localDateStr();
   let todayTotals = {};
   let todayBodyStats = {};
   let todayWaterMl = 0;
