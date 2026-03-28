@@ -115,6 +115,14 @@ db.exec(`
     expires_at     TEXT NOT NULL,
     fitbit_user_id TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS withings_tokens (
+    user_id          INTEGER PRIMARY KEY,
+    access_token     TEXT NOT NULL,
+    refresh_token    TEXT NOT NULL,
+    expires_at       TEXT NOT NULL,
+    withings_user_id TEXT
+  );
 `);
 
 // ── Migrations ─────────────────────────────────────────────────────────────
@@ -153,6 +161,10 @@ if (!columnExists('meals', 'user_id')) {
 }
 
 // diary needs a rebuild to get the composite UNIQUE(date, user_id)
+if (!columnExists('wellness_data', 'device_model')) {
+  db.exec(`ALTER TABLE wellness_data ADD COLUMN device_model TEXT DEFAULT NULL`);
+}
+
 if (!columnExists('diary', 'user_id')) {
   db.exec(`
     ALTER TABLE diary ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE CASCADE;

@@ -17,6 +17,7 @@ import appConfigRoutes  from './routes/app-config.js';
 import aiRoutes         from './routes/ai.js';
 import fullBackupRoutes from './routes/full-backup.js';
 import fitbitRoutes     from './routes/fitbit.js';
+import withingsRoutes   from './routes/withings.js';
 import { logger }   from './logger.js';
 import { authenticate } from './middleware/auth.js';
 import { seedSmtpFromEnv } from './email.js';
@@ -71,6 +72,7 @@ app.use('/api/app-config',  appConfigRoutes);
 app.use('/api/ai',          aiRoutes);
 app.use('/api/full-backup',        fullBackupRoutes);
 app.use('/api/wellness/fitbit',   fitbitRoutes);
+app.use('/api/wellness/withings', withingsRoutes);
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 // Serve Svelte frontend (production build)

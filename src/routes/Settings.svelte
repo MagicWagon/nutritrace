@@ -25,6 +25,7 @@
     aiEnabled, aiProvider, aiApiKey, aiModel, aiAssistantName,
     waterGoalMl, waterUnit, waterContainers, waterShowInStats, waterShowInDiary,
     wellnessEnabled, wellnessMetrics, wellnessSyncMode, wellnessSyncRange,
+    withingsSyncRange,
   } from '../stores/settings.js';
   import { mealIcon } from '../lib/mealIcon.js';
   import { DB } from '../lib/db.js';
@@ -342,6 +343,39 @@
 
   function copyRedirectUri() {
     navigator.clipboard.writeText(labsFitbitRedirectUri || labsFitbitRedirectSuggested).then(() => showSuccess('Copied'));
+  }
+
+  // ── Withings Labs ──────────────────────────────────────────────────────────
+  let labsWithingsClientId     = '';
+  let labsWithingsClientSecret = '';
+  let labsWithingsRedirectUri  = '';
+  let labsWithingsShowSecret   = false;
+  let labsWithingsRedirectSuggested = '';
+  let withingsSyncRangeVal = DB.getSetting('withingsSyncRange', 7);
+
+  async function loadWithingsConfig() {
+    labsWithingsRedirectSuggested = `${window.location.origin}/api/wellness/withings/callback`;
+    try {
+      const cfg = await NtApi.get('/api/app-config');
+      labsWithingsClientId     = cfg.withings_client_id     || '';
+      labsWithingsClientSecret = cfg.withings_client_secret || '';
+      labsWithingsRedirectUri  = cfg.withings_redirect_uri  || labsWithingsRedirectSuggested;
+    } catch { /* admin only */ }
+  }
+
+  async function saveLabsWithings() {
+    try {
+      await Promise.all([
+        NtApi.put('/api/app-config', { key: 'withings_client_id',     value: labsWithingsClientId }),
+        NtApi.put('/api/app-config', { key: 'withings_client_secret', value: labsWithingsClientSecret }),
+        NtApi.put('/api/app-config', { key: 'withings_redirect_uri',  value: labsWithingsRedirectUri }),
+      ]);
+      showSuccess('Withings credentials saved');
+    } catch (e) { showError('Failed to save: ' + e.message); }
+  }
+
+  function copyWithingsRedirectUri() {
+    navigator.clipboard.writeText(labsWithingsRedirectUri || labsWithingsRedirectSuggested).then(() => showSuccess('Copied'));
   }
 
   // ── Meal names ─────────────────────────────────────────────────────────────
@@ -2075,7 +2109,7 @@
     {/if}
 
     <!-- ── Labs ─────────────────────────────────────────────────────────────── -->
-    <button class="section-toggle labs-toggle" class:hidden={!sectionVisible(settingsQuery, 'labs')} on:click={() => { toggleSection('labs'); loadLabsConfig(); }}>
+    <button class="section-toggle labs-toggle" class:hidden={!sectionVisible(settingsQuery, 'labs')} on:click={() => { toggleSection('labs'); loadLabsConfig(); loadWithingsConfig(); }}>
       <span class="material-symbols-rounded si">science</span>
       <span>Labs <span class="labs-badge">Experimental</span></span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.labs}>expand_more</span>
@@ -2181,6 +2215,90 @@
             <div style="display:flex;align-items:center;gap:8px;color:var(--text-2)">
               <span class="material-symbols-rounded" style="font-size:18px">admin_panel_settings</span>
               <span style="font-size:13px">Fitbit API credentials are configured by your administrator.</span>
+            </div>
+          </div>
+        {/if}
+
+        <!-- Withings API credentials -->
+        <p class="sub-label" style="padding-top:16px">Withings</p>
+        <p class="sub-label" style="font-size:11px;padding-bottom:6px;opacity:0.7">
+          Body measurements and activity sync
+        </p>
+
+        <!-- Withings Sync Range -->
+        <div class="card settings-card" style="padding:14px 16px">
+          <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px">
+            <div>
+              <span class="setting-label">Withings Sync Range</span>
+              <div class="setting-desc">How far back the Withings manual Sync button fetches.</div>
+            </div>
+            <div class="chip-group">
+              {#each SYNC_RANGE_OPTIONS as opt}
+                <button
+                  class="chip"
+                  class:chip-active={withingsSyncRangeVal === opt.value}
+                  on:click={() => { withingsSyncRangeVal = opt.value; withingsSyncRange.set(opt.value); }}
+                >{opt.label}</button>
+              {/each}
+            </div>
+          </div>
+        </div>
+
+        {#if $currentUser?.role === 'admin' || !$userMgmtActive}
+          <p class="sub-label" style="padding-top:8px;font-size:11px;opacity:0.7">
+            Create a Withings app at <strong>developer.withings.com</strong>, add the redirect URI,
+            and paste the Client ID and Secret below.
+          </p>
+          <div class="card settings-card" style="padding:16px;display:flex;flex-direction:column;gap:12px">
+            <div class="form-group">
+              <label class="form-label">Client ID</label>
+              <input class="input" type="text" autocomplete="off" placeholder="e.g. abc123def456"
+                bind:value={labsWithingsClientId} />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Client Secret</label>
+              <div style="display:flex;gap:6px">
+                {#if labsWithingsShowSecret}
+                  <input class="input" type="text" autocomplete="new-password"
+                    placeholder="••••••••" bind:value={labsWithingsClientSecret} style="flex:1" />
+                {:else}
+                  <input class="input" type="password" autocomplete="new-password"
+                    placeholder="••••••••" bind:value={labsWithingsClientSecret} style="flex:1" />
+                {/if}
+                <button class="btn-icon" on:click={() => labsWithingsShowSecret = !labsWithingsShowSecret}
+                  title={labsWithingsShowSecret ? 'Hide' : 'Show'}>
+                  <span class="material-symbols-rounded">{labsWithingsShowSecret ? 'visibility_off' : 'visibility'}</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Redirect URI</label>
+              <div class="setting-desc" style="margin-bottom:4px">
+                Add this exact URI to your Withings app's redirect URL list
+              </div>
+              <div style="display:flex;gap:6px">
+                <input class="input" type="url" placeholder={labsWithingsRedirectSuggested}
+                  bind:value={labsWithingsRedirectUri} style="flex:1;font-size:12px" />
+                <button class="btn-icon" on:click={copyWithingsRedirectUri} title="Copy URI" aria-label="Copy redirect URI">
+                  <span class="material-symbols-rounded">content_copy</span>
+                </button>
+              </div>
+              {#if labsWithingsRedirectSuggested}
+                <div class="setting-desc" style="font-size:11px;margin-top:2px">
+                  Suggested: <code style="font-size:11px">{labsWithingsRedirectSuggested}</code>
+                </div>
+              {/if}
+            </div>
+
+            <button class="btn btn-primary" style="align-self:flex-end" on:click={saveLabsWithings}>Save Withings Settings</button>
+          </div>
+        {:else if $userMgmtActive}
+          <div class="card settings-card" style="padding:14px">
+            <div style="display:flex;align-items:center;gap:8px;color:var(--text-2)">
+              <span class="material-symbols-rounded" style="font-size:18px">admin_panel_settings</span>
+              <span style="font-size:13px">Withings API credentials are configured by your administrator.</span>
             </div>
           </div>
         {/if}

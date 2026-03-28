@@ -31,8 +31,6 @@ admin password resets for other users?
 
 bmi calculation settings - sparky?
 
-steps/sleep tracker? -> experimental section?
-
 test various backup/restores
 
 if multiple users enabled, then maybe an option so that the integrations automatically flow to them without them needing to mnanage? maybe they can just enabled disable the integration, but the api keys, settings for them etc they dont get access to?

@@ -24,6 +24,7 @@ const SERVER_SETTINGS = new Set([
   'usdaEnabled','usdaApiKey','offUsername','offPassword',
   'mealieEnabled','mealieBaseUrl','mealieApiToken',
   'wellnessEnabled','wellnessMetrics','wellnessSyncMode','wellnessSyncRange',
+  'withingsEnabled','withingsSyncRange','withingsDataPriority',
   // Appearance / UI prefs — included so full backups restore the full look-and-feel
   'appearance','accentColor',
   'navStyle','sidebarPersistent','startPage','disableAnimations','goalCelebrations','pageBanners','loopBannerAnimations',
@@ -224,6 +225,14 @@ export const wellnessEnabled    = createSettingStore('wellnessEnabled',    false
 export const wellnessMetrics    = createSettingStore('wellnessMetrics',    null); // null = all visible
 export const wellnessSyncMode   = createSettingStore('wellnessSyncMode',   'auto'); // 'auto' | 'manual'
 export const wellnessSyncRange  = createSettingStore('wellnessSyncRange',  7);    // days: 1|7|30|90|365
+
+export const withingsEnabled      = createSettingStore('withingsEnabled',      false);
+export const withingsSyncRange    = createSettingStore('withingsSyncRange',    7);
+export const withingsDataPriority = createSettingStore('withingsDataPriority', {
+  activity: 'fitbit',  // 'fitbit' | 'withings'
+  sleep:    'fitbit',
+  heart:    'fitbit',
+});
 
 // FitBot AI
 export const aiEnabled       = createSettingStore('aiEnabled',       false);

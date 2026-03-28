@@ -1,6 +1,7 @@
 <script>
-  import { onMount } from 'svelte';
-  import { wellnessMetrics, wellnessSyncMode, wellnessSyncRange, distUnit, pageBanners, dateFormat } from '../stores/settings.js';
+  import { onMount, onDestroy } from 'svelte';
+  import { wellnessMetrics, wellnessSyncMode, wellnessSyncRange, distUnit, pageBanners, dateFormat, withingsSyncRange as withingsSyncRangeSetting } from '../stores/settings.js';
+  import Chart from 'chart.js/auto';
   import WellnessBanner from '../components/banners/WellnessBanner.svelte';
   import { showSuccess, showError } from '../stores/toast.js';
   import { localDateStr } from '../lib/db.js';
@@ -54,6 +55,13 @@
   let connecting  = false;
   let loadingData = true;
 
+  // Withings state
+  let withingsStatus     = null;
+  let withingsData       = {};
+  let withingsSyncing    = false;
+  let withingsLastSync   = null;
+  let withingsConnecting = false;
+
   // ── Unit helpers ───────────────────────────────────────────────────────────
   $: du = $distUnit || 'km';
 
@@ -82,6 +90,233 @@
     const val = m.fmt ? m.fmt(rawValue) : rawValue;
     return { value: String(val), unit: m.unit };
   }
+
+  // ── Withings metric definitions ───────────────────────────────────────────
+  const BODY_METRICS = [
+    { id: 'weight_kg',     label: 'Weight',       unit: '', icon: 'monitor_weight',   fmt: null },
+    { id: 'body_fat_pct',  label: 'Body Fat',     unit: '%', icon: 'percent',          fmt: v => v.toFixed(1) },
+    { id: 'muscle_mass_kg',label: 'Muscle Mass',  unit: '', icon: 'fitness_center',   fmt: null },
+    { id: 'bone_mass_kg',  label: 'Bone Mass',    unit: '', icon: 'emergency',         fmt: v => v.toFixed(2) },
+    { id: 'body_water_pct',label: 'Body Water',   unit: '', icon: 'water_drop',       fmt: null },
+    { id: 'lean_mass_kg',  label: 'Lean Mass',    unit: '', icon: 'person',            fmt: null },
+    { id: 'fat_mass_kg',   label: 'Fat Mass',     unit: '', icon: 'scale',             fmt: null },
+    { id: 'visceral_fat',  label: 'Visceral Fat', unit: '', icon: 'favorite_border',  fmt: v => v.toFixed(1) },
+  ];
+
+  const BODY_SCORE_METRICS = [
+    { id: 'vascular_age',       label: 'Vascular Age',     unit: 'yrs',  icon: 'cardiology',   fmt: v => Math.round(v) },
+    { id: 'nerve_health_score', label: 'Nerve Health',     unit: '/100', icon: 'neurology',     fmt: v => Math.round(v) },
+    { id: 'pulse_wave_velocity',label: 'Pulse Wave Vel.',  unit: 'm/s',  icon: 'show_chart',    fmt: v => v.toFixed(1) },
+  ];
+
+  function fmtWeight(kg) {
+    if (kg == null) return null;
+    return { value: kg.toFixed(1), unit: 'kg' };
+  }
+
+  function fmtBodyMetric(m, raw) {
+    if (raw == null) return null;
+    if (m.id === 'weight_kg' || m.id === 'muscle_mass_kg' || m.id === 'lean_mass_kg' || m.id === 'fat_mass_kg' || m.id === 'bone_mass_kg') {
+      return fmtWeight(raw);
+    }
+    if (m.id === 'body_water_pct') return { value: raw.toFixed(1), unit: '%' };
+    if (m.fmt) return { value: m.fmt(raw), unit: m.unit };
+    return { value: String(raw), unit: m.unit };
+  }
+
+  // ── Withings init / sync / connect / disconnect ────────────────────────────
+  async function initWithings() {
+    try {
+      withingsStatus = await NtApi.get('/api/wellness/withings/status');
+    } catch { withingsStatus = { connected: false, configured: false }; }
+
+    if (withingsStatus.connected) {
+      await loadWithingsData();
+    }
+  }
+
+  async function loadWithingsData() {
+    try {
+      const result = await NtApi.get(`/api/wellness/withings/data?date=${dateStr}`);
+      withingsData = {};
+      for (const [, metrics] of Object.entries(result)) {
+        for (const [key, { value }] of Object.entries(metrics)) {
+          withingsData[key] = value;
+        }
+      }
+    } catch { withingsData = {}; }
+  }
+
+  async function syncWithings(silent = false) {
+    if (withingsSyncing) return;
+    withingsSyncing = true;
+    try {
+      const range = $withingsSyncRangeSetting || 1;
+      let from = dateStr, to = dateStr;
+      if (!silent && range > 1) {
+        const end = new Date(dateStr + 'T12:00:00');
+        const start = new Date(end);
+        start.setDate(start.getDate() - (range - 1));
+        from = start.toISOString().slice(0, 10);
+      }
+      const result = await NtApi.post('/api/wellness/withings/sync', { from, to });
+      await loadWithingsData();
+      withingsLastSync = new Date();
+      if (!silent) showSuccess(`Synced ${result.dates} day${result.dates === 1 ? '' : 's'} from Withings`);
+    } catch(e) {
+      if (!silent) showError('Withings sync failed: ' + e.message);
+    }
+    withingsSyncing = false;
+  }
+
+  async function connectWithings() {
+    withingsConnecting = true;
+    try {
+      const { url } = await NtApi.get('/api/wellness/withings/authorize');
+      window.location.href = url;
+    } catch(e) {
+      showError(e.message || 'Could not start Withings authorization');
+      withingsConnecting = false;
+    }
+  }
+
+  async function disconnectWithings() {
+    try {
+      await NtApi.del('/api/wellness/withings/disconnect');
+      withingsStatus = { ...withingsStatus, connected: false };
+      withingsData = {};
+      showSuccess('Disconnected from Withings');
+    } catch(e) { showError(e.message); }
+  }
+
+  // ── Trends ─────────────────────────────────────────────────────────────────
+  let trendsRange   = 7;
+  let trendsLoading = false;
+  let trendsData    = [];
+  let _trendCharts  = [];
+
+  let TREND_CHARTS = [
+    { id: 'steps',              label: 'Steps',       icon: 'directions_walk', source: 'fitbit',   fmtLatest: v => Math.round(v).toLocaleString() + ' steps', canvasEl: null, hasData: false, latest: null },
+    { id: 'sleep_duration_min', label: 'Sleep',       icon: 'bedtime',         source: 'fitbit',   fmtLatest: v => { const h=Math.floor(v/60); return `${h}h ${Math.round(v%60)}m`; }, canvasEl: null, hasData: false, latest: null },
+    { id: 'resting_hr',         label: 'Resting HR',  icon: 'favorite',        source: 'fitbit',   fmtLatest: v => Math.round(v) + ' bpm', canvasEl: null, hasData: false, latest: null },
+    { id: 'hrv_daily_rmssd',    label: 'HRV',         icon: 'monitor_heart',   source: 'fitbit',   fmtLatest: v => v.toFixed(1) + ' ms', canvasEl: null, hasData: false, latest: null },
+    { id: 'weight_kg',          label: 'Weight',      icon: 'monitor_weight',  source: 'withings', fmtLatest: v => v.toFixed(1) + ' kg', canvasEl: null, hasData: false, latest: null },
+    { id: 'body_fat_pct',       label: 'Body Fat',    icon: 'percent',         source: 'withings', fmtLatest: v => v.toFixed(1) + '%', canvasEl: null, hasData: false, latest: null },
+    { id: 'muscle_mass_kg',     label: 'Muscle Mass', icon: 'fitness_center',  source: 'withings', fmtLatest: v => v.toFixed(1) + ' kg', canvasEl: null, hasData: false, latest: null },
+  ];
+
+  async function loadTrends() {
+    trendsLoading = true;
+    _trendCharts.forEach(c => c.destroy?.());
+    _trendCharts = [];
+
+    // Reset chart state
+    TREND_CHARTS = TREND_CHARTS.map(c => ({ ...c, hasData: false, latest: null, canvasEl: null }));
+
+    const today = new Date();
+    const from = new Date(today);
+    from.setDate(from.getDate() - (trendsRange - 1));
+    const fromStr = from.toISOString().slice(0, 10);
+    const toStr   = today.toISOString().slice(0, 10);
+
+    let fitbitRows = {};
+    try {
+      fitbitRows = await NtApi.get(`/api/wellness/fitbit/data?from=${fromStr}&to=${toStr}`);
+    } catch { /* no fitbit */ }
+
+    let withingsRows = {};
+    try {
+      withingsRows = await NtApi.get(`/api/wellness/withings/data?from=${fromStr}&to=${toStr}`);
+    } catch { /* no withings */ }
+
+    // Build date axis
+    const dates = [];
+    const cursor = new Date(fromStr + 'T12:00:00');
+    while (cursor <= today) {
+      dates.push(cursor.toISOString().slice(0, 10));
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    // Pre-compute which dates have any data
+    const datesWithData = dates.filter(d =>
+      TREND_CHARTS.some(chart => {
+        if (chart.source === 'fitbit') return fitbitRows[d]?.[chart.id] != null;
+        if (chart.source === 'withings') return withingsRows[d]?.[chart.id]?.value != null;
+        return false;
+      })
+    );
+    trendsData = datesWithData;
+    trendsLoading = false;
+
+    // Wait for DOM to render canvases
+    await new Promise(r => setTimeout(r, 50));
+
+    for (const chart of TREND_CHARTS) {
+      const points = dates.map(d => {
+        if (chart.source === 'fitbit') return fitbitRows[d]?.[chart.id] ?? null;
+        if (chart.source === 'withings') return withingsRows[d]?.[chart.id]?.value ?? null;
+        return null;
+      });
+
+      chart.hasData = points.some(v => v != null);
+      chart.latest  = points.filter(v => v != null).at(-1) ?? null;
+    }
+
+    // Trigger reactivity
+    TREND_CHARTS = TREND_CHARTS;
+
+    // Another tick for canvases to render
+    await new Promise(r => setTimeout(r, 50));
+
+    for (const chart of TREND_CHARTS) {
+      if (!chart.hasData || !chart.canvasEl) continue;
+
+      const points = dates.map(d => {
+        if (chart.source === 'fitbit') return fitbitRows[d]?.[chart.id] ?? null;
+        if (chart.source === 'withings') return withingsRows[d]?.[chart.id]?.value ?? null;
+        return null;
+      });
+
+      const labels = dates.map(d => {
+        const dt = new Date(d + 'T12:00:00');
+        return dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      });
+
+      const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#4fffb0';
+
+      const c = new Chart(chart.canvasEl, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            data: points,
+            borderColor: accent,
+            backgroundColor: accent + '18',
+            fill: true,
+            tension: 0.35,
+            pointRadius: points.map(v => v != null ? 3 : 0),
+            pointBackgroundColor: accent,
+            spanGaps: true,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: {
+            callbacks: { label: ctx => chart.fmtLatest(ctx.raw) }
+          }},
+          scales: {
+            x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#888', maxTicksLimit: 7, maxRotation: 0 } },
+            y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#888' }, beginAtZero: false },
+          },
+        },
+      });
+      _trendCharts.push(c);
+    }
+  }
+
+  // Reload trends when tab becomes active or range changes
+  $: if (activeTab === 'trends') { trendsRange; loadTrends(); }
 
   // ── Date navigation ────────────────────────────────────────────────────────
   function prevDay() {
@@ -196,6 +431,8 @@
       status = await NtApi.get('/api/wellness/fitbit/status');
     } catch { status = { connected: false, configured: false }; }
 
+    await initWithings();
+
     if (status.connected) {
       await loadData();
       // Auto-sync on open if sync mode = auto and it's today
@@ -218,6 +455,7 @@
       const byDate = await NtApi.get(`/api/wellness/fitbit/data?date=${dateStr}`);
       data = byDate[dateStr] || {};
     } catch { data = {}; }
+    await loadWithingsData();
     loadingData = false;
   }
 
@@ -285,9 +523,17 @@
     } else if (params.get('fitbit') === 'error') {
       showError('Fitbit: ' + (params.get('msg') || 'Authorization failed'));
       history.replaceState({}, '', '/#/wellness');
+    } else if (params.get('withings') === 'connected') {
+      history.replaceState({}, '', '/#/wellness');
+      showSuccess('Withings connected!');
+    } else if (params.get('withings') === 'error') {
+      showError('Withings: ' + (params.get('msg') || 'Authorization failed'));
+      history.replaceState({}, '', '/#/wellness');
     }
     init();
   });
+
+  onDestroy(() => { _trendCharts.forEach(c => c.destroy?.()); });
 
   // ── Sleep stage breakdown ──────────────────────────────────────────────────
   $: sleepTotal = (data.sleep_deep_min || 0) + (data.sleep_light_min || 0) + (data.sleep_rem_min || 0) + (data.sleep_wake_min || 0);
@@ -299,7 +545,7 @@
   ];
 </script>
 
-<div class="page-shell">
+<div class="page-shell wl-shell">
   <!-- Header -->
   <header class="page-header" class:has-banner={$pageBanners}>
     {#if $pageBanners}<WellnessBanner />{/if}
@@ -414,6 +660,12 @@
         <button class="tab-btn" class:active={activeTab === 'heart'} on:click={() => activeTab = 'heart'}>
           <span class="material-symbols-rounded tab-icon">favorite</span> Heart
         </button>
+        <button class="tab-btn" class:active={activeTab === 'body'} on:click={() => activeTab = 'body'}>
+          <span class="material-symbols-rounded tab-icon">monitor_weight</span> Body
+        </button>
+        <button class="tab-btn" class:active={activeTab === 'trends'} on:click={() => activeTab = 'trends'}>
+          <span class="material-symbols-rounded tab-icon">show_chart</span> Trends
+        </button>
       </div>
 
       <!-- ── Movement tab ── -->
@@ -519,10 +771,168 @@
             </div>
           {/each}
         </div>
+
+      <!-- ── Body tab (Withings) ── -->
+      {:else if activeTab === 'body'}
+        {#if withingsStatus?.connected}
+          <!-- Withings sync bar -->
+          <div class="sync-bar" style="margin-bottom:8px">
+            <div class="sync-info">
+              <span class="material-symbols-rounded sync-source-icon">scale</span>
+              <div class="sync-source-text">
+                <span class="sync-source-label">Withings</span>
+                {#if withingsLastSync}
+                  <span class="sync-time">Synced {withingsLastSync.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                {:else if withingsStatus.withingsUserId}
+                  <span class="sync-time">User {withingsStatus.withingsUserId}</span>
+                {/if}
+              </div>
+            </div>
+            <div class="sync-actions">
+              <button class="sync-btn" class:syncing={withingsSyncing} on:click={() => syncWithings()} disabled={withingsSyncing} title="Sync Withings data">
+                <span class="material-symbols-rounded sync-btn-icon">sync</span>
+                <span>{withingsSyncing ? 'Syncing…' : 'Sync'}</span>
+              </button>
+              <button class="btn-icon text-danger" on:click={disconnectWithings} title="Disconnect Withings">
+                <span class="material-symbols-rounded">link_off</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Body composition metrics -->
+          <div class="metric-grid">
+            {#each BODY_METRICS as m}
+              {@const raw = withingsData[m.id]}
+              {@const formatted = fmtBodyMetric(m, raw)}
+              <div class="metric-card" class:no-data={formatted == null && !loadingData}>
+                <div class="metric-icon-wrap">
+                  <span class="material-symbols-rounded metric-icon">{m.icon}</span>
+                </div>
+                <div class="metric-body">
+                  <span class="metric-label">{m.label}</span>
+                  {#if loadingData}
+                    <span class="metric-value skeleton">—</span>
+                  {:else if formatted}
+                    <span class="metric-value">{formatted.value}<span class="metric-unit">{formatted.unit}</span></span>
+                  {:else}
+                    <span class="metric-value no-val">—</span>
+                  {/if}
+                </div>
+              </div>
+            {/each}
+          </div>
+
+          <!-- Body Scan score metrics -->
+          {#if BODY_SCORE_METRICS.some(m => withingsData[m.id] != null)}
+            <div class="card" style="margin-top:12px;padding:16px">
+              <div class="sleep-stages-header" style="margin-bottom:12px">
+                <span class="material-symbols-rounded" style="color:var(--accent)">biotech</span>
+                <span class="sleep-stages-title">Body Scan Scores</span>
+              </div>
+              <div class="metric-grid">
+                {#each BODY_SCORE_METRICS as m}
+                  {@const raw = withingsData[m.id]}
+                  {#if raw != null}
+                    <div class="metric-card">
+                      <div class="metric-icon-wrap">
+                        <span class="material-symbols-rounded metric-icon">{m.icon}</span>
+                      </div>
+                      <div class="metric-body">
+                        <span class="metric-label">{m.label}</span>
+                        <span class="metric-value">{m.fmt(raw)}<span class="metric-unit">{m.unit}</span></span>
+                      </div>
+                    </div>
+                  {/if}
+                {/each}
+              </div>
+            </div>
+          {/if}
+
+          {#if !loadingData && Object.keys(withingsData).length === 0}
+            <div class="empty-state">
+              <span class="material-symbols-rounded" style="font-size:48px;opacity:0.18">scale</span>
+              <p>No Withings data for {isToday ? 'today' : fmtDate(dateStr)}.</p>
+              <p class="text-3 text-sm">Tap <strong>Sync</strong> to pull from Withings.</p>
+            </div>
+          {/if}
+
+        {:else if withingsStatus?.configured}
+          <!-- Configured but not connected -->
+          <div class="connect-card">
+            <div class="connect-icon-wrap">
+              <span class="material-symbols-rounded connect-icon">scale</span>
+            </div>
+            <h2 class="connect-title">Connect Withings</h2>
+            <p class="connect-desc">
+              Sync body composition from your Withings scale. Weight, body fat %, muscle mass, bone mass, and more — automatically filled into your diary.
+            </p>
+            <div class="connect-chips">
+              <span class="connect-chip"><span class="material-symbols-rounded">monitor_weight</span> Weight</span>
+              <span class="connect-chip"><span class="material-symbols-rounded">percent</span> Body Fat %</span>
+              <span class="connect-chip"><span class="material-symbols-rounded">fitness_center</span> Muscle Mass</span>
+              <span class="connect-chip"><span class="material-symbols-rounded">water_drop</span> Body Water</span>
+              <span class="connect-chip"><span class="material-symbols-rounded">emergency</span> Bone Mass</span>
+            </div>
+            <button class="btn btn-primary connect-btn" on:click={connectWithings} disabled={withingsConnecting}>
+              {#if withingsConnecting}
+                <span class="material-symbols-rounded spin">sync</span> Connecting…
+              {:else}
+                <span class="material-symbols-rounded">link</span> Connect Withings
+              {/if}
+            </button>
+          </div>
+
+        {:else}
+          <div class="connect-card">
+            <div class="connect-icon-wrap">
+              <span class="material-symbols-rounded connect-icon">scale</span>
+            </div>
+            <h2 class="connect-title">Withings Integration</h2>
+            <p class="connect-desc">
+              Connect your Withings scale or device to automatically sync body composition data.
+              An administrator needs to configure Withings API credentials in <strong>Settings → Labs</strong>.
+            </p>
+          </div>
+        {/if}
+
+      <!-- ── Trends tab ── -->
+      {:else if activeTab === 'trends'}
+        <div class="trends-range-bar">
+          {#each [{v:7,l:'7d'},{v:30,l:'30d'},{v:90,l:'90d'}] as r}
+            <button class="chip" class:chip-active={trendsRange === r.v} on:click={() => trendsRange = r.v}>{r.l}</button>
+          {/each}
+        </div>
+
+        {#if trendsLoading}
+          <div class="wellness-loading"><span class="material-symbols-rounded spin">sync</span></div>
+        {:else if trendsData.length === 0}
+          <div class="empty-state">
+            <span class="material-symbols-rounded" style="font-size:48px;opacity:0.18">show_chart</span>
+            <p>No trend data yet.</p>
+            <p class="text-3 text-sm">Sync Fitbit or Withings data to see trends.</p>
+          </div>
+        {:else}
+          <div class="trends-charts">
+            {#each TREND_CHARTS as chart}
+              {#if chart.hasData}
+                <div class="card trends-card">
+                  <div class="trends-card-header">
+                    <span class="material-symbols-rounded" style="color:var(--accent)">{chart.icon}</span>
+                    <span class="trends-card-title">{chart.label}</span>
+                    {#if chart.latest != null}
+                      <span class="trends-latest">{chart.fmtLatest(chart.latest)}</span>
+                    {/if}
+                  </div>
+                  <canvas class="trends-canvas" bind:this={chart.canvasEl} height="160"></canvas>
+                </div>
+              {/if}
+            {/each}
+          </div>
+        {/if}
       {/if}
 
-      <!-- Empty state when no data at all -->
-      {#if !loadingData && Object.keys(data).length === 0}
+      <!-- Empty state when no Fitbit data (only show on Fitbit tabs) -->
+      {#if !loadingData && Object.keys(data).length === 0 && (activeTab === 'movement' || activeTab === 'sleep' || activeTab === 'heart')}
         <div class="empty-state">
           <span class="material-symbols-rounded" style="font-size:48px;opacity:0.18">monitor_heart</span>
           <p>No data for {isToday ? 'today' : fmtDate(dateStr)}.</p>
@@ -599,6 +1009,17 @@
 {/if}
 
 <style>
+  /*
+    Override the global page-shell min-height: 100dvh.
+    Wellness puts only the <header> inside page-shell (date bar + content are
+    outside siblings), so the global min-height would balloon the shell to full
+    viewport height and shove the date bar way off screen.
+  */
+  .wl-shell {
+    min-height: unset !important;
+    padding-bottom: 0 !important;
+  }
+
   /* Standalone content area (outside page-shell, same as Diary) */
   .wl-content {
     padding-bottom: calc(var(--nav-h) + var(--safe-bottom) + 16px);
@@ -927,10 +1348,79 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   .spin { animation: spin 1s linear infinite; }
 
+  /* Chip styles (used in Trends range bar) */
+  .chip {
+    padding: 6px 14px;
+    border-radius: 99px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-2);
+    cursor: pointer;
+    transition: background var(--dur-fast), color var(--dur-fast), border-color var(--dur-fast);
+  }
+  .chip:hover { background: var(--surface-3); color: var(--text-1); }
+  .chip-active {
+    background: var(--accent-dim) !important;
+    border-color: var(--accent) !important;
+    color: var(--accent) !important;
+    font-weight: 600;
+  }
+
+  /* Trends */
+  .trends-range-bar {
+    display: flex;
+    gap: 8px;
+    padding: 4px 0 12px;
+  }
+  .trends-charts {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .trends-card {
+    padding: 14px 16px;
+  }
+  .trends-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .trends-card-title {
+    font-size: 14px;
+    font-weight: 600;
+    flex: 1;
+  }
+  .trends-latest {
+    font-size: 13px;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .trends-canvas {
+    width: 100%;
+    height: 160px;
+  }
+
   @media (max-width: 400px) {
     .metric-grid { grid-template-columns: 1fr 1fr; }
     .tab-btn { font-size: 12px; padding: 7px 6px; }
     .tab-icon { display: none; }
+  }
+
+  /* ── Sheet backdrop + bottom sheet (must be defined here; Diary's are scoped there) ── */
+  .sheet-backdrop {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(0,0,0,0.5);
+    display: flex; align-items: flex-end;
+  }
+  .sheet-handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 10px auto 0; }
+  .bs-sheet {
+    background: var(--surface-1);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    width: 100%; max-width: 600px; margin: 0 auto;
+    padding-bottom: var(--safe-bottom);
   }
 
   /* ── Date picker calendar (mirrors Diary) ────────────────────────────────── */

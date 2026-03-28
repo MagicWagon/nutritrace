@@ -1,0 +1,376 @@
+import { Router } from 'express';
+import { randomBytes } from 'crypto';
+import db from '../db.js';
+import { wrap } from '../logger.js';
+import { requireAuth, userMgmtActive } from '../middleware/auth.js';
+
+const router = Router();
+router.use(requireAuth);
+
+const uid = req => userMgmtActive() ? req.user.id : 0;
+
+function _cfg(key) {
+  const row = db.prepare('SELECT value FROM app_config WHERE key = ?').get(key);
+  return row?.value || '';
+}
+
+function _getTokens(userId) {
+  return db.prepare('SELECT * FROM withings_tokens WHERE user_id = ?').get(userId);
+}
+
+// State store for OAuth (brief window, like Fitbit's _pkce map)
+const _stateStore = new Map();
+
+// Token refresh
+async function _refresh(userId) {
+  const tokens = _getTokens(userId);
+  if (!tokens) throw Object.assign(new Error('Not connected to Withings'), { status: 401 });
+
+  const res = await fetch('https://wbsapi.withings.net/v2/oauth2', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      action: 'requesttoken',
+      grant_type: 'refresh_token',
+      client_id: _cfg('withings_client_id'),
+      client_secret: _cfg('withings_client_secret'),
+      refresh_token: tokens.refresh_token,
+    }),
+  });
+  const json = await res.json();
+  if (json.status !== 0) {
+    db.prepare('DELETE FROM withings_tokens WHERE user_id = ?').run(userId);
+    throw Object.assign(new Error('Withings token revoked — please reconnect.'), { status: 401 });
+  }
+  const d = json.body;
+  const expiresAt = new Date(Date.now() + d.expires_in * 1000).toISOString();
+  db.prepare(`UPDATE withings_tokens SET access_token=?, refresh_token=?, expires_at=? WHERE user_id=?`)
+    .run(d.access_token, d.refresh_token, expiresAt, userId);
+  return d.access_token;
+}
+
+async function _token(userId) {
+  const tokens = _getTokens(userId);
+  if (!tokens) throw Object.assign(new Error('Not connected to Withings'), { status: 401 });
+  if (new Date(tokens.expires_at) < new Date(Date.now() + 5 * 60 * 1000)) {
+    return _refresh(userId);
+  }
+  return tokens.access_token;
+}
+
+// POST wrapper for Withings API (all data endpoints are POST)
+async function _wPost(userId, endpoint, params) {
+  const tok = await _token(userId);
+  const res = await fetch(`https://wbsapi.withings.net${endpoint}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Authorization': `Bearer ${tok}`,
+    },
+    body: new URLSearchParams(params),
+  });
+  if (!res.ok) throw new Error(`Withings HTTP ${res.status}`);
+  const json = await res.json();
+  if (json.status !== 0) throw new Error(`Withings API error ${json.status}: ${json.error || ''}`);
+  return json.body;
+}
+
+// ── GET /status ───────────────────────────────────────────────────────────────
+router.get('/status', wrap((req, res) => {
+  const u = uid(req);
+  const tokens = _getTokens(u);
+  const clientId = _cfg('withings_client_id');
+  res.json({
+    connected:        !!tokens,
+    configured:       !!clientId,
+    withingsUserId:   tokens?.withings_user_id || null,
+    expiresAt:        tokens?.expires_at || null,
+  });
+}));
+
+// ── GET /authorize ────────────────────────────────────────────────────────────
+router.get('/authorize', wrap((req, res) => {
+  const clientId    = _cfg('withings_client_id');
+  const redirectUri = _cfg('withings_redirect_uri');
+  if (!clientId || !redirectUri) {
+    return res.status(400).json({ error: 'Withings client_id and redirect_uri must be configured in Settings → Labs.' });
+  }
+  const state = randomBytes(16).toString('hex');
+  _stateStore.set(state, { userId: uid(req), expiresAt: Date.now() + 10 * 60 * 1000 });
+  // Clean up old states
+  for (const [k, v] of _stateStore) { if (Date.now() > v.expiresAt) _stateStore.delete(k); }
+
+  const url = 'https://account.withings.com/oauth2_user/authorize2?' + new URLSearchParams({
+    response_type: 'code',
+    client_id:     clientId,
+    redirect_uri:  redirectUri,
+    scope:         'user.info,user.metrics,user.activity',
+    state,
+  });
+  res.json({ url });
+}));
+
+// ── GET /callback ─────────────────────────────────────────────────────────────
+router.get('/callback', wrap(async (req, res) => {
+  const { code, state, error } = req.query;
+  const origin = req.headers.origin || (req.headers.host ? `https://${req.headers.host}` : '');
+  const base = origin || '';
+
+  if (error || !code) {
+    return res.redirect(`/?withings=error&msg=${encodeURIComponent(error || 'No code')}#/wellness`);
+  }
+
+  const stored = _stateStore.get(state);
+  if (!stored || Date.now() > stored.expiresAt) {
+    return res.redirect(`/?withings=error&msg=state_mismatch#/wellness`);
+  }
+  _stateStore.delete(state);
+
+  const clientId     = _cfg('withings_client_id');
+  const clientSecret = _cfg('withings_client_secret');
+  const redirectUri  = _cfg('withings_redirect_uri');
+
+  const tokenRes = await fetch('https://wbsapi.withings.net/v2/oauth2', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      action:        'requesttoken',
+      grant_type:    'authorization_code',
+      client_id:     clientId,
+      client_secret: clientSecret,
+      code,
+      redirect_uri:  redirectUri,
+    }),
+  });
+  const json = await tokenRes.json();
+  if (json.status !== 0) {
+    return res.redirect(`/?withings=error&msg=${encodeURIComponent(json.error || 'Token exchange failed')}#/wellness`);
+  }
+  const d = json.body;
+  const expiresAt = new Date(Date.now() + d.expires_in * 1000).toISOString();
+  const userId = stored.userId;
+
+  db.prepare(`
+    INSERT INTO withings_tokens (user_id, access_token, refresh_token, expires_at, withings_user_id)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(user_id) DO UPDATE SET
+      access_token=excluded.access_token,
+      refresh_token=excluded.refresh_token,
+      expires_at=excluded.expires_at,
+      withings_user_id=excluded.withings_user_id
+  `).run(userId, d.access_token, d.refresh_token, expiresAt, String(d.userid || ''));
+
+  res.redirect(`/?withings=connected#/wellness`);
+}));
+
+// ── Measurement type → metric mapping ────────────────────────────────────────
+// Types that map to diary body_stats (auto-fill on sync if no manual entry)
+const BODY_STAT_TYPES = {
+  1:   { metric: 'weight_kg',     label: 'Weight',        toValue: v => v },       // kg
+  6:   { metric: 'body_fat_pct',  label: 'Body Fat',      toValue: v => v },       // %
+  76:  { metric: 'muscle_mass_kg',label: 'Muscle Mass',   toValue: v => v },       // kg
+  88:  { metric: 'bone_mass_kg',  label: 'Bone Mass',     toValue: v => v },       // kg
+  77:  { metric: 'body_water_pct',label: 'Body Water',    toValue: (v, grp) => {
+    // Withings returns hydration in kg; convert to % using weight
+    return v; // stored as raw value; UI can display either
+  }},
+};
+
+// Types that go to wellness_data only
+const WELLNESS_TYPES = {
+  5:   'lean_mass_kg',
+  8:   'fat_mass_kg',
+  91:  'pulse_wave_velocity',
+  174: 'visceral_fat',
+  226: 'nerve_health_score',
+  238: 'vascular_age',
+  239: 'nerve_activity',
+  // Segmental (Body Scan)
+  167: 'muscle_mass_left_arm_kg',
+  168: 'muscle_mass_right_arm_kg',
+  169: 'muscle_mass_torso_kg',
+  170: 'muscle_mass_left_leg_kg',
+  171: 'muscle_mass_right_leg_kg',
+};
+
+function _withingsValue(measure) {
+  // Withings: actual_value = value * 10^unit
+  return measure.value * Math.pow(10, measure.unit);
+}
+
+function _dateFromUnix(ts) {
+  return new Date(ts * 1000).toISOString().slice(0, 10);
+}
+
+// ── Sync measurements for a date range ────────────────────────────────────────
+async function _syncRange(userId, fromDate, toDate) {
+  const startTs = Math.floor(new Date(fromDate + 'T00:00:00').getTime() / 1000);
+  const endTs   = Math.floor(new Date(toDate   + 'T23:59:59').getTime() / 1000);
+
+  // Fetch all relevant measurement types in one call
+  const measTypes = [
+    ...Object.keys(BODY_STAT_TYPES),
+    ...Object.keys(WELLNESS_TYPES),
+  ].filter((v, i, a) => a.indexOf(v) === i).join(',');
+
+  const body = await _wPost(userId, '/measure', {
+    action:    'getmeas',
+    meastype:  measTypes,
+    category:  1,
+    startdate: startTs,
+    enddate:   endTs,
+  });
+
+  const grps = body.measuregrps || [];
+  let synced = 0;
+
+  // Get list of paired devices for model names
+  let deviceModels = {};
+  try {
+    const deviceBody = await _wPost(userId, '/v2/user', { action: 'getdevice' });
+    for (const d of deviceBody.devices || []) {
+      deviceModels[d.deviceid] = d.model || d.type || 'Withings';
+    }
+  } catch { /* device list is optional — don't fail sync */ }
+
+  // Group by date
+  const byDate = {};
+  for (const grp of grps) {
+    const date = _dateFromUnix(grp.date);
+    if (!byDate[date]) byDate[date] = [];
+    byDate[date].push({ grp, deviceModel: deviceModels[grp.deviceid] || 'Withings' });
+  }
+
+  const upsertWellness = db.prepare(`
+    INSERT INTO wellness_data (user_id, date, source, metric_type, value, device_model, synced_at)
+    VALUES (?, ?, 'withings', ?, ?, ?, datetime('now'))
+    ON CONFLICT(user_id, date, source, metric_type) DO UPDATE SET
+      value=excluded.value, device_model=excluded.device_model, synced_at=excluded.synced_at
+  `);
+
+  for (const [date, entries] of Object.entries(byDate)) {
+    // Collect body_stat values to merge into diary
+    const bodyStatUpdates = {};
+
+    for (const { grp, deviceModel } of entries) {
+      for (const measure of grp.measures) {
+        const type = measure.type;
+        const value = _withingsValue(measure);
+
+        // Store in wellness_data
+        const wellnessMetric = WELLNESS_TYPES[type] ||
+          (BODY_STAT_TYPES[type] ? `withings_${BODY_STAT_TYPES[type].metric}` : null);
+        if (wellnessMetric || BODY_STAT_TYPES[type]) {
+          const metricKey = WELLNESS_TYPES[type] || BODY_STAT_TYPES[type].metric;
+          upsertWellness.run(userId || null, date, metricKey, value, deviceModel);
+        }
+
+        // Collect for diary body_stats merge
+        if (BODY_STAT_TYPES[type]) {
+          const stat = BODY_STAT_TYPES[type];
+          if (!bodyStatUpdates[stat.metric] || grp.date > (bodyStatUpdates[stat.metric]._ts || 0)) {
+            bodyStatUpdates[stat.metric] = { value, _ts: grp.date };
+          }
+        }
+      }
+    }
+
+    // Merge into diary body_stats (don't overwrite manual entries)
+    if (Object.keys(bodyStatUpdates).length > 0) {
+      _mergeDiaryBodyStats(userId, date, bodyStatUpdates);
+    }
+    synced++;
+  }
+
+  return { synced, dates: Object.keys(byDate).length };
+}
+
+function _mergeDiaryBodyStats(userId, date, updates) {
+  // Read existing diary entry
+  const u = userId;
+  const row = u === 0 || u == null
+    ? db.prepare('SELECT body_stats FROM diary WHERE date = ? AND user_id IS NULL').get(date)
+      || db.prepare('SELECT body_stats FROM diary WHERE date = ?').get(date)
+    : db.prepare('SELECT body_stats FROM diary WHERE date = ? AND user_id = ?').get(date, u);
+
+  const existing = JSON.parse(row?.body_stats || '{}');
+
+  // Only write metrics that have no existing manual value
+  // (we identify Withings-sourced values by also being in wellness_data)
+  let changed = false;
+  for (const [key, { value }] of Object.entries(updates)) {
+    if (existing[key] == null) {
+      existing[key] = value;
+      changed = true;
+    }
+    // If already has a value, leave it — user may have entered it manually
+  }
+
+  if (!changed) return;
+
+  // Upsert diary with merged body_stats
+  if (u === 0 || u == null) {
+    db.prepare(`
+      INSERT INTO diary (date, items, body_stats, water, updated_at)
+      VALUES (?, '[]', ?, '[]', datetime('now'))
+      ON CONFLICT(date, user_id) DO UPDATE SET
+        body_stats=excluded.body_stats, updated_at=excluded.updated_at
+    `).run(date, JSON.stringify(existing));
+  } else {
+    db.prepare(`
+      INSERT INTO diary (user_id, date, items, body_stats, water, updated_at)
+      VALUES (?, ?, '[]', ?, '[]', datetime('now'))
+      ON CONFLICT(date, user_id) DO UPDATE SET
+        body_stats=excluded.body_stats, updated_at=excluded.updated_at
+    `).run(u, date, JSON.stringify(existing));
+  }
+}
+
+// ── POST /sync ────────────────────────────────────────────────────────────────
+router.post('/sync', wrap(async (req, res) => {
+  const u = uid(req);
+  let { date, from, to } = req.body;
+  if (!date && !from) date = new Date().toISOString().slice(0, 10);
+  if (date && !from) { from = date; to = date; }
+
+  const result = await _syncRange(u, from, to);
+  res.json({ ok: true, ...result });
+}));
+
+// ── GET /data ─────────────────────────────────────────────────────────────────
+router.get('/data', wrap((req, res) => {
+  const u = uid(req);
+  const { date, from, to, metric } = req.query;
+
+  let rows;
+  const uCond = (u === 0 || u == null) ? 'user_id IS NULL OR user_id = 0' : 'user_id = ?';
+  const uArgs = (u === 0 || u == null) ? [] : [u];
+
+  if (date) {
+    rows = db.prepare(`SELECT * FROM wellness_data WHERE (${uCond}) AND date = ? AND source = 'withings'${metric ? ' AND metric_type = ?' : ''} ORDER BY date`)
+      .all(...uArgs, date, ...(metric ? [metric] : []));
+  } else if (from && to) {
+    rows = db.prepare(`SELECT * FROM wellness_data WHERE (${uCond}) AND date >= ? AND date <= ? AND source = 'withings'${metric ? ' AND metric_type = ?' : ''} ORDER BY date`)
+      .all(...uArgs, from, to, ...(metric ? [metric] : []));
+  } else {
+    rows = db.prepare(`SELECT * FROM wellness_data WHERE (${uCond}) AND source = 'withings'${metric ? ' AND metric_type = ?' : ''} ORDER BY date`)
+      .all(...uArgs, ...(metric ? [metric] : []));
+  }
+
+  // Group by date → metric_type
+  const out = {};
+  for (const r of rows) {
+    if (!out[r.date]) out[r.date] = {};
+    out[r.date][r.metric_type] = { value: r.value, device_model: r.device_model };
+  }
+  res.json(out);
+}));
+
+// ── DELETE /disconnect ────────────────────────────────────────────────────────
+router.delete('/disconnect', wrap(async (req, res) => {
+  const u = uid(req);
+  db.prepare('DELETE FROM withings_tokens WHERE user_id = ?').run(u);
+  res.json({ ok: true });
+}));
+
+export default router;
