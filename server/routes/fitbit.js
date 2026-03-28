@@ -125,13 +125,13 @@ router.get('/callback', wrap(async (req, res) => {
   const { code, state, error } = req.query;
 
   if (error) {
-    return res.redirect(`/#/wellness?error=${encodeURIComponent(error)}`);
+    return res.redirect(`/?fitbit=error&msg=${encodeURIComponent(error)}#/wellness`);
   }
 
   const pkce = _pkce.get(state);
   if (!pkce || pkce.expiresAt < Date.now()) {
     _pkce.delete(state);
-    return res.redirect('/#/wellness?error=invalid_state');
+    return res.redirect('/?fitbit=error&msg=invalid_state#/wellness');
   }
   _pkce.delete(state);
 
@@ -155,7 +155,7 @@ router.get('/callback', wrap(async (req, res) => {
 
   if (!tokenRes.ok) {
     const body = await tokenRes.text().catch(() => '');
-    return res.redirect(`/#/wellness?error=${encodeURIComponent('Token exchange failed: ' + body.slice(0, 80))}`);
+    return res.redirect(`/?fitbit=error&msg=${encodeURIComponent('Token exchange failed: ' + body.slice(0, 80))}#/wellness`);
   }
 
   const td = await tokenRes.json();
@@ -171,7 +171,7 @@ router.get('/callback', wrap(async (req, res) => {
       fitbit_user_id = excluded.fitbit_user_id
   `).run(pkce.userId, td.access_token, td.refresh_token, expiresAt, td.user_id || null);
 
-  res.redirect('/#/wellness?connected=1');
+  res.redirect('/?fitbit=connected#/wellness');
 }));
 
 // ── Helper: sync a single date, return { metrics, errors } ───────────────────

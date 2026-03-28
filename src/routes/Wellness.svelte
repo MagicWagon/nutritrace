@@ -188,16 +188,15 @@
   }
 
   onMount(() => {
-    // Handle post-OAuth redirect query params BEFORE init so status is fresh
-    const hash = window.location.hash;
-    const qStr = hash.includes('?') ? hash.split('?')[1] : '';
-    const params = new URLSearchParams(qStr);
-    if (params.get('connected') === '1') {
-      window.location.hash = '#/wellness';
+    // Post-OAuth redirect: signal is in window.location.search (before the #)
+    // so the router always lands on /wellness correctly regardless of query params
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('fitbit') === 'connected') {
+      history.replaceState({}, '', '/#/wellness');
       showSuccess('Fitbit connected!');
-    } else if (params.get('error')) {
-      showError('Fitbit: ' + decodeURIComponent(params.get('error')));
-      window.location.hash = '#/wellness';
+    } else if (params.get('fitbit') === 'error') {
+      showError('Fitbit: ' + (params.get('msg') || 'Authorization failed'));
+      history.replaceState({}, '', '/#/wellness');
     }
     init();
   });
