@@ -151,8 +151,10 @@
   $: isNewFood = !(params && params.id);
   $: hasBarcode = !!(food.barcode && food.barcode.trim());
 
+  let offVerified = null; // null = unchecked, true = confirmed, false = not found yet
+
   async function contributeToOFF() {
-    contributing = true; offSuccess = false;
+    contributing = true; offSuccess = false; offVerified = null;
     try {
       const { API } = await import('../lib/api.js');
       const { NUTRIMENTS: NUT } = await import('../lib/nutrition.js');
@@ -169,7 +171,13 @@
           offUploadCountry: $offUploadCountry }
       );
       offSuccess = true;
-      setTimeout(() => offSuccess = false, 3000);
+      // Give OFF a few seconds to index, then verify the product is live
+      setTimeout(async () => {
+        try {
+          const found = await API.lookupBarcode(food.barcode);
+          offVerified = !!found;
+        } catch { offVerified = false; }
+      }, 3000);
     } catch(e) {
       alert('Could not upload to Open Food Facts: ' + e.message);
     } finally { contributing = false; }
@@ -462,7 +470,7 @@
               <button class="btn btn-secondary" style="flex:1"
                 on:click={contributeToOFF} disabled={contributing}>
                 <span class="material-symbols-rounded" style="font-size:15px;vertical-align:middle;margin-right:4px">upload</span>
-                {contributing ? 'Uploading…' : offSuccess ? 'Contributed!' : 'Share to OFF'}
+                {contributing ? 'Uploading…' : offSuccess ? 'Submitted!' : 'Share to OFF'}
               </button>
             {/if}
             <button class="btn btn-secondary" style="flex:1"
@@ -471,6 +479,29 @@
               {downloading ? 'Loading…' : downloadSuccess ? 'Updated!' : 'Refresh from OFF'}
             </button>
           </div>
+          {#if offSuccess}
+            <div class="off-verify-row">
+              {#if offVerified === null}
+                <span class="off-verify-checking">
+                  <span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">hourglass_top</span>
+                  Verifying on Open Food Facts…
+                </span>
+              {:else if offVerified}
+                <span class="off-verify-ok">
+                  <span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">check_circle</span>
+                  Confirmed live on Open Food Facts
+                </span>
+              {:else}
+                <span class="off-verify-pending">
+                  <span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">schedule</span>
+                  Submitted — may take a few minutes to appear
+                </span>
+              {/if}
+              <a class="off-verify-link" href="https://world.openfoodfacts.org/product/{food.barcode}" target="_blank" rel="noopener">
+                View on OFF <span class="material-symbols-rounded" style="font-size:12px;vertical-align:middle">open_in_new</span>
+              </a>
+            </div>
+          {/if}
         {/if}
       </div>
     </div>
@@ -542,6 +573,18 @@
   .editor-card { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
   .editor-card-title { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); margin-bottom: 4px; }
   .form-row { display: flex; gap: 12px; align-items: flex-end; }
+  .off-verify-row {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px; font-size: 12px; padding: 6px 2px 0;
+  }
+  .off-verify-checking { color: var(--text-3); }
+  .off-verify-ok { color: var(--success, #4caf50); }
+  .off-verify-pending { color: var(--text-3); }
+  .off-verify-link {
+    color: var(--accent); text-decoration: none; font-size: 12px;
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .off-verify-link:hover { text-decoration: underline; }
   .cat-chips { display: flex; flex-wrap: wrap; gap: 8px; }
   /* Photo section */
   .photo-card { gap: 10px; }
