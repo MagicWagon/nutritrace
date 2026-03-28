@@ -2459,7 +2459,7 @@
             <img src="/icons/logo.png" alt="NutriTrace" class="about-icon" />
             <div>
               <div class="about-name">NutriTrace</div>
-              <div class="about-version text-3 text-sm">v0.10.0-alpha</div>
+              <div class="about-version text-3 text-sm">v0.11.0-alpha</div>
             </div>
           </div>
           <div class="setting-divider"></div>
