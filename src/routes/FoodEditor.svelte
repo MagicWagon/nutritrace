@@ -8,6 +8,7 @@
   import { showSuccess, showError } from '../stores/toast.js';
   import { editorState, clearFoodEditorState } from '../stores/editorState.js';
   import Toggle from '../components/settings/Toggle.svelte';
+  import Dialog from '../components/ui/Dialog.svelte';
   import { foodsShowCategories, foodsShowLabels, foodsShowNotes, foodCategories, visibleNutriments, nutrimentsOrder, customNutriments, cropPhotos, offUsername, offPassword, offUploadCountry, catName as _catName, catDisplay as _catDisplay } from '../stores/settings.js';
 
   // ── Photo capture / upload ─────────────────────────────────
@@ -151,36 +152,64 @@
   $: isNewFood = !(params && params.id);
   $: hasBarcode = !!(food.barcode && food.barcode.trim());
 
-  let offVerified = null; // null = unchecked, true = confirmed, false = not found yet
+  let offVerified    = null;  // null = unchecked, true = confirmed, false = not found yet
+  let offAlreadyExists = false;
+  let showOffExistsDialog = false;
 
   async function contributeToOFF() {
-    contributing = true; offSuccess = false; offVerified = null;
+    contributing = true; offSuccess = false; offVerified = null; offAlreadyExists = false;
     try {
       const { API } = await import('../lib/api.js');
-      const { NUTRIMENTS: NUT } = await import('../lib/nutrition.js');
-      const nutrition = {};
-      for (const n of NUT) {
-        const v = food[n.id];
-        if (v !== undefined && v !== '' && v !== null && !isNaN(parseFloat(v)))
-          nutrition[n.id] = parseFloat(v);
+      // Check if product already exists on OFF before uploading
+      const existing = await API.lookupBarcode(food.barcode);
+      if (existing) {
+        offAlreadyExists = true;
+        contributing = false;
+        showOffExistsDialog = true;
+        return;
       }
-      await API.contributeToOFF(
-        { name: food.name, barcode: food.barcode, brand: food.brand,
-          portion: food.portion, unit: food.unit, nutrition },
-        { offUsername: $offUsername, offPassword: $offPassword,
-          offUploadCountry: $offUploadCountry }
-      );
-      offSuccess = true;
-      // Give OFF a few seconds to index, then verify the product is live
-      setTimeout(async () => {
-        try {
-          const found = await API.lookupBarcode(food.barcode);
-          offVerified = !!found;
-        } catch { offVerified = false; }
-      }, 3000);
+      await _doUploadToOFF(API);
     } catch(e) {
       alert('Could not upload to Open Food Facts: ' + e.message);
-    } finally { contributing = false; }
+      contributing = false;
+    }
+  }
+
+  async function confirmOffOverwrite() {
+    showOffExistsDialog = false;
+    contributing = true;
+    try {
+      const { API } = await import('../lib/api.js');
+      await _doUploadToOFF(API);
+    } catch(e) {
+      alert('Could not upload to Open Food Facts: ' + e.message);
+      contributing = false;
+    }
+  }
+
+  async function _doUploadToOFF(API) {
+    const { NUTRIMENTS: NUT } = await import('../lib/nutrition.js');
+    const nutrition = {};
+    for (const n of NUT) {
+      const v = food[n.id];
+      if (v !== undefined && v !== '' && v !== null && !isNaN(parseFloat(v)))
+        nutrition[n.id] = parseFloat(v);
+    }
+    await API.contributeToOFF(
+      { name: food.name, barcode: food.barcode, brand: food.brand,
+        portion: food.portion, unit: food.unit, nutrition },
+      { offUsername: $offUsername, offPassword: $offPassword,
+        offUploadCountry: $offUploadCountry }
+    );
+    offSuccess = true;
+    contributing = false;
+    // Give OFF a few seconds to index, then verify the product is live
+    setTimeout(async () => {
+      try {
+        const found = await API.lookupBarcode(food.barcode);
+        offVerified = !!found;
+      } catch { offVerified = false; }
+    }, 3000);
   }
 
   function takeSnapshot() {
@@ -552,6 +581,14 @@
     <div style="height:16px"></div>
   </div>
 </div>
+
+<Dialog
+  bind:open={showOffExistsDialog}
+  title="Product already on Open Food Facts"
+  message="This barcode already exists in the Open Food Facts database. Uploading will update the existing entry with your data, which may overwrite community contributions. Continue?"
+  confirmText="Update anyway"
+  on:confirm={confirmOffOverwrite}
+/>
 
 <style>
   .link-btn { color: var(--text-3); margin-bottom: 2px; }
