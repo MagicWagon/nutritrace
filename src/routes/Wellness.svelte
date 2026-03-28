@@ -1045,9 +1045,21 @@
     outside siblings), so the global min-height would balloon the shell to full
     viewport height and shove the date bar way off screen.
   */
-  /* Content area inside page-shell — shell already handles bottom padding */
+  /* Shell: no forced min-height — avoids pushing fixed bottom nav off-screen on mobile.
+     Sticky still works because header + date bar + content share the same scroll container. */
+  .wl-shell {
+    min-height: unset;
+  }
+  /* Force h1 to same height as Diary so the sticky date-bar top offset (62px) is accurate.
+     Without this the h1 renders ~31px tall, creating a gap between header and date bar. */
+  .wl-shell .page-header h1 {
+    height: 40px;
+    display: flex;
+    align-items: center;
+  }
+  /* Content area: explicit bottom padding since shell no longer provides it. */
   .wl-content {
-    padding-bottom: 16px;
+    padding-bottom: calc(var(--nav-h) + var(--safe-bottom) + 16px);
   }
 
   /* Date sub-bar — same pattern as Diary */

@@ -254,12 +254,12 @@ async function _syncRange(userId, fromDate, toDate) {
     byDate[date].push({ grp, deviceModel: deviceModels[grp.deviceid] || 'Withings' });
   }
 
-  // Delete-then-reinsert strategy: if a measurement was removed in the Withings app,
-  // it won't appear in this sync and should be removed from our local store too.
-  // Only wipe dates that Withings actually returned data for (don't clear dates with no response).
-  const deleteWellnessDate = db.prepare(
-    `DELETE FROM wellness_data WHERE user_id = ? AND date = ? AND source = 'withings'`
-  );
+  // Delete-then-reinsert strategy: wipe the ENTIRE date range upfront so that
+  // measurements deleted in the Withings app (which return no data for that date)
+  // are also removed locally. Only wipe once, before any inserts.
+  db.prepare(
+    `DELETE FROM wellness_data WHERE user_id = ? AND source = 'withings' AND date >= ? AND date <= ?`
+  ).run(uid, fromDate, toDate);
 
   const insertWellness = db.prepare(`
     INSERT INTO wellness_data (user_id, date, source, metric_type, value, device_model, synced_at)
@@ -293,8 +293,6 @@ async function _syncRange(userId, fromDate, toDate) {
       }
     }
 
-    // Replace existing Withings data for this date with the latest values
-    deleteWellnessDate.run(uid, date);
     for (const [metricKey, { value, deviceModel }] of Object.entries(latestByMetric)) {
       insertWellness.run(uid, date, metricKey, value, deviceModel);
     }
