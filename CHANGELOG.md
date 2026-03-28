@@ -8,13 +8,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [0.14.0-alpha] — 2026-03-28
 
 ### Added
-- **WellnessBanner** — animated SVG banner for the Wellness page header: footstep trail walking left→right with sequential stamp animation, floating Zzz's looping upward, and twinkling stars; dual radial glow gradients (warm left / cool right); full `no-anim` / `no-loop` class support and `prefers-reduced-motion` media query
+- **WellnessBanner** — animated SVG banner for the Wellness page header: shoe-print trail walking left→right with sequential stamp animation, floating Zzz's looping upward beside a crescent moon, and twinkling stars; dual radial glow gradients (warm left / cool right); full `no-anim` / `no-loop` class support and `prefers-reduced-motion` media query
+- **Fitbit sync range** — Settings → Labs: chip selector for how far back the manual Sync button fetches (1 day / 1 week / 1 month / 3 months / 1 year); auto-sync always covers today only; server supports `{ from, to }` range with 250ms throttle and 429 rate-limit detection
 
 ### Changed
 - Sidebar version string updated to v0.14.0-alpha
+- Wellness tab restored to Statistics' slot in BottomNav; Statistics restored alongside it; Wellness only appears when the `wellnessEnabled` setting is on; Wellness inserts after Foods (where Water used to be)
+- Foods/Meals/Recipes multi-select: searching no longer clears selection; only switching tabs resets it
 
 ### Fixed
-- Water card banner title position corrected from `padding-bottom: 52px` to `16px` — the strip is a fixed 110px tall (not the 140–180px mobile page-header height), so the same padding pushed the title to mid-strip instead of the proportional lower-third position
+- Water card banner title position corrected from `padding-bottom: 52px` to `16px`
+- Wellness title: removed inline icon from h1 to match all other page headers
+- Fitbit OAuth redirect: callback redirected to `/?fitbit=connected#/wellness` (real query string) instead of `/#/wellness?connected=1` (inside hash fragment) — the latter caused svelte-spa-router to fall through to `* → Diary`
+- Fitbit OAuth callback URL: the correct redirect URI to register in the Fitbit developer portal and in Settings → Labs is `https://your-domain.com/api/wellness/fitbit/callback`
 
 ---
 
