@@ -1,7 +1,7 @@
 <script>
   import { onMount, tick } from 'svelte';
   import { push, location } from 'svelte-spa-router';
-  import { fade } from 'svelte/transition';
+  import { fade, fly } from 'svelte/transition';
 
   import Tabs        from '../components/ui/Tabs.svelte';
   import ActionSheet     from '../components/ui/ActionSheet.svelte';
@@ -73,6 +73,15 @@
   let promptUnit = 'g';
   let activeCategoryFilter = ''; // '' = all
   let yesterdayMeals = []; // { mealIdx, mealName, items, totalKcal } — only in pick mode
+
+  // Multi-select (pick mode only)
+  let selectedFoods = new Set();      // Set<food object reference>
+  let showMultiPortionSheet = false;
+  let multiPortionItems = [];         // [{ food, portion, unit, servings }]
+  let multiAdding = false;
+
+  // Clear selection when tab or search changes
+  $: { activeTab; search; selectedFoods = new Set(); }
 
   // Convert item portions to grams for total serving display
   const _toG = { g:1, ml:1, oz:28.35, lb:453.59, cup:240, tbsp:15, tsp:5 };
@@ -209,26 +218,93 @@
     history.back();
   }
 
-  async function _addFoodToDiary(food, qty) {
+  async function _addFoodToDiaryNoNav(food, qty) {
     const { addDiaryItem } = await import('../stores/diary.js');
-    // Ensure the food exists on the server so it shows up in Foods page.
-    // Local records already have a numeric id; API results may have a string id or none.
     let savedFood = food;
     if (!food.id || typeof food.id !== 'number') {
       const { id: _drop, ...rest } = food;
       savedFood = await NtApi.createFood({ ...rest, created_at: food.dateTime || new Date().toISOString() });
     }
-    // Preserve pre-calculated nutrition for recipes, or food's nutrition if present
     const item = {
       ...savedFood,
       portion: savedFood.portion || 100,
       unit: savedFood.unit || 'g',
       quantity: qty,
-      nutrition: savedFood.nutrition // Ensure nutrition field is included (recipes have this)
+      nutrition: savedFood.nutrition
     };
     await addDiaryItem(item, Number(pickMeal) || 0, pickDate || undefined);
+  }
+
+  async function _addFoodToDiary(food, qty) {
+    await _addFoodToDiaryNoNav(food, qty);
     import('../stores/toast.js').then(m => m.showSuccess('Added to diary'));
     editorState.lastMealAdded = Number(pickMeal) || 0;
+    history.back();
+  }
+
+  function toggleSelect(food) {
+    if (selectedFoods.has(food)) selectedFoods.delete(food);
+    else selectedFoods.add(food);
+    selectedFoods = selectedFoods;
+  }
+
+  async function confirmMultiAdd() {
+    if (selectedFoods.size === 0 || multiAdding) return;
+    const foods = [...selectedFoods];
+
+    // Meals always expand ingredients — no portion prompt even if setting is on
+    if (activeTab === 1) {
+      multiAdding = true;
+      const { addDiaryItem } = await import('../stores/diary.js');
+      for (const meal of foods) {
+        for (const item of (meal.items || [])) {
+          await addDiaryItem({ ...item, quantity: item.quantity || 1 }, Number(pickMeal) || 0, pickDate || undefined);
+        }
+      }
+      showSuccess(`Added ${foods.length} meal${foods.length > 1 ? 's' : ''} to diary`);
+      editorState.lastMealAdded = Number(pickMeal) || 0;
+      multiAdding = false;
+      history.back();
+      return;
+    }
+
+    // Foods & Recipes: if prompt setting on, show single stacked portion sheet
+    if ($diaryPromptQuantity) {
+      multiPortionItems = foods.map(food => ({
+        food,
+        portion: food.portion || 100,
+        unit: food.unit || 'g',
+        servings: 1,
+      }));
+      showMultiPortionSheet = true;
+      return;
+    }
+
+    // No prompt — add all with defaults
+    multiAdding = true;
+    for (const food of foods) await _addFoodToDiaryNoNav(food, 1);
+    showSuccess(`Added ${foods.length} item${foods.length > 1 ? 's' : ''} to diary`);
+    editorState.lastMealAdded = Number(pickMeal) || 0;
+    multiAdding = false;
+    history.back();
+  }
+
+  async function confirmMultiPortionSheet() {
+    if (multiAdding) return;
+    multiAdding = true;
+    for (const item of multiPortionItems) {
+      const origPortion = parseFloat(item.food.portion) || 100;
+      const newPortion  = parseFloat(item.portion) || origPortion;
+      const portionFactor = newPortion / origPortion;
+      const scaledNutrition = item.food.nutrition
+        ? Object.fromEntries(Object.entries(item.food.nutrition).map(([k,v]) => [k, (parseFloat(v)||0) * portionFactor]))
+        : item.food.nutrition;
+      const food = { ...item.food, portion: newPortion, unit: item.unit, nutrition: scaledNutrition };
+      await _addFoodToDiaryNoNav(food, parseFloat(item.servings) || 1);
+    }
+    showSuccess(`Added ${multiPortionItems.length} item${multiPortionItems.length > 1 ? 's' : ''} to diary`);
+    editorState.lastMealAdded = Number(pickMeal) || 0;
+    multiAdding = false;
     history.back();
   }
 
@@ -455,12 +531,18 @@
           </button>
         </div>
       {:else}
-        <ul class="food-list">
+        <ul class="food-list" class:pick-list={pickMode}>
           {#each filteredList as food (food.id)}
-            <li class="food-item card" in:fade={{ duration: 160 }}>
+            {@const _sel = selectedFoods.has(food)}
+            <li class="food-item card" class:food-selected={_sel} in:fade={{ duration: 160 }}>
               <button class="food-item-btn"
-                on:click={() => pickFood(food)}
+                on:click={() => pickMode ? toggleSelect(food) : pickFood(food)}
                 on:contextmenu|preventDefault={() => longPress(food)}>
+                {#if pickMode}
+                  <span class="food-check material-symbols-rounded" class:food-check-on={_sel}>
+                    {_sel ? 'check_circle' : 'radio_button_unchecked'}
+                  </span>
+                {/if}
                 {#if $foodsShowThumbnails && food.imgUrl}
                   <img class="food-thumb" src={food.imgUrl} alt="" loading="lazy" />
                 {:else}
@@ -479,7 +561,9 @@
                     <span class="food-kcal text-sm">{_kcal} kcal</span>
                   {/if}
                 </div>
-                <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
+                {#if !pickMode}
+                  <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
+                {/if}
               </button>
             </li>
           {/each}
@@ -509,12 +593,18 @@
       {:else}
         <!-- OFF / USDA results -->
         {#if apiResults.length > 0}
-          <ul class="food-list">
+          <ul class="food-list" class:pick-list={pickMode}>
             {#each apiResults as food (food.id || food.barcode)}
-              <li class="food-item card">
+              {@const _sel = selectedFoods.has(food)}
+              <li class="food-item card" class:food-selected={_sel}>
                 <button class="food-item-btn"
-                  on:click={() => pickFood(food)}
+                  on:click={() => pickMode ? toggleSelect(food) : pickFood(food)}
                   on:contextmenu|preventDefault={() => longPress(food)}>
+                  {#if pickMode}
+                    <span class="food-check material-symbols-rounded" class:food-check-on={_sel}>
+                      {_sel ? 'check_circle' : 'radio_button_unchecked'}
+                    </span>
+                  {/if}
                   {#if food.imgUrl}
                     <img class="food-thumb" src={food.imgUrl} alt="" loading="lazy" />
                   {:else}
@@ -562,6 +652,60 @@
     {/if}
   </div>
 </div>
+
+<!-- Multi-select bottom action bar -->
+{#if pickMode && selectedFoods.size > 0}
+  <div class="multi-add-bar" transition:fly={{ y: 80, duration: 220 }}>
+    <span class="multi-add-label">
+      {selectedFoods.size} item{selectedFoods.size > 1 ? 's' : ''} selected
+    </span>
+    <button class="btn btn-primary multi-add-btn" on:click={confirmMultiAdd} disabled={multiAdding}>
+      {#if multiAdding}
+        <span class="material-symbols-rounded spin" style="font-size:18px">refresh</span>
+      {:else}
+        Add to Diary
+      {/if}
+    </button>
+  </div>
+{/if}
+
+<!-- Multi-item portion sheet -->
+<Sheet bind:open={showMultiPortionSheet} title="Set Portions ({multiPortionItems.length} items)">
+  <div style="display:flex;flex-direction:column;gap:0;padding-top:4px">
+    {#each multiPortionItems as item, i}
+      {#if i > 0}<div style="height:1px;background:var(--border);margin:12px 0"></div>{/if}
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <span style="font-size:13px;font-weight:600;color:var(--text-1)">{item.food.name}</span>
+        <div style="display:flex;gap:10px">
+          <div style="flex:1">
+            <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:5px">Serving Size</label>
+            <input class="input" type="number" min="0.1" step="0.1" bind:value={item.portion} style="font-size:16px;width:100%" />
+          </div>
+          <div style="width:80px">
+            <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:5px">Unit</label>
+            <select class="select" bind:value={item.unit} style="width:100%">
+              {#each ['g','ml','oz','lb','cup','tbsp','tsp','piece','slice','serving'] as u}
+                <option value={u}>{u}</option>
+              {/each}
+            </select>
+          </div>
+          <div style="width:72px">
+            <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:5px">Servings</label>
+            <input class="input" type="number" min="0.1" step="0.1" bind:value={item.servings} style="font-size:16px;width:100%" />
+          </div>
+        </div>
+      </div>
+    {/each}
+    <button class="btn btn-primary w-full" style="margin-top:16px"
+      on:click={confirmMultiPortionSheet} disabled={multiAdding}>
+      {#if multiAdding}
+        <span class="material-symbols-rounded spin" style="font-size:18px">refresh</span>
+      {:else}
+        Add {multiPortionItems.length} Item{multiPortionItems.length > 1 ? 's' : ''} to Diary
+      {/if}
+    </button>
+  </div>
+</Sheet>
 
 <!-- Quantity prompt sheet -->
 <Sheet bind:open={showQtyPrompt} title={promptFood ? promptFood.name : 'Add to Diary'}>
@@ -713,6 +857,50 @@
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
   }
+  /* ── Multi-select ─────────────────────────────────────────────────────── */
+  .food-check {
+    font-size: 22px;
+    flex-shrink: 0;
+    color: var(--text-3);
+    transition: color var(--dur-fast);
+  }
+  .food-check-on { color: var(--accent); }
+
+  .food-selected { background: var(--accent-dim); }
+  .food-selected .food-item-btn:active { background: transparent; }
+
+  /* Extra bottom padding when bar is visible — prevents last item hiding behind bar */
+  .pick-list { padding-bottom: 80px; }
+
+  .multi-add-bar {
+    position: fixed;
+    bottom: calc(var(--nav-h) + var(--safe-bottom) + 8px);
+    left: var(--sidebar-w, 0px);
+    right: 0;
+    margin: 0 var(--page-px);
+    background: var(--glass-surface);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    z-index: 45;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+  }
+  .multi-add-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-1);
+  }
+  .multi-add-btn {
+    flex-shrink: 0;
+    min-width: 120px;
+  }
+
   .source-chip-row::-webkit-scrollbar { display: none; }
   .source-chip {
     flex-shrink: 0;
