@@ -143,7 +143,7 @@ router.get('/authorize', wrap((req, res) => {
     response_type: 'code',
     client_id:     clientId,
     redirect_uri:  redirectUri,
-    scope:         'user.info,user.metrics,user.activity',
+    scope:         'user.info,user.metrics,user.activity,user.cardiovascular',
     state,
   });
   res.json({ url });
@@ -219,19 +219,24 @@ const BODY_STAT_TYPES = {
 const WELLNESS_TYPES = {
   5:   'lean_mass_kg',
   8:   'fat_mass_kg',
+  11:  'heart_pulse_bpm',
   91:  'pulse_wave_velocity',
   174: 'visceral_fat',
   226: 'nerve_health_score',
   238: 'vascular_age',
   239: 'nerve_activity',
-  // Segmental (Body Scan)
+  // Segmental muscle (Body Scan)
   167: 'muscle_mass_left_arm_kg',
   168: 'muscle_mass_right_arm_kg',
   169: 'muscle_mass_torso_kg',
   170: 'muscle_mass_left_leg_kg',
   171: 'muscle_mass_right_leg_kg',
-  // Fat mass segmental
-  174: 'visceral_fat_mass_kg',  // NOTE: 174 also used above — last definition wins (visceral_fat_mass_kg)
+  // Segmental fat (Body Scan)
+  182: 'fat_mass_right_arm_kg',
+  183: 'fat_mass_left_arm_kg',
+  184: 'fat_mass_torso_kg',
+  185: 'fat_mass_right_leg_kg',
+  186: 'fat_mass_left_leg_kg',
 };
 
 function _withingsValue(measure) {
@@ -343,6 +348,37 @@ async function _syncRange(userId, fromDate, toDate) {
 
   const dates = Object.keys(byDate).length;
   console.log(`[withings] stored data for ${dates} date(s)`);
+
+  // ── ECG recordings (requires user.cardiovascular scope) ──────────────────────
+  try {
+    const tok = await _token(userId);
+    const ecgRes = await fetch(
+      `https://wbsapi.withings.net/v2/heart?action=list&startdate=${startTs}&enddate=${endTs}`,
+      { headers: { Authorization: `Bearer ${tok}` } }
+    );
+    const ecgJson = await ecgRes.json();
+    if (ecgJson.status === 0) {
+      // Group ECG readings by date; keep latest heart_rate, flag afib if any recording shows it
+      const ecgByDate = {};
+      for (const rec of (ecgJson.body?.series || [])) {
+        const date = _dateFromUnix(rec.timestamp);
+        if (!date) continue;
+        if (!ecgByDate[date]) ecgByDate[date] = { heart_rate: null, afib: 0, ts: 0 };
+        if (rec.timestamp > ecgByDate[date].ts) {
+          ecgByDate[date].ts = rec.timestamp;
+          if (rec.heart_rate != null) ecgByDate[date].heart_rate = rec.heart_rate;
+        }
+        if (rec.ecg?.afib === 1) ecgByDate[date].afib = 1;
+      }
+      db.transaction(() => {
+        for (const [date, { heart_rate, afib }] of Object.entries(ecgByDate)) {
+          if (heart_rate != null) insertWellness.run(uid, date, 'ecg_heart_rate', heart_rate, 'Withings');
+          insertWellness.run(uid, date, 'ecg_afib', afib, 'Withings');
+        }
+      })();
+    }
+  } catch { /* ECG is optional — user may not have cardiovascular scope yet */ }
+
   return { synced: dates, dates };
 }
 

@@ -150,7 +150,7 @@ router.get('/authorize', wrap((req, res) => {
   url.searchParams.set('response_type',          'code');
   url.searchParams.set('client_id',              clientId);
   url.searchParams.set('redirect_uri',           redirectUri);
-  url.searchParams.set('scope',                  'activity heartrate sleep oxygen_saturation respiratory_rate profile');
+  url.searchParams.set('scope',                  'activity heartrate sleep oxygen_saturation respiratory_rate cardio_fitness profile');
   url.searchParams.set('code_challenge',         codeChallenge);
   url.searchParams.set('code_challenge_method',  'S256');
   url.searchParams.set('state',                  state);
@@ -267,6 +267,18 @@ async function _syncDate(u, dateStr) {
     const d = await _get(u, `/1/user/-/br/date/${dateStr}.json`);
     metrics.respiratory_rate = d.br?.[0]?.value?.breathingRate ?? null;
   } catch (e) { errors.push('breathing: ' + e.message); }
+
+  // Active Zone Minutes
+  try {
+    const d = await _get(u, `/1/user/-/activities/active-zone-minutes/date/${dateStr}/1d.json`);
+    metrics.active_zone_minutes = d['activities-active-zone-minutes']?.[0]?.value?.activeZoneMinutes ?? null;
+  } catch (e) { errors.push('azm: ' + e.message); }
+
+  // VO2 Max / Cardio Fitness Score (requires cardio_fitness scope)
+  try {
+    const d = await _get(u, `/1/user/-/cardioscore/date/${dateStr}/1d.json`);
+    metrics.vo2_max = d['cardioScore']?.[0]?.value?.vo2Max ?? null;
+  } catch (e) { errors.push('vo2max: ' + e.message); }
 
   // Upsert all metrics
   const upsert = db.prepare(`

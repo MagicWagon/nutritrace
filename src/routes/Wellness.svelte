@@ -19,6 +19,9 @@
     { id: 'floors',           label: 'Floors Climbed',    unit: 'floors',group: 'movement', icon: 'stairs',             fmt: v => Math.round(v) },
     { id: 'active_minutes',   label: 'Active Minutes',    unit: 'min',   group: 'movement', icon: 'timer',              fmt: v => Math.round(v) },
     { id: 'calories_out',     label: 'Calories Burned',   unit: 'kcal',  group: 'movement', icon: 'local_fire_department', fmt: v => Math.round(v).toLocaleString() },
+    { id: 'active_zone_minutes',    label: 'Active Zone Min',   unit: 'min',  group: 'movement', icon: 'local_fire_department', fmt: v => Math.round(v) },
+    { id: 'moderate_intensity_min', label: 'Moderate Intensity',unit: 'min',  group: 'movement', icon: 'directions_run',        fmt: v => Math.round(v) },
+    { id: 'vigorous_intensity_min', label: 'Vigorous Intensity',unit: 'min',  group: 'movement', icon: 'sprint',                fmt: v => Math.round(v) },
     // Sleep
     { id: 'sleep_duration_min', label: 'Sleep Duration',  unit: '',      group: 'sleep',    icon: 'bedtime',            fmt: null },
     { id: 'sleep_efficiency',   label: 'Sleep Efficiency',unit: '%',     group: 'sleep',    icon: 'battery_charging_full', fmt: v => v.toFixed(0) },
@@ -26,11 +29,13 @@
     { id: 'sleep_light_min',    label: 'Light Sleep',     unit: 'min',   group: 'sleep',    icon: 'cloud',              fmt: v => Math.round(v) },
     { id: 'sleep_rem_min',      label: 'REM Sleep',       unit: 'min',   group: 'sleep',    icon: 'psychology',         fmt: v => Math.round(v) },
     { id: 'sleep_wake_min',     label: 'Awake',           unit: 'min',   group: 'sleep',    icon: 'wb_twilight',        fmt: v => Math.round(v) },
+    { id: 'sleep_score',     label: 'Sleep Score',     unit: '/100', group: 'sleep',    icon: 'star',               fmt: v => Math.round(v) },
     // Heart
     { id: 'resting_hr',         label: 'Resting Heart Rate', unit: 'bpm', group: 'heart', icon: 'favorite',           fmt: v => Math.round(v) },
     { id: 'hrv_daily_rmssd',    label: 'HRV (RMSSD)',        unit: 'ms',  group: 'heart', icon: 'monitor_heart',      fmt: v => v.toFixed(1) },
     { id: 'spo2_avg',           label: 'SpO2',               unit: '%',   group: 'heart', icon: 'water_drop',         fmt: v => v.toFixed(1) },
     { id: 'respiratory_rate',   label: 'Respiratory Rate',   unit: 'brpm',group: 'heart', icon: 'air',                fmt: v => v.toFixed(1) },
+    { id: 'vo2_max',            label: 'VO2 Max',            unit: 'mL/kg/min', group: 'heart', icon: 'lungs',          fmt: v => v.toFixed(1) },
   ];
 
   function isVisible(metricId) {
@@ -114,8 +119,11 @@
 
   const BODY_SCORE_METRICS = [
     { id: 'vascular_age',       label: 'Vascular Age',     unit: 'yrs',  icon: 'cardiology',   fmt: v => Math.round(v) },
+    { id: 'heart_pulse_bpm',    label: 'Heart Pulse',      unit: 'bpm',  icon: 'favorite',     fmt: v => Math.round(v) },
     { id: 'nerve_health_score', label: 'Nerve Activity',   unit: ' µS',  icon: 'neurology',     fmt: v => Math.round(v) },
     { id: 'pulse_wave_velocity',label: 'Pulse Wave Vel.',  unit: 'm/s',  icon: 'show_chart',    fmt: v => v.toFixed(1) },
+    { id: 'ecg_heart_rate',     label: 'ECG Heart Rate',   unit: 'bpm',  icon: 'ecg_heart',     fmt: v => Math.round(v) },
+    { id: 'ecg_afib',           label: 'AFib Detection',   unit: '',     icon: 'ecg',           fmt: v => v === 1 ? 'Detected' : 'Normal' },
   ];
 
   function fmtWeight(kg) {
@@ -1043,6 +1051,38 @@
             </div>
           {/if}
 
+          <!-- Segmental analysis (Body Scan) -->
+          {#if ['muscle_mass_left_arm_kg','muscle_mass_right_arm_kg','muscle_mass_torso_kg','muscle_mass_left_leg_kg','muscle_mass_right_leg_kg','fat_mass_left_arm_kg','fat_mass_right_arm_kg','fat_mass_torso_kg','fat_mass_left_leg_kg','fat_mass_right_leg_kg'].some(k => withingsData[k] != null)}
+            <div class="card" style="margin-top:12px;padding:16px">
+              <div class="sleep-stages-header" style="margin-bottom:12px">
+                <span class="material-symbols-rounded" style="color:var(--accent)">accessibility_new</span>
+                <span class="sleep-stages-title">Segmental Analysis</span>
+              </div>
+              <div class="segmental-table">
+                <div class="seg-header">
+                  <span></span>
+                  <span>Muscle</span>
+                  <span>Fat</span>
+                </div>
+                {#each [
+                  { label: 'Left Arm',  muscle: 'muscle_mass_left_arm_kg',  fat: 'fat_mass_left_arm_kg'  },
+                  { label: 'Right Arm', muscle: 'muscle_mass_right_arm_kg', fat: 'fat_mass_right_arm_kg' },
+                  { label: 'Torso',     muscle: 'muscle_mass_torso_kg',     fat: 'fat_mass_torso_kg'     },
+                  { label: 'Left Leg',  muscle: 'muscle_mass_left_leg_kg',  fat: 'fat_mass_left_leg_kg'  },
+                  { label: 'Right Leg', muscle: 'muscle_mass_right_leg_kg', fat: 'fat_mass_right_leg_kg' },
+                ] as seg}
+                  {#if withingsData[seg.muscle] != null || withingsData[seg.fat] != null}
+                    <div class="seg-row">
+                      <span class="seg-label">{seg.label}</span>
+                      <span class="seg-val">{withingsData[seg.muscle] != null ? fmtWeight(withingsData[seg.muscle]).value + ' ' + fmtWeight(withingsData[seg.muscle]).unit : '—'}</span>
+                      <span class="seg-val">{withingsData[seg.fat] != null ? fmtWeight(withingsData[seg.fat]).value + ' ' + fmtWeight(withingsData[seg.fat]).unit : '—'}</span>
+                    </div>
+                  {/if}
+                {/each}
+              </div>
+            </div>
+          {/if}
+
           {#if !loadingData && Object.keys(withingsData).length === 0}
             <div class="empty-state">
               <span class="material-symbols-rounded" style="font-size:48px;opacity:0.18">scale</span>
@@ -1066,6 +1106,7 @@
               <span class="connect-chip"><span class="material-symbols-rounded">fitness_center</span> Muscle Mass</span>
               <span class="connect-chip"><span class="material-symbols-rounded">water_drop</span> Body Water</span>
               <span class="connect-chip"><span class="material-symbols-rounded">emergency</span> Bone Mass</span>
+              <span class="connect-chip"><span class="material-symbols-rounded">ecg_heart</span> ECG &amp; AFib</span>
             </div>
             <button class="btn btn-primary connect-btn" on:click={connectWithings} disabled={withingsConnecting}>
               {#if withingsConnecting}
@@ -1731,5 +1772,35 @@
   .dp-manual {
     display: flex; gap: 8px; padding: 8px 16px 16px; align-items: center;
     border-top: 1px solid var(--border); margin-top: 4px;
+  }
+  .segmental-table {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .seg-header {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-3);
+  }
+  .seg-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    padding: 8px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    font-size: 13px;
+  }
+  .seg-label {
+    font-weight: 600;
+    color: var(--text-2);
+  }
+  .seg-val {
+    color: var(--text-1);
   }
 </style>

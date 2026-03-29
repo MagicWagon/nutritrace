@@ -280,9 +280,11 @@ async function _syncRange(u, fromDate, toDate) {
           calories_out:   day.totalKilocalories,
           distance_km:    day.totalDistanceInMeters != null ? +(day.totalDistanceInMeters / 1000).toFixed(2) : null,
           floors:         day.floorsClimbed,
-          body_battery_high: day.bodyBatteryHighestValue,
-          body_battery_low:  day.bodyBatteryLowestValue,
-          stress_avg:        day.averageStressLevel,
+          body_battery_high:     day.bodyBatteryHighestValue,
+          body_battery_low:      day.bodyBatteryLowestValue,
+          stress_avg:            day.averageStressLevel,
+          moderate_intensity_min: day.moderateIntensityMinutes ?? null,
+          vigorous_intensity_min: day.vigorousIntensityMinutes ?? null,
         };
         for (const [type, value] of Object.entries(m)) {
           if (value != null && value >= 0) upsert.run(u, date, type, value);
@@ -308,6 +310,8 @@ async function _syncRange(u, fromDate, toDate) {
           sleep_light_min:    night.lightSleepDurationInSeconds != null ? Math.round(night.lightSleepDurationInSeconds / 60) : null,
           sleep_rem_min:      night.remSleepInSeconds  != null ? Math.round(night.remSleepInSeconds / 60) : null,
           sleep_wake_min:     night.awakeDurationInSeconds  != null ? Math.round(night.awakeDurationInSeconds / 60) : null,
+          respiratory_rate:   night.averageRespirationValue ?? null,
+          sleep_score:        night.sleepScores?.overallSleepScore ?? night.overallSleepScore ?? null,
         };
         for (const [type, value] of Object.entries(m)) {
           if (value != null) upsert.run(u, date, type, value);
