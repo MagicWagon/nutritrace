@@ -43,7 +43,8 @@
     { id: 'respiratory_rate',   label: 'Respiratory Rate',   unit: 'brpm',     group: 'heart', icon: 'air',             fmt: v => v.toFixed(1),   sources: ['fitbit','garmin'] },
     // Heart — Fitbit only
     { id: 'vo2_max',            label: 'Cardio Fitness',     unit: 'mL/kg/min',group: 'heart', icon: 'fitness_center',  fmt: v => v.toFixed(1),   sources: ['fitbit'] },
-    { id: 'readiness_score',    label: 'Daily Readiness',    unit: '/100',     group: 'heart', icon: 'battery_charging_full', fmt: v => Math.round(v), sources: ['fitbit'] },
+    // Heart — Garmin only
+    { id: 'max_hr',             label: 'Max Heart Rate',     unit: 'bpm',      group: 'heart', icon: 'favorite',        fmt: v => Math.round(v),  sources: ['garmin'] },
   ];
 
   // Returns true if at least one of this metric's source integrations is enabled
@@ -728,7 +729,11 @@
     }
     if ($fitbitEnabled) {
       for (const [k, v] of Object.entries(data)) {
-        if (v != null) merged[k] = v; // Fitbit wins over Garmin for shared metrics
+        if (v != null) {
+          // Garmin sleep_score is device-measured; don't let Fitbit's estimate overwrite it
+          if (k === 'sleep_score' && merged[k] != null) continue;
+          merged[k] = v;
+        }
       }
     }
     return merged;

@@ -280,6 +280,7 @@ async function _syncRange(u, fromDate, toDate) {
           calories_out:   day.totalKilocalories,
           distance_km:    day.totalDistanceInMeters != null ? +(day.totalDistanceInMeters / 1000).toFixed(2) : null,
           floors:         day.floorsClimbed,
+          max_hr:                day.maxHeartRate ?? null,
           body_battery_high:     day.bodyBatteryHighestValue,
           body_battery_low:      day.bodyBatteryLowestValue,
           stress_avg:            day.averageStressLevel,
