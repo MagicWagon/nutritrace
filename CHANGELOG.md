@@ -5,6 +5,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.16.0-alpha] — 2026-03-29
+
+### Added
+- **Sliding pill tabs** — `Tabs.svelte` now uses an animated sliding pill indicator (same transition as BottomNav) on Foods (Foods/Meals/Recipes), MealEditor picker, and anywhere else the `<Tabs>` component is used
+- **Wellness tab bar pill** — Wellness Movement/Sleep/Heart/Body/Trends tab bar gets the same sliding pill treatment
+- **Wellness sync buttons in topbar** — Fitbit and Withings sync buttons are now fixed to the top-right corner (same row and height as the hamburger menu), portalled to `document.body` so they stay on screen while scrolling; each shows its brand logo at rest and a spinning sync icon while active
+- **FitbitIcon + WithingsIcon** — monochrome SVG brand mark components (`currentColor`) for use anywhere in the app
+- **Disconnect in Settings** — Fitbit and Withings each show a "Connected device" row (with account ID) and a Disconnect button inside Settings → Labs; connection status fetched when Labs section opens
+- **Custom sync range** — Fitbit and Withings sync range now support any number of days via an inline number input alongside the preset chips; input highlights accent when a custom value is active
+- **Multi-select in MealEditor ingredient picker** — checkbox-based multi-select across all three tabs (Foods, Meals, Recipes); selecting multiple items opens a stacked per-item portion sheet before batch-adding; single tap still opens the single-item flow
+
+### Changed
+- Wellness sync bars removed from content area — sync is now always accessible from the fixed topbar buttons regardless of active tab
+- Wellness disconnect moved from topbar to Settings → Labs (more appropriate home for device management)
+- Settings Appearance: Celebrate goals, Page banners, Loop banner animations descriptions now render below the label (block `<div>`) instead of inline (`<span>`), consistent with Persistent sidebar
+
+### Fixed
+- Wellness sync buttons now stay visible while scrolling (portal + position:fixed, unaffected by Svelte fade transition stacking context)
+
+---
+
 ## [0.15.0-alpha] — 2026-03-28
 
 ### Added
