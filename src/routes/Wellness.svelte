@@ -12,31 +12,48 @@
   import GarminIcon from '../components/icons/GarminIcon.svelte';
 
   // ── Metric definitions ─────────────────────────────────────────────────────
+  // sources: which integrations can supply this metric. Used to hide metrics
+  // when their only source integration is disabled.
   const ALL_METRICS = [
-    // Movement
-    { id: 'steps',            label: 'Steps',             unit: 'steps', group: 'movement', icon: 'directions_walk',    fmt: v => Math.round(v).toLocaleString() },
-    { id: 'distance_km',      label: 'Distance',          unit: '',      group: 'movement', icon: 'straighten',         fmt: null },
-    { id: 'floors',           label: 'Floors Climbed',    unit: 'floors',group: 'movement', icon: 'stairs',             fmt: v => Math.round(v) },
-    { id: 'active_minutes',   label: 'Active Minutes',    unit: 'min',   group: 'movement', icon: 'timer',              fmt: v => Math.round(v) },
-    { id: 'calories_out',     label: 'Calories Burned',   unit: 'kcal',  group: 'movement', icon: 'local_fire_department', fmt: v => Math.round(v).toLocaleString() },
-    { id: 'active_zone_minutes',    label: 'Active Zone Min',   unit: 'min',  group: 'movement', icon: 'local_fire_department', fmt: v => Math.round(v) },
-    { id: 'moderate_intensity_min', label: 'Moderate Intensity',unit: 'min',  group: 'movement', icon: 'directions_run',        fmt: v => Math.round(v) },
-    { id: 'vigorous_intensity_min', label: 'Vigorous Intensity',unit: 'min',  group: 'movement', icon: 'sprint',                fmt: v => Math.round(v) },
-    // Sleep
-    { id: 'sleep_duration_min', label: 'Sleep Duration',  unit: '',      group: 'sleep',    icon: 'bedtime',            fmt: null },
-    { id: 'sleep_efficiency',   label: 'Sleep Efficiency',unit: '%',     group: 'sleep',    icon: 'battery_charging_full', fmt: v => v.toFixed(0) },
-    { id: 'sleep_deep_min',     label: 'Deep Sleep',      unit: 'min',   group: 'sleep',    icon: 'nights_stay',        fmt: v => Math.round(v) },
-    { id: 'sleep_light_min',    label: 'Light Sleep',     unit: 'min',   group: 'sleep',    icon: 'cloud',              fmt: v => Math.round(v) },
-    { id: 'sleep_rem_min',      label: 'REM Sleep',       unit: 'min',   group: 'sleep',    icon: 'psychology',         fmt: v => Math.round(v) },
-    { id: 'sleep_wake_min',     label: 'Awake',           unit: 'min',   group: 'sleep',    icon: 'wb_twilight',        fmt: v => Math.round(v) },
-    { id: 'sleep_score',     label: 'Sleep Score',     unit: '/100', group: 'sleep',    icon: 'star',               fmt: v => Math.round(v) },
-    // Heart
-    { id: 'resting_hr',         label: 'Resting Heart Rate', unit: 'bpm', group: 'heart', icon: 'favorite',           fmt: v => Math.round(v) },
-    { id: 'hrv_daily_rmssd',    label: 'HRV (RMSSD)',        unit: 'ms',  group: 'heart', icon: 'monitor_heart',      fmt: v => v.toFixed(1) },
-    { id: 'spo2_avg',           label: 'SpO2',               unit: '%',   group: 'heart', icon: 'water_drop',         fmt: v => v.toFixed(1) },
-    { id: 'respiratory_rate',   label: 'Respiratory Rate',   unit: 'brpm',group: 'heart', icon: 'air',                fmt: v => v.toFixed(1) },
-    { id: 'vo2_max',            label: 'VO2 Max',            unit: 'mL/kg/min', group: 'heart', icon: 'fitness_center',  fmt: v => v.toFixed(1) },
+    // Movement — both Fitbit and Garmin
+    { id: 'steps',            label: 'Steps',             unit: 'steps', group: 'movement', icon: 'directions_walk',       fmt: v => Math.round(v).toLocaleString(),  sources: ['fitbit','garmin'] },
+    { id: 'distance_km',      label: 'Distance',          unit: '',      group: 'movement', icon: 'straighten',            fmt: null,                                  sources: ['fitbit','garmin'] },
+    { id: 'floors',           label: 'Floors Climbed',    unit: 'floors',group: 'movement', icon: 'stairs',                fmt: v => Math.round(v),                   sources: ['fitbit','garmin'] },
+    { id: 'active_minutes',   label: 'Active Minutes',    unit: 'min',   group: 'movement', icon: 'timer',                 fmt: v => Math.round(v),                   sources: ['fitbit','garmin'] },
+    { id: 'calories_out',     label: 'Calories Burned',   unit: 'kcal',  group: 'movement', icon: 'local_fire_department', fmt: v => Math.round(v).toLocaleString(),  sources: ['fitbit','garmin'] },
+    // Movement — Fitbit only
+    { id: 'active_zone_minutes',    label: 'Active Zone Min',   unit: 'min',  group: 'movement', icon: 'local_fire_department', fmt: v => Math.round(v), sources: ['fitbit'] },
+    // Movement — Garmin only
+    { id: 'moderate_intensity_min', label: 'Moderate Intensity',unit: 'min',  group: 'movement', icon: 'directions_run',        fmt: v => Math.round(v), sources: ['garmin'] },
+    { id: 'vigorous_intensity_min', label: 'Vigorous Intensity',unit: 'min',  group: 'movement', icon: 'sprint',                fmt: v => Math.round(v), sources: ['garmin'] },
+    // Sleep — both
+    { id: 'sleep_duration_min', label: 'Sleep Duration',  unit: '',      group: 'sleep',    icon: 'bedtime',               fmt: null,                 sources: ['fitbit','garmin'] },
+    { id: 'sleep_deep_min',     label: 'Deep Sleep',      unit: 'min',   group: 'sleep',    icon: 'nights_stay',           fmt: v => Math.round(v),   sources: ['fitbit','garmin'] },
+    { id: 'sleep_light_min',    label: 'Light Sleep',     unit: 'min',   group: 'sleep',    icon: 'cloud',                 fmt: v => Math.round(v),   sources: ['fitbit','garmin'] },
+    { id: 'sleep_rem_min',      label: 'REM Sleep',       unit: 'min',   group: 'sleep',    icon: 'psychology',            fmt: v => Math.round(v),   sources: ['fitbit','garmin'] },
+    { id: 'sleep_wake_min',     label: 'Awake',           unit: 'min',   group: 'sleep',    icon: 'wb_twilight',           fmt: v => Math.round(v),   sources: ['fitbit','garmin'] },
+    // Sleep — Fitbit only
+    { id: 'sleep_efficiency',   label: 'Sleep Efficiency',unit: '%',     group: 'sleep',    icon: 'battery_charging_full', fmt: v => v.toFixed(0),    sources: ['fitbit'] },
+    // Sleep — Garmin only
+    { id: 'sleep_score',        label: 'Sleep Score',     unit: '/100',  group: 'sleep',    icon: 'star',                  fmt: v => Math.round(v),   sources: ['garmin'] },
+    // Heart — both
+    { id: 'resting_hr',         label: 'Resting Heart Rate', unit: 'bpm',      group: 'heart', icon: 'favorite',        fmt: v => Math.round(v),  sources: ['fitbit','garmin'] },
+    { id: 'hrv_daily_rmssd',    label: 'HRV (RMSSD)',        unit: 'ms',       group: 'heart', icon: 'monitor_heart',   fmt: v => v.toFixed(1),   sources: ['fitbit','garmin'] },
+    { id: 'spo2_avg',           label: 'SpO2',               unit: '%',        group: 'heart', icon: 'water_drop',      fmt: v => v.toFixed(1),   sources: ['fitbit','garmin'] },
+    { id: 'respiratory_rate',   label: 'Respiratory Rate',   unit: 'brpm',     group: 'heart', icon: 'air',             fmt: v => v.toFixed(1),   sources: ['fitbit','garmin'] },
+    // Heart — Fitbit only
+    { id: 'vo2_max',            label: 'VO2 Max',            unit: 'mL/kg/min',group: 'heart', icon: 'fitness_center',  fmt: v => v.toFixed(1),   sources: ['fitbit'] },
   ];
+
+  // Returns true if at least one of this metric's source integrations is enabled
+  function isSourceEnabled(m) {
+    if (!m.sources) return true;
+    return m.sources.some(s =>
+      (s === 'fitbit'   && $fitbitEnabled)  ||
+      (s === 'garmin'   && $garminEnabled)  ||
+      (s === 'withings' && $withingsEnabled)
+    );
+  }
 
   function isVisible(metricId) {
     const vis = $wellnessMetrics;
@@ -872,7 +889,7 @@
           <!-- ── Movement tab ── -->
           {#if activeTab === 'movement'}
             <div class="metric-grid">
-              {#each ALL_METRICS.filter(m => m.group === 'movement' && isVisible(m.id)) as m}
+              {#each ALL_METRICS.filter(m => m.group === 'movement' && isVisible(m.id) && isSourceEnabled(m)) as m}
                 {@const fmt = fmtMetric(m, displayData[m.id])}
                 <div class="metric-card" class:no-data={fmt == null && !loadingData} class:celebrating={_celebratingMetrics.has(m.id)}>
                   <div class="metric-icon-wrap">
@@ -928,7 +945,7 @@
               </div>
             {/if}
             <div class="metric-grid">
-              {#each ALL_METRICS.filter(m => m.group === 'sleep' && isVisible(m.id)) as m}
+              {#each ALL_METRICS.filter(m => m.group === 'sleep' && isVisible(m.id) && isSourceEnabled(m)) as m}
                 {@const fmt = fmtMetric(m, displayData[m.id])}
                 <div class="metric-card" class:no-data={fmt == null && !loadingData} class:celebrating={_celebratingMetrics.has(m.id)}>
                   <div class="metric-icon-wrap">
@@ -951,7 +968,7 @@
           <!-- ── Heart tab ── -->
           {:else if activeTab === 'heart'}
             <div class="metric-grid">
-              {#each ALL_METRICS.filter(m => m.group === 'heart' && isVisible(m.id)) as m}
+              {#each ALL_METRICS.filter(m => m.group === 'heart' && isVisible(m.id) && isSourceEnabled(m)) as m}
                 {@const fmt = fmtMetric(m, displayData[m.id])}
                 <div class="metric-card" class:no-data={fmt == null && !loadingData} class:celebrating={_celebratingMetrics.has(m.id)}>
                   <div class="metric-icon-wrap">
