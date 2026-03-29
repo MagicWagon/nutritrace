@@ -83,6 +83,13 @@ function restoreFromZip(zip) {
       VALUES (@id, @user_id, @role, @content, @created_at)
     `);
     for (const m of data.ai_chat_history || []) insChat.run(m);
+
+    db.prepare('DELETE FROM wellness_data').run();
+    const insWellness = db.prepare(`
+      INSERT OR IGNORE INTO wellness_data (id, user_id, date, source, metric_type, value, metadata, synced_at, device_model)
+      VALUES (@id, @user_id, @date, @source, @metric_type, @value, @metadata, @synced_at, @device_model)
+    `);
+    for (const w of data.wellness_data || []) insWellness.run(w);
   })();
 
   // Restore images
@@ -110,6 +117,7 @@ function dumpDatabase() {
     user_settings:    db.prepare('SELECT * FROM user_settings').all(),
     app_config:       db.prepare('SELECT * FROM app_config').all(),
     ai_chat_history:  db.prepare('SELECT * FROM ai_chat_history').all(),
+    wellness_data:    db.prepare('SELECT * FROM wellness_data').all(),
   };
 }
 
