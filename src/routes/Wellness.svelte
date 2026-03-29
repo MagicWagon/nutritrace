@@ -1,6 +1,6 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
-  import { wellnessMetrics, wellnessSyncMode, wellnessSyncRange, distUnit, pageBanners, dateFormat, withingsSyncRange as withingsSyncRangeSetting, fitbitEnabled, withingsEnabled, weightUnit, goals, goalCelebrations, disableAnimations } from '../stores/settings.js';
+  import { wellnessMetrics, wellnessSyncMode, wellnessSyncRange, distUnit, pageBanners, dateFormat, withingsSyncRange as withingsSyncRangeSetting, fitbitEnabled, withingsEnabled, garminEnabled, garminSyncRange as garminSyncRangeSetting, weightUnit, goals, goalCelebrations, disableAnimations } from '../stores/settings.js';
   import Chart from 'chart.js/auto';
   import WellnessBanner from '../components/banners/WellnessBanner.svelte';
   import { showSuccess, showError } from '../stores/toast.js';
@@ -9,6 +9,7 @@
   import { portal } from '../lib/portal.js';
   import FitbitIcon from '../components/icons/FitbitIcon.svelte';
   import WithingsIcon from '../components/icons/WithingsIcon.svelte';
+  import GarminIcon from '../components/icons/GarminIcon.svelte';
 
   // ── Metric definitions ─────────────────────────────────────────────────────
   const ALL_METRICS = [
@@ -64,6 +65,12 @@
   let withingsLastSync   = null;
   let withingsConnecting = false;
 
+  // Garmin state
+  let garminStatus     = null;
+  let garminData       = {};
+  let garminSyncing    = false;
+  let garminConnecting = false;
+
   // ── Unit helpers ───────────────────────────────────────────────────────────
   $: du = $distUnit || 'km';
 
@@ -107,7 +114,7 @@
 
   const BODY_SCORE_METRICS = [
     { id: 'vascular_age',       label: 'Vascular Age',     unit: 'yrs',  icon: 'cardiology',   fmt: v => Math.round(v) },
-    { id: 'nerve_health_score', label: 'Nerve Health',     unit: '/100', icon: 'neurology',     fmt: v => Math.round(v) },
+    { id: 'nerve_health_score', label: 'Nerve Activity',   unit: ' µS',  icon: 'neurology',     fmt: v => Math.round(v) },
     { id: 'pulse_wave_velocity',label: 'Pulse Wave Vel.',  unit: 'm/s',  icon: 'show_chart',    fmt: v => v.toFixed(1) },
   ];
 
@@ -190,6 +197,69 @@
       withingsStatus = { ...withingsStatus, connected: false };
       withingsData = {};
       showSuccess('Disconnected from Withings');
+    } catch(e) { showError(e.message); }
+  }
+
+  // ── Garmin ─────────────────────────────────────────────────────────────────
+  // Garmin-specific metrics (supplements the shared ALL_METRICS)
+  const GARMIN_METRICS = [
+    { id: 'body_battery_high', label: 'Body Battery (Peak)', unit: '',    icon: 'battery_full',    fmt: v => Math.round(v) },
+    { id: 'body_battery_low',  label: 'Body Battery (Low)',  unit: '',    icon: 'battery_alert',   fmt: v => Math.round(v) },
+    { id: 'stress_avg',        label: 'Avg Stress',          unit: '/100',icon: 'sentiment_stressed', fmt: v => Math.round(v) },
+  ];
+
+  async function initGarmin() {
+    try {
+      garminStatus = await NtApi.get('/api/wellness/garmin/status');
+    } catch { garminStatus = { connected: false, configured: false }; }
+    if (garminStatus.connected) await loadGarminData();
+  }
+
+  async function loadGarminData() {
+    try {
+      const result = await NtApi.get(`/api/wellness/garmin/data?date=${dateStr}`);
+      garminData = result[dateStr] || {};
+    } catch { garminData = {}; }
+  }
+
+  async function syncGarmin(silent = false) {
+    if (garminSyncing) return;
+    garminSyncing = true;
+    try {
+      const range = $garminSyncRangeSetting || 1;
+      let from = dateStr, to = dateStr;
+      if (!silent && range > 1) {
+        const end = new Date(dateStr + 'T12:00:00');
+        const start = new Date(end);
+        start.setDate(start.getDate() - (range - 1));
+        from = start.toISOString().slice(0, 10);
+      }
+      const result = await NtApi.post('/api/wellness/garmin/sync', { from, to });
+      await loadGarminData();
+      if (!silent) showSuccess(`Synced ${result.synced ?? 0} day${result.synced === 1 ? '' : 's'} from Garmin`);
+    } catch(e) {
+      if (!silent) showError('Garmin sync failed: ' + e.message);
+    }
+    garminSyncing = false;
+  }
+
+  async function connectGarmin() {
+    garminConnecting = true;
+    try {
+      const { url } = await NtApi.get('/api/wellness/garmin/authorize');
+      window.location.href = url;
+    } catch(e) {
+      showError(e.message || 'Could not start Garmin authorization');
+      garminConnecting = false;
+    }
+  }
+
+  async function disconnectGarmin() {
+    try {
+      await NtApi.del('/api/wellness/garmin/disconnect');
+      garminStatus = { ...garminStatus, connected: false };
+      garminData = {};
+      showSuccess('Disconnected from Garmin');
     } catch(e) { showError(e.message); }
   }
 
@@ -329,15 +399,15 @@
   $: if (activeTab === 'trends') { trendsRange; loadTrends(); }
 
   // ── Integration availability ───────────────────────────────────────────────
-  // Tab visibility: driven by the Settings toggle (enabled) not connection state.
-  // Connection state is handled per-tab (shows connect card when toggled on but not yet auth'd).
   $: fitbitAvailable   = $fitbitEnabled;
   $: withingsAvailable = $withingsEnabled;
-  $: anyAvailable      = fitbitAvailable || withingsAvailable;
+  $: garminAvailable   = $garminEnabled;
+  $: anyAvailable      = fitbitAvailable || withingsAvailable || garminAvailable;
 
   // Sliding pill: ordered list of visible tabs + active index
+  // Garmin contributes to movement/sleep/heart tabs alongside Fitbit
   $: _wlTabList = [
-    ...(fitbitAvailable  ? ['movement', 'sleep', 'heart'] : []),
+    ...(fitbitAvailable || garminAvailable ? ['movement', 'sleep', 'heart'] : []),
     ...(withingsAvailable ? ['body'] : []),
     'trends',
   ];
@@ -346,10 +416,10 @@
   $: _wlPillLeft   = `calc(4px + ${_wlActiveIdx} * (100% - 8px) / ${_wlTabList.length})`;
 
   // Auto-correct activeTab when an integration's availability changes
-  $: if (status !== null && withingsStatus !== null) {
-    const isFitbitTab = activeTab === 'movement' || activeTab === 'sleep' || activeTab === 'heart';
-    if (isFitbitTab && !fitbitAvailable) activeTab = withingsAvailable ? 'body' : 'trends';
-    if (activeTab === 'body' && !withingsAvailable) activeTab = fitbitAvailable ? 'movement' : 'trends';
+  $: if (status !== null && withingsStatus !== null && garminStatus !== null) {
+    const isActivityTab = activeTab === 'movement' || activeTab === 'sleep' || activeTab === 'heart';
+    if (isActivityTab && !fitbitAvailable && !garminAvailable) activeTab = withingsAvailable ? 'body' : 'trends';
+    if (activeTab === 'body' && !withingsAvailable) activeTab = (fitbitAvailable || garminAvailable) ? 'movement' : 'trends';
   }
 
   // ── Date navigation ────────────────────────────────────────────────────────
@@ -466,8 +536,9 @@
     } catch { status = { connected: false, configured: false }; }
 
     await initWithings();
+    await initGarmin();
 
-    if (status.connected) {
+    if (status.connected || garminStatus?.connected) {
       await loadData();
       // Auto-sync on open if sync mode = auto and it's today
       if ($wellnessSyncMode === 'auto' && isToday) {
@@ -475,7 +546,8 @@
         const last = localStorage.getItem(key);
         const cooldownMs = 15 * 60 * 1000; // 15 minutes
         if (!last || Date.now() - Number(last) > cooldownMs) {
-          await sync(true);
+          if (status.connected)       await sync(true);
+          if (garminStatus?.connected) await syncGarmin(true);
         }
       }
     } else {
@@ -490,7 +562,8 @@
       data = byDate[dateStr] || {};
     } catch { data = {}; }
     await loadWithingsData();
-    _checkWellnessGoals(data, withingsData);
+    await loadGarminData();
+    _checkWellnessGoals({ ...garminData, ...data }, withingsData);
     loadingData = false;
   }
 
@@ -566,6 +639,12 @@
     } else if (params.get('withings') === 'error') {
       showError('Withings: ' + (params.get('msg') || 'Authorization failed'));
       history.replaceState({}, '', '/#/wellness');
+    } else if (params.get('garmin') === 'connected') {
+      history.replaceState({}, '', '/#/wellness');
+      showSuccess('Garmin connected!');
+    } else if (params.get('garmin') === 'error') {
+      showError('Garmin: ' + (params.get('msg') || 'Authorization failed'));
+      history.replaceState({}, '', '/#/wellness');
     }
     init();
   });
@@ -600,8 +679,17 @@
     _prevCombinedData = { ...combined };
   }
 
+  // ── Merged display data: Fitbit first, Garmin as fallback ────────────────────
+  $: displayData = (() => {
+    const merged = { ...garminData };
+    for (const [k, v] of Object.entries(data)) {
+      if (v != null) merged[k] = v; // Fitbit wins when it has a value
+    }
+    return merged;
+  })();
+
   // ── Sleep stage breakdown ──────────────────────────────────────────────────
-  $: sleepTotal = (data.sleep_deep_min || 0) + (data.sleep_light_min || 0) + (data.sleep_rem_min || 0) + (data.sleep_wake_min || 0);
+  $: sleepTotal = (displayData.sleep_deep_min || 0) + (displayData.sleep_light_min || 0) + (displayData.sleep_rem_min || 0) + (displayData.sleep_wake_min || 0);
   $: sleepStages = [
     { label: 'Deep',  key: 'sleep_deep_min',  color: '#6366f1' },
     { label: 'REM',   key: 'sleep_rem_min',   color: '#8b5cf6' },
@@ -638,6 +726,17 @@
           <span class="material-symbols-rounded wl-spin-icon">sync</span>
         {:else}
           <span class="wl-brand-icon"><WithingsIcon /></span>
+        {/if}
+      </button>
+    {/if}
+    {#if garminStatus?.connected}
+      <button class="wl-sync-icon-btn" class:wl-syncing={garminSyncing}
+        on:click={() => syncGarmin()} disabled={garminSyncing}
+        title="Sync Garmin{garminStatus.garminUserId ? ' · ' + garminStatus.garminUserId : ''}">
+        {#if garminSyncing}
+          <span class="material-symbols-rounded wl-spin-icon">sync</span>
+        {:else}
+          <span class="wl-brand-icon"><GarminIcon /></span>
         {/if}
       </button>
     {/if}
@@ -760,7 +859,7 @@
           {#if activeTab === 'movement'}
             <div class="metric-grid">
               {#each ALL_METRICS.filter(m => m.group === 'movement' && isVisible(m.id)) as m}
-                {@const fmt = fmtMetric(m, data[m.id])}
+                {@const fmt = fmtMetric(m, displayData[m.id])}
                 <div class="metric-card" class:no-data={fmt == null && !loadingData} class:celebrating={_celebratingMetrics.has(m.id)}>
                   <div class="metric-icon-wrap">
                     <span class="material-symbols-rounded metric-icon">{m.icon}</span>
@@ -786,17 +885,17 @@
                 <div class="sleep-stages-header">
                   <span class="material-symbols-rounded" style="color:var(--accent)">bar_chart</span>
                   <span class="sleep-stages-title">Sleep Stages</span>
-                  {#if data.sleep_duration_min != null}
-                    {@const s = fmtSleep(data.sleep_duration_min)}
+                  {#if displayData.sleep_duration_min != null}
+                    {@const s = fmtSleep(displayData.sleep_duration_min)}
                     <span class="sleep-total">{s.value}</span>
                   {/if}
                 </div>
                 {#if sleepTotal > 0}
                   <div class="stage-bar">
                     {#each sleepStages as stage}
-                      {@const pct = sleepTotal > 0 ? ((data[stage.key] || 0) / sleepTotal * 100) : 0}
+                      {@const pct = sleepTotal > 0 ? ((displayData[stage.key] || 0) / sleepTotal * 100) : 0}
                       {#if pct > 0}
-                        <div class="stage-seg" style="width:{pct.toFixed(1)}%;background:{stage.color}" title="{stage.label}: {Math.round(data[stage.key] || 0)} min"></div>
+                        <div class="stage-seg" style="width:{pct.toFixed(1)}%;background:{stage.color}" title="{stage.label}: {Math.round(displayData[stage.key] || 0)} min"></div>
                       {/if}
                     {/each}
                   </div>
@@ -805,7 +904,7 @@
                       <div class="stage-legend-item">
                         <span class="stage-dot" style="background:{stage.color}"></span>
                         <span class="stage-leg-label">{stage.label}</span>
-                        <span class="stage-leg-val">{data[stage.key] != null ? Math.round(data[stage.key]) + ' min' : '—'}</span>
+                        <span class="stage-leg-val">{displayData[stage.key] != null ? Math.round(displayData[stage.key]) + ' min' : '—'}</span>
                       </div>
                     {/each}
                   </div>
@@ -816,7 +915,7 @@
             {/if}
             <div class="metric-grid">
               {#each ALL_METRICS.filter(m => m.group === 'sleep' && isVisible(m.id)) as m}
-                {@const fmt = fmtMetric(m, data[m.id])}
+                {@const fmt = fmtMetric(m, displayData[m.id])}
                 <div class="metric-card" class:no-data={fmt == null && !loadingData} class:celebrating={_celebratingMetrics.has(m.id)}>
                   <div class="metric-icon-wrap">
                     <span class="material-symbols-rounded metric-icon">{m.icon}</span>
@@ -839,7 +938,7 @@
           {:else if activeTab === 'heart'}
             <div class="metric-grid">
               {#each ALL_METRICS.filter(m => m.group === 'heart' && isVisible(m.id)) as m}
-                {@const fmt = fmtMetric(m, data[m.id])}
+                {@const fmt = fmtMetric(m, displayData[m.id])}
                 <div class="metric-card" class:no-data={fmt == null && !loadingData} class:celebrating={_celebratingMetrics.has(m.id)}>
                   <div class="metric-icon-wrap">
                     <span class="material-symbols-rounded metric-icon" style="color:#ef4444">{m.icon}</span>
@@ -857,14 +956,39 @@
                 </div>
               {/each}
             </div>
+            <!-- Garmin-specific: Body Battery + Stress -->
+            {#if garminStatus?.connected && GARMIN_METRICS.some(m => garminData[m.id] != null)}
+              <div class="card" style="margin-top:12px;padding:16px">
+                <div class="sleep-stages-header" style="margin-bottom:12px">
+                  <span class="wl-brand-icon" style="font-size:16px;color:var(--accent)"><GarminIcon /></span>
+                  <span class="sleep-stages-title">Garmin</span>
+                </div>
+                <div class="metric-grid">
+                  {#each GARMIN_METRICS as m}
+                    {@const raw = garminData[m.id]}
+                    {#if raw != null}
+                      <div class="metric-card">
+                        <div class="metric-icon-wrap">
+                          <span class="material-symbols-rounded metric-icon">{m.icon}</span>
+                        </div>
+                        <div class="metric-body">
+                          <span class="metric-label">{m.label}</span>
+                          <span class="metric-value">{m.fmt(raw)}<span class="metric-unit">{m.unit}</span></span>
+                        </div>
+                      </div>
+                    {/if}
+                  {/each}
+                </div>
+              </div>
+            {/if}
           {/if}
 
-          <!-- Empty state for Fitbit tabs -->
-          {#if !loadingData && Object.keys(data).length === 0}
+          <!-- Empty state for activity tabs -->
+          {#if !loadingData && Object.keys(displayData).length === 0}
             <div class="empty-state">
               <span class="material-symbols-rounded" style="font-size:48px;opacity:0.18">monitor_heart</span>
               <p>No data for {isToday ? 'today' : fmtDate(dateStr)}.</p>
-              <p class="text-3 text-sm">Tap <strong>Sync</strong> to pull the latest from Fitbit.</p>
+              <p class="text-3 text-sm">Tap <strong>Sync</strong> to pull the latest from your device.</p>
             </div>
           {/if}
         {/if}

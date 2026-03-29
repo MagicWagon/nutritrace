@@ -25,6 +25,7 @@ const SERVER_SETTINGS = new Set([
   'mealieEnabled','mealieBaseUrl','mealieApiToken',
   'wellnessEnabled','fitbitEnabled','wellnessMetrics','wellnessSyncMode','wellnessSyncRange',
   'withingsEnabled','withingsSyncRange','withingsDataPriority',
+  'garminEnabled','garminSyncRange',
   // Appearance / UI prefs — included so full backups restore the full look-and-feel
   'appearance','accentColor',
   'navStyle','sidebarPersistent','startPage','disableAnimations','goalCelebrations','pageBanners','loopBannerAnimations',
@@ -234,6 +235,9 @@ export const withingsDataPriority = createSettingStore('withingsDataPriority', {
   sleep:    'fitbit',
   heart:    'fitbit',
 });
+
+export const garminEnabled   = createSettingStore('garminEnabled',   false);
+export const garminSyncRange = createSettingStore('garminSyncRange', 7);
 
 // FitBot AI
 export const aiEnabled       = createSettingStore('aiEnabled',       false);

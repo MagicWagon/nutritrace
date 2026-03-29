@@ -124,6 +124,14 @@ db.exec(`
     withings_user_id TEXT
   );
 
+  -- OAuth 1.0a tokens (no expiry — revoke by deleting)
+  CREATE TABLE IF NOT EXISTS garmin_tokens (
+    user_id        INTEGER PRIMARY KEY,
+    access_token   TEXT NOT NULL,
+    access_secret  TEXT NOT NULL,
+    garmin_user_id TEXT
+  );
+
   CREATE TABLE IF NOT EXISTS ai_chat_history (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE,

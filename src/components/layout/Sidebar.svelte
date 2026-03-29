@@ -4,7 +4,7 @@
   import { location, push } from 'svelte-spa-router';
   import { createEventDispatcher } from 'svelte';
   import { currentUser, userMgmtActive, logout } from '../../stores/auth.js';
-  import { wellnessEnabled, fitbitEnabled, withingsEnabled } from '../../stores/settings.js';
+  import { wellnessEnabled, fitbitEnabled, withingsEnabled, garminEnabled } from '../../stores/settings.js';
   import WellnessIcon from '../icons/WellnessIcon.svelte';
 
   export let open = false;
@@ -31,7 +31,7 @@
 
   const WELLNESS_NAV = { path: '/wellness', customIcon: WellnessIcon, label: 'Wellness' };
 
-  $: showWellness = $wellnessEnabled && ($fitbitEnabled || $withingsEnabled);
+  $: showWellness = $wellnessEnabled && ($fitbitEnabled || $withingsEnabled || $garminEnabled);
   $: navItems = showWellness
     ? [...BASE_NAV.slice(0, 2), WELLNESS_NAV, ...BASE_NAV.slice(2)]
     : BASE_NAV;
@@ -118,14 +118,14 @@
           </div>
           <div class="user-info">
             <span class="user-name">{$currentUser.full_name || $currentUser.username}</span>
-            <span class="sidebar-version">v0.18.0-beta</span>
+            <span class="sidebar-version">v0.19.0-beta</span>
           </div>
           <button class="btn-icon logout-btn" on:click={handleLogout} title="Sign out" aria-label="Sign out">
             <span class="material-symbols-rounded">logout</span>
           </button>
         </div>
       {:else}
-        <span class="sidebar-version">v0.18.0-beta</span>
+        <span class="sidebar-version">v0.19.0-beta</span>
       {/if}
     </div>
   </aside>

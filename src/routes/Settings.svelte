@@ -26,6 +26,7 @@
     waterGoalMl, waterUnit, waterContainers, waterShowInStats, waterShowInDiary,
     wellnessEnabled, fitbitEnabled, wellnessMetrics, wellnessSyncMode, wellnessSyncRange,
     withingsSyncRange, withingsEnabled,
+    garminEnabled, garminSyncRange,
   } from '../stores/settings.js';
   import { mealIcon } from '../lib/mealIcon.js';
   import { DB } from '../lib/db.js';
@@ -60,7 +61,7 @@
     statistics:        ['statistics','chart','y-axis','average','goal line','trend','stats'],
     connectedServices: ['connected services','usda','open food facts','mealie','recipe','search language','country','api key','credentials','username','password'],
     ai:                ['ai','fitbot','assistant','provider','model','api key','artificial intelligence','chat'],
-    wellness:          ['wellness','activity tracking','fitbit','withings','steps','sleep','heart rate','hrv','spo2','sync mode','sync range','connect','disconnect','connected devices','fitness tracker'],
+    wellness:          ['wellness','activity tracking','fitbit','withings','garmin','steps','sleep','heart rate','hrv','spo2','sync mode','sync range','connect','disconnect','connected devices','fitness tracker','body battery','stress'],
     labs:              ['labs','experimental','client id','client secret','redirect uri','api credentials'],
     backup:            ['backup','export','import','restore','waistline','csv','clear data','json','full backup','images','zip'],
     email:             ['email','smtp','mail','password reset','invites','notifications'],
@@ -342,6 +343,7 @@
     labsLoaded = true;
     labsFitbitRedirectSuggested = window.location.origin + '/api/wellness/fitbit/callback';
     labsWithingsRedirectSuggested = window.location.origin + '/api/wellness/withings/callback';
+    labsGarminRedirectSuggested = window.location.origin + '/api/wellness/garmin/callback';
     // Load per-user credential config
     try {
       const cfg = await NtApi.get('/api/wellness/fitbit/config');
@@ -365,9 +367,16 @@
         if (!labsWithingsRedirectUri)  labsWithingsRedirectUri  = cfg.withings_redirect_uri  || '';
       } catch { /* ignore */ }
     }
+    // Load Garmin config
+    try {
+      const cfg = await NtApi.get('/api/wellness/garmin/config');
+      labsGarminConsumerKey = cfg.consumer_key  || '';
+      labsGarminRedirectUri = cfg.redirect_uri  || '';
+    } catch { /* ignore */ }
     // Load connection status for all users
-    try { fitbitConnectionStatus  = await NtApi.get('/api/wellness/fitbit/status');  } catch { fitbitConnectionStatus  = { connected: false }; }
+    try { fitbitConnectionStatus   = await NtApi.get('/api/wellness/fitbit/status');   } catch { fitbitConnectionStatus   = { connected: false }; }
     try { withingsConnectionStatus = await NtApi.get('/api/wellness/withings/status'); } catch { withingsConnectionStatus = { connected: false }; }
+    try { garminConnectionStatus   = await NtApi.get('/api/wellness/garmin/status');   } catch { garminConnectionStatus   = { connected: false }; }
   }
 
   async function disconnectFitbitFromSettings() {
@@ -440,6 +449,56 @@
   let labsWithingsShowSecret   = false;
   let labsWithingsRedirectSuggested = '';
   let withingsSyncRangeVal = DB.getSetting('withingsSyncRange', 7);
+
+  // ── Garmin ─────────────────────────────────────────────────────────────────
+  let garminEnabledVal     = DB.getSetting('garminEnabled',   false);
+  let garminSyncRangeVal   = DB.getSetting('garminSyncRange', 7);
+  let labsGarminConsumerKey    = '';
+  let labsGarminConsumerSecret = '';
+  let labsGarminRedirectUri    = '';
+  let labsGarminShowSecret     = false;
+  let labsGarminRedirectSuggested = '';
+  let garminConnectionStatus = null;
+  let disconnectingGarmin    = false;
+  let connectingGarmin       = false;
+
+  async function disconnectGarminFromSettings() {
+    disconnectingGarmin = true;
+    try {
+      await NtApi.del('/api/wellness/garmin/disconnect');
+      garminConnectionStatus = { ...garminConnectionStatus, connected: false };
+      showSuccess('Disconnected from Garmin');
+    } catch(e) { showError(e.message); }
+    disconnectingGarmin = false;
+  }
+
+  async function connectGarminFromSettings() {
+    connectingGarmin = true;
+    try {
+      const { url } = await NtApi.get('/api/wellness/garmin/authorize');
+      window.location.href = url;
+    } catch(e) {
+      showError(e.message || 'Could not start Garmin authorization');
+      connectingGarmin = false;
+    }
+  }
+
+  async function saveLabsGarmin() {
+    try {
+      await NtApi.put('/api/wellness/garmin/config', {
+        consumer_key:    labsGarminConsumerKey,
+        consumer_secret: labsGarminConsumerSecret || undefined,
+        redirect_uri:    labsGarminRedirectUri,
+      });
+      garminConnectionStatus = null;
+      garminConnectionStatus = await NtApi.get('/api/wellness/garmin/status');
+      showSuccess('Garmin credentials saved');
+    } catch(e) { showError('Failed to save: ' + e.message); }
+  }
+
+  function copyGarminRedirectUri() {
+    navigator.clipboard.writeText(labsGarminRedirectUri || labsGarminRedirectSuggested).then(() => showSuccess('Copied'));
+  }
 
   async function saveLabsWithings() {
     try {
@@ -2443,6 +2502,117 @@
           </div>
         {/if}
 
+          <!-- ── Garmin (Experimental) ── -->
+          <p class="sub-label" style="padding-top:16px">
+            Garmin
+            <span class="labs-badge" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">Experimental</span>
+          </p>
+          <div class="card settings-card">
+            <div class="setting-row">
+              <div>
+                <span class="setting-label">Enable Garmin</span>
+                <div class="setting-desc">Steps, sleep, heart rate, HRV, SpO2, Body Battery, stress. Requires the <strong>Garmin Health API</strong> partnership (apply at developer.garmin.com).</div>
+              </div>
+              <Toggle checked={garminEnabledVal} on:change={e => { garminEnabledVal = e.detail; garminEnabled.set(e.detail); loadLabsConfig(); }} />
+            </div>
+
+            {#if garminEnabledVal}
+              <div class="setting-divider"></div>
+              <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px">
+                <div>
+                  <span class="setting-label">Sync Range</span>
+                  <div class="setting-desc">How far back the manual Sync button fetches.</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                  <div class="chip-group">
+                    {#each SYNC_RANGE_OPTIONS as opt}
+                      <button class="chip" class:chip-active={garminSyncRangeVal === opt.value}
+                        on:click={() => { garminSyncRangeVal = opt.value; garminSyncRange.set(opt.value); }}
+                      >{opt.label}</button>
+                    {/each}
+                  </div>
+                  <div style="display:flex;align-items:center;gap:4px">
+                    <input class="input" type="number" min="1" max="730" style="width:64px;height:32px;padding:0 8px;font-size:13px;text-align:center"
+                      class:input-active={!SYNC_RANGE_OPTIONS.some(o => o.value === garminSyncRangeVal)}
+                      value={garminSyncRangeVal}
+                      on:change={e => { const v = Math.max(1, parseInt(e.target.value)||1); garminSyncRangeVal = v; garminSyncRange.set(v); }}
+                      placeholder="days" title="Custom number of days" />
+                    <span class="setting-desc" style="margin:0">days</span>
+                  </div>
+                </div>
+              </div>
+              <div class="setting-divider"></div>
+              {#if garminConnectionStatus === null}
+                <div class="setting-row">
+                  <span class="setting-desc">Loading connection status…</span>
+                </div>
+              {:else if garminConnectionStatus.connected}
+                <div class="setting-row">
+                  <div>
+                    <span class="setting-label">Connected</span>
+                    <div class="setting-desc">
+                      {garminConnectionStatus.garminUserId || 'Garmin account linked'}
+                      {#if garminConnectionStatus.lastSyncedAt}
+                        · Last synced {_timeAgo(garminConnectionStatus.lastSyncedAt)}
+                      {/if}
+                    </div>
+                  </div>
+                  <button class="btn btn-ghost" style="height:32px;padding:0 12px;font-size:13px;color:var(--error,#f87171);border-color:var(--error,#f87171)"
+                    on:click={disconnectGarminFromSettings} disabled={disconnectingGarmin}>
+                    {disconnectingGarmin ? 'Disconnecting…' : 'Disconnect'}
+                  </button>
+                </div>
+              {:else if garminConnectionStatus.configured}
+                <div class="setting-row">
+                  <div>
+                    <span class="setting-label">Not connected</span>
+                    <div class="setting-desc">Authorize NutriTrace to read your Garmin data.</div>
+                  </div>
+                  <button class="btn btn-primary" style="height:32px;padding:0 12px;font-size:13px" on:click={connectGarminFromSettings} disabled={connectingGarmin}>
+                    {connectingGarmin ? 'Connecting…' : 'Connect'}
+                  </button>
+                </div>
+              {:else}
+                <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:12px">
+                  <div>
+                    <span class="setting-label">API Credentials</span>
+                    <div class="setting-desc">Apply for the <strong>Garmin Health API</strong> at <strong>developer.garmin.com/health-api</strong>. Once approved, paste your Consumer Key and Secret below. Garmin uses OAuth 1.0a — the redirect URI must match exactly.</div>
+                  </div>
+                  <div style="width:100%;display:flex;flex-direction:column;gap:8px">
+                    <div class="form-group" style="margin:0">
+                      <label class="form-label">Consumer Key</label>
+                      <input class="input" type="text" autocomplete="off" placeholder="Your Garmin Consumer Key"
+                        bind:value={labsGarminConsumerKey} />
+                    </div>
+                    <div class="form-group" style="margin:0">
+                      <label class="form-label">Consumer Secret</label>
+                      <div style="display:flex;gap:6px">
+                        {#if labsGarminShowSecret}
+                          <input class="input" type="text" autocomplete="new-password" placeholder="••••••••" bind:value={labsGarminConsumerSecret} style="flex:1" />
+                        {:else}
+                          <input class="input" type="password" autocomplete="new-password" placeholder="••••••••" bind:value={labsGarminConsumerSecret} style="flex:1" />
+                        {/if}
+                        <button class="btn-icon" on:click={() => labsGarminShowSecret = !labsGarminShowSecret} title={labsGarminShowSecret ? 'Hide' : 'Show'}>
+                          <span class="material-symbols-rounded">{labsGarminShowSecret ? 'visibility_off' : 'visibility'}</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="form-group" style="margin:0">
+                      <label class="form-label">Redirect URI</label>
+                      <div class="setting-desc" style="margin-bottom:4px">Register this exact URI in your Garmin app settings</div>
+                      <div style="display:flex;gap:6px">
+                        <input class="input" type="url" placeholder={labsGarminRedirectSuggested} bind:value={labsGarminRedirectUri} style="flex:1;font-size:12px" />
+                        <button class="btn-icon" on:click={copyGarminRedirectUri} title="Copy URI"><span class="material-symbols-rounded">content_copy</span></button>
+                      </div>
+                      <div class="setting-desc" style="font-size:11px;margin-top:2px">Format: <code style="font-size:11px">https://your-domain.com/api/wellness/garmin/callback</code></div>
+                    </div>
+                    <button class="btn btn-primary" style="align-self:flex-end" on:click={saveLabsGarmin}>Save &amp; Connect</button>
+                  </div>
+                </div>
+              {/if}
+            {/if}
+          </div>
+
       </div>
     {/if}
 
@@ -2458,7 +2628,7 @@
           <div style="display:flex;align-items:flex-start;gap:10px;color:var(--text-2)">
             <span class="material-symbols-rounded" style="font-size:18px;flex-shrink:0;margin-top:1px">info</span>
             <span style="font-size:13px;line-height:1.5">
-              Wellness API credentials (Fitbit, Withings) are now configured per-user in
+              Wellness API credentials (Fitbit, Withings, Garmin) are now configured per-user in
               <button class="link-btn" on:click={() => { toggleSection('wellness'); loadLabsConfig(); document.querySelector('.section-toggle.wellness-toggle')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>Settings → Wellness</button>
               — each user registers their own developer app.
             </span>

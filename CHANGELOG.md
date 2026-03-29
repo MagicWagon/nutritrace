@@ -5,6 +5,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.19.0-beta] — 2026-03-29
+
+### Added
+- **Garmin integration (Experimental)** — OAuth 1.0a flow via Garmin Health API; syncs steps, distance, active minutes, calories, floors, sleep stages, resting HR, HRV, SpO2, Body Battery, and Stress score; requires a Garmin Health API partnership (not a free developer program)
+- **GarminIcon** — triangle brand mark SVG component (`currentColor`) matching the Garmin logo
+- **Garmin sync button** — appears in the fixed topbar alongside Fitbit/Withings when connected; shows GarminIcon at rest, spinning sync icon while active
+- **Garmin card in Settings → Wellness** — with purple "Experimental" badge, enable toggle, sync range chips + custom input, and inline credential setup form (Consumer Key/Secret/Redirect URI)
+- **Garmin-specific metrics in Heart tab** — Body Battery (peak/low) and Avg Stress shown in a dedicated Garmin card
+- **Merged activity display** — Fitbit data takes priority; Garmin fills in when Fitbit has no value for a metric (movement, sleep, heart tabs)
+
+### Fixed
+- **Nerve Activity (EDA) display** — Withings Body Scan nerve measurement (meastype 226) is raw electrodermal activity in µS, not a 0–100 score; unit corrected from `/100` → `µS` and label updated to "Nerve Activity" to accurately reflect what the API returns
+
+---
+
 ## [0.18.0-beta] — 2026-03-29
 
 ### Added
