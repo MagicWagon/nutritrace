@@ -259,6 +259,7 @@ async function _syncDate(u, dateStr) {
   // SpO2
   try {
     const d = await _get(u, `/1/user/-/spo2/date/${dateStr}.json`);
+    console.log('[fitbit] spo2 raw:', JSON.stringify(d));
     metrics.spo2_avg = d.value?.avg ?? null;
   } catch (e) { errors.push('spo2: ' + e.message); }
 
@@ -271,18 +272,21 @@ async function _syncDate(u, dateStr) {
   // Active Zone Minutes
   try {
     const d = await _get(u, `/1/user/-/activities/active-zone-minutes/date/${dateStr}/1d.json`);
+    console.log('[fitbit] azm raw:', JSON.stringify(d));
     metrics.active_zone_minutes = d['activities-active-zone-minutes']?.[0]?.value?.activeZoneMinutes ?? null;
   } catch (e) { errors.push('azm: ' + e.message); }
 
   // VO2 Max / Cardio Fitness Score (requires cardio_fitness scope)
   try {
     const d = await _get(u, `/1/user/-/cardioscore/date/${dateStr}/1d.json`);
+    console.log('[fitbit] cardioscore raw:', JSON.stringify(d));
     metrics.vo2_max = d['cardioScore']?.[0]?.value?.vo2Max ?? null;
   } catch (e) { errors.push('vo2max: ' + e.message); }
 
   // Sleep Score
   try {
     const d = await _get(u, `/1/user/-/sleep/score/date/${dateStr}/1d.json`);
+    console.log('[fitbit] sleep score raw:', JSON.stringify(d));
     const entry = d['sleep']?.[0] ?? d['sleepScore']?.[0];
     metrics.sleep_score = entry?.value?.sleepScore ?? entry?.value ?? null;
     if (typeof metrics.sleep_score !== 'number') metrics.sleep_score = null;
@@ -291,6 +295,7 @@ async function _syncDate(u, dateStr) {
   // Daily Readiness Score
   try {
     const d = await _get(u, `/1/user/-/readiness/date/${dateStr}/1d.json`);
+    console.log('[fitbit] readiness raw:', JSON.stringify(d));
     metrics.readiness_score = d['readinessScore']?.[0]?.value?.score ?? null;
   } catch (e) { errors.push('readiness: ' + e.message); }
 
@@ -307,6 +312,8 @@ async function _syncDate(u, dateStr) {
     }
   })();
 
+  if (errors.length) console.log(`[fitbit] sync errors for ${dateStr}:`, errors);
+  console.log('[fitbit] metrics stored:', Object.fromEntries(Object.entries(metrics).filter(([,v]) => v != null)));
   return { metrics, errors };
 }
 
