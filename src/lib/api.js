@@ -34,8 +34,8 @@ const API = {
   async contributeToOFF(food, settings) {
     const { name, barcode, brand, portion, unit, nutrition } = food;
     if (!name || !barcode) throw new Error("Name and barcode required");
-    const username = (settings && settings.offUsername) || "waistline-app";
-    const password = (settings && settings.offPassword) || "waistline";
+    const username = (settings && settings.offUsername) || "nutritrace-app";
+    const password = (settings && settings.offPassword) || "nutritrace";
     const uploadCountry = (settings && settings.offUploadCountry) || "Auto";
     const lang = (navigator.language || "en").substring(0, 2);
     let params = "code=" + encodeURIComponent(barcode);

@@ -62,7 +62,7 @@
     connectedServices: ['connected services','usda','open food facts','mealie','recipe','search language','country','api key','credentials','username','password'],
     ai:                ['ai','fitbot','assistant','provider','model','api key','artificial intelligence','chat'],
     wellness:          ['wellness','activity tracking','fitbit','withings','garmin','steps','sleep','heart rate','hrv','spo2','sync mode','sync range','connect','disconnect','connected devices','fitness tracker','body battery','stress'],
-    backup:            ['backup','export','import','restore','waistline','csv','clear data','json','full backup','images','zip'],
+    backup:            ['backup','export','import','restore','csv','clear data','json','full backup','images','zip'],
     email:             ['email','smtp','mail','password reset','invites','notifications'],
     users:             ['users','user management','accounts','login','password','admin','register','profile'],
     about:             ['about','version','nutritrace'],
@@ -929,151 +929,6 @@
       } catch(err) { showError('Import failed: ' + err.message); }
     };
     input.click();
-  }
-
-  async function importWaistline() {
-    const input = document.createElement('input');
-    input.type = 'file'; input.accept = '.json';
-    input.onchange = async (e) => {
-      const file = e.target.files[0]; if (!file) return;
-      try {
-        const text = await file.text();
-        const raw = JSON.parse(text);
-        if (!raw.foodList && !raw.diary) { showError('Not a valid Waistline export file'); return; }
-
-        const NUTR_MAP = { 'Added Sugars':'added-sugars','vitamin-b1':'b1','vitamin-b2':'b2','vitamin-b6':'b6','vitamin-b9':'b9','vitamin-b12':'b12','vitamin-pp':'b3' };
-        const mapNutrition = n => { const o={}; for(const[k,v] of Object.entries(n||{})) o[NUTR_MAP[k]||k]=parseFloat(v)||0; return o; };
-        const cleanImg = u => (u && u !== 'undefined') ? u : null;
-
-        // Upload base64 images first so diary items (which embed full food objects) are small
-        async function migrateImg(imgUrl) {
-          if (!imgUrl || !imgUrl.startsWith('data:')) return imgUrl;
-          try {
-            const blob = await fetch(imgUrl).then(r => r.blob());
-            const file = new File([blob], 'photo.jpg', { type: blob.type || 'image/jpeg' });
-            return await NtApi.uploadImage(file);
-          } catch { return ''; }
-        }
-
-        // Map foods — drop original image_url (base64) after migrating to server URL
-        const foods = await Promise.all((raw.foodList||[]).map(async f => {
-          const { image_url, ...rest } = f;
-          return { ...rest, imgUrl: await migrateImg(cleanImg(image_url)), nutrition: mapNutrition(f.nutrition) };
-        }));
-        const foodMap = Object.fromEntries((raw.foodList||[]).map((f,i) => [f.id, foods[i]]));
-
-        const resolveItems = items => (items||[]).map(item => {
-          const food = foodMap[item.id]; if(!food) return null;
-          const fPortion  = parseFloat(food.portion) || 100;
-          const iPortion  = parseFloat(item.portion) || fPortion;
-          const iQty      = parseFloat(item.quantity) || 1;
-          // Normalise to total portion × qty=1 so Nutrition.calculate is always simple
-          const factor    = (iPortion / fPortion) * iQty;
-          const totalNutrition = food.nutrition
-            ? Object.fromEntries(Object.entries(food.nutrition).map(([k,v]) => [k, (parseFloat(v)||0) * factor]))
-            : food.nutrition;
-          return { ...food, portion: iPortion * iQty, quantity: 1, nutrition: totalNutrition };
-        }).filter(Boolean);
-
-        const meals = await Promise.all((raw.meals||[]).map(async m => {
-          const { image_url, ...rest } = m;
-          return { ...rest, imgUrl: await migrateImg(cleanImg(image_url)), items: resolveItems(m.items), nutrition: {} };
-        }));
-        const recipes = await Promise.all((raw.recipes||[]).map(async r => {
-          const { image_url, ...rest } = r;
-          return { ...rest, imgUrl: await migrateImg(cleanImg(image_url)), items: resolveItems(r.items), nutrition: mapNutrition(r.nutrition) };
-        }));
-
-        await NtApi.post('/api/data/import', { foodList: foods, meals, recipes });
-
-        // Merge imported categories into the category list
-        const importedCats = [...new Set(foods.map(f => (f.categories && f.categories[0]) || f.category).filter(Boolean))];
-        if (importedCats.length) {
-          const existing = get(foodCategories) || [];
-          const existingNames = new Set(existing.map(c => _catName(c)));
-          const toAdd = importedCats.filter(n => !existingNames.has(n));
-          if (toAdd.length) foodCategories.set([...existing, ...toAdd]);
-        }
-
-        showSuccess('Waistline data imported — reloading...');
-        setTimeout(() => location.reload(), 1500);
-      } catch(err) { showError('Import failed: ' + err.message); }
-    };
-    input.click();
-  }
-
-  let repairBusy = false;
-  async function repairRecipeNutrition() {
-    repairBusy = true;
-    try {
-      const [recipes, foods] = await Promise.all([NtApi.getRecipes(), NtApi.getFoods()]);
-      // Import reassigns IDs — match by normalised name
-      const norm = s => (s||'').toLowerCase().replace(/[^a-z0-9]/g,' ').replace(/\s+/g,' ').trim();
-      const foodByName = new Map(foods.map(f => [norm(f.name), f]));
-
-      let fixed = 0;
-      for (const recipe of recipes) {
-        if (!recipe.items?.length) continue;
-        let changed = false;
-
-        const fixedItems = recipe.items.map(item => {
-          const qty      = parseFloat(item.quantity) || 1;
-          const iPortion = parseFloat(item.portion)  || 100;
-
-          // Already normalised (quantity === 1 and no food lookup needed) — skip
-          // We detect "already done" by qty==1 and nutrition already scaled
-          // Instead, always normalise: total_portion = iPortion * qty, qty = 1
-          // Scale nutrition if we can find the food's original portion
-          const food     = foodByName.get(norm(item.name));
-          const fPortion = food ? (parseFloat(food.portion) || 100) : iPortion;
-          const fNutr    = food?.nutrition;
-
-          // Compute the scaling factor: (item_portion / food_portion) × quantity
-          const factor = (iPortion / fPortion) * qty;
-
-          // Build scaled nutrition from food's per-serving values (most accurate)
-          // or fall back to scaling whatever is currently on the item
-          const baseNutrition = fNutr || item.nutrition;
-          if (!baseNutrition) return item;
-
-          const totalNutrition = Object.fromEntries(
-            Object.entries(baseNutrition).map(([k,v]) => [k, (parseFloat(v)||0) * factor])
-          );
-
-          const totalPortion = iPortion * qty;
-
-          // Only mark changed if something actually differs
-          const currentCal = parseFloat(item.nutrition?.calories) || 0;
-          const newCal     = parseFloat(totalNutrition.calories)   || 0;
-          const qtyChanged = Math.abs(qty - 1) > 0.001;
-          const calChanged = Math.abs(currentCal - newCal) / (newCal || 1) > 0.01;
-
-          // Sync imgUrl from the current food record — fixes stale/broken image paths
-          // (e.g. Android local paths from Waistline imports)
-          const correctImgUrl = food?.imgUrl ?? item.imgUrl;
-          const imgChanged = correctImgUrl !== item.imgUrl;
-
-          if (!qtyChanged && !calChanged && !imgChanged) return item;
-
-          changed = true;
-          return {
-            ...item,
-            portion: totalPortion,
-            quantity: 1,
-            nutrition: totalNutrition,
-            imgUrl: correctImgUrl,
-          };
-        });
-
-        if (changed) {
-          const totals = Nutrition.sum(fixedItems.map(i => Nutrition.calculate(i)));
-          await NtApi.updateMeal(recipe.id, { ...recipe, items: fixedItems, nutrition: totals });
-          fixed++;
-        }
-      }
-      showSuccess(fixed > 0 ? `Fixed ${fixed} recipe${fixed !== 1 ? 's' : ''}` : 'Nothing needed fixing');
-    } catch(e) { showError('Repair failed: ' + e.message); }
-    finally { repairBusy = false; }
   }
 
   async function exportCSV() {
@@ -2815,28 +2670,6 @@
         <!-- Other tools -->
         <p class="sub-label">Other</p>
         <div class="card settings-card">
-          <button class="setting-row setting-action" on:click={importWaistline}>
-            <span class="material-symbols-rounded si" style="color:var(--accent)">swap_horiz</span>
-            <div>
-              <span class="setting-label">Import from Waistline</span>
-              <div class="setting-desc">Import foods, meals &amp; recipes from the Waistline Android app</div>
-            </div>
-            <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
-          </button>
-          <div class="setting-divider"></div>
-          <button class="setting-row setting-action" on:click={repairRecipeNutrition} disabled={repairBusy}>
-            <span class="material-symbols-rounded si" style="color:var(--accent)">build</span>
-            <div>
-              <span class="setting-label">Repair recipe nutrition</span>
-              <div class="setting-desc">Fixes calorie/macro totals for recipes imported from Waistline where ingredient nutrition wasn't scaled to portion size.</div>
-            </div>
-            {#if repairBusy}
-              <span class="material-symbols-rounded spin text-3" style="font-size:18px;flex-shrink:0">autorenew</span>
-            {:else}
-              <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
-            {/if}
-          </button>
-          <div class="setting-divider"></div>
           <button class="setting-row setting-action" on:click={exportCSV}>
             <span class="material-symbols-rounded si" style="color:var(--info)">table_chart</span>
             <div>
