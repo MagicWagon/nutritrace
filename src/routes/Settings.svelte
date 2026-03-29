@@ -59,7 +59,7 @@
     bodyStats:         ['body stats','body','weight','measurements','stats'],
     statistics:        ['statistics','chart','y-axis','average','goal line','trend','stats'],
     goals:             ['goals','target','calorie goal','water goal','daily water'],
-    units:             ['units','energy unit','weight unit','height','circumference','imperial','metric'],
+    units:             ['units','energy unit','weight unit','height','circumference','distance','imperial','metric'],
     connectedServices: ['connected services','usda','open food facts','mealie','recipe','search language','country','api key','credentials','username','password'],
     ai:                ['ai','fitbot','assistant','provider','model','api key','artificial intelligence','chat'],
     labs:              ['labs','experimental','wellness','activity tracking','fitbit','fitness tracker','steps','sleep','heart rate','hrv','spo2','client id','client secret','redirect uri','sync mode'],
@@ -245,6 +245,7 @@
   let weightUnit  = DB.getSetting('weightUnit',  'lb');
   let heightUnit  = DB.getSetting('heightUnit',  'ft');
   let lengthUnit  = DB.getSetting('lengthUnit',  'in');
+  let distUnitVal = DB.getSetting('distUnit',    'km');
 
   // ── API keys ───────────────────────────────────────────────────────────────
   let usdaApiKey    = DB.getSetting('usdaApiKey',    '');
@@ -1285,6 +1286,7 @@
   $: set('weightUnit',         weightUnit);
   $: set('heightUnit',         heightUnit);
   $: set('lengthUnit',         lengthUnit);
+  $: set('distUnit',           distUnitVal);
   $: set('usdaEnabled',        usdaEnabled);
   $: set('offSearchLanguage',  offSearchLanguage);
   $: set('offSearchCountry',   offSearchCountry);
@@ -1868,6 +1870,16 @@
               <select class="select sel-sm" bind:value={lengthUnit}>
                 <option value="in">in</option>
                 <option value="cm">cm</option>
+              </select>
+            </div>
+          </div>
+          <div class="setting-divider"></div>
+          <div class="setting-row">
+            <span class="setting-label">Distance</span>
+            <div class="select-wrap" style="width:100px">
+              <select class="select sel-sm" bind:value={distUnitVal}>
+                <option value="km">km</option>
+                <option value="mi">mi</option>
               </select>
             </div>
           </div>
