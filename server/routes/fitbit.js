@@ -276,28 +276,36 @@ async function _syncDate(u, dateStr) {
     metrics.active_zone_minutes = d['activities-active-zone-minutes']?.[0]?.value?.activeZoneMinutes ?? null;
   } catch (e) { errors.push('azm: ' + e.message); }
 
-  // VO2 Max / Cardio Fitness Score
+  // VO2 Max / Cardio Fitness Score (Fitbit returns a range string like "39-43"; store midpoint)
   try {
     const d = await _get(u, `/1/user/-/cardioscore/date/${dateStr}.json`);
     console.log('[fitbit] cardioscore raw:', JSON.stringify(d));
-    metrics.vo2_max = d['cardioScore']?.[0]?.value?.vo2Max ?? null;
+    const raw = d['cardioScore']?.[0]?.value?.vo2Max ?? null;
+    if (typeof raw === 'number') {
+      metrics.vo2_max = raw;
+    } else if (typeof raw === 'string' && raw.includes('-')) {
+      const [lo, hi] = raw.split('-').map(Number);
+      metrics.vo2_max = (lo + hi) / 2;
+    } else {
+      metrics.vo2_max = raw != null ? Number(raw) : null;
+    }
   } catch (e) { errors.push('vo2max: ' + e.message); }
 
-  // Sleep Score
+  // Sleep Score (may not be available on all Fitbit accounts/plans)
   try {
     const d = await _get(u, `/1/user/-/sleep/score/date/${dateStr}.json`);
     console.log('[fitbit] sleep score raw:', JSON.stringify(d));
     const entry = d['sleep']?.[0] ?? d['sleepScore']?.[0];
     metrics.sleep_score = entry?.value?.sleepScore ?? entry?.value ?? null;
     if (typeof metrics.sleep_score !== 'number') metrics.sleep_score = null;
-  } catch (e) { errors.push('sleepscore: ' + e.message); }
+  } catch (e) { /* endpoint may not be available */ }
 
-  // Daily Readiness Score
+  // Daily Readiness Score (may not be available on all Fitbit accounts/plans)
   try {
     const d = await _get(u, `/1/user/-/readiness/date/${dateStr}.json`);
     console.log('[fitbit] readiness raw:', JSON.stringify(d));
     metrics.readiness_score = d['readinessScore']?.[0]?.value?.score ?? null;
-  } catch (e) { errors.push('readiness: ' + e.message); }
+  } catch (e) { /* endpoint may not be available */ }
 
   // Upsert all metrics
   const upsert = db.prepare(`

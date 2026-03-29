@@ -77,7 +77,10 @@ async function _wPost(userId, endpoint, params) {
   });
   if (!res.ok) throw new Error(`Withings HTTP ${res.status}`);
   const json = await res.json();
-  if (json.status !== 0) throw new Error(`Withings API error ${json.status}: ${json.error || ''}`);
+  if (json.status !== 0) {
+    console.error('[withings] API error response:', JSON.stringify(json));
+    throw new Error(`Withings API error ${json.status}: ${json.error || ''}`);
+  }
   return json.body;
 }
 
