@@ -64,8 +64,8 @@
   function toggleMetric(id) {
     const all = [
       ...ALL_METRICS.map(m => m.id),
-      'weight_kg','body_fat_pct','muscle_mass_kg','bone_mass_kg','body_water_pct','lean_mass_kg','fat_mass_kg','visceral_fat',
-      'vascular_age','heart_pulse_bpm','nerve_health_score','pulse_wave_velocity','ecg_heart_rate','ecg_afib',
+      'weight_kg','body_fat_pct','muscle_mass_kg','bone_mass_kg','body_water_pct','lean_mass_kg','fat_mass_kg','visceral_fat','visceral_fat_index','extracellular_water_kg','intracellular_water_kg',
+      'vascular_age','heart_pulse_bpm','nerve_health_score','pulse_wave_velocity','ecg_heart_rate','ecg_afib','metabolic_age',
       'body_battery_high','body_battery_low','stress_avg',
       'segmental_analysis',
     ];
@@ -139,13 +139,17 @@
     { id: 'muscle_mass_kg',label: 'Muscle Mass',  unit: '', icon: 'fitness_center',   fmt: null },
     { id: 'bone_mass_kg',  label: 'Bone Mass',    unit: '', icon: 'emergency',         fmt: v => v.toFixed(2) },
     { id: 'body_water_pct',label: 'Body Water',   unit: '', icon: 'water_drop',       fmt: null },
-    { id: 'lean_mass_kg',  label: 'Lean Mass',    unit: '', icon: 'person',            fmt: null },
-    { id: 'fat_mass_kg',   label: 'Fat Mass',     unit: '', icon: 'scale',             fmt: null },
-    { id: 'visceral_fat',  label: 'Visceral Fat', unit: '', icon: 'favorite_border',  fmt: v => v.toFixed(1) },
+    { id: 'lean_mass_kg',            label: 'Lean Mass',            unit: '', icon: 'person',           fmt: null },
+    { id: 'fat_mass_kg',             label: 'Fat Mass',             unit: '', icon: 'scale',            fmt: null },
+    { id: 'visceral_fat',            label: 'Visceral Fat',         unit: '', icon: 'favorite_border',  fmt: v => v.toFixed(1) },
+    { id: 'visceral_fat_index',      label: 'Visceral Fat Index',   unit: '', icon: 'favorite_border',  fmt: v => v.toFixed(1) },
+    { id: 'extracellular_water_kg',  label: 'Extracellular Water',  unit: '', icon: 'water_drop',       fmt: null },
+    { id: 'intracellular_water_kg',  label: 'Intracellular Water',  unit: '', icon: 'water_drop',       fmt: null },
   ];
 
   const BODY_SCORE_METRICS = [
     { id: 'vascular_age',       label: 'Vascular Age',     unit: 'yrs',  icon: 'cardiology',   fmt: v => Math.round(v) },
+    { id: 'metabolic_age',      label: 'Metabolic Age',    unit: 'yrs',  icon: 'trending_up',  fmt: v => Math.round(v) },
     { id: 'heart_pulse_bpm',    label: 'Heart Pulse',      unit: 'bpm',  icon: 'favorite',     fmt: v => Math.round(v) },
     { id: 'nerve_health_score', label: 'Nerve Activity',   unit: ' µS',  icon: 'neurology',     fmt: v => Math.round(v) },
     { id: 'pulse_wave_velocity',label: 'Pulse Wave Vel.',  unit: 'm/s',  icon: 'show_chart',    fmt: v => v.toFixed(1) },
@@ -161,7 +165,7 @@
 
   function fmtBodyMetric(m, raw) {
     if (raw == null) return null;
-    if (m.id === 'weight_kg' || m.id === 'muscle_mass_kg' || m.id === 'lean_mass_kg' || m.id === 'fat_mass_kg' || m.id === 'bone_mass_kg') {
+    if (m.id === 'weight_kg' || m.id === 'muscle_mass_kg' || m.id === 'lean_mass_kg' || m.id === 'fat_mass_kg' || m.id === 'bone_mass_kg' || m.id === 'extracellular_water_kg' || m.id === 'intracellular_water_kg') {
       return fmtWeight(raw);
     }
     if (m.id === 'body_water_pct') return { value: raw.toFixed(1), unit: '%' };
