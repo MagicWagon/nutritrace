@@ -7,6 +7,8 @@
   import { localDateStr } from '../lib/db.js';
   import { NtApi } from '../lib/api.js';
   import { portal } from '../lib/portal.js';
+  import FitbitIcon from '../components/icons/FitbitIcon.svelte';
+  import WithingsIcon from '../components/icons/WithingsIcon.svelte';
 
   // ── Metric definitions ─────────────────────────────────────────────────────
   const ALL_METRICS = [
@@ -333,6 +335,16 @@
   $: withingsAvailable = $withingsEnabled;
   $: anyAvailable      = fitbitAvailable || withingsAvailable;
 
+  // Sliding pill: ordered list of visible tabs + active index
+  $: _wlTabList = [
+    ...(fitbitAvailable  ? ['movement', 'sleep', 'heart'] : []),
+    ...(withingsAvailable ? ['body'] : []),
+    'trends',
+  ];
+  $: _wlActiveIdx  = Math.max(0, _wlTabList.indexOf(activeTab));
+  $: _wlPillWidth  = `calc((100% - 8px) / ${_wlTabList.length})`;
+  $: _wlPillLeft   = `calc(4px + ${_wlActiveIdx} * (100% - 8px) / ${_wlTabList.length})`;
+
   // Auto-correct activeTab when an integration's availability changes
   $: if (status !== null && withingsStatus !== null) {
     const isFitbitTab = activeTab === 'movement' || activeTab === 'sleep' || activeTab === 'heart';
@@ -603,6 +615,38 @@
   <header class="page-header" class:has-banner={$pageBanners}>
     {#if $pageBanners}<WellnessBanner />{/if}
     <h1>Wellness</h1>
+    <div class="wl-header-actions">
+      {#if status?.connected}
+        <button class="wl-sync-icon-btn" class:wl-syncing={syncing}
+          on:click={() => sync()} disabled={syncing}
+          title="Sync Fitbit{status.fitbitUserId ? ' · ' + status.fitbitUserId : ''}">
+          {#if syncing}
+            <span class="material-symbols-rounded wl-spin-icon">sync</span>
+          {:else}
+            <span class="wl-brand-icon"><FitbitIcon /></span>
+          {/if}
+        </button>
+        <button class="wl-disconnect-btn" on:click={disconnect}
+          title="Disconnect Fitbit">
+          <span class="material-symbols-rounded">link_off</span>
+        </button>
+      {/if}
+      {#if withingsStatus?.connected}
+        <button class="wl-sync-icon-btn" class:wl-syncing={withingsSyncing}
+          on:click={() => syncWithings()} disabled={withingsSyncing}
+          title="Sync Withings{withingsStatus.withingsUserId ? ' · User ' + withingsStatus.withingsUserId : ''}">
+          {#if withingsSyncing}
+            <span class="material-symbols-rounded wl-spin-icon">sync</span>
+          {:else}
+            <span class="wl-brand-icon"><WithingsIcon /></span>
+          {/if}
+        </button>
+        <button class="wl-disconnect-btn" on:click={disconnectWithings}
+          title="Disconnect Withings">
+          <span class="material-symbols-rounded">link_off</span>
+        </button>
+      {/if}
+    </div>
   </header>
 
   <!-- Date navigation sub-bar — sticky below header, same pattern as Diary -->
@@ -648,34 +692,9 @@
     {:else}
       <!-- ── At least one integration configured — main UI ── -->
 
-      <!-- Fitbit sync bar (only when connected) -->
-      {#if status.connected}
-        <div class="sync-bar">
-          <div class="sync-info">
-            <span class="material-symbols-rounded sync-source-icon">fitbit</span>
-            <div class="sync-source-text">
-              <span class="sync-source-label">Fitbit</span>
-              {#if lastSync}
-                <span class="sync-time">Synced {lastSync.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-              {:else if status.fitbitUserId}
-                <span class="sync-time">{status.fitbitUserId}</span>
-              {/if}
-            </div>
-          </div>
-          <div class="sync-actions">
-            <button class="sync-btn" class:syncing on:click={() => sync()} disabled={syncing} title="Sync Fitbit data" aria-label="Sync now">
-              <span class="material-symbols-rounded sync-btn-icon">sync</span>
-              <span>{syncing ? 'Syncing…' : 'Sync'}</span>
-            </button>
-            <button class="btn-icon text-danger" on:click={disconnect} title="Disconnect Fitbit" aria-label="Disconnect">
-              <span class="material-symbols-rounded">link_off</span>
-            </button>
-          </div>
-        </div>
-      {/if}
-
       <!-- Tab bar — only tabs for configured integrations -->
       <div class="tab-bar">
+        <div class="tab-pill" style="left:{_wlPillLeft};width:{_wlPillWidth}"></div>
         {#if fitbitAvailable}
           <button class="tab-btn" class:active={activeTab === 'movement'} on:click={() => activeTab = 'movement'}>
             <span class="material-symbols-rounded tab-icon">directions_walk</span> Movement
@@ -859,29 +878,6 @@
       <!-- ── Body tab (Withings) ── -->
       {:else if activeTab === 'body'}
         {#if withingsStatus.connected}
-          <div class="sync-bar" style="margin-bottom:8px">
-            <div class="sync-info">
-              <span class="material-symbols-rounded sync-source-icon">scale</span>
-              <div class="sync-source-text">
-                <span class="sync-source-label">Withings</span>
-                {#if withingsLastSync}
-                  <span class="sync-time">Synced {withingsLastSync.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                {:else if withingsStatus.withingsUserId}
-                  <span class="sync-time">User {withingsStatus.withingsUserId}</span>
-                {/if}
-              </div>
-            </div>
-            <div class="sync-actions">
-              <button class="sync-btn" class:syncing={withingsSyncing} on:click={() => syncWithings()} disabled={withingsSyncing} title="Sync Withings data">
-                <span class="material-symbols-rounded sync-btn-icon">sync</span>
-                <span>{withingsSyncing ? 'Syncing…' : 'Sync'}</span>
-              </button>
-              <button class="btn-icon text-danger" on:click={disconnectWithings} title="Disconnect Withings">
-                <span class="material-symbols-rounded">link_off</span>
-              </button>
-            </div>
-          </div>
-
           <div class="metric-grid">
             {#each BODY_METRICS as m}
               {@const raw = withingsData[m.id]}
@@ -1082,9 +1078,9 @@
   .wl-shell {
     min-height: unset;
   }
-  /* Force h1 to same height as Diary so the sticky date-bar top offset (62px) is accurate.
-     Without this the h1 renders ~31px tall, creating a gap between header and date bar. */
+  /* h1 fills available space so wl-header-actions sits at the right edge. */
   .wl-shell .page-header h1 {
+    flex: 1;
     height: 40px;
     display: flex;
     align-items: center;
@@ -1250,10 +1246,66 @@
   .text-danger { color: var(--text-3); }
   .text-danger:hover { color: var(--error, #f87171); }
 
+  /* Header sync actions */
+  .wl-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-left: auto;
+  }
+  .wl-sync-icon-btn {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-md);
+    border: none;
+    background: var(--accent-dim);
+    color: var(--accent);
+    cursor: pointer;
+    font-size: 20px;
+    transition: opacity var(--dur-fast), transform var(--dur-fast);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .wl-sync-icon-btn:hover:not(:disabled) { opacity: 0.8; }
+  .wl-sync-icon-btn:active:not(:disabled) { transform: scale(0.9); }
+  .wl-sync-icon-btn:disabled { opacity: 0.5; cursor: default; }
+  .wl-brand-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+  }
+  .wl-brand-icon :global(svg) {
+    width: 100%;
+    height: 100%;
+  }
+  .wl-spin-icon {
+    font-size: 20px;
+    animation: wl-spin 0.8s linear infinite;
+  }
+  .wl-disconnect-btn {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-md);
+    border: none;
+    background: none;
+    color: var(--text-3);
+    cursor: pointer;
+    font-size: 18px;
+    transition: color var(--dur-fast);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .wl-disconnect-btn:hover { color: var(--error, #f87171); }
+
   /* Tabs */
   .tab-bar {
     display: flex;
-    gap: 4px;
     padding: 4px;
     background: var(--surface-2);
     border-radius: var(--radius-md);
@@ -1261,8 +1313,20 @@
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
+    position: relative;
   }
   .tab-bar::-webkit-scrollbar { display: none; }
+  .tab-pill {
+    position: absolute;
+    top: 4px;
+    bottom: 4px;
+    border-radius: calc(var(--radius-md) - 2px);
+    background: var(--surface-1);
+    box-shadow: var(--shadow-sm);
+    transition: left var(--dur-base, 220ms) var(--ease-inout, cubic-bezier(.4,0,.2,1));
+    pointer-events: none;
+    z-index: 0;
+  }
   .tab-btn {
     flex: 1 0 auto;
     display: flex;
@@ -1277,13 +1341,13 @@
     font-size: 13px;
     font-weight: 500;
     color: var(--text-3);
-    transition: background var(--dur-fast), color var(--dur-fast);
+    transition: color var(--dur-fast);
     white-space: nowrap;
+    position: relative;
+    z-index: 1;
   }
   .tab-btn.active {
-    background: var(--surface-1);
     color: var(--accent);
-    box-shadow: var(--shadow-sm);
   }
   .tab-icon { font-size: 16px; }
 
