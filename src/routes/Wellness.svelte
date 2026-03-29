@@ -1,6 +1,6 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
-  import { wellnessMetrics, wellnessSyncMode, wellnessSyncRange, distUnit, pageBanners, dateFormat, withingsSyncRange as withingsSyncRangeSetting, fitbitEnabled, withingsEnabled, weightUnit } from '../stores/settings.js';
+  import { wellnessMetrics, wellnessSyncMode, wellnessSyncRange, distUnit, pageBanners, dateFormat, withingsSyncRange as withingsSyncRangeSetting, fitbitEnabled, withingsEnabled, weightUnit, goals, goalCelebrations, disableAnimations } from '../stores/settings.js';
   import Chart from 'chart.js/auto';
   import WellnessBanner from '../components/banners/WellnessBanner.svelte';
   import { showSuccess, showError } from '../stores/toast.js';
@@ -162,6 +162,7 @@
       }
       const result = await NtApi.post('/api/wellness/withings/sync', { from, to });
       await loadWithingsData();
+      _checkWellnessGoals(data, withingsData);
       withingsLastSync = new Date();
       if (!silent) showSuccess(`Synced ${result.dates} day${result.dates === 1 ? '' : 's'} from Withings`);
     } catch(e) {
@@ -477,6 +478,7 @@
       data = byDate[dateStr] || {};
     } catch { data = {}; }
     await loadWithingsData();
+    _checkWellnessGoals(data, withingsData);
     loadingData = false;
   }
 
@@ -503,7 +505,9 @@
       } else {
         // Auto-sync or 1-day range: single day
         result = await NtApi.post('/api/wellness/fitbit/sync', { date: dateStr });
-        data = result.metrics || {};
+        const newData = result.metrics || {};
+        _checkWellnessGoals(newData, withingsData);
+        data = newData;
         lastSync = new Date();
         localStorage.setItem(`wl_wellness_lastSync_${dateStr}`, String(Date.now()));
         if (!silent) showSuccess('Synced');
@@ -555,6 +559,34 @@
   });
 
   onDestroy(() => { _trendCharts.forEach(c => c.destroy?.()); });
+
+  // ── Goal celebrations ─────────────────────────────────────────────────────
+  let _celebratingMetrics = new Set();
+  let _prevCombinedData = null;
+
+  // Check all wellness metrics (fitbit + withings merged) against goals
+  function _checkWellnessGoals(fitbitData, withingsData_) {
+    if (!$goalCelebrations || $disableAnimations) return;
+    // Merge sources into one flat map of id → value
+    const combined = { ...fitbitData };
+    for (const [key, val] of Object.entries(withingsData_)) {
+      combined[key] = val; // withingsData values are already raw numbers
+    }
+    const g = goals.get();
+    for (const id of Object.keys(g)) {
+      const goal = g[id]?.min;
+      if (!goal) continue;
+      const prev = _prevCombinedData?.[id];
+      const curr = combined[id];
+      if (curr != null && curr >= goal && (prev == null || prev < goal)) {
+        _celebratingMetrics = new Set([..._celebratingMetrics, id]);
+        setTimeout(() => {
+          _celebratingMetrics = new Set([..._celebratingMetrics].filter(x => x !== id));
+        }, 1200);
+      }
+    }
+    _prevCombinedData = { ...combined };
+  }
 
   // ── Sleep stage breakdown ──────────────────────────────────────────────────
   $: sleepTotal = (data.sleep_deep_min || 0) + (data.sleep_light_min || 0) + (data.sleep_rem_min || 0) + (data.sleep_wake_min || 0);
@@ -716,7 +748,7 @@
             <div class="metric-grid">
               {#each ALL_METRICS.filter(m => m.group === 'movement' && isVisible(m.id)) as m}
                 {@const fmt = fmtMetric(m, data[m.id])}
-                <div class="metric-card" class:no-data={fmt == null && !loadingData}>
+                <div class="metric-card" class:no-data={fmt == null && !loadingData} class:celebrating={_celebratingMetrics.has(m.id)}>
                   <div class="metric-icon-wrap">
                     <span class="material-symbols-rounded metric-icon">{m.icon}</span>
                   </div>
@@ -772,7 +804,7 @@
             <div class="metric-grid">
               {#each ALL_METRICS.filter(m => m.group === 'sleep' && isVisible(m.id)) as m}
                 {@const fmt = fmtMetric(m, data[m.id])}
-                <div class="metric-card" class:no-data={fmt == null && !loadingData}>
+                <div class="metric-card" class:no-data={fmt == null && !loadingData} class:celebrating={_celebratingMetrics.has(m.id)}>
                   <div class="metric-icon-wrap">
                     <span class="material-symbols-rounded metric-icon">{m.icon}</span>
                   </div>
@@ -795,7 +827,7 @@
             <div class="metric-grid">
               {#each ALL_METRICS.filter(m => m.group === 'heart' && isVisible(m.id)) as m}
                 {@const fmt = fmtMetric(m, data[m.id])}
-                <div class="metric-card" class:no-data={fmt == null && !loadingData}>
+                <div class="metric-card" class:no-data={fmt == null && !loadingData} class:celebrating={_celebratingMetrics.has(m.id)}>
                   <div class="metric-icon-wrap">
                     <span class="material-symbols-rounded metric-icon" style="color:#ef4444">{m.icon}</span>
                   </div>
@@ -854,7 +886,7 @@
             {#each BODY_METRICS as m}
               {@const raw = withingsData[m.id]}
               {@const formatted = fmtBodyMetric(m, raw)}
-              <div class="metric-card" class:no-data={formatted == null && !loadingData}>
+              <div class="metric-card" class:no-data={formatted == null && !loadingData} class:celebrating={_celebratingMetrics.has(m.id)}>
                 <div class="metric-icon-wrap">
                   <span class="material-symbols-rounded metric-icon">{m.icon}</span>
                 </div>
@@ -1232,7 +1264,7 @@
   }
   .tab-bar::-webkit-scrollbar { display: none; }
   .tab-btn {
-    flex: 0 0 auto;
+    flex: 1 0 auto;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1273,6 +1305,13 @@
     transition: opacity var(--dur-fast);
   }
   .metric-card.no-data { opacity: 0.5; }
+  .metric-card.celebrating { animation: goal-pulse 1.2s ease-out; }
+  @keyframes goal-pulse {
+    0%   { filter: brightness(1); }
+    30%  { filter: brightness(1.6) saturate(1.4); box-shadow: 0 0 12px var(--accent); }
+    70%  { filter: brightness(1.3); }
+    100% { filter: brightness(1); }
+  }
   .metric-icon-wrap {
     width: 36px;
     height: 36px;

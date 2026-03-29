@@ -39,9 +39,20 @@
 
   // Wellness goal fields (shown when wellness is enabled)
   const WELLNESS_GOALS = [
+    // Fitbit — Movement
     { id: 'steps',              label: 'Daily Steps',       unit: 'steps', isWellness: true },
     { id: 'active_minutes',     label: 'Active Minutes',    unit: 'min',   isWellness: true },
+    { id: 'floors',             label: 'Floors Climbed',    unit: 'floors',isWellness: true },
+    { id: 'calories_out',       label: 'Calories Burned',   unit: 'kcal',  isWellness: true },
+    // Fitbit — Sleep
     { id: 'sleep_duration_min', label: 'Sleep Duration',    unit: 'min',   isWellness: true },
+    { id: 'sleep_efficiency',   label: 'Sleep Efficiency',  unit: '%',     isWellness: true },
+    // Fitbit — Heart
+    { id: 'hrv_daily_rmssd',    label: 'HRV (RMSSD)',       unit: 'ms',    isWellness: true },
+    // Withings — Body
+    { id: 'weight_kg',          label: 'Target Weight',     unit: 'kg',    isWellness: true },
+    { id: 'body_fat_pct',       label: 'Target Body Fat',   unit: '%',     isWellness: true },
+    { id: 'muscle_mass_kg',     label: 'Target Muscle Mass',unit: 'kg',    isWellness: true },
   ];
 
   // All fields for goal-setting: all body stats + all nutrients + wellness if enabled

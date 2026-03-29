@@ -160,7 +160,36 @@
       if (parts.length) statsText = parts.join(', ');
     }
 
-    return { today, diaryText, goalsText, statsText };
+    // Wellness data (Fitbit + Withings) — best-effort, silent on failure
+    let wellnessText = '';
+    try {
+      const fitbitRes = await NtApi.get(`/api/wellness/fitbit/data?date=${today}`);
+      const fd = fitbitRes[today];
+      if (fd) {
+        const parts = [];
+        if (fd.steps != null)              parts.push(`Steps: ${Math.round(fd.steps).toLocaleString()}`);
+        if (fd.active_minutes != null)     parts.push(`Active minutes: ${Math.round(fd.active_minutes)}`);
+        if (fd.calories_out != null)       parts.push(`Calories burned: ${Math.round(fd.calories_out)}`);
+        if (fd.sleep_duration_min != null) { const h = Math.floor(fd.sleep_duration_min/60); parts.push(`Sleep: ${h}h ${Math.round(fd.sleep_duration_min%60)}m`); }
+        if (fd.sleep_efficiency != null)   parts.push(`Sleep efficiency: ${fd.sleep_efficiency.toFixed(0)}%`);
+        if (fd.resting_hr != null)         parts.push(`Resting HR: ${Math.round(fd.resting_hr)} bpm`);
+        if (fd.hrv_daily_rmssd != null)    parts.push(`HRV: ${fd.hrv_daily_rmssd.toFixed(1)} ms`);
+        if (parts.length) wellnessText += `Fitbit: ${parts.join(', ')}`;
+      }
+    } catch {}
+    try {
+      const withingsRes = await NtApi.get(`/api/wellness/withings/data?date=${today}`);
+      const wd = withingsRes[today];
+      if (wd) {
+        const parts = [];
+        if (wd.weight_kg?.value != null)    parts.push(`Weight: ${wd.weight_kg.value.toFixed(1)} kg`);
+        if (wd.body_fat_pct?.value != null)  parts.push(`Body fat: ${wd.body_fat_pct.value.toFixed(1)}%`);
+        if (wd.muscle_mass_kg?.value != null) parts.push(`Muscle mass: ${wd.muscle_mass_kg.value.toFixed(1)} kg`);
+        if (parts.length) wellnessText += (wellnessText ? '\n' : '') + `Withings: ${parts.join(', ')}`;
+      }
+    } catch {}
+
+    return { today, diaryText, goalsText, statsText, wellnessText };
   }
 
   function buildSystemPrompt(ctx) {
@@ -171,7 +200,8 @@
          + `Current date: ${ctx.today}\n\n`
          + `TODAY'S FOOD LOG:\n${ctx.diaryText}\n`
          + `DAILY GOALS:\n${ctx.goalsText}`
-         + (ctx.statsText ? `\n\nBODY STATS TODAY:\n${ctx.statsText}` : '');
+         + (ctx.statsText ? `\n\nBODY STATS TODAY:\n${ctx.statsText}` : '')
+         + (ctx.wellnessText ? `\n\nWELLNESS DATA TODAY:\n${ctx.wellnessText}` : '');
   }
 
   function fmtTime() {

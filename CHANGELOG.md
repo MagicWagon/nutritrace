@@ -5,6 +5,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.15.0-alpha] — 2026-03-28
+
+### Added
+- **AI wellness context** — AI Buddy now includes today's Fitbit and Withings data (steps, active minutes, sleep, HR, HRV, weight, body fat, etc.) in its system prompt so it can speak to your full health picture
+- **Wellness goal celebrations** — metric cards pulse with the same `goal-pulse` animation as Diary when a tracked metric (steps, active minutes, sleep duration) crosses its goal for the day; respects the "Celebrate goals" and "Disable animations" settings
+
+### Changed
+- Wellness tab bar now uses `flex: 1 0 auto` so tabs are equally spaced on wide screens and horizontally scrollable on mobile without shrinking
+
+### Fixed
+- Wellness tab bar buttons were all left-aligned on desktop after the scroll fix; restored equal distribution while preserving scrollability on small screens
+
+---
+
 ## [0.14.0-alpha] — 2026-03-28
 
 ### Added

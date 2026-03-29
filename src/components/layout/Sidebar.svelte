@@ -118,14 +118,14 @@
           </div>
           <div class="user-info">
             <span class="user-name">{$currentUser.full_name || $currentUser.username}</span>
-            <span class="sidebar-version">v0.14.0-alpha</span>
+            <span class="sidebar-version">v0.15.0-alpha</span>
           </div>
           <button class="btn-icon logout-btn" on:click={handleLogout} title="Sign out" aria-label="Sign out">
             <span class="material-symbols-rounded">logout</span>
           </button>
         </div>
       {:else}
-        <span class="sidebar-version">v0.14.0-alpha</span>
+        <span class="sidebar-version">v0.15.0-alpha</span>
       {/if}
     </div>
   </aside>
