@@ -57,6 +57,11 @@
   let portionSheet = false;
   let editingIndex = null; // null = adding new, number = editing existing
 
+  // Multi-select
+  let selectedIngredients = new Set();
+  let showMultiPortionSheet = false;
+  let multiPortionItems = [];
+
   onMount(async () => {
     isRecipe = editorState.mealIsRecipe || false;
     store    = isRecipe ? 'recipes' : 'meals';
@@ -164,9 +169,50 @@
         (f.brand||'').toLowerCase().includes(pickerSearch.toLowerCase()))
     : _pickerList;
 
+  $: { pickerTab; selectedIngredients = new Set(); }
+
   // Track ingredient images that fail to load so we fall back to the placeholder
   let failedImgs = new Set();
   function onImgError(url) { failedImgs.add(url); failedImgs = failedImgs; }
+
+  function toggleIngredient(food) {
+    if (selectedIngredients.has(food)) selectedIngredients.delete(food);
+    else selectedIngredients.add(food);
+    selectedIngredients = selectedIngredients;
+  }
+
+  function confirmMultiIngredientAdd() {
+    if (selectedIngredients.size === 0) return;
+    multiPortionItems = [...selectedIngredients].map(food => ({
+      food,
+      portion: food.portion || 100,
+      unit: food.unit || 'g',
+      qty: food.quantity || 1,
+    }));
+    showMultiPortionSheet = true;
+  }
+
+  function confirmMultiPortion() {
+    for (const item of multiPortionItems) {
+      const origPortion = parseFloat(item.food.portion) || 100;
+      const newPortion = parseFloat(item.portion) || origPortion;
+      const newQty = parseFloat(item.qty) || 1;
+      let scaledNutrition = item.food.nutrition;
+      if (item.food.nutrition) {
+        const factor = (newPortion / origPortion) * newQty;
+        scaledNutrition = Object.fromEntries(
+          Object.entries(item.food.nutrition).map(([k, v]) => [k, (parseFloat(v)||0) * factor])
+        );
+      }
+      meal = { ...meal, items: [...meal.items, { ...item.food, portion: newPortion * newQty, unit: item.unit, quantity: 1, nutrition: scaledNutrition }] };
+    }
+    if (isRecipe) autoUpdateRecipeAmount();
+    showMultiPortionSheet = false;
+    showPicker = false;
+    pickerSearch = '';
+    selectedIngredients = new Set();
+    multiPortionItems = [];
+  }
 
   let _meLock = false;
   let _meLockTimer;
@@ -528,10 +574,17 @@
 {#if showPicker}
   <div class="picker-overlay" role="dialog" aria-modal="true">
     <div class="picker-header">
-      <button class="btn-icon" on:click={() => { showPicker = false; pickerSearch = ''; }} title="Back">
+      <button class="btn-icon" on:click={() => { showPicker = false; pickerSearch = ''; selectedIngredients = new Set(); }} title="Back">
         <span class="material-symbols-rounded">arrow_back</span>
       </button>
-      <input class="input picker-search-input" placeholder="Search…" bind:value={pickerSearch} autofocus />
+      {#if selectedIngredients.size > 0}
+        <span class="picker-count-title">{selectedIngredients.size} selected</span>
+        <button class="btn-icon accent" on:click={confirmMultiIngredientAdd} aria-label="Add selected" title="Add selected">
+          <span class="material-symbols-rounded">check</span>
+        </button>
+      {:else}
+        <input class="input picker-search-input" placeholder="Search…" bind:value={pickerSearch} autofocus />
+      {/if}
     </div>
     <div class="picker-tabs-row">
       {#each PICKER_TABS as label, idx}
@@ -548,28 +601,36 @@
         <div class="picker-empty">{pickerSearch ? 'No results found' : 'No items yet. Add some in the Foods tab first.'}</div>
       {:else}
         {#each pickerFiltered as food (food.id)}
-          <button class="picker-item-btn" on:click={() => { showPicker = false; pickerSearch = ''; pickIngredient(food); }}>
-            {#if food.imgUrl && !failedImgs.has(food.imgUrl)}
-              <img src={food.imgUrl} alt={food.name} class="picker-thumb"
-                   on:error={() => onImgError(food.imgUrl)} />
-            {:else}
-              <div class="picker-thumb picker-thumb-ph">
-                <span class="material-symbols-rounded" style="font-size:20px">
-                  {pickerTab === 0 ? 'restaurant' : pickerTab === 1 ? 'dinner_dining' : 'menu_book'}
-                </span>
-              </div>
-            {/if}
-            <div class="picker-info">
-              <span class="picker-name">{food.name}</span>
-              {#if food.brand}<span class="text-3" style="font-size:12px">{food.brand}</span>{/if}
-              {#if pickerTab === 0}
-                <span class="text-3" style="font-size:12px">{food.portion||100}{food.unit||'g'} · {Math.round(food.nutrition?.calories||0)} kcal</span>
+          {@const _sel = selectedIngredients.has(food)}
+          <div class="picker-item-row" class:picker-item-selected={_sel}>
+            <button class="picker-select-btn" on:click={() => toggleIngredient(food)} aria-label="Select">
+              <span class="material-symbols-rounded picker-check" class:picker-check-on={_sel}>
+                {_sel ? 'check_circle' : 'radio_button_unchecked'}
+              </span>
+            </button>
+            <button class="picker-item-btn" on:click={() => { showPicker = false; pickerSearch = ''; selectedIngredients = new Set(); pickIngredient(food); }}>
+              {#if food.imgUrl && !failedImgs.has(food.imgUrl)}
+                <img src={food.imgUrl} alt={food.name} class="picker-thumb"
+                     on:error={() => onImgError(food.imgUrl)} />
               {:else}
-                <span class="text-3" style="font-size:12px">{Math.round(food.nutrition?.calories||0)} kcal</span>
+                <div class="picker-thumb picker-thumb-ph">
+                  <span class="material-symbols-rounded" style="font-size:20px">
+                    {pickerTab === 0 ? 'restaurant' : pickerTab === 1 ? 'dinner_dining' : 'menu_book'}
+                  </span>
+                </div>
               {/if}
-            </div>
-            <span class="material-symbols-rounded" style="font-size:18px;color:var(--accent);flex-shrink:0">add_circle</span>
-          </button>
+              <div class="picker-info">
+                <span class="picker-name">{food.name}</span>
+                {#if food.brand}<span class="text-3" style="font-size:12px">{food.brand}</span>{/if}
+                {#if pickerTab === 0}
+                  <span class="text-3" style="font-size:12px">{food.portion||100}{food.unit||'g'} · {Math.round(food.nutrition?.calories||0)} kcal</span>
+                {:else}
+                  <span class="text-3" style="font-size:12px">{Math.round(food.nutrition?.calories||0)} kcal</span>
+                {/if}
+              </div>
+              <span class="material-symbols-rounded" style="font-size:18px;color:var(--accent);flex-shrink:0">add_circle</span>
+            </button>
+          </div>
         {/each}
       {/if}
     </div>
@@ -599,6 +660,50 @@
       </div>
       <div style="padding:16px;flex-shrink:0">
         <button class="btn btn-primary w-full" on:click={confirmPortion}>{editingIndex !== null ? 'Save Changes' : 'Add Ingredient'}</button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- ── Multi-ingredient portion sheet ── -->
+{#if showMultiPortionSheet}
+  <div use:portal class="overlay-backdrop" role="dialog" aria-modal="true"
+    on:click={() => { showMultiPortionSheet = false; }} on:keydown={() => {}}>
+    <div class="portion-sheet" style="max-height:80vh;display:flex;flex-direction:column" on:click|stopPropagation on:keydown={() => {}}>
+      <div class="portion-header">
+        <span style="font-weight:600">Set Portions ({multiPortionItems.length} items)</span>
+        <button class="btn-icon" on:click={() => { showMultiPortionSheet = false; }} title="Close">
+          <span class="material-symbols-rounded">close</span>
+        </button>
+      </div>
+      <div class="portion-body" style="flex:1;overflow-y:auto">
+        {#each multiPortionItems as item, i}
+          {#if i > 0}<div style="height:1px;background:var(--border);margin:12px 0"></div>{/if}
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <span style="font-size:13px;font-weight:600;color:var(--text-1)">{item.food.name}</span>
+            <div style="display:flex;gap:10px">
+              <div style="flex:1">
+                <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:5px">Amount</label>
+                <input class="input" type="number" min="0.1" step="any" bind:value={item.portion} style="width:100%" />
+              </div>
+              <div style="width:80px">
+                <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:5px">Unit</label>
+                <select class="input" bind:value={item.unit} style="width:100%">
+                  {#each UNITS as u}<option value={u}>{u}</option>{/each}
+                </select>
+              </div>
+              <div style="width:60px">
+                <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:5px">Qty</label>
+                <input class="input" type="number" min="0.01" step="any" bind:value={item.qty} style="width:100%" />
+              </div>
+            </div>
+          </div>
+        {/each}
+      </div>
+      <div style="padding:16px;flex-shrink:0">
+        <button class="btn btn-primary w-full" on:click={confirmMultiPortion}>
+          Add {multiPortionItems.length} Ingredient{multiPortionItems.length > 1 ? 's' : ''}
+        </button>
       </div>
     </div>
   </div>
@@ -740,12 +845,28 @@
   }
   .picker-list { flex: 1; overflow-y: auto; padding: 8px 0; }
   .picker-empty { padding: 48px 24px; text-align: center; color: var(--text-3); font-size: 14px; }
+  .picker-count-title {
+    flex: 1; font-size: 17px; font-weight: 600; color: var(--text-1);
+  }
+  .picker-item-row {
+    display: flex; align-items: center;
+    border-bottom: 1px solid var(--border);
+    transition: background 120ms;
+  }
+  .picker-item-row:last-child { border-bottom: none; }
+  .picker-item-row.picker-item-selected { background: var(--accent-dim); }
+  .picker-select-btn {
+    flex-shrink: 0; width: 44px; height: 100%; min-height: 56px;
+    display: flex; align-items: center; justify-content: center;
+    background: none; border: none; cursor: pointer; padding: 0;
+  }
+  .picker-check { font-size: 22px; color: var(--text-3); transition: color 120ms; }
+  .picker-check.picker-check-on { color: var(--accent); }
   .picker-item-btn {
     display: flex; align-items: center; gap: 12px;
-    width: 100%; padding: 10px 16px;
+    flex: 1; padding: 10px 16px 10px 0;
     background: none; border: none; cursor: pointer;
     text-align: left; color: var(--text-1);
-    border-bottom: 1px solid var(--border);
     transition: background var(--dur-fast);
   }
   .picker-item-btn:last-child { border-bottom: none; }
