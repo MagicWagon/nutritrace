@@ -5,6 +5,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.20.0-beta] — 2026-03-29
+
+### Added
+- **Metric visibility toggles** — Settings → Wellness now includes a "Visible Metrics" card with chip toggles for every wellness metric, grouped by section (Movement, Sleep, Heart, Garmin, Body, Body Scan, Segmental); hidden metrics are excluded from Wellness display and future reports; data is always synced regardless of visibility; defaults to all visible with a "Reset to defaults" button
+- **Expanded Withings metrics** — now captures heart pulse during weigh-in (meastype 11), segmental fat mass per limb (right arm, left arm, torso, right leg, left leg); displays in a new Segmental Analysis table (muscle + fat per limb) on the Body tab
+- **Withings ECG** — syncs ECG recordings from `/v2/heart` endpoint after each measurement sync; stores `ecg_heart_rate` (latest reading) and `ecg_afib` (Normal / Detected per day); requires re-authorization to grant `user.cardiovascular` scope
+- **Fixed Withings type-174 duplicate bug** — `visceral_fat` was being silently overwritten by a second `174` mapping; corrected to a single `visceral_fat` entry
+- **Expanded Garmin metrics** — now extracts moderate/vigorous intensity minutes from dailies; respiration rate and sleep score from sleep response (already fetched)
+- **Fitbit Active Zone Minutes** — synced from `/activities/active-zone-minutes` endpoint using the existing `activity` scope
+- **Fitbit VO2 Max** — synced from `/cardioscore` endpoint; requires re-authorization to grant `cardio_fitness` scope
+- **New metric cards** in Wellness — Active Zone Min, Moderate Intensity, Vigorous Intensity (Movement tab); Sleep Score (Sleep tab); VO2 Max (Heart tab); Heart Pulse, ECG Heart Rate, AFib Detection (Body Scan Scores); ECG & AFib chip on Withings connect screen
+
+### Changed
+- Visibility filtering extended to Body, Body Scan Scores, Garmin-specific, and Segmental sections (previously only applied to Movement/Sleep/Heart)
+- **Labs section removed** from Settings — it had been reduced to a redirect note; credentials are fully managed per-integration in Settings → Wellness
+
+---
+
 ## [0.19.0-beta] — 2026-03-29
 
 ### Added

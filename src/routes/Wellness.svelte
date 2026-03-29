@@ -44,8 +44,14 @@
   }
 
   function toggleMetric(id) {
-    const all   = ALL_METRICS.map(m => m.id);
-    const cur   = $wellnessMetrics ?? all;
+    const all = [
+      ...ALL_METRICS.map(m => m.id),
+      'weight_kg','body_fat_pct','muscle_mass_kg','bone_mass_kg','body_water_pct','lean_mass_kg','fat_mass_kg','visceral_fat',
+      'vascular_age','heart_pulse_bpm','nerve_health_score','pulse_wave_velocity','ecg_heart_rate','ecg_afib',
+      'body_battery_high','body_battery_low','stress_avg',
+      'segmental_analysis',
+    ];
+    const cur = $wellnessMetrics ?? all;
     if (cur.includes(id)) {
       wellnessMetrics.set(cur.filter(x => x !== id));
     } else {
@@ -965,14 +971,14 @@
               {/each}
             </div>
             <!-- Garmin-specific: Body Battery + Stress -->
-            {#if garminStatus?.connected && GARMIN_METRICS.some(m => garminData[m.id] != null)}
+            {#if garminStatus?.connected && GARMIN_METRICS.filter(m => isVisible(m.id)).some(m => garminData[m.id] != null)}
               <div class="card" style="margin-top:12px;padding:16px">
                 <div class="sleep-stages-header" style="margin-bottom:12px">
                   <span class="wl-brand-icon" style="font-size:16px;color:var(--accent)"><GarminIcon /></span>
                   <span class="sleep-stages-title">Garmin</span>
                 </div>
                 <div class="metric-grid">
-                  {#each GARMIN_METRICS as m}
+                  {#each GARMIN_METRICS.filter(m => isVisible(m.id)) as m}
                     {@const raw = garminData[m.id]}
                     {#if raw != null}
                       <div class="metric-card">
@@ -1005,7 +1011,7 @@
       {:else if activeTab === 'body'}
         {#if withingsStatus.connected}
           <div class="metric-grid">
-            {#each BODY_METRICS as m}
+            {#each BODY_METRICS.filter(m => isVisible(m.id)) as m}
               {@const raw = withingsData[m.id]}
               {@const formatted = fmtBodyMetric(m, raw)}
               <div class="metric-card" class:no-data={formatted == null && !loadingData} class:celebrating={_celebratingMetrics.has(m.id)}>
@@ -1026,14 +1032,14 @@
             {/each}
           </div>
 
-          {#if BODY_SCORE_METRICS.some(m => withingsData[m.id] != null)}
+          {#if BODY_SCORE_METRICS.filter(m => isVisible(m.id)).some(m => withingsData[m.id] != null)}
             <div class="card" style="margin-top:12px;padding:16px">
               <div class="sleep-stages-header" style="margin-bottom:12px">
                 <span class="material-symbols-rounded" style="color:var(--accent)">biotech</span>
                 <span class="sleep-stages-title">Body Scan Scores</span>
               </div>
               <div class="metric-grid">
-                {#each BODY_SCORE_METRICS as m}
+                {#each BODY_SCORE_METRICS.filter(m => isVisible(m.id)) as m}
                   {@const raw = withingsData[m.id]}
                   {#if raw != null}
                     <div class="metric-card">
@@ -1052,7 +1058,7 @@
           {/if}
 
           <!-- Segmental analysis (Body Scan) -->
-          {#if ['muscle_mass_left_arm_kg','muscle_mass_right_arm_kg','muscle_mass_torso_kg','muscle_mass_left_leg_kg','muscle_mass_right_leg_kg','fat_mass_left_arm_kg','fat_mass_right_arm_kg','fat_mass_torso_kg','fat_mass_left_leg_kg','fat_mass_right_leg_kg'].some(k => withingsData[k] != null)}
+          {#if isVisible('segmental_analysis') && ['muscle_mass_left_arm_kg','muscle_mass_right_arm_kg','muscle_mass_torso_kg','muscle_mass_left_leg_kg','muscle_mass_right_leg_kg','fat_mass_left_arm_kg','fat_mass_right_arm_kg','fat_mass_torso_kg','fat_mass_left_leg_kg','fat_mass_right_leg_kg'].some(k => withingsData[k] != null)}
             <div class="card" style="margin-top:12px;padding:16px">
               <div class="sleep-stages-header" style="margin-bottom:12px">
                 <span class="material-symbols-rounded" style="color:var(--accent)">accessibility_new</span>

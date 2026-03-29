@@ -38,7 +38,7 @@
   $: isDark = $appearance === 'dark' || ($appearance === 'system' && (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches));
   let openSections = { appearance: true, regional: false, diary: false, foods: false, water: false,
                        categories: false, nutrients: false, bodyStats: false, statistics: false,
-                       connectedServices: false, ai: false, wellness: false, labs: false,
+                       connectedServices: false, ai: false, wellness: false,
                        backup: false, email: false, users: false, about: false };
 
   function toggleSection(key) {
@@ -62,7 +62,6 @@
     connectedServices: ['connected services','usda','open food facts','mealie','recipe','search language','country','api key','credentials','username','password'],
     ai:                ['ai','fitbot','assistant','provider','model','api key','artificial intelligence','chat'],
     wellness:          ['wellness','activity tracking','fitbit','withings','garmin','steps','sleep','heart rate','hrv','spo2','sync mode','sync range','connect','disconnect','connected devices','fitness tracker','body battery','stress'],
-    labs:              ['labs','experimental','client id','client secret','redirect uri','api credentials'],
     backup:            ['backup','export','import','restore','waistline','csv','clear data','json','full backup','images','zip'],
     email:             ['email','smtp','mail','password reset','invites','notifications'],
     users:             ['users','user management','accounts','login','password','admin','register','profile'],
@@ -304,6 +303,77 @@
   let wellnessEnabledVal   = DB.getSetting('wellnessEnabled',   false);
   let fitbitEnabledVal     = DB.getSetting('fitbitEnabled',     false);
   let withingsEnabledVal   = DB.getSetting('withingsEnabled',   false);
+  // ── Wellness metric visibility ────────────────────────────────────────────
+  const WELLNESS_METRIC_GROUPS = [
+    { label: 'Movement', metrics: [
+      { id: 'steps',                label: 'Steps'            },
+      { id: 'distance_km',          label: 'Distance'         },
+      { id: 'floors',               label: 'Floors'           },
+      { id: 'active_minutes',       label: 'Active Min'       },
+      { id: 'calories_out',         label: 'Calories'         },
+      { id: 'active_zone_minutes',  label: 'Zone Min'         },
+      { id: 'moderate_intensity_min', label: 'Moderate'       },
+      { id: 'vigorous_intensity_min', label: 'Vigorous'       },
+    ]},
+    { label: 'Sleep', metrics: [
+      { id: 'sleep_duration_min',  label: 'Duration'    },
+      { id: 'sleep_efficiency',    label: 'Efficiency'  },
+      { id: 'sleep_deep_min',      label: 'Deep'        },
+      { id: 'sleep_light_min',     label: 'Light'       },
+      { id: 'sleep_rem_min',       label: 'REM'         },
+      { id: 'sleep_wake_min',      label: 'Awake'       },
+      { id: 'sleep_score',         label: 'Score'       },
+    ]},
+    { label: 'Heart', metrics: [
+      { id: 'resting_hr',        label: 'Resting HR'   },
+      { id: 'hrv_daily_rmssd',   label: 'HRV'          },
+      { id: 'spo2_avg',          label: 'SpO2'         },
+      { id: 'respiratory_rate',  label: 'Resp. Rate'   },
+      { id: 'vo2_max',           label: 'VO2 Max'      },
+    ]},
+    { label: 'Garmin', metrics: [
+      { id: 'body_battery_high', label: 'Battery High' },
+      { id: 'body_battery_low',  label: 'Battery Low'  },
+      { id: 'stress_avg',        label: 'Stress'       },
+    ]},
+    { label: 'Body', metrics: [
+      { id: 'weight_kg',      label: 'Weight'       },
+      { id: 'body_fat_pct',   label: 'Body Fat'     },
+      { id: 'muscle_mass_kg', label: 'Muscle Mass'  },
+      { id: 'bone_mass_kg',   label: 'Bone Mass'    },
+      { id: 'body_water_pct', label: 'Body Water'   },
+      { id: 'lean_mass_kg',   label: 'Lean Mass'    },
+      { id: 'fat_mass_kg',    label: 'Fat Mass'     },
+      { id: 'visceral_fat',   label: 'Visceral Fat' },
+    ]},
+    { label: 'Body Scan', metrics: [
+      { id: 'vascular_age',        label: 'Vascular Age'  },
+      { id: 'heart_pulse_bpm',     label: 'Heart Pulse'   },
+      { id: 'nerve_health_score',  label: 'Nerve Activity'},
+      { id: 'pulse_wave_velocity', label: 'Pulse Wave'    },
+      { id: 'ecg_heart_rate',      label: 'ECG HR'        },
+      { id: 'ecg_afib',            label: 'AFib'          },
+    ]},
+    { label: 'Segmental', metrics: [
+      { id: 'segmental_analysis', label: 'Segmental Analysis' },
+    ]},
+  ];
+
+  function isWellnessMetricVisible(id) {
+    const vis = $wellnessMetrics;
+    return vis == null || vis.includes(id);
+  }
+
+  function toggleWellnessMetric(id) {
+    const allIds = WELLNESS_METRIC_GROUPS.flatMap(g => g.metrics.map(m => m.id));
+    const cur = $wellnessMetrics ?? allIds;
+    if (cur.includes(id)) {
+      wellnessMetrics.set(cur.filter(x => x !== id));
+    } else {
+      wellnessMetrics.set([...cur, id]);
+    }
+  }
+
   let wellnessSyncModeVal  = DB.getSetting('wellnessSyncMode',  'auto');
   let wellnessSyncRangeVal = DB.getSetting('wellnessSyncRange', 7);
 
@@ -2282,6 +2352,28 @@
           {/if}
         </div>
 
+        <!-- ── Visible Metrics ── -->
+        <p class="sub-label" style="padding-top:16px">Visible Metrics</p>
+        <div class="card settings-card">
+          <div class="setting-desc" style="padding:2px 0 14px">Choose which metrics appear in Wellness and future reports. Data is always synced regardless of visibility.</div>
+          {#each WELLNESS_METRIC_GROUPS as grp, gi}
+            {#if gi > 0}<div class="setting-divider"></div>{/if}
+            <div class="metric-vis-group">
+              <span class="metric-vis-label">{grp.label}</span>
+              <div class="chip-group" style="flex-wrap:wrap;gap:6px">
+                {#each grp.metrics as m}
+                  <button class="chip" class:chip-active={isWellnessMetricVisible(m.id)}
+                    on:click={() => toggleWellnessMetric(m.id)}>{m.label}</button>
+                {/each}
+              </div>
+            </div>
+          {/each}
+          <div class="setting-divider"></div>
+          <div class="setting-row" style="justify-content:flex-end">
+            <button class="btn btn-sm" on:click={() => wellnessMetrics.set(null)}>Reset to defaults</button>
+          </div>
+        </div>
+
         <!-- ── Fitbit ── -->
         {#if wellnessEnabledVal}
           <p class="sub-label" style="padding-top:16px">Fitbit</p>
@@ -2613,27 +2705,6 @@
             {/if}
           </div>
 
-      </div>
-    {/if}
-
-    <!-- ── Labs ─────────────────────────────────────────────────────────────── -->
-    <button class="section-toggle labs-toggle" class:hidden={!sectionVisible(settingsQuery, 'labs')} on:click={() => { toggleSection('labs'); loadLabsConfig(); }}>
-      <span class="material-symbols-rounded si">science</span>
-      <span>Labs <span class="labs-badge">Experimental</span></span>
-      <span class="material-symbols-rounded chevron" class:rotated={openSections.labs}>expand_more</span>
-    </button>
-    {#if sectionOpen(openSections, settingsQuery, 'labs') && sectionVisible(settingsQuery, 'labs')}
-      <div class="section-body" transition:slide={{ duration: 180 }}>
-        <div class="card settings-card" style="padding:14px">
-          <div style="display:flex;align-items:flex-start;gap:10px;color:var(--text-2)">
-            <span class="material-symbols-rounded" style="font-size:18px;flex-shrink:0;margin-top:1px">info</span>
-            <span style="font-size:13px;line-height:1.5">
-              Wellness API credentials (Fitbit, Withings, Garmin) are now configured per-user in
-              <button class="link-btn" on:click={() => { toggleSection('wellness'); loadLabsConfig(); document.querySelector('.section-toggle.wellness-toggle')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>Settings → Wellness</button>
-              — each user registers their own developer app.
-            </span>
-          </div>
-        </div>
       </div>
     {/if}
 
@@ -3549,7 +3620,6 @@
   .form-group { display: flex; flex-direction: column; gap: 6px; }
   .form-label { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); }
 
-  /* Labs section */
   .chip-group {
     display: flex;
     flex-wrap: wrap;
@@ -3657,4 +3727,17 @@
     margin-bottom: 4px;
   }
   .env-lock-banner .material-symbols-rounded { font-size: 16px; color: var(--accent); flex-shrink: 0; }
+  .metric-vis-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 0;
+  }
+  .metric-vis-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-3);
+  }
 </style>
