@@ -9,7 +9,13 @@ router.use(requireAuth);
 
 const uid = req => userMgmtActive() ? req.user.id : 0;
 
-function _cfg(key) {
+function _userCfg(key, userId) {
+  if (userMgmtActive() && userId != null && userId !== 0) {
+    const row = db.prepare('SELECT value FROM user_settings WHERE user_id = ? AND key = ?').get(userId, key);
+    if (row?.value != null && row.value !== '' && row.value !== '""') {
+      try { return JSON.parse(row.value) || ''; } catch { return row.value; }
+    }
+  }
   const row = db.prepare('SELECT value FROM app_config WHERE key = ?').get(key);
   return row?.value || '';
 }
@@ -32,8 +38,8 @@ async function _refresh(userId) {
     body: new URLSearchParams({
       action: 'requesttoken',
       grant_type: 'refresh_token',
-      client_id: _cfg('withings_client_id'),
-      client_secret: _cfg('withings_client_secret'),
+      client_id: _userCfg('withings_client_id', userId),
+      client_secret: _userCfg('withings_client_secret', userId),
       refresh_token: tokens.refresh_token,
     }),
   });
@@ -75,25 +81,58 @@ async function _wPost(userId, endpoint, params) {
   return json.body;
 }
 
+// ── GET /config ────────────────────────────────────────────────────────────────
+router.get('/config', wrap((req, res) => {
+  const u = uid(req);
+  res.json({
+    client_id:    _userCfg('withings_client_id',    u),
+    redirect_uri: _userCfg('withings_redirect_uri', u),
+  });
+}));
+
+// ── PUT /config ────────────────────────────────────────────────────────────────
+router.put('/config', wrap((req, res) => {
+  const { client_id, client_secret, redirect_uri } = req.body;
+  if (userMgmtActive() && req.user) {
+    const save = db.prepare('INSERT OR REPLACE INTO user_settings (user_id, key, value) VALUES (?, ?, ?)');
+    db.transaction(() => {
+      if (client_id     !== undefined) save.run(req.user.id, 'withings_client_id',     JSON.stringify(client_id));
+      if (client_secret !== undefined) save.run(req.user.id, 'withings_client_secret', JSON.stringify(client_secret));
+      if (redirect_uri  !== undefined) save.run(req.user.id, 'withings_redirect_uri',  JSON.stringify(redirect_uri));
+    })();
+  } else {
+    const save = db.prepare('INSERT OR REPLACE INTO app_config (key, value) VALUES (?, ?)');
+    db.transaction(() => {
+      if (client_id     !== undefined) save.run('withings_client_id',     client_id);
+      if (client_secret !== undefined) save.run('withings_client_secret', client_secret);
+      if (redirect_uri  !== undefined) save.run('withings_redirect_uri',  redirect_uri);
+    })();
+  }
+  res.json({ ok: true });
+}));
+
 // ── GET /status ───────────────────────────────────────────────────────────────
 router.get('/status', wrap((req, res) => {
   const u = uid(req);
   const tokens = _getTokens(u);
-  const clientId = _cfg('withings_client_id');
+  const clientId = _userCfg('withings_client_id', u);
+  const lastSync = db.prepare('SELECT MAX(synced_at) as ts FROM wellness_data WHERE user_id=? AND source=?').get(u, 'withings');
   res.json({
     connected:        !!tokens,
     configured:       !!clientId,
     withingsUserId:   tokens?.withings_user_id || null,
-    expiresAt:        tokens?.expires_at || null,
+    expiresAt:        tokens?.expires_at       || null,
+    lastSyncedAt:     lastSync?.ts             || null,
   });
 }));
 
 // ── GET /authorize ────────────────────────────────────────────────────────────
 router.get('/authorize', wrap((req, res) => {
-  const clientId    = _cfg('withings_client_id');
-  const redirectUri = _cfg('withings_redirect_uri');
+  const u = uid(req);
+  const clientId    = _userCfg('withings_client_id',    u);
+  const redirectUri = _userCfg('withings_redirect_uri', u);
   if (!clientId || !redirectUri) {
-    return res.status(400).json({ error: 'Withings client_id and redirect_uri must be configured in Settings → Labs.' });
+    return res.status(400).json({ error: 'Withings client_id and redirect_uri must be configured in Settings → Wellness.' });
   }
   const state = randomBytes(16).toString('hex');
   _stateStore.set(state, { userId: uid(req), expiresAt: Date.now() + 10 * 60 * 1000 });
@@ -126,9 +165,9 @@ router.get('/callback', wrap(async (req, res) => {
   }
   _stateStore.delete(state);
 
-  const clientId     = _cfg('withings_client_id');
-  const clientSecret = _cfg('withings_client_secret');
-  const redirectUri  = _cfg('withings_redirect_uri');
+  const clientId     = _userCfg('withings_client_id',     stored.userId);
+  const clientSecret = _userCfg('withings_client_secret', stored.userId);
+  const redirectUri  = _userCfg('withings_redirect_uri',  stored.userId);
 
   const tokenRes = await fetch('https://wbsapi.withings.net/v2/oauth2', {
     method: 'POST',

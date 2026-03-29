@@ -14,7 +14,14 @@ const uid = req => userMgmtActive() ? req.user.id : 0;
 // Only used during the brief OAuth redirect dance (~10 min window)
 const _pkce = new Map();
 
-function _cfg(key) {
+// Read credential: user_settings first (multi-user), app_config fallback (single-user / migration)
+function _userCfg(key, userId) {
+  if (userMgmtActive() && userId != null && userId !== 0) {
+    const row = db.prepare('SELECT value FROM user_settings WHERE user_id = ? AND key = ?').get(userId, key);
+    if (row?.value != null && row.value !== '' && row.value !== '""') {
+      try { return JSON.parse(row.value) || ''; } catch { return row.value; }
+    }
+  }
   const row = db.prepare('SELECT value FROM app_config WHERE key = ?').get(key);
   return row?.value || '';
 }
@@ -31,7 +38,7 @@ async function _refresh(userId) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
-      'Authorization': 'Basic ' + Buffer.from(`${_cfg('fitbit_client_id')}:${_cfg('fitbit_client_secret')}`).toString('base64'),
+      'Authorization': 'Basic ' + Buffer.from(`${_userCfg('fitbit_client_id', userId)}:${_userCfg('fitbit_client_secret', userId)}`).toString('base64'),
     },
     body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: tokens.refresh_token }),
   });
@@ -77,28 +84,60 @@ async function _get(userId, path) {
   return res.json();
 }
 
+// ── GET /config — read user's own credentials (client_id + redirect_uri only, no secret) ──
+router.get('/config', wrap((req, res) => {
+  const u = uid(req);
+  res.json({
+    client_id:    _userCfg('fitbit_client_id',    u),
+    redirect_uri: _userCfg('fitbit_redirect_uri', u),
+  });
+}));
+
+// ── PUT /config — save user's own credentials ─────────────────────────────────
+router.put('/config', wrap((req, res) => {
+  const { client_id, client_secret, redirect_uri } = req.body;
+  if (userMgmtActive() && req.user) {
+    const save = db.prepare('INSERT OR REPLACE INTO user_settings (user_id, key, value) VALUES (?, ?, ?)');
+    db.transaction(() => {
+      if (client_id     !== undefined) save.run(req.user.id, 'fitbit_client_id',     JSON.stringify(client_id));
+      if (client_secret !== undefined) save.run(req.user.id, 'fitbit_client_secret', JSON.stringify(client_secret));
+      if (redirect_uri  !== undefined) save.run(req.user.id, 'fitbit_redirect_uri',  JSON.stringify(redirect_uri));
+    })();
+  } else {
+    const save = db.prepare('INSERT OR REPLACE INTO app_config (key, value) VALUES (?, ?)');
+    db.transaction(() => {
+      if (client_id     !== undefined) save.run('fitbit_client_id',     client_id);
+      if (client_secret !== undefined) save.run('fitbit_client_secret', client_secret);
+      if (redirect_uri  !== undefined) save.run('fitbit_redirect_uri',  redirect_uri);
+    })();
+  }
+  res.json({ ok: true });
+}));
+
 // ── GET /status ──────────────────────────────────────────────────────────────
 router.get('/status', wrap((req, res) => {
   const u = uid(req);
   const tokens = _getTokens(u);
-  const clientId = _cfg('fitbit_client_id');
+  const clientId = _userCfg('fitbit_client_id', u);
+  const lastSync = db.prepare('SELECT MAX(synced_at) as ts FROM wellness_data WHERE user_id=? AND source=?').get(u, 'fitbit');
   res.json({
     connected:     !!tokens,
     configured:    !!clientId,
     fitbitUserId:  tokens?.fitbit_user_id || null,
     expiresAt:     tokens?.expires_at     || null,
+    lastSyncedAt:  lastSync?.ts           || null,
   });
 }));
 
 // ── GET /authorize — returns Fitbit OAuth URL using PKCE ─────────────────────
 router.get('/authorize', wrap((req, res) => {
-  const clientId   = _cfg('fitbit_client_id');
-  const redirectUri = _cfg('fitbit_redirect_uri');
+  const u = uid(req);
+  const clientId   = _userCfg('fitbit_client_id',    u);
+  const redirectUri = _userCfg('fitbit_redirect_uri', u);
   if (!clientId || !redirectUri) {
-    return res.status(400).json({ error: 'Fitbit client_id and redirect_uri must be configured in Settings → Labs.' });
+    return res.status(400).json({ error: 'Fitbit client_id and redirect_uri must be configured in Settings → Wellness.' });
   }
 
-  const u = uid(req);
   const codeVerifier  = randomBytes(64).toString('base64url').slice(0, 128);
   const codeChallenge = createHash('sha256').update(codeVerifier).digest('base64url');
   const state         = randomBytes(16).toString('hex');
@@ -135,9 +174,9 @@ router.get('/callback', wrap(async (req, res) => {
   }
   _pkce.delete(state);
 
-  const clientId    = _cfg('fitbit_client_id');
-  const clientSecret = _cfg('fitbit_client_secret');
-  const redirectUri  = _cfg('fitbit_redirect_uri');
+  const clientId    = _userCfg('fitbit_client_id',     pkce.userId);
+  const clientSecret = _userCfg('fitbit_client_secret', pkce.userId);
+  const redirectUri  = _userCfg('fitbit_redirect_uri',  pkce.userId);
 
   const tokenRes = await fetch('https://api.fitbit.com/oauth2/token', {
     method: 'POST',

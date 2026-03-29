@@ -324,16 +324,47 @@
   let disconnectingFitbit   = false;
   let disconnectingWithings = false;
 
+  // Format a timestamp as "X minutes/hours/days ago"
+  function _timeAgo(isoStr) {
+    if (!isoStr) return null;
+    const diff = Date.now() - new Date(isoStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 2)   return 'just now';
+    if (mins < 60)  return `${mins} minutes ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24)   return `${hrs} hour${hrs !== 1 ? 's' : ''} ago`;
+    const days = Math.floor(hrs / 24);
+    return `${days} day${days !== 1 ? 's' : ''} ago`;
+  }
+
   async function loadLabsConfig() {
     if (labsLoaded) return;
     labsLoaded = true;
-    labsFitbitRedirectSuggested = 'https://your-domain.com/api/wellness/fitbit/callback';
+    labsFitbitRedirectSuggested = window.location.origin + '/api/wellness/fitbit/callback';
+    labsWithingsRedirectSuggested = window.location.origin + '/api/wellness/withings/callback';
+    // Load per-user credential config
     try {
-      const cfg = await NtApi.get('/api/app-config');
-      labsFitbitClientId     = cfg.fitbit_client_id     || '';
-      labsFitbitClientSecret = cfg.fitbit_client_secret || '';
-      labsFitbitRedirectUri  = cfg.fitbit_redirect_uri  || '';
-    } catch { /* non-admin users can't fetch app-config; hide fields below */ }
+      const cfg = await NtApi.get('/api/wellness/fitbit/config');
+      labsFitbitClientId    = cfg.client_id    || '';
+      labsFitbitRedirectUri = cfg.redirect_uri || '';
+    } catch { /* ignore */ }
+    try {
+      const cfg = await NtApi.get('/api/wellness/withings/config');
+      labsWithingsClientId    = cfg.client_id    || '';
+      labsWithingsRedirectUri = cfg.redirect_uri || '';
+    } catch { /* ignore */ }
+    // Admin: also load secrets from app-config for display (single-user or migration)
+    if ($currentUser?.role === 'admin' || !$userMgmtActive) {
+      try {
+        const cfg = await NtApi.get('/api/app-config');
+        if (!labsFitbitClientId)     labsFitbitClientId     = cfg.fitbit_client_id     || '';
+        if (!labsFitbitClientSecret) labsFitbitClientSecret = cfg.fitbit_client_secret || '';
+        if (!labsFitbitRedirectUri)  labsFitbitRedirectUri  = cfg.fitbit_redirect_uri  || '';
+        if (!labsWithingsClientId)     labsWithingsClientId     = cfg.withings_client_id     || '';
+        if (!labsWithingsClientSecret) labsWithingsClientSecret = cfg.withings_client_secret || '';
+        if (!labsWithingsRedirectUri)  labsWithingsRedirectUri  = cfg.withings_redirect_uri  || '';
+      } catch { /* ignore */ }
+    }
     // Load connection status for all users
     try { fitbitConnectionStatus  = await NtApi.get('/api/wellness/fitbit/status');  } catch { fitbitConnectionStatus  = { connected: false }; }
     try { withingsConnectionStatus = await NtApi.get('/api/wellness/withings/status'); } catch { withingsConnectionStatus = { connected: false }; }
@@ -386,12 +417,15 @@
 
   async function saveLabsFitbit() {
     try {
-      await Promise.all([
-        NtApi.put('/api/app-config', { key: 'fitbit_client_id',     value: labsFitbitClientId }),
-        NtApi.put('/api/app-config', { key: 'fitbit_client_secret', value: labsFitbitClientSecret }),
-        NtApi.put('/api/app-config', { key: 'fitbit_redirect_uri',  value: labsFitbitRedirectUri }),
-      ]);
-      showSuccess('Fitbit settings saved');
+      await NtApi.put('/api/wellness/fitbit/config', {
+        client_id:     labsFitbitClientId,
+        client_secret: labsFitbitClientSecret || undefined,
+        redirect_uri:  labsFitbitRedirectUri,
+      });
+      // Refresh status so Connect button reflects new config
+      fitbitConnectionStatus = null;
+      fitbitConnectionStatus = await NtApi.get('/api/wellness/fitbit/status');
+      showSuccess('Fitbit credentials saved');
     } catch (e) { showError('Failed to save: ' + e.message); }
   }
 
@@ -407,23 +441,15 @@
   let labsWithingsRedirectSuggested = '';
   let withingsSyncRangeVal = DB.getSetting('withingsSyncRange', 7);
 
-  async function loadWithingsConfig() {
-    labsWithingsRedirectSuggested = 'https://your-domain.com/api/wellness/withings/callback';
-    try {
-      const cfg = await NtApi.get('/api/app-config');
-      labsWithingsClientId     = cfg.withings_client_id     || '';
-      labsWithingsClientSecret = cfg.withings_client_secret || '';
-      labsWithingsRedirectUri  = cfg.withings_redirect_uri  || '';
-    } catch { /* admin only */ }
-  }
-
   async function saveLabsWithings() {
     try {
-      await Promise.all([
-        NtApi.put('/api/app-config', { key: 'withings_client_id',     value: labsWithingsClientId }),
-        NtApi.put('/api/app-config', { key: 'withings_client_secret', value: labsWithingsClientSecret }),
-        NtApi.put('/api/app-config', { key: 'withings_redirect_uri',  value: labsWithingsRedirectUri }),
-      ]);
+      await NtApi.put('/api/wellness/withings/config', {
+        client_id:     labsWithingsClientId,
+        client_secret: labsWithingsClientSecret || undefined,
+        redirect_uri:  labsWithingsRedirectUri,
+      });
+      withingsConnectionStatus = null;
+      withingsConnectionStatus = await NtApi.get('/api/wellness/withings/status');
       showSuccess('Withings credentials saved');
     } catch (e) { showError('Failed to save: ' + e.message); }
   }
@@ -2163,7 +2189,7 @@
     {/if}
 
     <!-- ── Wellness ──────────────────────────────────────────────────────────── -->
-    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'wellness')} on:click={() => { toggleSection('wellness'); loadLabsConfig(); loadWithingsConfig(); }}>
+    <button class="section-toggle wellness-toggle" class:hidden={!sectionVisible(settingsQuery, 'wellness')} on:click={() => { toggleSection('wellness'); loadLabsConfig(); }}>
       <span class="material-symbols-rounded si">monitor_heart</span>
       <span>Wellness</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.wellness}>expand_more</span>
@@ -2242,8 +2268,13 @@
               {:else if fitbitConnectionStatus.connected}
                 <div class="setting-row">
                   <div>
-                    <span class="setting-label">Connected device</span>
-                    <div class="setting-desc">{fitbitConnectionStatus.fitbitUserId || 'Fitbit account linked'}</div>
+                    <span class="setting-label">Connected</span>
+                    <div class="setting-desc">
+                      {fitbitConnectionStatus.fitbitUserId || 'Fitbit account linked'}
+                      {#if fitbitConnectionStatus.lastSyncedAt}
+                        · Last synced {_timeAgo(fitbitConnectionStatus.lastSyncedAt)}
+                      {/if}
+                    </div>
                   </div>
                   <button class="btn btn-ghost" style="height:32px;padding:0 12px;font-size:13px;color:var(--error,#f87171);border-color:var(--error,#f87171)"
                     on:click={disconnectFitbitFromSettings} disabled={disconnectingFitbit}>
@@ -2261,10 +2292,41 @@
                   </button>
                 </div>
               {:else}
-                <div class="setting-row">
-                  <div style="display:flex;align-items:center;gap:8px;color:var(--text-3)">
-                    <span class="material-symbols-rounded" style="font-size:18px">admin_panel_settings</span>
-                    <span class="setting-desc" style="margin:0">API credentials must be configured by an administrator before connecting.</span>
+                <!-- No credentials yet — show inline setup form -->
+                <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:12px">
+                  <div>
+                    <span class="setting-label">API Credentials</span>
+                    <div class="setting-desc">Register a free app at <strong>dev.fitbit.com</strong> (OAuth 2.0, Application Type: Personal) and paste your Client ID and Secret below.</div>
+                  </div>
+                  <div style="width:100%;display:flex;flex-direction:column;gap:8px">
+                    <div class="form-group" style="margin:0">
+                      <label class="form-label">Client ID</label>
+                      <input class="input" type="text" autocomplete="off" placeholder="e.g. 23ABC123"
+                        bind:value={labsFitbitClientId} />
+                    </div>
+                    <div class="form-group" style="margin:0">
+                      <label class="form-label">Client Secret</label>
+                      <div style="display:flex;gap:6px">
+                        {#if labsFitbitShowSecret}
+                          <input class="input" type="text" autocomplete="new-password" placeholder="••••••••" bind:value={labsFitbitClientSecret} style="flex:1" />
+                        {:else}
+                          <input class="input" type="password" autocomplete="new-password" placeholder="••••••••" bind:value={labsFitbitClientSecret} style="flex:1" />
+                        {/if}
+                        <button class="btn-icon" on:click={() => labsFitbitShowSecret = !labsFitbitShowSecret} title={labsFitbitShowSecret ? 'Hide' : 'Show'}>
+                          <span class="material-symbols-rounded">{labsFitbitShowSecret ? 'visibility_off' : 'visibility'}</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="form-group" style="margin:0">
+                      <label class="form-label">Redirect URI</label>
+                      <div class="setting-desc" style="margin-bottom:4px">Add this exact URI to your Fitbit app's Redirect URL list</div>
+                      <div style="display:flex;gap:6px">
+                        <input class="input" type="url" placeholder={labsFitbitRedirectSuggested} bind:value={labsFitbitRedirectUri} style="flex:1;font-size:12px" />
+                        <button class="btn-icon" on:click={copyRedirectUri} title="Copy URI"><span class="material-symbols-rounded">content_copy</span></button>
+                      </div>
+                      <div class="setting-desc" style="font-size:11px;margin-top:2px">Format: <code style="font-size:11px">https://your-domain.com/api/wellness/fitbit/callback</code></div>
+                    </div>
+                    <button class="btn btn-primary" style="align-self:flex-end" on:click={saveLabsFitbit}>Save &amp; Connect</button>
                   </div>
                 </div>
               {/if}
@@ -2315,8 +2377,13 @@
               {:else if withingsConnectionStatus.connected}
                 <div class="setting-row">
                   <div>
-                    <span class="setting-label">Connected device</span>
-                    <div class="setting-desc">{withingsConnectionStatus.withingsUserId ? 'User ' + withingsConnectionStatus.withingsUserId : 'Withings account linked'}</div>
+                    <span class="setting-label">Connected</span>
+                    <div class="setting-desc">
+                      {withingsConnectionStatus.withingsUserId ? 'User ' + withingsConnectionStatus.withingsUserId : 'Withings account linked'}
+                      {#if withingsConnectionStatus.lastSyncedAt}
+                        · Last synced {_timeAgo(withingsConnectionStatus.lastSyncedAt)}
+                      {/if}
+                    </div>
                   </div>
                   <button class="btn btn-ghost" style="height:32px;padding:0 12px;font-size:13px;color:var(--error,#f87171);border-color:var(--error,#f87171)"
                     on:click={disconnectWithingsFromSettings} disabled={disconnectingWithings}>
@@ -2334,10 +2401,41 @@
                   </button>
                 </div>
               {:else}
-                <div class="setting-row">
-                  <div style="display:flex;align-items:center;gap:8px;color:var(--text-3)">
-                    <span class="material-symbols-rounded" style="font-size:18px">admin_panel_settings</span>
-                    <span class="setting-desc" style="margin:0">API credentials must be configured by an administrator before connecting.</span>
+                <!-- No credentials yet — show inline setup form -->
+                <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:12px">
+                  <div>
+                    <span class="setting-label">API Credentials</span>
+                    <div class="setting-desc">Register a free app at <strong>developer.withings.com</strong>, add the redirect URI, then paste your Client ID and Secret below.</div>
+                  </div>
+                  <div style="width:100%;display:flex;flex-direction:column;gap:8px">
+                    <div class="form-group" style="margin:0">
+                      <label class="form-label">Client ID</label>
+                      <input class="input" type="text" autocomplete="off" placeholder="e.g. abc123def456"
+                        bind:value={labsWithingsClientId} />
+                    </div>
+                    <div class="form-group" style="margin:0">
+                      <label class="form-label">Client Secret</label>
+                      <div style="display:flex;gap:6px">
+                        {#if labsWithingsShowSecret}
+                          <input class="input" type="text" autocomplete="new-password" placeholder="••••••••" bind:value={labsWithingsClientSecret} style="flex:1" />
+                        {:else}
+                          <input class="input" type="password" autocomplete="new-password" placeholder="••••••••" bind:value={labsWithingsClientSecret} style="flex:1" />
+                        {/if}
+                        <button class="btn-icon" on:click={() => labsWithingsShowSecret = !labsWithingsShowSecret} title={labsWithingsShowSecret ? 'Hide' : 'Show'}>
+                          <span class="material-symbols-rounded">{labsWithingsShowSecret ? 'visibility_off' : 'visibility'}</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="form-group" style="margin:0">
+                      <label class="form-label">Redirect URI</label>
+                      <div class="setting-desc" style="margin-bottom:4px">Add this exact URI to your Withings app's redirect URL list</div>
+                      <div style="display:flex;gap:6px">
+                        <input class="input" type="url" placeholder={labsWithingsRedirectSuggested} bind:value={labsWithingsRedirectUri} style="flex:1;font-size:12px" />
+                        <button class="btn-icon" on:click={copyWithingsRedirectUri} title="Copy URI"><span class="material-symbols-rounded">content_copy</span></button>
+                      </div>
+                      <div class="setting-desc" style="font-size:11px;margin-top:2px">Format: <code style="font-size:11px">https://your-domain.com/api/wellness/withings/callback</code></div>
+                    </div>
+                    <button class="btn btn-primary" style="align-self:flex-end" on:click={saveLabsWithings}>Save &amp; Connect</button>
                   </div>
                 </div>
               {/if}
@@ -2349,123 +2447,23 @@
     {/if}
 
     <!-- ── Labs ─────────────────────────────────────────────────────────────── -->
-    <button class="section-toggle labs-toggle" class:hidden={!sectionVisible(settingsQuery, 'labs')} on:click={() => { toggleSection('labs'); if ($currentUser?.role === 'admin' || !$userMgmtActive) { loadLabsConfig(); loadWithingsConfig(); } }}>
+    <button class="section-toggle labs-toggle" class:hidden={!sectionVisible(settingsQuery, 'labs')} on:click={() => { toggleSection('labs'); loadLabsConfig(); }}>
       <span class="material-symbols-rounded si">science</span>
       <span>Labs <span class="labs-badge">Experimental</span></span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.labs}>expand_more</span>
     </button>
     {#if sectionOpen(openSections, settingsQuery, 'labs') && sectionVisible(settingsQuery, 'labs')}
       <div class="section-body" transition:slide={{ duration: 180 }}>
-        <p class="sub-label" style="padding-bottom:4px">Admin-only API credentials for third-party integrations</p>
-
-        <!-- ── Fitbit API credentials ── -->
-        <p class="sub-label" style="padding-top:16px">Fitbit API Credentials</p>
-        {#if $currentUser?.role === 'admin' || !$userMgmtActive}
-          <p class="sub-label" style="padding-top:4px;font-size:11px;opacity:0.7">
-            Create a Fitbit app at <strong>dev.fitbit.com</strong>, set OAuth 2.0 Application Type to "Personal",
-            and copy the Client ID and Secret below.
-          </p>
-          <div class="card settings-card" style="padding:16px;display:flex;flex-direction:column;gap:12px">
-            <div class="form-group">
-              <label class="form-label">Client ID</label>
-              <input class="input" type="text" autocomplete="off" placeholder="e.g. 23ABC123"
-                bind:value={labsFitbitClientId} />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Client Secret</label>
-              <div style="display:flex;gap:6px">
-                {#if labsFitbitShowSecret}
-                  <input class="input" type="text" autocomplete="new-password"
-                    placeholder="••••••••" bind:value={labsFitbitClientSecret} style="flex:1" />
-                {:else}
-                  <input class="input" type="password" autocomplete="new-password"
-                    placeholder="••••••••" bind:value={labsFitbitClientSecret} style="flex:1" />
-                {/if}
-                <button class="btn-icon" on:click={() => labsFitbitShowSecret = !labsFitbitShowSecret}
-                  title={labsFitbitShowSecret ? 'Hide' : 'Show'}>
-                  <span class="material-symbols-rounded">{labsFitbitShowSecret ? 'visibility_off' : 'visibility'}</span>
-                </button>
-              </div>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Redirect URI</label>
-              <div class="setting-desc" style="margin-bottom:4px">Enter your domain — add this exact URI to your Fitbit app's "Redirect URL" list</div>
-              <div style="display:flex;gap:6px">
-                <input class="input" type="url" placeholder={labsFitbitRedirectSuggested}
-                  bind:value={labsFitbitRedirectUri} style="flex:1;font-size:12px" />
-                <button class="btn-icon" on:click={copyRedirectUri} title="Copy URI" aria-label="Copy redirect URI">
-                  <span class="material-symbols-rounded">content_copy</span>
-                </button>
-              </div>
-              <div class="setting-desc" style="font-size:11px;margin-top:2px">
-                Format: <code style="font-size:11px">https://your-domain.com/api/wellness/fitbit/callback</code>
-              </div>
-            </div>
-            <button class="btn btn-primary" style="align-self:flex-end" on:click={saveLabsFitbit}>Save Fitbit Credentials</button>
+        <div class="card settings-card" style="padding:14px">
+          <div style="display:flex;align-items:flex-start;gap:10px;color:var(--text-2)">
+            <span class="material-symbols-rounded" style="font-size:18px;flex-shrink:0;margin-top:1px">info</span>
+            <span style="font-size:13px;line-height:1.5">
+              Wellness API credentials (Fitbit, Withings) are now configured per-user in
+              <button class="link-btn" on:click={() => { toggleSection('wellness'); loadLabsConfig(); document.querySelector('.section-toggle.wellness-toggle')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>Settings → Wellness</button>
+              — each user registers their own developer app.
+            </span>
           </div>
-        {:else}
-          <div class="card settings-card" style="padding:14px">
-            <div style="display:flex;align-items:center;gap:8px;color:var(--text-2)">
-              <span class="material-symbols-rounded" style="font-size:18px">admin_panel_settings</span>
-              <span style="font-size:13px">Fitbit API credentials are managed by your administrator.</span>
-            </div>
-          </div>
-        {/if}
-
-        <!-- ── Withings API credentials ── -->
-        <p class="sub-label" style="padding-top:16px">Withings API Credentials</p>
-        {#if $currentUser?.role === 'admin' || !$userMgmtActive}
-          <p class="sub-label" style="padding-top:4px;font-size:11px;opacity:0.7">
-            Create a Withings app at <strong>developer.withings.com</strong>, add the redirect URI,
-            and paste the Client ID and Secret below.
-          </p>
-          <div class="card settings-card" style="padding:16px;display:flex;flex-direction:column;gap:12px">
-            <div class="form-group">
-              <label class="form-label">Client ID</label>
-              <input class="input" type="text" autocomplete="off" placeholder="e.g. abc123def456"
-                bind:value={labsWithingsClientId} />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Client Secret</label>
-              <div style="display:flex;gap:6px">
-                {#if labsWithingsShowSecret}
-                  <input class="input" type="text" autocomplete="new-password"
-                    placeholder="••••••••" bind:value={labsWithingsClientSecret} style="flex:1" />
-                {:else}
-                  <input class="input" type="password" autocomplete="new-password"
-                    placeholder="••••••••" bind:value={labsWithingsClientSecret} style="flex:1" />
-                {/if}
-                <button class="btn-icon" on:click={() => labsWithingsShowSecret = !labsWithingsShowSecret}
-                  title={labsWithingsShowSecret ? 'Hide' : 'Show'}>
-                  <span class="material-symbols-rounded">{labsWithingsShowSecret ? 'visibility_off' : 'visibility'}</span>
-                </button>
-              </div>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Redirect URI</label>
-              <div class="setting-desc" style="margin-bottom:4px">Enter your domain — add this exact URI to your Withings app's redirect URL list</div>
-              <div style="display:flex;gap:6px">
-                <input class="input" type="url" placeholder={labsWithingsRedirectSuggested}
-                  bind:value={labsWithingsRedirectUri} style="flex:1;font-size:12px" />
-                <button class="btn-icon" on:click={copyWithingsRedirectUri} title="Copy URI" aria-label="Copy redirect URI">
-                  <span class="material-symbols-rounded">content_copy</span>
-                </button>
-              </div>
-              <div class="setting-desc" style="font-size:11px;margin-top:2px">
-                Format: <code style="font-size:11px">https://your-domain.com/api/wellness/withings/callback</code>
-              </div>
-            </div>
-            <button class="btn btn-primary" style="align-self:flex-end" on:click={saveLabsWithings}>Save Withings Credentials</button>
-          </div>
-        {:else}
-          <div class="card settings-card" style="padding:14px">
-            <div style="display:flex;align-items:center;gap:8px;color:var(--text-2)">
-              <span class="material-symbols-rounded" style="font-size:18px">admin_panel_settings</span>
-              <span style="font-size:13px">Withings API credentials are managed by your administrator.</span>
-            </div>
-          </div>
-        {/if}
-
+        </div>
       </div>
     {/if}
 
@@ -3410,6 +3408,12 @@
     color: var(--accent);
     font-weight: 600;
   }
+  .link-btn {
+    background: none; border: none; padding: 0; cursor: pointer;
+    color: var(--accent); font-size: inherit; text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .link-btn:hover { opacity: 0.8; }
   .labs-badge {
     font-size: 10px;
     font-weight: 700;

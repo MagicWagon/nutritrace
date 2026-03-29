@@ -5,6 +5,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.18.0-beta] — 2026-03-29
+
+### Added
+- **Per-user Fitbit & Withings credentials** — each user registers their own developer OAuth app; credentials stored in user_settings (multi-user) or app_config (single-user), no admin required
+- **Inline credential setup in Settings → Wellness** — when a tracker is enabled but not yet configured, the credential form appears inline with step-by-step instructions; no separate Labs section needed
+- **Last synced timestamp** — `/status` routes now return `lastSyncedAt`; Settings → Wellness shows "Last synced X minutes ago" next to each connected device
+- **DEPLOY.md** — full self-hosting guide: Docker Compose setup, all env vars, first-run walkthrough, Fitbit & Withings OAuth app registration steps with required scopes and redirect URI format
+
+### Changed
+- Settings → Labs now shows a brief note directing users to Settings → Wellness for credential setup
+- Redirect URI suggestion auto-filled from `window.location.origin` (matches actual deployment URL instead of placeholder)
+
+---
+
+## [0.17.0-alpha] — 2026-03-29
+
+### Added
+- **Wellness settings section** — dedicated "Wellness" section in Settings (between AI Assistant and Labs) for all user-facing wellness controls: Activity Tracking toggle, Sync Mode selector, and per-integration cards (Fitbit + Withings) each with an enable toggle, sync range (chips + custom input), and a 4-state connection UI (loading / connected+disconnect / configured+connect / admin-required)
+
+### Changed
+- Settings → Labs now contains only admin API credentials (Fitbit Client ID/Secret, Withings Client ID/Secret); all operational controls moved to the new Wellness section
+- Non-admin users see an info card in Labs noting that credentials are managed by an admin
+
+---
+
 ## [0.16.0-alpha] — 2026-03-29
 
 ### Added
