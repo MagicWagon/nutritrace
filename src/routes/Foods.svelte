@@ -417,12 +417,13 @@
   }
 
   async function addYesterdayMeal(group) {
+    const targetMeal = Number(pickMeal) || 0;
     const { addDiaryItem } = await import('../stores/diary.js');
     for (const item of group.items) {
-      await addDiaryItem({ ...item }, group.mealIdx, pickDate);
+      await addDiaryItem({ ...item }, targetMeal, pickDate);
     }
     import('../stores/toast.js').then(m => m.showSuccess('Added ' + group.mealName));
-    editorState.lastMealAdded = group.mealIdx;
+    editorState.lastMealAdded = targetMeal;
     history.back();
   }
 
