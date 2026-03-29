@@ -303,60 +303,64 @@
   let wellnessEnabledVal   = DB.getSetting('wellnessEnabled',   false);
   let fitbitEnabledVal     = DB.getSetting('fitbitEnabled',     false);
   let withingsEnabledVal   = DB.getSetting('withingsEnabled',   false);
-  // ── Wellness metric visibility ────────────────────────────────────────────
-  const WELLNESS_METRIC_GROUPS = [
-    { label: 'Movement', metrics: [
-      { id: 'steps',                label: 'Steps'            },
-      { id: 'distance_km',          label: 'Distance'         },
-      { id: 'floors',               label: 'Floors'           },
-      { id: 'active_minutes',       label: 'Active Min'       },
-      { id: 'calories_out',         label: 'Calories'         },
-      { id: 'active_zone_minutes',  label: 'Zone Min'         },
-      { id: 'moderate_intensity_min', label: 'Moderate'       },
-      { id: 'vigorous_intensity_min', label: 'Vigorous'       },
-    ]},
-    { label: 'Sleep', metrics: [
-      { id: 'sleep_duration_min',  label: 'Duration'    },
-      { id: 'sleep_efficiency',    label: 'Efficiency'  },
-      { id: 'sleep_deep_min',      label: 'Deep'        },
-      { id: 'sleep_light_min',     label: 'Light'       },
-      { id: 'sleep_rem_min',       label: 'REM'         },
-      { id: 'sleep_wake_min',      label: 'Awake'       },
-      { id: 'sleep_score',         label: 'Score'       },
-    ]},
-    { label: 'Heart', metrics: [
-      { id: 'resting_hr',        label: 'Resting HR'   },
-      { id: 'hrv_daily_rmssd',   label: 'HRV'          },
-      { id: 'spo2_avg',          label: 'SpO2'         },
-      { id: 'respiratory_rate',  label: 'Resp. Rate'   },
-      { id: 'vo2_max',           label: 'VO2 Max'      },
-    ]},
-    { label: 'Garmin', metrics: [
-      { id: 'body_battery_high', label: 'Battery High' },
-      { id: 'body_battery_low',  label: 'Battery Low'  },
-      { id: 'stress_avg',        label: 'Stress'       },
-    ]},
-    { label: 'Body', metrics: [
-      { id: 'weight_kg',      label: 'Weight'       },
-      { id: 'body_fat_pct',   label: 'Body Fat'     },
-      { id: 'muscle_mass_kg', label: 'Muscle Mass'  },
-      { id: 'bone_mass_kg',   label: 'Bone Mass'    },
-      { id: 'body_water_pct', label: 'Body Water'   },
-      { id: 'lean_mass_kg',   label: 'Lean Mass'    },
-      { id: 'fat_mass_kg',    label: 'Fat Mass'     },
-      { id: 'visceral_fat',   label: 'Visceral Fat' },
-    ]},
-    { label: 'Body Scan', metrics: [
-      { id: 'vascular_age',        label: 'Vascular Age'  },
-      { id: 'heart_pulse_bpm',     label: 'Heart Pulse'   },
-      { id: 'nerve_health_score',  label: 'Nerve Activity'},
-      { id: 'pulse_wave_velocity', label: 'Pulse Wave'    },
-      { id: 'ecg_heart_rate',      label: 'ECG HR'        },
-      { id: 'ecg_afib',            label: 'AFib'          },
-    ]},
-    { label: 'Segmental', metrics: [
-      { id: 'segmental_analysis', label: 'Segmental Analysis' },
-    ]},
+  // ── Wellness metric visibility (per integration, alphabetical by label) ──
+  const FITBIT_METRICS = [
+    { id: 'active_minutes',       label: 'Active Min'       },
+    { id: 'active_zone_minutes',  label: 'Active Zone Min'  },
+    { id: 'calories_out',         label: 'Calories'         },
+    { id: 'sleep_deep_min',       label: 'Deep Sleep'       },
+    { id: 'distance_km',          label: 'Distance'         },
+    { id: 'floors',               label: 'Floors'           },
+    { id: 'hrv_daily_rmssd',      label: 'HRV'              },
+    { id: 'sleep_light_min',      label: 'Light Sleep'      },
+    { id: 'sleep_rem_min',        label: 'REM Sleep'        },
+    { id: 'respiratory_rate',     label: 'Resp. Rate'       },
+    { id: 'resting_hr',           label: 'Resting HR'       },
+    { id: 'sleep_duration_min',   label: 'Sleep Duration'   },
+    { id: 'sleep_efficiency',     label: 'Sleep Efficiency' },
+    { id: 'spo2_avg',             label: 'SpO2'             },
+    { id: 'steps',                label: 'Steps'            },
+    { id: 'vo2_max',              label: 'VO2 Max'          },
+    { id: 'sleep_wake_min',       label: 'Wake Time'        },
+  ];
+  const GARMIN_METRICS = [
+    { id: 'active_minutes',         label: 'Active Min'          },
+    { id: 'body_battery_high',      label: 'Battery High'        },
+    { id: 'body_battery_low',       label: 'Battery Low'         },
+    { id: 'calories_out',           label: 'Calories'            },
+    { id: 'sleep_deep_min',         label: 'Deep Sleep'          },
+    { id: 'distance_km',            label: 'Distance'            },
+    { id: 'floors',                 label: 'Floors'              },
+    { id: 'hrv_daily_rmssd',        label: 'HRV'                 },
+    { id: 'sleep_light_min',        label: 'Light Sleep'         },
+    { id: 'moderate_intensity_min', label: 'Moderate Intensity'  },
+    { id: 'sleep_rem_min',          label: 'REM Sleep'           },
+    { id: 'respiratory_rate',       label: 'Resp. Rate'          },
+    { id: 'resting_hr',             label: 'Resting HR'          },
+    { id: 'sleep_duration_min',     label: 'Sleep Duration'      },
+    { id: 'sleep_score',            label: 'Sleep Score'         },
+    { id: 'spo2_avg',               label: 'SpO2'                },
+    { id: 'steps',                  label: 'Steps'               },
+    { id: 'stress_avg',             label: 'Stress'              },
+    { id: 'vigorous_intensity_min', label: 'Vigorous Intensity'  },
+    { id: 'sleep_wake_min',         label: 'Wake Time'           },
+  ];
+  const WITHINGS_METRICS = [
+    { id: 'ecg_afib',            label: 'AFib'               },
+    { id: 'body_fat_pct',        label: 'Body Fat'           },
+    { id: 'body_water_pct',      label: 'Body Water'         },
+    { id: 'bone_mass_kg',        label: 'Bone Mass'          },
+    { id: 'ecg_heart_rate',      label: 'ECG Heart Rate'     },
+    { id: 'fat_mass_kg',         label: 'Fat Mass'           },
+    { id: 'heart_pulse_bpm',     label: 'Heart Pulse'        },
+    { id: 'lean_mass_kg',        label: 'Lean Mass'          },
+    { id: 'muscle_mass_kg',      label: 'Muscle Mass'        },
+    { id: 'nerve_health_score',  label: 'Nerve Activity'     },
+    { id: 'pulse_wave_velocity', label: 'Pulse Wave'         },
+    { id: 'segmental_analysis',  label: 'Segmental Analysis' },
+    { id: 'vascular_age',        label: 'Vascular Age'       },
+    { id: 'visceral_fat',        label: 'Visceral Fat'       },
+    { id: 'weight_kg',           label: 'Weight'             },
   ];
 
   function isWellnessMetricVisible(id) {
@@ -365,7 +369,7 @@
   }
 
   function toggleWellnessMetric(id) {
-    const allIds = WELLNESS_METRIC_GROUPS.flatMap(g => g.metrics.map(m => m.id));
+    const allIds = [...FITBIT_METRICS, ...GARMIN_METRICS, ...WITHINGS_METRICS].map(m => m.id);
     const cur = $wellnessMetrics ?? allIds;
     if (cur.includes(id)) {
       wellnessMetrics.set(cur.filter(x => x !== id));
@@ -2207,30 +2211,8 @@
           {/if}
         </div>
 
-        <!-- ── Visible Metrics ── -->
-        <p class="sub-label" style="padding-top:16px">Visible Metrics</p>
-        <div class="card settings-card">
-          <div class="setting-desc" style="padding:2px 0 14px">Choose which metrics appear in Wellness and future reports. Data is always synced regardless of visibility.</div>
-          {#each WELLNESS_METRIC_GROUPS as grp, gi}
-            {#if gi > 0}<div class="setting-divider"></div>{/if}
-            <div class="metric-vis-group">
-              <span class="metric-vis-label">{grp.label}</span>
-              <div class="chip-group" style="flex-wrap:wrap;gap:6px">
-                {#each grp.metrics as m}
-                  <button class="chip" class:chip-active={isWellnessMetricVisible(m.id)}
-                    on:click={() => toggleWellnessMetric(m.id)}>{m.label}</button>
-                {/each}
-              </div>
-            </div>
-          {/each}
-          <div class="setting-divider"></div>
-          <div class="setting-row" style="justify-content:flex-end">
-            <button class="btn btn-sm" on:click={() => wellnessMetrics.set(null)}>Reset to defaults</button>
-          </div>
-        </div>
-
-        <!-- ── Fitbit ── -->
         {#if wellnessEnabledVal}
+          <!-- ── Fitbit ── -->
           <p class="sub-label" style="padding-top:16px">Fitbit</p>
           <div class="card settings-card">
             <div class="setting-row">
@@ -2336,118 +2318,18 @@
                   </div>
                 </div>
               {/if}
-            {/if}
-          </div>
-
-          <!-- ── Withings ── -->
-          <p class="sub-label" style="padding-top:16px">Withings</p>
-          <div class="card settings-card">
-            <div class="setting-row">
-              <div>
-                <span class="setting-label">Enable Withings</span>
-                <div class="setting-desc">Body composition from scales (weight, fat %, muscle, bone mass, and more)</div>
-              </div>
-              <Toggle checked={withingsEnabledVal} on:change={e => { withingsEnabledVal = e.detail; withingsEnabled.set(e.detail); }} />
-            </div>
-
-            {#if withingsEnabledVal}
               <div class="setting-divider"></div>
               <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px">
-                <div>
-                  <span class="setting-label">Sync Range</span>
-                  <div class="setting-desc">How far back the manual Sync button fetches.</div>
-                </div>
-                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                  <div class="chip-group">
-                    {#each SYNC_RANGE_OPTIONS as opt}
-                      <button class="chip" class:chip-active={withingsSyncRangeVal === opt.value}
-                        on:click={() => { withingsSyncRangeVal = opt.value; withingsSyncRange.set(opt.value); }}
-                      >{opt.label}</button>
-                    {/each}
-                  </div>
-                  <div style="display:flex;align-items:center;gap:4px">
-                    <input class="input" type="number" min="1" max="730" style="width:64px;height:32px;padding:0 8px;font-size:13px;text-align:center"
-                      class:input-active={!SYNC_RANGE_OPTIONS.some(o => o.value === withingsSyncRangeVal)}
-                      value={withingsSyncRangeVal}
-                      on:change={e => { const v = Math.max(1, parseInt(e.target.value)||1); withingsSyncRangeVal = v; withingsSyncRange.set(v); }}
-                      placeholder="days" title="Custom number of days" />
-                    <span class="setting-desc" style="margin:0">days</span>
-                  </div>
+                <span class="setting-label">Visible Metrics</span>
+                <div class="chip-group" style="flex-wrap:wrap;gap:6px">
+                  {#each FITBIT_METRICS as m}
+                    <button class="chip" class:chip-active={isWellnessMetricVisible(m.id)}
+                      on:click={() => toggleWellnessMetric(m.id)}>{m.label}</button>
+                  {/each}
                 </div>
               </div>
-              <div class="setting-divider"></div>
-              {#if withingsConnectionStatus === null}
-                <div class="setting-row">
-                  <span class="setting-desc">Loading connection status…</span>
-                </div>
-              {:else if withingsConnectionStatus.connected}
-                <div class="setting-row">
-                  <div>
-                    <span class="setting-label">Connected</span>
-                    <div class="setting-desc">
-                      {withingsConnectionStatus.withingsUserId ? 'User ' + withingsConnectionStatus.withingsUserId : 'Withings account linked'}
-                      {#if withingsConnectionStatus.lastSyncedAt}
-                        · Last synced {_timeAgo(withingsConnectionStatus.lastSyncedAt)}
-                      {/if}
-                    </div>
-                  </div>
-                  <button class="btn btn-ghost" style="height:32px;padding:0 12px;font-size:13px;color:var(--error,#f87171);border-color:var(--error,#f87171)"
-                    on:click={disconnectWithingsFromSettings} disabled={disconnectingWithings}>
-                    {disconnectingWithings ? 'Disconnecting…' : 'Disconnect'}
-                  </button>
-                </div>
-              {:else if withingsConnectionStatus.configured}
-                <div class="setting-row">
-                  <div>
-                    <span class="setting-label">Not connected</span>
-                    <div class="setting-desc">Authorize NutriTrace to read your Withings data.</div>
-                  </div>
-                  <button class="btn btn-primary" style="height:32px;padding:0 12px;font-size:13px" on:click={connectWithingsFromSettings} disabled={connectingWithings}>
-                    {connectingWithings ? 'Connecting…' : 'Connect'}
-                  </button>
-                </div>
-              {:else}
-                <!-- No credentials yet — show inline setup form -->
-                <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:12px">
-                  <div>
-                    <span class="setting-label">API Credentials</span>
-                    <div class="setting-desc">Register a free app at <strong>developer.withings.com</strong>, add the redirect URI, then paste your Client ID and Secret below.</div>
-                  </div>
-                  <div style="width:100%;display:flex;flex-direction:column;gap:8px">
-                    <div class="form-group" style="margin:0">
-                      <label class="form-label">Client ID</label>
-                      <input class="input" type="text" autocomplete="off" placeholder="e.g. abc123def456"
-                        bind:value={withingsClientId} />
-                    </div>
-                    <div class="form-group" style="margin:0">
-                      <label class="form-label">Client Secret</label>
-                      <div style="display:flex;gap:6px">
-                        {#if withingsShowSecret}
-                          <input class="input" type="text" autocomplete="new-password" placeholder="••••••••" bind:value={withingsClientSecret} style="flex:1" />
-                        {:else}
-                          <input class="input" type="password" autocomplete="new-password" placeholder="••••••••" bind:value={withingsClientSecret} style="flex:1" />
-                        {/if}
-                        <button class="btn-icon" on:click={() => withingsShowSecret = !withingsShowSecret} title={withingsShowSecret ? 'Hide' : 'Show'}>
-                          <span class="material-symbols-rounded">{withingsShowSecret ? 'visibility_off' : 'visibility'}</span>
-                        </button>
-                      </div>
-                    </div>
-                    <div class="form-group" style="margin:0">
-                      <label class="form-label">Redirect URI</label>
-                      <div class="setting-desc" style="margin-bottom:4px">Add this exact URI to your Withings app's redirect URL list</div>
-                      <div style="display:flex;gap:6px">
-                        <input class="input" type="url" placeholder={withingsRedirectSuggested} bind:value={withingsRedirectUri} style="flex:1;font-size:12px" />
-                        <button class="btn-icon" on:click={copyWithingsRedirectUri} title="Copy URI"><span class="material-symbols-rounded">content_copy</span></button>
-                      </div>
-                      <div class="setting-desc" style="font-size:11px;margin-top:2px">Format: <code style="font-size:11px">https://your-domain.com/api/wellness/withings/callback</code></div>
-                    </div>
-                    <button class="btn btn-primary" style="align-self:flex-end" on:click={saveWithingsConfig}>Save &amp; Connect</button>
-                  </div>
-                </div>
-              {/if}
             {/if}
           </div>
-        {/if}
 
           <!-- ── Garmin (Experimental) ── -->
           <p class="sub-label" style="padding-top:16px">
@@ -2557,8 +2439,142 @@
                   </div>
                 </div>
               {/if}
+              <div class="setting-divider"></div>
+              <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px">
+                <span class="setting-label">Visible Metrics</span>
+                <div class="chip-group" style="flex-wrap:wrap;gap:6px">
+                  {#each GARMIN_METRICS as m}
+                    <button class="chip" class:chip-active={isWellnessMetricVisible(m.id)}
+                      on:click={() => toggleWellnessMetric(m.id)}>{m.label}</button>
+                  {/each}
+                </div>
+              </div>
             {/if}
           </div>
+
+          <!-- ── Withings ── -->
+          <p class="sub-label" style="padding-top:16px">Withings</p>
+          <div class="card settings-card">
+            <div class="setting-row">
+              <div>
+                <span class="setting-label">Enable Withings</span>
+                <div class="setting-desc">Body composition from scales (weight, fat %, muscle, bone mass, and more)</div>
+              </div>
+              <Toggle checked={withingsEnabledVal} on:change={e => { withingsEnabledVal = e.detail; withingsEnabled.set(e.detail); }} />
+            </div>
+
+            {#if withingsEnabledVal}
+              <div class="setting-divider"></div>
+              <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px">
+                <div>
+                  <span class="setting-label">Sync Range</span>
+                  <div class="setting-desc">How far back the manual Sync button fetches.</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                  <div class="chip-group">
+                    {#each SYNC_RANGE_OPTIONS as opt}
+                      <button class="chip" class:chip-active={withingsSyncRangeVal === opt.value}
+                        on:click={() => { withingsSyncRangeVal = opt.value; withingsSyncRange.set(opt.value); }}
+                      >{opt.label}</button>
+                    {/each}
+                  </div>
+                  <div style="display:flex;align-items:center;gap:4px">
+                    <input class="input" type="number" min="1" max="730" style="width:64px;height:32px;padding:0 8px;font-size:13px;text-align:center"
+                      class:input-active={!SYNC_RANGE_OPTIONS.some(o => o.value === withingsSyncRangeVal)}
+                      value={withingsSyncRangeVal}
+                      on:change={e => { const v = Math.max(1, parseInt(e.target.value)||1); withingsSyncRangeVal = v; withingsSyncRange.set(v); }}
+                      placeholder="days" title="Custom number of days" />
+                    <span class="setting-desc" style="margin:0">days</span>
+                  </div>
+                </div>
+              </div>
+              <div class="setting-divider"></div>
+              {#if withingsConnectionStatus === null}
+                <div class="setting-row">
+                  <span class="setting-desc">Loading connection status…</span>
+                </div>
+              {:else if withingsConnectionStatus.connected}
+                <div class="setting-row">
+                  <div>
+                    <span class="setting-label">Connected</span>
+                    <div class="setting-desc">
+                      {withingsConnectionStatus.withingsUserId ? 'User ' + withingsConnectionStatus.withingsUserId : 'Withings account linked'}
+                      {#if withingsConnectionStatus.lastSyncedAt}
+                        · Last synced {_timeAgo(withingsConnectionStatus.lastSyncedAt)}
+                      {/if}
+                    </div>
+                  </div>
+                  <button class="btn btn-ghost" style="height:32px;padding:0 12px;font-size:13px;color:var(--error,#f87171);border-color:var(--error,#f87171)"
+                    on:click={disconnectWithingsFromSettings} disabled={disconnectingWithings}>
+                    {disconnectingWithings ? 'Disconnecting…' : 'Disconnect'}
+                  </button>
+                </div>
+              {:else if withingsConnectionStatus.configured}
+                <div class="setting-row">
+                  <div>
+                    <span class="setting-label">Not connected</span>
+                    <div class="setting-desc">Authorize NutriTrace to read your Withings data.</div>
+                  </div>
+                  <button class="btn btn-primary" style="height:32px;padding:0 12px;font-size:13px" on:click={connectWithingsFromSettings} disabled={connectingWithings}>
+                    {connectingWithings ? 'Connecting…' : 'Connect'}
+                  </button>
+                </div>
+              {:else}
+                <!-- No credentials yet — show inline setup form -->
+                <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:12px">
+                  <div>
+                    <span class="setting-label">API Credentials</span>
+                    <div class="setting-desc">Register a free app at <strong>developer.withings.com</strong>, add the redirect URI, then paste your Client ID and Secret below.</div>
+                  </div>
+                  <div style="width:100%;display:flex;flex-direction:column;gap:8px">
+                    <div class="form-group" style="margin:0">
+                      <label class="form-label">Client ID</label>
+                      <input class="input" type="text" autocomplete="off" placeholder="e.g. abc123def456"
+                        bind:value={withingsClientId} />
+                    </div>
+                    <div class="form-group" style="margin:0">
+                      <label class="form-label">Client Secret</label>
+                      <div style="display:flex;gap:6px">
+                        {#if withingsShowSecret}
+                          <input class="input" type="text" autocomplete="new-password" placeholder="••••••••" bind:value={withingsClientSecret} style="flex:1" />
+                        {:else}
+                          <input class="input" type="password" autocomplete="new-password" placeholder="••••••••" bind:value={withingsClientSecret} style="flex:1" />
+                        {/if}
+                        <button class="btn-icon" on:click={() => withingsShowSecret = !withingsShowSecret} title={withingsShowSecret ? 'Hide' : 'Show'}>
+                          <span class="material-symbols-rounded">{withingsShowSecret ? 'visibility_off' : 'visibility'}</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="form-group" style="margin:0">
+                      <label class="form-label">Redirect URI</label>
+                      <div class="setting-desc" style="margin-bottom:4px">Add this exact URI to your Withings app's redirect URL list</div>
+                      <div style="display:flex;gap:6px">
+                        <input class="input" type="url" placeholder={withingsRedirectSuggested} bind:value={withingsRedirectUri} style="flex:1;font-size:12px" />
+                        <button class="btn-icon" on:click={copyWithingsRedirectUri} title="Copy URI"><span class="material-symbols-rounded">content_copy</span></button>
+                      </div>
+                      <div class="setting-desc" style="font-size:11px;margin-top:2px">Format: <code style="font-size:11px">https://your-domain.com/api/wellness/withings/callback</code></div>
+                    </div>
+                    <button class="btn btn-primary" style="align-self:flex-end" on:click={saveWithingsConfig}>Save &amp; Connect</button>
+                  </div>
+                </div>
+              {/if}
+              <div class="setting-divider"></div>
+              <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px">
+                <span class="setting-label">Visible Metrics</span>
+                <div class="chip-group" style="flex-wrap:wrap;gap:6px">
+                  {#each WITHINGS_METRICS as m}
+                    <button class="chip" class:chip-active={isWellnessMetricVisible(m.id)}
+                      on:click={() => toggleWellnessMetric(m.id)}>{m.label}</button>
+                  {/each}
+                </div>
+              </div>
+            {/if}
+          </div>
+
+          <div style="display:flex;justify-content:flex-end;margin-top:4px">
+            <button class="btn btn-sm" on:click={() => wellnessMetrics.set(null)}>Reset visible metrics</button>
+          </div>
+        {/if}
 
       </div>
     {/if}
@@ -3560,17 +3576,4 @@
     margin-bottom: 4px;
   }
   .env-lock-banner .material-symbols-rounded { font-size: 16px; color: var(--accent); flex-shrink: 0; }
-  .metric-vis-group {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 10px 0;
-  }
-  .metric-vis-label {
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-3);
-  }
 </style>
