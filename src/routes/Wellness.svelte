@@ -35,7 +35,7 @@
     { id: 'hrv_daily_rmssd',    label: 'HRV (RMSSD)',        unit: 'ms',  group: 'heart', icon: 'monitor_heart',      fmt: v => v.toFixed(1) },
     { id: 'spo2_avg',           label: 'SpO2',               unit: '%',   group: 'heart', icon: 'water_drop',         fmt: v => v.toFixed(1) },
     { id: 'respiratory_rate',   label: 'Respiratory Rate',   unit: 'brpm',group: 'heart', icon: 'air',                fmt: v => v.toFixed(1) },
-    { id: 'vo2_max',            label: 'VO2 Max',            unit: 'mL/kg/min', group: 'heart', icon: 'lungs',          fmt: v => v.toFixed(1) },
+    { id: 'vo2_max',            label: 'VO2 Max',            unit: 'mL/kg/min', group: 'heart', icon: 'fitness_center',  fmt: v => v.toFixed(1) },
   ];
 
   function isVisible(metricId) {

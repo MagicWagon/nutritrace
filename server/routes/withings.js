@@ -143,7 +143,7 @@ router.get('/authorize', wrap((req, res) => {
     response_type: 'code',
     client_id:     clientId,
     redirect_uri:  redirectUri,
-    scope:         'user.info,user.metrics,user.activity,user.cardiovascular',
+    scope:         'user.info,user.metrics,user.activity',
     state,
   });
   res.json({ url });
