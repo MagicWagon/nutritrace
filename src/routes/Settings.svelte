@@ -37,7 +37,7 @@
   $: isDark = $appearance === 'dark' || ($appearance === 'system' && (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches));
   let openSections = { appearance: true, regional: false, diary: false, foods: false, water: false,
                        categories: false, nutrients: false, bodyStats: false, statistics: false,
-                       connectedServices: false, ai: false, labs: false,
+                       connectedServices: false, ai: false, wellness: false, labs: false,
                        backup: false, email: false, users: false, about: false };
 
   function toggleSection(key) {
@@ -60,7 +60,8 @@
     statistics:        ['statistics','chart','y-axis','average','goal line','trend','stats'],
     connectedServices: ['connected services','usda','open food facts','mealie','recipe','search language','country','api key','credentials','username','password'],
     ai:                ['ai','fitbot','assistant','provider','model','api key','artificial intelligence','chat'],
-    labs:              ['labs','experimental','wellness','activity tracking','fitbit','fitness tracker','steps','sleep','heart rate','hrv','spo2','client id','client secret','redirect uri','sync mode'],
+    wellness:          ['wellness','activity tracking','fitbit','withings','steps','sleep','heart rate','hrv','spo2','sync mode','sync range','connect','disconnect','connected devices','fitness tracker'],
+    labs:              ['labs','experimental','client id','client secret','redirect uri','api credentials'],
     backup:            ['backup','export','import','restore','waistline','csv','clear data','json','full backup','images','zip'],
     email:             ['email','smtp','mail','password reset','invites','notifications'],
     users:             ['users','user management','accounts','login','password','admin','register','profile'],
@@ -356,6 +357,31 @@
       showSuccess('Disconnected from Withings');
     } catch(e) { showError(e.message); }
     disconnectingWithings = false;
+  }
+
+  let connectingFitbit  = false;
+  let connectingWithings = false;
+
+  async function connectFitbitFromSettings() {
+    connectingFitbit = true;
+    try {
+      const { url } = await NtApi.get('/api/wellness/fitbit/authorize');
+      window.location.href = url;
+    } catch(e) {
+      showError(e.message || 'Could not start Fitbit authorization');
+      connectingFitbit = false;
+    }
+  }
+
+  async function connectWithingsFromSettings() {
+    connectingWithings = true;
+    try {
+      const { url } = await NtApi.get('/api/wellness/withings/authorize');
+      window.location.href = url;
+    } catch(e) {
+      showError(e.message || 'Could not start Withings authorization');
+      connectingWithings = false;
+    }
   }
 
   async function saveLabsFitbit() {
@@ -2136,30 +2162,31 @@
       </div>
     {/if}
 
-    <!-- ── Labs ─────────────────────────────────────────────────────────────── -->
-    <button class="section-toggle labs-toggle" class:hidden={!sectionVisible(settingsQuery, 'labs')} on:click={() => { toggleSection('labs'); loadLabsConfig(); loadWithingsConfig(); }}>
-      <span class="material-symbols-rounded si">science</span>
-      <span>Labs <span class="labs-badge">Experimental</span></span>
-      <span class="material-symbols-rounded chevron" class:rotated={openSections.labs}>expand_more</span>
+    <!-- ── Wellness ──────────────────────────────────────────────────────────── -->
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'wellness')} on:click={() => { toggleSection('wellness'); loadLabsConfig(); loadWithingsConfig(); }}>
+      <span class="material-symbols-rounded si">monitor_heart</span>
+      <span>Wellness</span>
+      <span class="material-symbols-rounded chevron" class:rotated={openSections.wellness}>expand_more</span>
     </button>
-    {#if sectionOpen(openSections, settingsQuery, 'labs') && sectionVisible(settingsQuery, 'labs')}
+    {#if sectionOpen(openSections, settingsQuery, 'wellness') && sectionVisible(settingsQuery, 'wellness')}
       <div class="section-body" transition:slide={{ duration: 180 }}>
-        <p class="sub-label" style="padding-bottom:4px">Experimental features that may change in future versions</p>
 
-        <!-- Wellness master toggle -->
+        <!-- Master toggle + sync mode -->
         <div class="card settings-card">
           <div class="setting-row">
             <div>
-              <span class="setting-label">Activity Tracking (Wellness)</span>
-              <div class="setting-desc">Adds a Wellness section for syncing fitness tracker data. Enable at least one integration below.</div>
+              <span class="setting-label">Activity Tracking</span>
+              <div class="setting-desc">Adds a Wellness section for syncing fitness tracker and scale data.</div>
             </div>
             <Toggle checked={wellnessEnabledVal} on:change={e => { wellnessEnabledVal = e.detail; wellnessEnabled.set(e.detail); }} />
           </div>
-
           {#if wellnessEnabledVal}
             <div class="setting-divider"></div>
             <div class="setting-row">
-              <span class="setting-label">Sync Mode</span>
+              <div>
+                <span class="setting-label">Sync Mode</span>
+                <div class="setting-desc">Auto syncs when you open the Wellness page (15 min cooldown). Manual requires tapping Sync.</div>
+              </div>
               <div class="select-wrap" style="width:150px">
                 <select class="select sel-sm" bind:value={wellnessSyncModeVal} on:change={e => wellnessSyncMode.set(e.target.value)}>
                   <option value="auto">Auto (on open)</option>
@@ -2171,216 +2198,274 @@
         </div>
 
         <!-- ── Fitbit ── -->
-        <p class="sub-label" style="padding-top:16px">Fitbit</p>
-        <div class="card settings-card">
-          <div class="setting-row">
-            <div>
-              <span class="setting-label">Enable Fitbit</span>
-              <div class="setting-desc">Steps, activity, sleep stages, heart rate, HRV, SpO2</div>
+        {#if wellnessEnabledVal}
+          <p class="sub-label" style="padding-top:16px">Fitbit</p>
+          <div class="card settings-card">
+            <div class="setting-row">
+              <div>
+                <span class="setting-label">Enable Fitbit</span>
+                <div class="setting-desc">Steps, activity, sleep stages, heart rate, HRV, SpO2</div>
+              </div>
+              <Toggle checked={fitbitEnabledVal} on:change={e => { fitbitEnabledVal = e.detail; fitbitEnabled.set(e.detail); }} />
             </div>
-            <Toggle checked={fitbitEnabledVal} on:change={e => { fitbitEnabledVal = e.detail; fitbitEnabled.set(e.detail); }} />
+
+            {#if fitbitEnabledVal}
+              <div class="setting-divider"></div>
+              <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px">
+                <div>
+                  <span class="setting-label">Sync Range</span>
+                  <div class="setting-desc">How far back the manual Sync button fetches. Auto-sync always covers today only.</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                  <div class="chip-group">
+                    {#each SYNC_RANGE_OPTIONS as opt}
+                      <button class="chip" class:chip-active={wellnessSyncRangeVal === opt.value}
+                        on:click={() => { wellnessSyncRangeVal = opt.value; wellnessSyncRange.set(opt.value); }}
+                      >{opt.label}</button>
+                    {/each}
+                  </div>
+                  <div style="display:flex;align-items:center;gap:4px">
+                    <input class="input" type="number" min="1" max="730" style="width:64px;height:32px;padding:0 8px;font-size:13px;text-align:center"
+                      class:input-active={!SYNC_RANGE_OPTIONS.some(o => o.value === wellnessSyncRangeVal)}
+                      value={wellnessSyncRangeVal}
+                      on:change={e => { const v = Math.max(1, parseInt(e.target.value)||1); wellnessSyncRangeVal = v; wellnessSyncRange.set(v); }}
+                      placeholder="days" title="Custom number of days" />
+                    <span class="setting-desc" style="margin:0">days</span>
+                  </div>
+                </div>
+              </div>
+              <div class="setting-divider"></div>
+              {#if fitbitConnectionStatus === null}
+                <div class="setting-row">
+                  <span class="setting-desc">Loading connection status…</span>
+                </div>
+              {:else if fitbitConnectionStatus.connected}
+                <div class="setting-row">
+                  <div>
+                    <span class="setting-label">Connected device</span>
+                    <div class="setting-desc">{fitbitConnectionStatus.fitbitUserId || 'Fitbit account linked'}</div>
+                  </div>
+                  <button class="btn btn-ghost" style="height:32px;padding:0 12px;font-size:13px;color:var(--error,#f87171);border-color:var(--error,#f87171)"
+                    on:click={disconnectFitbitFromSettings} disabled={disconnectingFitbit}>
+                    {disconnectingFitbit ? 'Disconnecting…' : 'Disconnect'}
+                  </button>
+                </div>
+              {:else if fitbitConnectionStatus.configured}
+                <div class="setting-row">
+                  <div>
+                    <span class="setting-label">Not connected</span>
+                    <div class="setting-desc">Authorize NutriTrace to read your Fitbit data.</div>
+                  </div>
+                  <button class="btn btn-primary" style="height:32px;padding:0 12px;font-size:13px" on:click={connectFitbitFromSettings} disabled={connectingFitbit}>
+                    {connectingFitbit ? 'Connecting…' : 'Connect'}
+                  </button>
+                </div>
+              {:else}
+                <div class="setting-row">
+                  <div style="display:flex;align-items:center;gap:8px;color:var(--text-3)">
+                    <span class="material-symbols-rounded" style="font-size:18px">admin_panel_settings</span>
+                    <span class="setting-desc" style="margin:0">API credentials must be configured by an administrator before connecting.</span>
+                  </div>
+                </div>
+              {/if}
+            {/if}
           </div>
 
-          {#if fitbitEnabledVal}
-            <div class="setting-divider"></div>
-            <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px">
+          <!-- ── Withings ── -->
+          <p class="sub-label" style="padding-top:16px">Withings</p>
+          <div class="card settings-card">
+            <div class="setting-row">
               <div>
-                <span class="setting-label">Fitbit Sync Range</span>
-                <div class="setting-desc">How far back the manual Sync button fetches. Auto-sync always covers today only.</div>
+                <span class="setting-label">Enable Withings</span>
+                <div class="setting-desc">Body composition from scales (weight, fat %, muscle, bone mass, and more)</div>
               </div>
-              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                <div class="chip-group">
-                  {#each SYNC_RANGE_OPTIONS as opt}
-                    <button class="chip" class:chip-active={wellnessSyncRangeVal === opt.value}
-                      on:click={() => { wellnessSyncRangeVal = opt.value; wellnessSyncRange.set(opt.value); }}
-                    >{opt.label}</button>
-                  {/each}
-                </div>
-                <div style="display:flex;align-items:center;gap:4px">
-                  <input class="input" type="number" min="1" max="730" style="width:64px;height:32px;padding:0 8px;font-size:13px;text-align:center"
-                    class:input-active={!SYNC_RANGE_OPTIONS.some(o => o.value === wellnessSyncRangeVal)}
-                    value={wellnessSyncRangeVal}
-                    on:change={e => { const v = Math.max(1, parseInt(e.target.value)||1); wellnessSyncRangeVal = v; wellnessSyncRange.set(v); }}
-                    placeholder="days" title="Custom number of days" />
-                  <span class="setting-desc" style="margin:0">days</span>
-                </div>
-              </div>
+              <Toggle checked={withingsEnabledVal} on:change={e => { withingsEnabledVal = e.detail; withingsEnabled.set(e.detail); }} />
             </div>
-            {#if fitbitConnectionStatus?.connected}
+
+            {#if withingsEnabledVal}
               <div class="setting-divider"></div>
-              <div class="setting-row">
+              <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px">
                 <div>
-                  <span class="setting-label">Connected device</span>
-                  <div class="setting-desc">{fitbitConnectionStatus.fitbitUserId || 'Fitbit account linked'}</div>
+                  <span class="setting-label">Sync Range</span>
+                  <div class="setting-desc">How far back the manual Sync button fetches.</div>
                 </div>
-                <button class="btn btn-ghost" style="height:32px;padding:0 12px;font-size:13px;color:var(--error,#f87171);border-color:var(--error,#f87171)"
-                  on:click={disconnectFitbitFromSettings} disabled={disconnectingFitbit}>
-                  {disconnectingFitbit ? 'Disconnecting…' : 'Disconnect'}
-                </button>
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                  <div class="chip-group">
+                    {#each SYNC_RANGE_OPTIONS as opt}
+                      <button class="chip" class:chip-active={withingsSyncRangeVal === opt.value}
+                        on:click={() => { withingsSyncRangeVal = opt.value; withingsSyncRange.set(opt.value); }}
+                      >{opt.label}</button>
+                    {/each}
+                  </div>
+                  <div style="display:flex;align-items:center;gap:4px">
+                    <input class="input" type="number" min="1" max="730" style="width:64px;height:32px;padding:0 8px;font-size:13px;text-align:center"
+                      class:input-active={!SYNC_RANGE_OPTIONS.some(o => o.value === withingsSyncRangeVal)}
+                      value={withingsSyncRangeVal}
+                      on:change={e => { const v = Math.max(1, parseInt(e.target.value)||1); withingsSyncRangeVal = v; withingsSyncRange.set(v); }}
+                      placeholder="days" title="Custom number of days" />
+                    <span class="setting-desc" style="margin:0">days</span>
+                  </div>
+                </div>
               </div>
+              <div class="setting-divider"></div>
+              {#if withingsConnectionStatus === null}
+                <div class="setting-row">
+                  <span class="setting-desc">Loading connection status…</span>
+                </div>
+              {:else if withingsConnectionStatus.connected}
+                <div class="setting-row">
+                  <div>
+                    <span class="setting-label">Connected device</span>
+                    <div class="setting-desc">{withingsConnectionStatus.withingsUserId ? 'User ' + withingsConnectionStatus.withingsUserId : 'Withings account linked'}</div>
+                  </div>
+                  <button class="btn btn-ghost" style="height:32px;padding:0 12px;font-size:13px;color:var(--error,#f87171);border-color:var(--error,#f87171)"
+                    on:click={disconnectWithingsFromSettings} disabled={disconnectingWithings}>
+                    {disconnectingWithings ? 'Disconnecting…' : 'Disconnect'}
+                  </button>
+                </div>
+              {:else if withingsConnectionStatus.configured}
+                <div class="setting-row">
+                  <div>
+                    <span class="setting-label">Not connected</span>
+                    <div class="setting-desc">Authorize NutriTrace to read your Withings data.</div>
+                  </div>
+                  <button class="btn btn-primary" style="height:32px;padding:0 12px;font-size:13px" on:click={connectWithingsFromSettings} disabled={connectingWithings}>
+                    {connectingWithings ? 'Connecting…' : 'Connect'}
+                  </button>
+                </div>
+              {:else}
+                <div class="setting-row">
+                  <div style="display:flex;align-items:center;gap:8px;color:var(--text-3)">
+                    <span class="material-symbols-rounded" style="font-size:18px">admin_panel_settings</span>
+                    <span class="setting-desc" style="margin:0">API credentials must be configured by an administrator before connecting.</span>
+                  </div>
+                </div>
+              {/if}
             {/if}
-          {/if}
-        </div>
-
-        {#if fitbitEnabledVal}
-          {#if $currentUser?.role === 'admin' || !$userMgmtActive}
-            <p class="sub-label" style="padding-top:8px;font-size:11px;opacity:0.7">
-              Create a Fitbit app at <strong>dev.fitbit.com</strong>, set OAuth 2.0 Application Type to "Personal",
-              and copy the Client ID and Secret below.
-            </p>
-            <div class="card settings-card" style="padding:16px;display:flex;flex-direction:column;gap:12px">
-              <div class="form-group">
-                <label class="form-label">Client ID</label>
-                <input class="input" type="text" autocomplete="off" placeholder="e.g. 23ABC123"
-                  bind:value={labsFitbitClientId} />
-              </div>
-              <div class="form-group">
-                <label class="form-label">Client Secret</label>
-                <div style="display:flex;gap:6px">
-                  {#if labsFitbitShowSecret}
-                    <input class="input" type="text" autocomplete="new-password"
-                      placeholder="••••••••" bind:value={labsFitbitClientSecret} style="flex:1" />
-                  {:else}
-                    <input class="input" type="password" autocomplete="new-password"
-                      placeholder="••••••••" bind:value={labsFitbitClientSecret} style="flex:1" />
-                  {/if}
-                  <button class="btn-icon" on:click={() => labsFitbitShowSecret = !labsFitbitShowSecret}
-                    title={labsFitbitShowSecret ? 'Hide' : 'Show'}>
-                    <span class="material-symbols-rounded">{labsFitbitShowSecret ? 'visibility_off' : 'visibility'}</span>
-                  </button>
-                </div>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Redirect URI</label>
-                <div class="setting-desc" style="margin-bottom:4px">Enter your domain — add this exact URI to your Fitbit app's "Redirect URL" list</div>
-                <div style="display:flex;gap:6px">
-                  <input class="input" type="url" placeholder={labsFitbitRedirectSuggested}
-                    bind:value={labsFitbitRedirectUri} style="flex:1;font-size:12px" />
-                  <button class="btn-icon" on:click={copyRedirectUri} title="Copy URI" aria-label="Copy redirect URI">
-                    <span class="material-symbols-rounded">content_copy</span>
-                  </button>
-                </div>
-                <div class="setting-desc" style="font-size:11px;margin-top:2px">
-                  Format: <code style="font-size:11px">https://your-domain.com/api/wellness/fitbit/callback</code>
-                </div>
-              </div>
-              <button class="btn btn-primary" style="align-self:flex-end" on:click={saveLabsFitbit}>Save Fitbit Settings</button>
-            </div>
-          {:else if $userMgmtActive}
-            <div class="card settings-card" style="padding:14px">
-              <div style="display:flex;align-items:center;gap:8px;color:var(--text-2)">
-                <span class="material-symbols-rounded" style="font-size:18px">admin_panel_settings</span>
-                <span style="font-size:13px">Fitbit API credentials are configured by your administrator.</span>
-              </div>
-            </div>
-          {/if}
-        {/if}
-
-        <!-- ── Withings ── -->
-        <p class="sub-label" style="padding-top:16px">Withings</p>
-        <div class="card settings-card">
-          <div class="setting-row">
-            <div>
-              <span class="setting-label">Enable Withings</span>
-              <div class="setting-desc">Body composition from scales (weight, fat %, muscle, bone mass, and more)</div>
-            </div>
-            <Toggle checked={withingsEnabledVal} on:change={e => { withingsEnabledVal = e.detail; withingsEnabled.set(e.detail); }} />
           </div>
+        {/if}
 
-          {#if withingsEnabledVal}
-            <div class="setting-divider"></div>
-            <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px">
-              <div>
-                <span class="setting-label">Withings Sync Range</span>
-                <div class="setting-desc">How far back the manual Sync button fetches.</div>
-              </div>
-              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                <div class="chip-group">
-                  {#each SYNC_RANGE_OPTIONS as opt}
-                    <button class="chip" class:chip-active={withingsSyncRangeVal === opt.value}
-                      on:click={() => { withingsSyncRangeVal = opt.value; withingsSyncRange.set(opt.value); }}
-                    >{opt.label}</button>
-                  {/each}
-                </div>
-                <div style="display:flex;align-items:center;gap:4px">
-                  <input class="input" type="number" min="1" max="730" style="width:64px;height:32px;padding:0 8px;font-size:13px;text-align:center"
-                    class:input-active={!SYNC_RANGE_OPTIONS.some(o => o.value === withingsSyncRangeVal)}
-                    value={withingsSyncRangeVal}
-                    on:change={e => { const v = Math.max(1, parseInt(e.target.value)||1); withingsSyncRangeVal = v; withingsSyncRange.set(v); }}
-                    placeholder="days" title="Custom number of days" />
-                  <span class="setting-desc" style="margin:0">days</span>
-                </div>
-              </div>
+      </div>
+    {/if}
+
+    <!-- ── Labs ─────────────────────────────────────────────────────────────── -->
+    <button class="section-toggle labs-toggle" class:hidden={!sectionVisible(settingsQuery, 'labs')} on:click={() => { toggleSection('labs'); if ($currentUser?.role === 'admin' || !$userMgmtActive) { loadLabsConfig(); loadWithingsConfig(); } }}>
+      <span class="material-symbols-rounded si">science</span>
+      <span>Labs <span class="labs-badge">Experimental</span></span>
+      <span class="material-symbols-rounded chevron" class:rotated={openSections.labs}>expand_more</span>
+    </button>
+    {#if sectionOpen(openSections, settingsQuery, 'labs') && sectionVisible(settingsQuery, 'labs')}
+      <div class="section-body" transition:slide={{ duration: 180 }}>
+        <p class="sub-label" style="padding-bottom:4px">Admin-only API credentials for third-party integrations</p>
+
+        <!-- ── Fitbit API credentials ── -->
+        <p class="sub-label" style="padding-top:16px">Fitbit API Credentials</p>
+        {#if $currentUser?.role === 'admin' || !$userMgmtActive}
+          <p class="sub-label" style="padding-top:4px;font-size:11px;opacity:0.7">
+            Create a Fitbit app at <strong>dev.fitbit.com</strong>, set OAuth 2.0 Application Type to "Personal",
+            and copy the Client ID and Secret below.
+          </p>
+          <div class="card settings-card" style="padding:16px;display:flex;flex-direction:column;gap:12px">
+            <div class="form-group">
+              <label class="form-label">Client ID</label>
+              <input class="input" type="text" autocomplete="off" placeholder="e.g. 23ABC123"
+                bind:value={labsFitbitClientId} />
             </div>
-            {#if withingsConnectionStatus?.connected}
-              <div class="setting-divider"></div>
-              <div class="setting-row">
-                <div>
-                  <span class="setting-label">Connected device</span>
-                  <div class="setting-desc">{withingsConnectionStatus.withingsUserId ? 'User ' + withingsConnectionStatus.withingsUserId : 'Withings account linked'}</div>
-                </div>
-                <button class="btn btn-ghost" style="height:32px;padding:0 12px;font-size:13px;color:var(--error,#f87171);border-color:var(--error,#f87171)"
-                  on:click={disconnectWithingsFromSettings} disabled={disconnectingWithings}>
-                  {disconnectingWithings ? 'Disconnecting…' : 'Disconnect'}
+            <div class="form-group">
+              <label class="form-label">Client Secret</label>
+              <div style="display:flex;gap:6px">
+                {#if labsFitbitShowSecret}
+                  <input class="input" type="text" autocomplete="new-password"
+                    placeholder="••••••••" bind:value={labsFitbitClientSecret} style="flex:1" />
+                {:else}
+                  <input class="input" type="password" autocomplete="new-password"
+                    placeholder="••••••••" bind:value={labsFitbitClientSecret} style="flex:1" />
+                {/if}
+                <button class="btn-icon" on:click={() => labsFitbitShowSecret = !labsFitbitShowSecret}
+                  title={labsFitbitShowSecret ? 'Hide' : 'Show'}>
+                  <span class="material-symbols-rounded">{labsFitbitShowSecret ? 'visibility_off' : 'visibility'}</span>
                 </button>
               </div>
-            {/if}
-          {/if}
-        </div>
-
-        {#if withingsEnabledVal}
-          {#if $currentUser?.role === 'admin' || !$userMgmtActive}
-            <p class="sub-label" style="padding-top:8px;font-size:11px;opacity:0.7">
-              Create a Withings app at <strong>developer.withings.com</strong>, add the redirect URI,
-              and paste the Client ID and Secret below.
-            </p>
-            <div class="card settings-card" style="padding:16px;display:flex;flex-direction:column;gap:12px">
-              <div class="form-group">
-                <label class="form-label">Client ID</label>
-                <input class="input" type="text" autocomplete="off" placeholder="e.g. abc123def456"
-                  bind:value={labsWithingsClientId} />
-              </div>
-              <div class="form-group">
-                <label class="form-label">Client Secret</label>
-                <div style="display:flex;gap:6px">
-                  {#if labsWithingsShowSecret}
-                    <input class="input" type="text" autocomplete="new-password"
-                      placeholder="••••••••" bind:value={labsWithingsClientSecret} style="flex:1" />
-                  {:else}
-                    <input class="input" type="password" autocomplete="new-password"
-                      placeholder="••••••••" bind:value={labsWithingsClientSecret} style="flex:1" />
-                  {/if}
-                  <button class="btn-icon" on:click={() => labsWithingsShowSecret = !labsWithingsShowSecret}
-                    title={labsWithingsShowSecret ? 'Hide' : 'Show'}>
-                    <span class="material-symbols-rounded">{labsWithingsShowSecret ? 'visibility_off' : 'visibility'}</span>
-                  </button>
-                </div>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Redirect URI</label>
-                <div class="setting-desc" style="margin-bottom:4px">Enter your domain — add this exact URI to your Withings app's redirect URL list</div>
-                <div style="display:flex;gap:6px">
-                  <input class="input" type="url" placeholder={labsWithingsRedirectSuggested}
-                    bind:value={labsWithingsRedirectUri} style="flex:1;font-size:12px" />
-                  <button class="btn-icon" on:click={copyWithingsRedirectUri} title="Copy URI" aria-label="Copy redirect URI">
-                    <span class="material-symbols-rounded">content_copy</span>
-                  </button>
-                </div>
-                <div class="setting-desc" style="font-size:11px;margin-top:2px">
-                  Format: <code style="font-size:11px">https://your-domain.com/api/wellness/withings/callback</code>
-                </div>
-              </div>
-              <button class="btn btn-primary" style="align-self:flex-end" on:click={saveLabsWithings}>Save Withings Settings</button>
             </div>
-          {:else if $userMgmtActive}
-            <div class="card settings-card" style="padding:14px">
-              <div style="display:flex;align-items:center;gap:8px;color:var(--text-2)">
-                <span class="material-symbols-rounded" style="font-size:18px">admin_panel_settings</span>
-                <span style="font-size:13px">Withings API credentials are configured by your administrator.</span>
+            <div class="form-group">
+              <label class="form-label">Redirect URI</label>
+              <div class="setting-desc" style="margin-bottom:4px">Enter your domain — add this exact URI to your Fitbit app's "Redirect URL" list</div>
+              <div style="display:flex;gap:6px">
+                <input class="input" type="url" placeholder={labsFitbitRedirectSuggested}
+                  bind:value={labsFitbitRedirectUri} style="flex:1;font-size:12px" />
+                <button class="btn-icon" on:click={copyRedirectUri} title="Copy URI" aria-label="Copy redirect URI">
+                  <span class="material-symbols-rounded">content_copy</span>
+                </button>
+              </div>
+              <div class="setting-desc" style="font-size:11px;margin-top:2px">
+                Format: <code style="font-size:11px">https://your-domain.com/api/wellness/fitbit/callback</code>
               </div>
             </div>
-          {/if}
+            <button class="btn btn-primary" style="align-self:flex-end" on:click={saveLabsFitbit}>Save Fitbit Credentials</button>
+          </div>
+        {:else}
+          <div class="card settings-card" style="padding:14px">
+            <div style="display:flex;align-items:center;gap:8px;color:var(--text-2)">
+              <span class="material-symbols-rounded" style="font-size:18px">admin_panel_settings</span>
+              <span style="font-size:13px">Fitbit API credentials are managed by your administrator.</span>
+            </div>
+          </div>
         {/if}
+
+        <!-- ── Withings API credentials ── -->
+        <p class="sub-label" style="padding-top:16px">Withings API Credentials</p>
+        {#if $currentUser?.role === 'admin' || !$userMgmtActive}
+          <p class="sub-label" style="padding-top:4px;font-size:11px;opacity:0.7">
+            Create a Withings app at <strong>developer.withings.com</strong>, add the redirect URI,
+            and paste the Client ID and Secret below.
+          </p>
+          <div class="card settings-card" style="padding:16px;display:flex;flex-direction:column;gap:12px">
+            <div class="form-group">
+              <label class="form-label">Client ID</label>
+              <input class="input" type="text" autocomplete="off" placeholder="e.g. abc123def456"
+                bind:value={labsWithingsClientId} />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Client Secret</label>
+              <div style="display:flex;gap:6px">
+                {#if labsWithingsShowSecret}
+                  <input class="input" type="text" autocomplete="new-password"
+                    placeholder="••••••••" bind:value={labsWithingsClientSecret} style="flex:1" />
+                {:else}
+                  <input class="input" type="password" autocomplete="new-password"
+                    placeholder="••••••••" bind:value={labsWithingsClientSecret} style="flex:1" />
+                {/if}
+                <button class="btn-icon" on:click={() => labsWithingsShowSecret = !labsWithingsShowSecret}
+                  title={labsWithingsShowSecret ? 'Hide' : 'Show'}>
+                  <span class="material-symbols-rounded">{labsWithingsShowSecret ? 'visibility_off' : 'visibility'}</span>
+                </button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Redirect URI</label>
+              <div class="setting-desc" style="margin-bottom:4px">Enter your domain — add this exact URI to your Withings app's redirect URL list</div>
+              <div style="display:flex;gap:6px">
+                <input class="input" type="url" placeholder={labsWithingsRedirectSuggested}
+                  bind:value={labsWithingsRedirectUri} style="flex:1;font-size:12px" />
+                <button class="btn-icon" on:click={copyWithingsRedirectUri} title="Copy URI" aria-label="Copy redirect URI">
+                  <span class="material-symbols-rounded">content_copy</span>
+                </button>
+              </div>
+              <div class="setting-desc" style="font-size:11px;margin-top:2px">
+                Format: <code style="font-size:11px">https://your-domain.com/api/wellness/withings/callback</code>
+              </div>
+            </div>
+            <button class="btn btn-primary" style="align-self:flex-end" on:click={saveLabsWithings}>Save Withings Credentials</button>
+          </div>
+        {:else}
+          <div class="card settings-card" style="padding:14px">
+            <div style="display:flex;align-items:center;gap:8px;color:var(--text-2)">
+              <span class="material-symbols-rounded" style="font-size:18px">admin_panel_settings</span>
+              <span style="font-size:13px">Withings API credentials are managed by your administrator.</span>
+            </div>
+          </div>
+        {/if}
+
       </div>
     {/if}
 
