@@ -1088,7 +1088,7 @@
           {/if}
 
           <!-- Segmental analysis (Body Scan) -->
-          {#if isVisible('segmental_analysis') && ['muscle_mass_left_arm_kg','muscle_mass_right_arm_kg','muscle_mass_torso_kg','muscle_mass_left_leg_kg','muscle_mass_right_leg_kg','fat_mass_left_arm_kg','fat_mass_right_arm_kg','fat_mass_torso_kg','fat_mass_left_leg_kg','fat_mass_right_leg_kg'].some(k => withingsData[k] != null)}
+          {#if isVisible('segmental_analysis') && ['muscle_mass_torso_kg','muscle_mass_left_leg_kg','muscle_mass_left_arm_kg','muscle_mass_right_leg_kg','muscle_mass_right_arm_kg','lean_mass_torso_kg','lean_mass_left_leg_kg','lean_mass_left_arm_kg','lean_mass_right_leg_kg','lean_mass_right_arm_kg'].some(k => withingsData[k] != null)}
             <div class="card" style="margin-top:12px;padding:16px">
               <div class="sleep-stages-header" style="margin-bottom:12px">
                 <span class="material-symbols-rounded" style="color:var(--accent)">accessibility_new</span>
@@ -1102,27 +1102,27 @@
                 <div class="seg-header">
                   <span></span>
                   <span>Muscle</span>
-                  <span>Fat</span>
+                  <span>Lean</span>
                 </div>
                 {#each [
-                  { label: 'Left Arm',  muscle: 'muscle_mass_left_arm_kg',  fat: 'fat_mass_left_arm_kg'  },
-                  { label: 'Right Arm', muscle: 'muscle_mass_right_arm_kg', fat: 'fat_mass_right_arm_kg' },
-                  { label: 'Torso',     muscle: 'muscle_mass_torso_kg',     fat: 'fat_mass_torso_kg'     },
-                  { label: 'Left Leg',  muscle: 'muscle_mass_left_leg_kg',  fat: 'fat_mass_left_leg_kg'  },
-                  { label: 'Right Leg', muscle: 'muscle_mass_right_leg_kg', fat: 'fat_mass_right_leg_kg' },
+                  { label: 'Left Arm',  muscle: 'muscle_mass_left_arm_kg',  lean: 'lean_mass_left_arm_kg'  },
+                  { label: 'Right Arm', muscle: 'muscle_mass_right_arm_kg', lean: 'lean_mass_right_arm_kg' },
+                  { label: 'Torso',     muscle: 'muscle_mass_torso_kg',     lean: 'lean_mass_torso_kg'     },
+                  { label: 'Left Leg',  muscle: 'muscle_mass_left_leg_kg',  lean: 'lean_mass_left_leg_kg'  },
+                  { label: 'Right Leg', muscle: 'muscle_mass_right_leg_kg', lean: 'lean_mass_right_leg_kg' },
                 ] as seg}
-                  {#if withingsData[seg.muscle] != null || withingsData[seg.fat] != null}
+                  {#if withingsData[seg.muscle] != null || withingsData[seg.lean] != null}
                     {@const mKg = withingsData[seg.muscle]}
-                    {@const fKg = withingsData[seg.fat]}
-                    {@const segTotal = (mKg ?? 0) + (fKg ?? 0)}
+                    {@const lKg = withingsData[seg.lean]}
+                    {@const segTotal = (mKg ?? 0) + (lKg ?? 0)}
                     <div class="seg-row">
                       <span class="seg-label">{seg.label}</span>
                       {#if segmentalShowPct}
                         <span class="seg-val">{mKg != null && segTotal > 0 ? (mKg / segTotal * 100).toFixed(1) + '%' : '—'}</span>
-                        <span class="seg-val">{fKg != null && segTotal > 0 ? (fKg / segTotal * 100).toFixed(1) + '%' : '—'}</span>
+                        <span class="seg-val">{lKg != null && segTotal > 0 ? (lKg / segTotal * 100).toFixed(1) + '%' : '—'}</span>
                       {:else}
                         <span class="seg-val">{mKg != null ? fmtWeight(mKg).value + ' ' + fmtWeight(mKg).unit : '—'}</span>
-                        <span class="seg-val">{fKg != null ? fmtWeight(fKg).value + ' ' + fmtWeight(fKg).unit : '—'}</span>
+                        <span class="seg-val">{lKg != null ? fmtWeight(lKg).value + ' ' + fmtWeight(lKg).unit : '—'}</span>
                       {/if}
                     </div>
                   {/if}

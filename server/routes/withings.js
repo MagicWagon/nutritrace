@@ -223,20 +223,16 @@ const WELLNESS_TYPES = {
   91:  'pulse_wave_velocity',
   174: 'visceral_fat',
   226: 'nerve_health_score',
+  227: 'metabolic_age',
   238: 'vascular_age',
   239: 'nerve_activity',
-  // Segmental muscle (Body Scan)
-  167: 'muscle_mass_left_arm_kg',
-  168: 'muscle_mass_right_arm_kg',
-  169: 'muscle_mass_torso_kg',
-  170: 'muscle_mass_left_leg_kg',
-  171: 'muscle_mass_right_leg_kg',
-  // Segmental fat (Body Scan)
-  182: 'fat_mass_right_arm_kg',
-  183: 'fat_mass_left_arm_kg',
-  184: 'fat_mass_torso_kg',
-  185: 'fat_mass_right_leg_kg',
-  186: 'fat_mass_left_leg_kg',
+};
+
+// Segmental types: same type code appears 5× per measuregrp, one per body segment.
+// Positional order (confirmed from device logs): Torso, Left Leg, Left Arm, Right Leg, Right Arm
+const SEGMENTAL_TYPES = {
+  173: { prefix: 'lean_mass',   parts: ['torso', 'left_leg', 'left_arm', 'right_leg', 'right_arm'] },
+  175: { prefix: 'muscle_mass', parts: ['torso', 'left_leg', 'left_arm', 'right_leg', 'right_arm'] },
 };
 
 function _withingsValue(measure) {
@@ -317,18 +313,31 @@ async function _syncRange(userId, fromDate, toDate) {
     const bodyStatUpdates = {};
 
     for (const { grp, deviceModel } of entries) {
+      const segCounts = {}; // per-type position counter, reset per grp
+
       for (const measure of grp.measures) {
         const type = measure.type;
         const value = _withingsValue(measure);
 
-        const metricKey = BODY_STAT_TYPES[type]?.metric || WELLNESS_TYPES[type];
-        if (metricKey) {
-          if (!latestByMetric[metricKey] || grp.date > latestByMetric[metricKey].ts) {
-            latestByMetric[metricKey] = { value, deviceModel, ts: grp.date };
+        if (SEGMENTAL_TYPES[type]) {
+          const seg = SEGMENTAL_TYPES[type];
+          const idx = segCounts[type] ?? 0;
+          segCounts[type] = idx + 1;
+          if (idx < seg.parts.length) {
+            const metricKey = `${seg.prefix}_${seg.parts[idx]}_kg`;
+            if (!latestByMetric[metricKey] || grp.date > latestByMetric[metricKey].ts) {
+              latestByMetric[metricKey] = { value, deviceModel, ts: grp.date };
+            }
           }
         } else {
-          // Log unmapped types to help verify segmental/new measurement codes
-          console.log(`[withings] unmapped type ${type} = ${value} (date: ${date})`);
+          const metricKey = BODY_STAT_TYPES[type]?.metric || WELLNESS_TYPES[type];
+          if (metricKey) {
+            if (!latestByMetric[metricKey] || grp.date > latestByMetric[metricKey].ts) {
+              latestByMetric[metricKey] = { value, deviceModel, ts: grp.date };
+            }
+          } else {
+            console.log(`[withings] unmapped type ${type} = ${value} (date: ${date})`);
+          }
         }
 
         if (BODY_STAT_TYPES[type]) {
