@@ -42,7 +42,7 @@
     { id: 'spo2_avg',           label: 'SpO2',               unit: '%',        group: 'heart', icon: 'water_drop',      fmt: v => v.toFixed(1),   sources: ['fitbit','garmin'] },
     { id: 'respiratory_rate',   label: 'Respiratory Rate',   unit: 'brpm',     group: 'heart', icon: 'air',             fmt: v => v.toFixed(1),   sources: ['fitbit','garmin'] },
     // Heart — Fitbit only
-    { id: 'vo2_max',            label: 'VO2 Max',            unit: 'mL/kg/min',group: 'heart', icon: 'fitness_center',  fmt: v => v.toFixed(1),   sources: ['fitbit'] },
+    { id: 'vo2_max',            label: 'Cardio Fitness',     unit: 'mL/kg/min',group: 'heart', icon: 'fitness_center',  fmt: v => v.toFixed(1),   sources: ['fitbit'] },
     { id: 'readiness_score',    label: 'Daily Readiness',    unit: '/100',     group: 'heart', icon: 'battery_charging_full', fmt: v => Math.round(v), sources: ['fitbit'] },
   ];
 

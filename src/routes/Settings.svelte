@@ -322,7 +322,7 @@
     { id: 'sleep_score',          label: 'Sleep Score'      },
     { id: 'spo2_avg',             label: 'SpO2'             },
     { id: 'steps',                label: 'Steps'            },
-    { id: 'vo2_max',              label: 'VO2 Max'          },
+    { id: 'vo2_max',              label: 'Cardio Fitness'   },
     { id: 'sleep_wake_min',       label: 'Wake Time'        },
   ];
   const GARMIN_METRICS = [
