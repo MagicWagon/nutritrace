@@ -710,11 +710,18 @@
     _prevCombinedData = { ...combined };
   }
 
-  // ── Merged display data: Fitbit first, Garmin as fallback ────────────────────
+  // ── Merged display data: only include data from enabled integrations ─────────
   $: displayData = (() => {
-    const merged = { ...garminData };
-    for (const [k, v] of Object.entries(data)) {
-      if (v != null) merged[k] = v; // Fitbit wins when it has a value
+    const merged = {};
+    if ($garminEnabled) {
+      for (const [k, v] of Object.entries(garminData)) {
+        if (v != null) merged[k] = v;
+      }
+    }
+    if ($fitbitEnabled) {
+      for (const [k, v] of Object.entries(data)) {
+        if (v != null) merged[k] = v; // Fitbit wins over Garmin for shared metrics
+      }
     }
     return merged;
   })();
@@ -988,7 +995,7 @@
               {/each}
             </div>
             <!-- Garmin-specific: Body Battery + Stress -->
-            {#if garminStatus?.connected && GARMIN_METRICS.filter(m => isVisible(m.id)).some(m => garminData[m.id] != null)}
+            {#if $garminEnabled && garminStatus?.connected && GARMIN_METRICS.filter(m => isVisible(m.id)).some(m => garminData[m.id] != null)}
               <div class="card" style="margin-top:12px;padding:16px">
                 <div class="sleep-stages-header" style="margin-bottom:12px">
                   <span class="wl-brand-icon" style="font-size:16px;color:var(--accent)"><GarminIcon /></span>
