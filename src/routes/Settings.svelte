@@ -37,7 +37,7 @@
   $: isDark = $appearance === 'dark' || ($appearance === 'system' && (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches));
   let openSections = { appearance: true, regional: false, diary: false, foods: false, water: false,
                        categories: false, nutrients: false, bodyStats: false, statistics: false,
-                       units: false, connectedServices: false, ai: false, labs: false,
+                       connectedServices: false, ai: false, labs: false,
                        backup: false, email: false, users: false, about: false };
 
   function toggleSection(key) {
@@ -50,7 +50,7 @@
 
   const SECTION_KEYWORDS = {
     appearance:        ['appearance','theme','dark','light','accent','color','navigation','sidebar','persistent','start page','animations','celebrations','reduce motion','banner','page banner','loop','looping'],
-    regional:          ['regional','date format','time format','locale','date','time','12h','24h'],
+    regional:          ['regional','date format','time format','locale','date','time','12h','24h','units','energy unit','weight unit','height','circumference','distance','imperial','metric'],
     diary:             ['diary','brands','timestamps','thumbnails','nutrients','nutrition units','macros','macro summary','prompt quantity','portion size','nutrition bar','goals progress','meal names','meals'],
     foods:             ['foods','thumbnails','category','notes','yesterday meals','sort order','sort','barcode','scan','beep','flashlight','crop photos'],
     water:             ['water','display unit','daily goal','containers','bottle','cup','glass'],
@@ -58,8 +58,6 @@
     nutrients:         ['nutrients','nutriments','custom nutrients','vitamins','minerals'],
     bodyStats:         ['body stats','body','weight','measurements','stats'],
     statistics:        ['statistics','chart','y-axis','average','goal line','trend','stats'],
-    goals:             ['goals','target','calorie goal','water goal','daily water'],
-    units:             ['units','energy unit','weight unit','height','circumference','distance','imperial','metric'],
     connectedServices: ['connected services','usda','open food facts','mealie','recipe','search language','country','api key','credentials','username','password'],
     ai:                ['ai','fitbot','assistant','provider','model','api key','artificial intelligence','chat'],
     labs:              ['labs','experimental','wellness','activity tracking','fitbit','fitness tracker','steps','sleep','heart rate','hrv','spo2','client id','client secret','redirect uri','sync mode'],
@@ -1443,10 +1441,10 @@
       </div>
     {/if}
 
-    <!-- ── Regional ────────────────────────────────────────────────────────── -->
+    <!-- ── Regional & Units ─────────────────────────────────────────────────── -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'regional')} on:click={() => toggleSection('regional')}>
       <span class="material-symbols-rounded si">language</span>
-      <span>Regional</span>
+      <span>Regional &amp; Units</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.regional}>expand_more</span>
     </button>
     {#if sectionOpen(openSections, settingsQuery, 'regional') && sectionVisible(settingsQuery, 'regional')}
@@ -1470,6 +1468,56 @@
               <select class="select sel-sm" value={$timeFormat} on:change={e => timeFormat.set(e.target.value)}>
                 <option value="12h">12-hour (AM/PM)</option>
                 <option value="24h">24-hour</option>
+              </select>
+            </div>
+          </div>
+          <div class="setting-divider"></div>
+          <div class="setting-row">
+            <span class="setting-label">Energy</span>
+            <div class="select-wrap" style="width:160px">
+              <select class="select sel-sm" value={$energyUnit} on:change={e => energyUnit.set(e.target.value)}>
+                {#each ENERGY_OPTS as o}<option value={o.value}>{o.label}</option>{/each}
+              </select>
+            </div>
+          </div>
+          <div class="setting-divider"></div>
+          <div class="setting-row">
+            <span class="setting-label">Weight</span>
+            <div class="select-wrap" style="width:100px">
+              <select class="select sel-sm" bind:value={weightUnit}>
+                <option value="kg">kg</option>
+                <option value="lb">lbs</option>
+                <option value="st">st</option>
+              </select>
+            </div>
+          </div>
+          <div class="setting-divider"></div>
+          <div class="setting-row">
+            <span class="setting-label">Height</span>
+            <div class="select-wrap" style="width:100px">
+              <select class="select sel-sm" bind:value={heightUnit}>
+                <option value="cm">cm</option>
+                <option value="ft">ft / in</option>
+              </select>
+            </div>
+          </div>
+          <div class="setting-divider"></div>
+          <div class="setting-row">
+            <span class="setting-label">Circumference</span>
+            <div class="select-wrap" style="width:100px">
+              <select class="select sel-sm" bind:value={lengthUnit}>
+                <option value="in">in</option>
+                <option value="cm">cm</option>
+              </select>
+            </div>
+          </div>
+          <div class="setting-divider"></div>
+          <div class="setting-row">
+            <span class="setting-label">Distance</span>
+            <div class="select-wrap" style="width:100px">
+              <select class="select sel-sm" bind:value={distUnitVal}>
+                <option value="km">km</option>
+                <option value="mi">mi</option>
               </select>
             </div>
           </div>
@@ -1825,67 +1873,6 @@
       </div>
     {/if}
 
-    <!-- ── Units ───────────────────────────────────────────────────────────── -->
-    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'units')} on:click={() => toggleSection('units')}>
-      <span class="material-symbols-rounded si">straighten</span>
-      <span>Units</span>
-      <span class="material-symbols-rounded chevron" class:rotated={openSections.units}>expand_more</span>
-    </button>
-    {#if sectionOpen(openSections, settingsQuery, 'units') && sectionVisible(settingsQuery, 'units')}
-      <div class="section-body" transition:slide={{ duration: 180 }}>
-        <div class="card settings-card">
-          <div class="setting-row">
-            <span class="setting-label">Energy</span>
-            <div class="select-wrap" style="width:160px">
-              <select class="select sel-sm" value={$energyUnit} on:change={e => energyUnit.set(e.target.value)}>
-                {#each ENERGY_OPTS as o}<option value={o.value}>{o.label}</option>{/each}
-              </select>
-            </div>
-          </div>
-          <div class="setting-divider"></div>
-          <div class="setting-row">
-            <span class="setting-label">Weight</span>
-            <div class="select-wrap" style="width:100px">
-              <select class="select sel-sm" bind:value={weightUnit}>
-                <option value="kg">kg</option>
-                <option value="lb">lbs</option>
-                <option value="st">st</option>
-              </select>
-            </div>
-          </div>
-          <div class="setting-divider"></div>
-          <div class="setting-row">
-            <span class="setting-label">Height</span>
-            <div class="select-wrap" style="width:100px">
-              <select class="select sel-sm" bind:value={heightUnit}>
-                <option value="cm">cm</option>
-                <option value="ft">ft / in</option>
-              </select>
-            </div>
-          </div>
-          <div class="setting-divider"></div>
-          <div class="setting-row">
-            <span class="setting-label">Circumference</span>
-            <div class="select-wrap" style="width:100px">
-              <select class="select sel-sm" bind:value={lengthUnit}>
-                <option value="in">in</option>
-                <option value="cm">cm</option>
-              </select>
-            </div>
-          </div>
-          <div class="setting-divider"></div>
-          <div class="setting-row">
-            <span class="setting-label">Distance</span>
-            <div class="select-wrap" style="width:100px">
-              <select class="select sel-sm" bind:value={distUnitVal}>
-                <option value="km">km</option>
-                <option value="mi">mi</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
-    {/if}
 
     <p class="settings-group-label">Connected Services</p>
     <!-- ── Connected Services ─────────────────────────────────────────────── -->
@@ -2028,10 +2015,10 @@
       </div>
     {/if}
 
-    <!-- ── FitBot AI ─────────────────────────────────────────────────────────── -->
+    <!-- ── AI Assistant ──────────────────────────────────────────────────────── -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'ai')} on:click={() => toggleSection('ai')}>
       <span class="material-symbols-rounded si">smart_toy</span>
-      <span>FitBot AI</span>
+      <span>AI Assistant</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.ai}>expand_more</span>
     </button>
     {#if sectionOpen(openSections, settingsQuery, 'ai') && sectionVisible(settingsQuery, 'ai')}
@@ -2461,7 +2448,11 @@
             </div>
             <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
           </button>
-          <div class="setting-divider"></div>
+        </div>
+
+        <!-- Danger zone -->
+        <p class="sub-label danger-zone-label">Danger Zone</p>
+        <div class="card settings-card danger-zone-card">
           <button class="setting-row setting-action danger" on:click={() => showClearDialog = true}>
             <span class="material-symbols-rounded si" style="color:var(--danger)">delete_forever</span>
             <div>
@@ -3097,6 +3088,8 @@
     display: flex;
     flex-direction: column;
   }
+  .danger-zone-label { color: var(--danger) !important; opacity: 0.85; }
+  .danger-zone-card { border-color: color-mix(in srgb, var(--danger) 30%, transparent); }
   .setting-row {
     display: flex;
     align-items: center;
