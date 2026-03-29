@@ -299,7 +299,7 @@
     aiModelVal = AI_DEFAULT_MODELS[aiProviderVal] || '';
   }
 
-  // ── Labs / Wellness ────────────────────────────────────────────────────────
+  // ── Wellness ─────────────────────────────────────────────────────────────────
   let wellnessEnabledVal   = DB.getSetting('wellnessEnabled',   false);
   let fitbitEnabledVal     = DB.getSetting('fitbitEnabled',     false);
   let withingsEnabledVal   = DB.getSetting('withingsEnabled',   false);
@@ -384,12 +384,12 @@
     { value: 90,  label: '3 months'},
     { value: 365, label: '1 year'  },
   ];
-  let labsFitbitClientId     = '';
-  let labsFitbitClientSecret = '';
-  let labsFitbitRedirectUri  = '';
-  let labsFitbitShowSecret   = false;
-  let labsFitbitRedirectSuggested = '';
-  let labsLoaded = false;
+  let fitbitClientId     = '';
+  let fitbitClientSecret = '';
+  let fitbitRedirectUri  = '';
+  let fitbitShowSecret   = false;
+  let fitbitRedirectSuggested = '';
+  let wellnessConfigLoaded = false;
   let fitbitConnectionStatus  = null; // null = not loaded, { connected, fitbitUserId }
   let withingsConnectionStatus = null;
   let disconnectingFitbit   = false;
@@ -408,40 +408,40 @@
     return `${days} day${days !== 1 ? 's' : ''} ago`;
   }
 
-  async function loadLabsConfig() {
-    if (labsLoaded) return;
-    labsLoaded = true;
-    labsFitbitRedirectSuggested = window.location.origin + '/api/wellness/fitbit/callback';
-    labsWithingsRedirectSuggested = window.location.origin + '/api/wellness/withings/callback';
-    labsGarminRedirectSuggested = window.location.origin + '/api/wellness/garmin/callback';
+  async function loadWellnessConfig() {
+    if (wellnessConfigLoaded) return;
+    wellnessConfigLoaded = true;
+    fitbitRedirectSuggested = window.location.origin + '/api/wellness/fitbit/callback';
+    withingsRedirectSuggested = window.location.origin + '/api/wellness/withings/callback';
+    garminRedirectSuggested = window.location.origin + '/api/wellness/garmin/callback';
     // Load per-user credential config
     try {
       const cfg = await NtApi.get('/api/wellness/fitbit/config');
-      labsFitbitClientId    = cfg.client_id    || '';
-      labsFitbitRedirectUri = cfg.redirect_uri || '';
+      fitbitClientId    = cfg.client_id    || '';
+      fitbitRedirectUri = cfg.redirect_uri || '';
     } catch { /* ignore */ }
     try {
       const cfg = await NtApi.get('/api/wellness/withings/config');
-      labsWithingsClientId    = cfg.client_id    || '';
-      labsWithingsRedirectUri = cfg.redirect_uri || '';
+      withingsClientId    = cfg.client_id    || '';
+      withingsRedirectUri = cfg.redirect_uri || '';
     } catch { /* ignore */ }
     // Admin: also load secrets from app-config for display (single-user or migration)
     if ($currentUser?.role === 'admin' || !$userMgmtActive) {
       try {
         const cfg = await NtApi.get('/api/app-config');
-        if (!labsFitbitClientId)     labsFitbitClientId     = cfg.fitbit_client_id     || '';
-        if (!labsFitbitClientSecret) labsFitbitClientSecret = cfg.fitbit_client_secret || '';
-        if (!labsFitbitRedirectUri)  labsFitbitRedirectUri  = cfg.fitbit_redirect_uri  || '';
-        if (!labsWithingsClientId)     labsWithingsClientId     = cfg.withings_client_id     || '';
-        if (!labsWithingsClientSecret) labsWithingsClientSecret = cfg.withings_client_secret || '';
-        if (!labsWithingsRedirectUri)  labsWithingsRedirectUri  = cfg.withings_redirect_uri  || '';
+        if (!fitbitClientId)     fitbitClientId     = cfg.fitbit_client_id     || '';
+        if (!fitbitClientSecret) fitbitClientSecret = cfg.fitbit_client_secret || '';
+        if (!fitbitRedirectUri)  fitbitRedirectUri  = cfg.fitbit_redirect_uri  || '';
+        if (!withingsClientId)     withingsClientId     = cfg.withings_client_id     || '';
+        if (!withingsClientSecret) withingsClientSecret = cfg.withings_client_secret || '';
+        if (!withingsRedirectUri)  withingsRedirectUri  = cfg.withings_redirect_uri  || '';
       } catch { /* ignore */ }
     }
     // Load Garmin config
     try {
       const cfg = await NtApi.get('/api/wellness/garmin/config');
-      labsGarminConsumerKey = cfg.consumer_key  || '';
-      labsGarminRedirectUri = cfg.redirect_uri  || '';
+      garminConsumerKey = cfg.consumer_key  || '';
+      garminRedirectUri = cfg.redirect_uri  || '';
     } catch { /* ignore */ }
     // Load connection status for all users
     try { fitbitConnectionStatus   = await NtApi.get('/api/wellness/fitbit/status');   } catch { fitbitConnectionStatus   = { connected: false }; }
@@ -494,12 +494,12 @@
     }
   }
 
-  async function saveLabsFitbit() {
+  async function saveFitbitConfig() {
     try {
       await NtApi.put('/api/wellness/fitbit/config', {
-        client_id:     labsFitbitClientId,
-        client_secret: labsFitbitClientSecret || undefined,
-        redirect_uri:  labsFitbitRedirectUri,
+        client_id:     fitbitClientId,
+        client_secret: fitbitClientSecret || undefined,
+        redirect_uri:  fitbitRedirectUri,
       });
       // Refresh status so Connect button reflects new config
       fitbitConnectionStatus = null;
@@ -509,25 +509,25 @@
   }
 
   function copyRedirectUri() {
-    navigator.clipboard.writeText(labsFitbitRedirectUri || labsFitbitRedirectSuggested).then(() => showSuccess('Copied'));
+    navigator.clipboard.writeText(fitbitRedirectUri || fitbitRedirectSuggested).then(() => showSuccess('Copied'));
   }
 
   // ── Withings Labs ──────────────────────────────────────────────────────────
-  let labsWithingsClientId     = '';
-  let labsWithingsClientSecret = '';
-  let labsWithingsRedirectUri  = '';
-  let labsWithingsShowSecret   = false;
-  let labsWithingsRedirectSuggested = '';
+  let withingsClientId     = '';
+  let withingsClientSecret = '';
+  let withingsRedirectUri  = '';
+  let withingsShowSecret   = false;
+  let withingsRedirectSuggested = '';
   let withingsSyncRangeVal = DB.getSetting('withingsSyncRange', 7);
 
   // ── Garmin ─────────────────────────────────────────────────────────────────
   let garminEnabledVal     = DB.getSetting('garminEnabled',   false);
   let garminSyncRangeVal   = DB.getSetting('garminSyncRange', 7);
-  let labsGarminConsumerKey    = '';
-  let labsGarminConsumerSecret = '';
-  let labsGarminRedirectUri    = '';
-  let labsGarminShowSecret     = false;
-  let labsGarminRedirectSuggested = '';
+  let garminConsumerKey    = '';
+  let garminConsumerSecret = '';
+  let garminRedirectUri    = '';
+  let garminShowSecret     = false;
+  let garminRedirectSuggested = '';
   let garminConnectionStatus = null;
   let disconnectingGarmin    = false;
   let connectingGarmin       = false;
@@ -553,12 +553,12 @@
     }
   }
 
-  async function saveLabsGarmin() {
+  async function saveGarminConfig() {
     try {
       await NtApi.put('/api/wellness/garmin/config', {
-        consumer_key:    labsGarminConsumerKey,
-        consumer_secret: labsGarminConsumerSecret || undefined,
-        redirect_uri:    labsGarminRedirectUri,
+        consumer_key:    garminConsumerKey,
+        consumer_secret: garminConsumerSecret || undefined,
+        redirect_uri:    garminRedirectUri,
       });
       garminConnectionStatus = null;
       garminConnectionStatus = await NtApi.get('/api/wellness/garmin/status');
@@ -567,15 +567,15 @@
   }
 
   function copyGarminRedirectUri() {
-    navigator.clipboard.writeText(labsGarminRedirectUri || labsGarminRedirectSuggested).then(() => showSuccess('Copied'));
+    navigator.clipboard.writeText(garminRedirectUri || garminRedirectSuggested).then(() => showSuccess('Copied'));
   }
 
-  async function saveLabsWithings() {
+  async function saveWithingsConfig() {
     try {
       await NtApi.put('/api/wellness/withings/config', {
-        client_id:     labsWithingsClientId,
-        client_secret: labsWithingsClientSecret || undefined,
-        redirect_uri:  labsWithingsRedirectUri,
+        client_id:     withingsClientId,
+        client_secret: withingsClientSecret || undefined,
+        redirect_uri:  withingsRedirectUri,
       });
       withingsConnectionStatus = null;
       withingsConnectionStatus = await NtApi.get('/api/wellness/withings/status');
@@ -584,7 +584,7 @@
   }
 
   function copyWithingsRedirectUri() {
-    navigator.clipboard.writeText(labsWithingsRedirectUri || labsWithingsRedirectSuggested).then(() => showSuccess('Copied'));
+    navigator.clipboard.writeText(withingsRedirectUri || withingsRedirectSuggested).then(() => showSuccess('Copied'));
   }
 
   // ── Meal names ─────────────────────────────────────────────────────────────
@@ -2318,7 +2318,7 @@
     {/if}
 
     <!-- ── Wellness ──────────────────────────────────────────────────────────── -->
-    <button class="section-toggle wellness-toggle" class:hidden={!sectionVisible(settingsQuery, 'wellness')} on:click={() => { toggleSection('wellness'); loadLabsConfig(); }}>
+    <button class="section-toggle wellness-toggle" class:hidden={!sectionVisible(settingsQuery, 'wellness')} on:click={() => { toggleSection('wellness'); loadWellnessConfig(); }}>
       <span class="material-symbols-rounded si">monitor_heart</span>
       <span>Wellness</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.wellness}>expand_more</span>
@@ -2453,18 +2453,18 @@
                     <div class="form-group" style="margin:0">
                       <label class="form-label">Client ID</label>
                       <input class="input" type="text" autocomplete="off" placeholder="e.g. 23ABC123"
-                        bind:value={labsFitbitClientId} />
+                        bind:value={fitbitClientId} />
                     </div>
                     <div class="form-group" style="margin:0">
                       <label class="form-label">Client Secret</label>
                       <div style="display:flex;gap:6px">
-                        {#if labsFitbitShowSecret}
-                          <input class="input" type="text" autocomplete="new-password" placeholder="••••••••" bind:value={labsFitbitClientSecret} style="flex:1" />
+                        {#if fitbitShowSecret}
+                          <input class="input" type="text" autocomplete="new-password" placeholder="••••••••" bind:value={fitbitClientSecret} style="flex:1" />
                         {:else}
-                          <input class="input" type="password" autocomplete="new-password" placeholder="••••••••" bind:value={labsFitbitClientSecret} style="flex:1" />
+                          <input class="input" type="password" autocomplete="new-password" placeholder="••••••••" bind:value={fitbitClientSecret} style="flex:1" />
                         {/if}
-                        <button class="btn-icon" on:click={() => labsFitbitShowSecret = !labsFitbitShowSecret} title={labsFitbitShowSecret ? 'Hide' : 'Show'}>
-                          <span class="material-symbols-rounded">{labsFitbitShowSecret ? 'visibility_off' : 'visibility'}</span>
+                        <button class="btn-icon" on:click={() => fitbitShowSecret = !fitbitShowSecret} title={fitbitShowSecret ? 'Hide' : 'Show'}>
+                          <span class="material-symbols-rounded">{fitbitShowSecret ? 'visibility_off' : 'visibility'}</span>
                         </button>
                       </div>
                     </div>
@@ -2472,12 +2472,12 @@
                       <label class="form-label">Redirect URI</label>
                       <div class="setting-desc" style="margin-bottom:4px">Add this exact URI to your Fitbit app's Redirect URL list</div>
                       <div style="display:flex;gap:6px">
-                        <input class="input" type="url" placeholder={labsFitbitRedirectSuggested} bind:value={labsFitbitRedirectUri} style="flex:1;font-size:12px" />
+                        <input class="input" type="url" placeholder={fitbitRedirectSuggested} bind:value={fitbitRedirectUri} style="flex:1;font-size:12px" />
                         <button class="btn-icon" on:click={copyRedirectUri} title="Copy URI"><span class="material-symbols-rounded">content_copy</span></button>
                       </div>
                       <div class="setting-desc" style="font-size:11px;margin-top:2px">Format: <code style="font-size:11px">https://your-domain.com/api/wellness/fitbit/callback</code></div>
                     </div>
-                    <button class="btn btn-primary" style="align-self:flex-end" on:click={saveLabsFitbit}>Save &amp; Connect</button>
+                    <button class="btn btn-primary" style="align-self:flex-end" on:click={saveFitbitConfig}>Save &amp; Connect</button>
                   </div>
                 </div>
               {/if}
@@ -2562,18 +2562,18 @@
                     <div class="form-group" style="margin:0">
                       <label class="form-label">Client ID</label>
                       <input class="input" type="text" autocomplete="off" placeholder="e.g. abc123def456"
-                        bind:value={labsWithingsClientId} />
+                        bind:value={withingsClientId} />
                     </div>
                     <div class="form-group" style="margin:0">
                       <label class="form-label">Client Secret</label>
                       <div style="display:flex;gap:6px">
-                        {#if labsWithingsShowSecret}
-                          <input class="input" type="text" autocomplete="new-password" placeholder="••••••••" bind:value={labsWithingsClientSecret} style="flex:1" />
+                        {#if withingsShowSecret}
+                          <input class="input" type="text" autocomplete="new-password" placeholder="••••••••" bind:value={withingsClientSecret} style="flex:1" />
                         {:else}
-                          <input class="input" type="password" autocomplete="new-password" placeholder="••••••••" bind:value={labsWithingsClientSecret} style="flex:1" />
+                          <input class="input" type="password" autocomplete="new-password" placeholder="••••••••" bind:value={withingsClientSecret} style="flex:1" />
                         {/if}
-                        <button class="btn-icon" on:click={() => labsWithingsShowSecret = !labsWithingsShowSecret} title={labsWithingsShowSecret ? 'Hide' : 'Show'}>
-                          <span class="material-symbols-rounded">{labsWithingsShowSecret ? 'visibility_off' : 'visibility'}</span>
+                        <button class="btn-icon" on:click={() => withingsShowSecret = !withingsShowSecret} title={withingsShowSecret ? 'Hide' : 'Show'}>
+                          <span class="material-symbols-rounded">{withingsShowSecret ? 'visibility_off' : 'visibility'}</span>
                         </button>
                       </div>
                     </div>
@@ -2581,12 +2581,12 @@
                       <label class="form-label">Redirect URI</label>
                       <div class="setting-desc" style="margin-bottom:4px">Add this exact URI to your Withings app's redirect URL list</div>
                       <div style="display:flex;gap:6px">
-                        <input class="input" type="url" placeholder={labsWithingsRedirectSuggested} bind:value={labsWithingsRedirectUri} style="flex:1;font-size:12px" />
+                        <input class="input" type="url" placeholder={withingsRedirectSuggested} bind:value={withingsRedirectUri} style="flex:1;font-size:12px" />
                         <button class="btn-icon" on:click={copyWithingsRedirectUri} title="Copy URI"><span class="material-symbols-rounded">content_copy</span></button>
                       </div>
                       <div class="setting-desc" style="font-size:11px;margin-top:2px">Format: <code style="font-size:11px">https://your-domain.com/api/wellness/withings/callback</code></div>
                     </div>
-                    <button class="btn btn-primary" style="align-self:flex-end" on:click={saveLabsWithings}>Save &amp; Connect</button>
+                    <button class="btn btn-primary" style="align-self:flex-end" on:click={saveWithingsConfig}>Save &amp; Connect</button>
                   </div>
                 </div>
               {/if}
@@ -2605,7 +2605,7 @@
                 <span class="setting-label">Enable Garmin</span>
                 <div class="setting-desc">Steps, sleep, heart rate, HRV, SpO2, Body Battery, stress. Requires the <strong>Garmin Health API</strong> partnership (apply at developer.garmin.com).</div>
               </div>
-              <Toggle checked={garminEnabledVal} on:change={e => { garminEnabledVal = e.detail; garminEnabled.set(e.detail); loadLabsConfig(); }} />
+              <Toggle checked={garminEnabledVal} on:change={e => { garminEnabledVal = e.detail; garminEnabled.set(e.detail); loadWellnessConfig(); }} />
             </div>
 
             {#if garminEnabledVal}
@@ -2674,18 +2674,18 @@
                     <div class="form-group" style="margin:0">
                       <label class="form-label">Consumer Key</label>
                       <input class="input" type="text" autocomplete="off" placeholder="Your Garmin Consumer Key"
-                        bind:value={labsGarminConsumerKey} />
+                        bind:value={garminConsumerKey} />
                     </div>
                     <div class="form-group" style="margin:0">
                       <label class="form-label">Consumer Secret</label>
                       <div style="display:flex;gap:6px">
-                        {#if labsGarminShowSecret}
-                          <input class="input" type="text" autocomplete="new-password" placeholder="••••••••" bind:value={labsGarminConsumerSecret} style="flex:1" />
+                        {#if garminShowSecret}
+                          <input class="input" type="text" autocomplete="new-password" placeholder="••••••••" bind:value={garminConsumerSecret} style="flex:1" />
                         {:else}
-                          <input class="input" type="password" autocomplete="new-password" placeholder="••••••••" bind:value={labsGarminConsumerSecret} style="flex:1" />
+                          <input class="input" type="password" autocomplete="new-password" placeholder="••••••••" bind:value={garminConsumerSecret} style="flex:1" />
                         {/if}
-                        <button class="btn-icon" on:click={() => labsGarminShowSecret = !labsGarminShowSecret} title={labsGarminShowSecret ? 'Hide' : 'Show'}>
-                          <span class="material-symbols-rounded">{labsGarminShowSecret ? 'visibility_off' : 'visibility'}</span>
+                        <button class="btn-icon" on:click={() => garminShowSecret = !garminShowSecret} title={garminShowSecret ? 'Hide' : 'Show'}>
+                          <span class="material-symbols-rounded">{garminShowSecret ? 'visibility_off' : 'visibility'}</span>
                         </button>
                       </div>
                     </div>
@@ -2693,12 +2693,12 @@
                       <label class="form-label">Redirect URI</label>
                       <div class="setting-desc" style="margin-bottom:4px">Register this exact URI in your Garmin app settings</div>
                       <div style="display:flex;gap:6px">
-                        <input class="input" type="url" placeholder={labsGarminRedirectSuggested} bind:value={labsGarminRedirectUri} style="flex:1;font-size:12px" />
+                        <input class="input" type="url" placeholder={garminRedirectSuggested} bind:value={garminRedirectUri} style="flex:1;font-size:12px" />
                         <button class="btn-icon" on:click={copyGarminRedirectUri} title="Copy URI"><span class="material-symbols-rounded">content_copy</span></button>
                       </div>
                       <div class="setting-desc" style="font-size:11px;margin-top:2px">Format: <code style="font-size:11px">https://your-domain.com/api/wellness/garmin/callback</code></div>
                     </div>
-                    <button class="btn btn-primary" style="align-self:flex-end" on:click={saveLabsGarmin}>Save &amp; Connect</button>
+                    <button class="btn btn-primary" style="align-self:flex-end" on:click={saveGarminConfig}>Save &amp; Connect</button>
                   </div>
                 </div>
               {/if}
