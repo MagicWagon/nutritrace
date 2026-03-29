@@ -34,8 +34,8 @@
     { id: 'sleep_wake_min',     label: 'Awake',           unit: 'min',   group: 'sleep',    icon: 'wb_twilight',           fmt: v => Math.round(v),   sources: ['fitbit','garmin'] },
     // Sleep — Fitbit only
     { id: 'sleep_efficiency',   label: 'Sleep Efficiency',unit: '%',     group: 'sleep',    icon: 'battery_charging_full', fmt: v => v.toFixed(0),    sources: ['fitbit'] },
-    // Sleep — Garmin only
-    { id: 'sleep_score',        label: 'Sleep Score',     unit: '/100',  group: 'sleep',    icon: 'star',                  fmt: v => Math.round(v),   sources: ['garmin'] },
+    // Sleep — both (Fitbit and Garmin each generate their own score)
+    { id: 'sleep_score',        label: 'Sleep Score',     unit: '/100',  group: 'sleep',    icon: 'star',                  fmt: v => Math.round(v),   sources: ['fitbit','garmin'] },
     // Heart — both
     { id: 'resting_hr',         label: 'Resting Heart Rate', unit: 'bpm',      group: 'heart', icon: 'favorite',        fmt: v => Math.round(v),  sources: ['fitbit','garmin'] },
     { id: 'hrv_daily_rmssd',    label: 'HRV (RMSSD)',        unit: 'ms',       group: 'heart', icon: 'monitor_heart',   fmt: v => v.toFixed(1),   sources: ['fitbit','garmin'] },
@@ -43,6 +43,7 @@
     { id: 'respiratory_rate',   label: 'Respiratory Rate',   unit: 'brpm',     group: 'heart', icon: 'air',             fmt: v => v.toFixed(1),   sources: ['fitbit','garmin'] },
     // Heart — Fitbit only
     { id: 'vo2_max',            label: 'VO2 Max',            unit: 'mL/kg/min',group: 'heart', icon: 'fitness_center',  fmt: v => v.toFixed(1),   sources: ['fitbit'] },
+    { id: 'readiness_score',    label: 'Daily Readiness',    unit: '/100',     group: 'heart', icon: 'battery_charging_full', fmt: v => Math.round(v), sources: ['fitbit'] },
   ];
 
   // Returns true if at least one of this metric's source integrations is enabled
@@ -98,6 +99,7 @@
   let garminData       = {};
   let garminSyncing    = false;
   let garminConnecting = false;
+  let segmentalShowPct = false;
 
   // ── Unit helpers ───────────────────────────────────────────────────────────
   $: du = $distUnit || 'km';
@@ -112,8 +114,12 @@
     if (min == null) return null;
     const h = Math.floor(min / 60);
     const m = Math.round(min % 60);
+    if (h === 0) return { value: `${m}`, unit: 'min' };
+    if (m === 0) return { value: `${h}h`, unit: '' };
     return { value: `${h}h ${m}m`, unit: '' };
   }
+
+  const SLEEP_TIME_IDS = new Set(['sleep_duration_min','sleep_deep_min','sleep_light_min','sleep_rem_min','sleep_wake_min']);
 
   function fmtMetric(m, rawValue) {
     if (rawValue == null) return null;
@@ -121,7 +127,7 @@
       const d = fmtDistance(rawValue);
       return d ? { value: d.value, unit: d.unit } : null;
     }
-    if (m.id === 'sleep_duration_min') {
+    if (SLEEP_TIME_IDS.has(m.id)) {
       return fmtSleep(rawValue);
     }
     const val = m.fmt ? m.fmt(rawValue) : rawValue;
@@ -1087,6 +1093,10 @@
               <div class="sleep-stages-header" style="margin-bottom:12px">
                 <span class="material-symbols-rounded" style="color:var(--accent)">accessibility_new</span>
                 <span class="sleep-stages-title">Segmental Analysis</span>
+                <div class="chip-group" style="margin-left:auto">
+                  <button class="chip" class:chip-active={!segmentalShowPct} on:click={() => segmentalShowPct = false}>kg / lbs</button>
+                  <button class="chip" class:chip-active={segmentalShowPct}  on:click={() => segmentalShowPct = true}>%</button>
+                </div>
               </div>
               <div class="segmental-table">
                 <div class="seg-header">
@@ -1102,10 +1112,18 @@
                   { label: 'Right Leg', muscle: 'muscle_mass_right_leg_kg', fat: 'fat_mass_right_leg_kg' },
                 ] as seg}
                   {#if withingsData[seg.muscle] != null || withingsData[seg.fat] != null}
+                    {@const mKg = withingsData[seg.muscle]}
+                    {@const fKg = withingsData[seg.fat]}
+                    {@const segTotal = (mKg ?? 0) + (fKg ?? 0)}
                     <div class="seg-row">
                       <span class="seg-label">{seg.label}</span>
-                      <span class="seg-val">{withingsData[seg.muscle] != null ? fmtWeight(withingsData[seg.muscle]).value + ' ' + fmtWeight(withingsData[seg.muscle]).unit : '—'}</span>
-                      <span class="seg-val">{withingsData[seg.fat] != null ? fmtWeight(withingsData[seg.fat]).value + ' ' + fmtWeight(withingsData[seg.fat]).unit : '—'}</span>
+                      {#if segmentalShowPct}
+                        <span class="seg-val">{mKg != null && segTotal > 0 ? (mKg / segTotal * 100).toFixed(1) + '%' : '—'}</span>
+                        <span class="seg-val">{fKg != null && segTotal > 0 ? (fKg / segTotal * 100).toFixed(1) + '%' : '—'}</span>
+                      {:else}
+                        <span class="seg-val">{mKg != null ? fmtWeight(mKg).value + ' ' + fmtWeight(mKg).unit : '—'}</span>
+                        <span class="seg-val">{fKg != null ? fmtWeight(fKg).value + ' ' + fmtWeight(fKg).unit : '—'}</span>
+                      {/if}
                     </div>
                   {/if}
                 {/each}

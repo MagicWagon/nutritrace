@@ -280,6 +280,20 @@ async function _syncDate(u, dateStr) {
     metrics.vo2_max = d['cardioScore']?.[0]?.value?.vo2Max ?? null;
   } catch (e) { errors.push('vo2max: ' + e.message); }
 
+  // Sleep Score
+  try {
+    const d = await _get(u, `/1/user/-/sleep/score/date/${dateStr}/1d.json`);
+    const entry = d['sleep']?.[0] ?? d['sleepScore']?.[0];
+    metrics.sleep_score = entry?.value?.sleepScore ?? entry?.value ?? null;
+    if (typeof metrics.sleep_score !== 'number') metrics.sleep_score = null;
+  } catch (e) { errors.push('sleepscore: ' + e.message); }
+
+  // Daily Readiness Score
+  try {
+    const d = await _get(u, `/1/user/-/readiness/date/${dateStr}/1d.json`);
+    metrics.readiness_score = d['readinessScore']?.[0]?.value?.score ?? null;
+  } catch (e) { errors.push('readiness: ' + e.message); }
+
   // Upsert all metrics
   const upsert = db.prepare(`
     INSERT INTO wellness_data (user_id, date, source, metric_type, value, synced_at)

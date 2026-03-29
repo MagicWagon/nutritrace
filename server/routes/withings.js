@@ -326,6 +326,9 @@ async function _syncRange(userId, fromDate, toDate) {
           if (!latestByMetric[metricKey] || grp.date > latestByMetric[metricKey].ts) {
             latestByMetric[metricKey] = { value, deviceModel, ts: grp.date };
           }
+        } else {
+          // Log unmapped types to help verify segmental/new measurement codes
+          console.log(`[withings] unmapped type ${type} = ${value} (date: ${date})`);
         }
 
         if (BODY_STAT_TYPES[type]) {
