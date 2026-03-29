@@ -617,8 +617,8 @@
     <h1>Wellness</h1>
   </header>
 
-  <!-- Fixed sync buttons — top-right corner, same row as hamburger -->
-  <div class="wl-topbar-actions">
+  <!-- Fixed sync buttons — portalled to body so position:fixed is viewport-relative -->
+  <div class="wl-topbar-actions" use:portal>
     {#if status?.connected}
       <button class="wl-sync-icon-btn" class:wl-syncing={syncing}
         on:click={() => sync()} disabled={syncing}

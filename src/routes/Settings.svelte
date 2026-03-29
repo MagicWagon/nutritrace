@@ -2188,12 +2188,22 @@
                 <span class="setting-label">Fitbit Sync Range</span>
                 <div class="setting-desc">How far back the manual Sync button fetches. Auto-sync always covers today only.</div>
               </div>
-              <div class="chip-group">
-                {#each SYNC_RANGE_OPTIONS as opt}
-                  <button class="chip" class:chip-active={wellnessSyncRangeVal === opt.value}
-                    on:click={() => { wellnessSyncRangeVal = opt.value; wellnessSyncRange.set(opt.value); }}
-                  >{opt.label}</button>
-                {/each}
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <div class="chip-group">
+                  {#each SYNC_RANGE_OPTIONS as opt}
+                    <button class="chip" class:chip-active={wellnessSyncRangeVal === opt.value}
+                      on:click={() => { wellnessSyncRangeVal = opt.value; wellnessSyncRange.set(opt.value); }}
+                    >{opt.label}</button>
+                  {/each}
+                </div>
+                <div style="display:flex;align-items:center;gap:4px">
+                  <input class="input" type="number" min="1" max="730" style="width:64px;height:32px;padding:0 8px;font-size:13px;text-align:center"
+                    class:input-active={!SYNC_RANGE_OPTIONS.some(o => o.value === wellnessSyncRangeVal)}
+                    value={wellnessSyncRangeVal}
+                    on:change={e => { const v = Math.max(1, parseInt(e.target.value)||1); wellnessSyncRangeVal = v; wellnessSyncRange.set(v); }}
+                    placeholder="days" title="Custom number of days" />
+                  <span class="setting-desc" style="margin:0">days</span>
+                </div>
               </div>
             </div>
             {#if fitbitConnectionStatus?.connected}
@@ -2284,12 +2294,22 @@
                 <span class="setting-label">Withings Sync Range</span>
                 <div class="setting-desc">How far back the manual Sync button fetches.</div>
               </div>
-              <div class="chip-group">
-                {#each SYNC_RANGE_OPTIONS as opt}
-                  <button class="chip" class:chip-active={withingsSyncRangeVal === opt.value}
-                    on:click={() => { withingsSyncRangeVal = opt.value; withingsSyncRange.set(opt.value); }}
-                  >{opt.label}</button>
-                {/each}
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <div class="chip-group">
+                  {#each SYNC_RANGE_OPTIONS as opt}
+                    <button class="chip" class:chip-active={withingsSyncRangeVal === opt.value}
+                      on:click={() => { withingsSyncRangeVal = opt.value; withingsSyncRange.set(opt.value); }}
+                    >{opt.label}</button>
+                  {/each}
+                </div>
+                <div style="display:flex;align-items:center;gap:4px">
+                  <input class="input" type="number" min="1" max="730" style="width:64px;height:32px;padding:0 8px;font-size:13px;text-align:center"
+                    class:input-active={!SYNC_RANGE_OPTIONS.some(o => o.value === withingsSyncRangeVal)}
+                    value={withingsSyncRangeVal}
+                    on:change={e => { const v = Math.max(1, parseInt(e.target.value)||1); withingsSyncRangeVal = v; withingsSyncRange.set(v); }}
+                    placeholder="days" title="Custom number of days" />
+                  <span class="setting-desc" style="margin:0">days</span>
+                </div>
               </div>
             </div>
             {#if withingsConnectionStatus?.connected}
@@ -3294,6 +3314,12 @@
   }
   .chip:hover { border-color: var(--accent); color: var(--text-1); }
   .chip-active {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .input-active {
     border-color: var(--accent);
     background: var(--accent-dim);
     color: var(--accent);
