@@ -99,8 +99,6 @@
   let garminData       = {};
   let garminSyncing    = false;
   let garminConnecting = false;
-  let segmentalShowPct = false;
-
   // ── Unit helpers ───────────────────────────────────────────────────────────
   $: du = $distUnit || 'km';
 
@@ -1090,14 +1088,13 @@
           <!-- Segmental analysis (Body Scan) -->
           {#if isVisible('segmental_analysis') && ['muscle_mass_torso_kg','muscle_mass_left_leg_kg','muscle_mass_left_arm_kg','muscle_mass_right_leg_kg','muscle_mass_right_arm_kg','lean_mass_torso_kg','lean_mass_left_leg_kg','lean_mass_left_arm_kg','lean_mass_right_leg_kg','lean_mass_right_arm_kg'].some(k => withingsData[k] != null)}
             <div class="card" style="margin-top:12px;padding:16px">
-              <div class="sleep-stages-header" style="margin-bottom:12px">
+              <div class="sleep-stages-header" style="margin-bottom:4px">
                 <span class="material-symbols-rounded" style="color:var(--accent)">accessibility_new</span>
                 <span class="sleep-stages-title">Segmental Analysis</span>
-                <div class="chip-group" style="margin-left:auto">
-                  <button class="chip" class:chip-active={!segmentalShowPct} on:click={() => segmentalShowPct = false}>kg / lbs</button>
-                  <button class="chip" class:chip-active={segmentalShowPct}  on:click={() => segmentalShowPct = true}>%</button>
-                </div>
               </div>
+              <p style="font-size:0.75rem;color:var(--text-3);margin:0 0 12px;line-height:1.4">
+                <strong>Muscle</strong> = contractile muscle tissue. <strong>Lean</strong> = all non-fat tissue (muscle + bone + water). Lean is always higher than muscle. These values are absolute weights — percentages shown in the Withings app use a different calculation and will not match.
+              </p>
               <div class="segmental-table">
                 <div class="seg-header">
                   <span></span>
@@ -1114,16 +1111,10 @@
                   {#if withingsData[seg.muscle] != null || withingsData[seg.lean] != null}
                     {@const mKg = withingsData[seg.muscle]}
                     {@const lKg = withingsData[seg.lean]}
-                    {@const segTotal = (mKg ?? 0) + (lKg ?? 0)}
                     <div class="seg-row">
                       <span class="seg-label">{seg.label}</span>
-                      {#if segmentalShowPct}
-                        <span class="seg-val">{mKg != null && segTotal > 0 ? (mKg / segTotal * 100).toFixed(1) + '%' : '—'}</span>
-                        <span class="seg-val">{lKg != null && segTotal > 0 ? (lKg / segTotal * 100).toFixed(1) + '%' : '—'}</span>
-                      {:else}
-                        <span class="seg-val">{mKg != null ? fmtWeight(mKg).value + ' ' + fmtWeight(mKg).unit : '—'}</span>
-                        <span class="seg-val">{lKg != null ? fmtWeight(lKg).value + ' ' + fmtWeight(lKg).unit : '—'}</span>
-                      {/if}
+                      <span class="seg-val">{mKg != null ? fmtWeight(mKg).value + ' ' + fmtWeight(mKg).unit : '—'}</span>
+                      <span class="seg-val">{lKg != null ? fmtWeight(lKg).value + ' ' + fmtWeight(lKg).unit : '—'}</span>
                     </div>
                   {/if}
                 {/each}

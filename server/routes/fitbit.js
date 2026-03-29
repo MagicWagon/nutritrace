@@ -276,16 +276,16 @@ async function _syncDate(u, dateStr) {
     metrics.active_zone_minutes = d['activities-active-zone-minutes']?.[0]?.value?.activeZoneMinutes ?? null;
   } catch (e) { errors.push('azm: ' + e.message); }
 
-  // VO2 Max / Cardio Fitness Score (requires cardio_fitness scope)
+  // VO2 Max / Cardio Fitness Score
   try {
-    const d = await _get(u, `/1/user/-/cardioscore/date/${dateStr}/1d.json`);
+    const d = await _get(u, `/1/user/-/cardioscore/date/${dateStr}.json`);
     console.log('[fitbit] cardioscore raw:', JSON.stringify(d));
     metrics.vo2_max = d['cardioScore']?.[0]?.value?.vo2Max ?? null;
   } catch (e) { errors.push('vo2max: ' + e.message); }
 
   // Sleep Score
   try {
-    const d = await _get(u, `/1/user/-/sleep/score/date/${dateStr}/1d.json`);
+    const d = await _get(u, `/1/user/-/sleep/score/date/${dateStr}.json`);
     console.log('[fitbit] sleep score raw:', JSON.stringify(d));
     const entry = d['sleep']?.[0] ?? d['sleepScore']?.[0];
     metrics.sleep_score = entry?.value?.sleepScore ?? entry?.value ?? null;
@@ -294,7 +294,7 @@ async function _syncDate(u, dateStr) {
 
   // Daily Readiness Score
   try {
-    const d = await _get(u, `/1/user/-/readiness/date/${dateStr}/1d.json`);
+    const d = await _get(u, `/1/user/-/readiness/date/${dateStr}.json`);
     console.log('[fitbit] readiness raw:', JSON.stringify(d));
     metrics.readiness_score = d['readinessScore']?.[0]?.value?.score ?? null;
   } catch (e) { errors.push('readiness: ' + e.message); }
