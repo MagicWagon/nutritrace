@@ -2,7 +2,7 @@
  * db.js - IndexedDB abstraction layer for NutriTrace
  */
 const DB = (() => {
-  const DB_NAME = 'waistline';
+  const DB_NAME = 'nutritrace';
   const DB_VERSION = 2;
   let _db = null;
 
