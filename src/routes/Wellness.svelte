@@ -615,39 +615,33 @@
   <header class="page-header" class:has-banner={$pageBanners}>
     {#if $pageBanners}<WellnessBanner />{/if}
     <h1>Wellness</h1>
-    <div class="wl-header-actions">
-      {#if status?.connected}
-        <button class="wl-sync-icon-btn" class:wl-syncing={syncing}
-          on:click={() => sync()} disabled={syncing}
-          title="Sync Fitbit{status.fitbitUserId ? ' · ' + status.fitbitUserId : ''}">
-          {#if syncing}
-            <span class="material-symbols-rounded wl-spin-icon">sync</span>
-          {:else}
-            <span class="wl-brand-icon"><FitbitIcon /></span>
-          {/if}
-        </button>
-        <button class="wl-disconnect-btn" on:click={disconnect}
-          title="Disconnect Fitbit">
-          <span class="material-symbols-rounded">link_off</span>
-        </button>
-      {/if}
-      {#if withingsStatus?.connected}
-        <button class="wl-sync-icon-btn" class:wl-syncing={withingsSyncing}
-          on:click={() => syncWithings()} disabled={withingsSyncing}
-          title="Sync Withings{withingsStatus.withingsUserId ? ' · User ' + withingsStatus.withingsUserId : ''}">
-          {#if withingsSyncing}
-            <span class="material-symbols-rounded wl-spin-icon">sync</span>
-          {:else}
-            <span class="wl-brand-icon"><WithingsIcon /></span>
-          {/if}
-        </button>
-        <button class="wl-disconnect-btn" on:click={disconnectWithings}
-          title="Disconnect Withings">
-          <span class="material-symbols-rounded">link_off</span>
-        </button>
-      {/if}
-    </div>
   </header>
+
+  <!-- Fixed sync buttons — top-right corner, same row as hamburger -->
+  <div class="wl-topbar-actions">
+    {#if status?.connected}
+      <button class="wl-sync-icon-btn" class:wl-syncing={syncing}
+        on:click={() => sync()} disabled={syncing}
+        title="Sync Fitbit{status.fitbitUserId ? ' · ' + status.fitbitUserId : ''}">
+        {#if syncing}
+          <span class="material-symbols-rounded wl-spin-icon">sync</span>
+        {:else}
+          <span class="wl-brand-icon"><FitbitIcon /></span>
+        {/if}
+      </button>
+    {/if}
+    {#if withingsStatus?.connected}
+      <button class="wl-sync-icon-btn" class:wl-syncing={withingsSyncing}
+        on:click={() => syncWithings()} disabled={withingsSyncing}
+        title="Sync Withings{withingsStatus.withingsUserId ? ' · User ' + withingsStatus.withingsUserId : ''}">
+        {#if withingsSyncing}
+          <span class="material-symbols-rounded wl-spin-icon">sync</span>
+        {:else}
+          <span class="wl-brand-icon"><WithingsIcon /></span>
+        {/if}
+      </button>
+    {/if}
+  </div>
 
   <!-- Date navigation sub-bar — sticky below header, same pattern as Diary -->
   <div class="wl-date-bar" class:has-banner={$pageBanners}>
@@ -1078,9 +1072,8 @@
   .wl-shell {
     min-height: unset;
   }
-  /* h1 fills available space so wl-header-actions sits at the right edge. */
+  /* Force h1 to same height as Diary so the sticky date-bar top offset (62px) is accurate. */
   .wl-shell .page-header h1 {
-    flex: 1;
     height: 40px;
     display: flex;
     align-items: center;
@@ -1246,12 +1239,15 @@
   .text-danger { color: var(--text-3); }
   .text-danger:hover { color: var(--error, #f87171); }
 
-  /* Header sync actions */
-  .wl-header-actions {
+  /* Fixed sync buttons — top-right, same row as hamburger */
+  .wl-topbar-actions {
+    position: fixed;
+    top: calc(var(--safe-top) + 10px);
+    right: 12px;
+    z-index: 41;
     display: flex;
     align-items: center;
-    gap: 2px;
-    margin-left: auto;
+    gap: 6px;
   }
   .wl-sync-icon-btn {
     width: 40px;
@@ -1286,23 +1282,6 @@
     font-size: 20px;
     animation: wl-spin 0.8s linear infinite;
   }
-  .wl-disconnect-btn {
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: var(--radius-md);
-    border: none;
-    background: none;
-    color: var(--text-3);
-    cursor: pointer;
-    font-size: 18px;
-    transition: color var(--dur-fast);
-    -webkit-tap-highlight-color: transparent;
-  }
-  .wl-disconnect-btn:hover { color: var(--error, #f87171); }
-
   /* Tabs */
   .tab-bar {
     display: flex;

@@ -318,6 +318,10 @@
   let labsFitbitShowSecret   = false;
   let labsFitbitRedirectSuggested = '';
   let labsLoaded = false;
+  let fitbitConnectionStatus  = null; // null = not loaded, { connected, fitbitUserId }
+  let withingsConnectionStatus = null;
+  let disconnectingFitbit   = false;
+  let disconnectingWithings = false;
 
   async function loadLabsConfig() {
     if (labsLoaded) return;
@@ -329,6 +333,29 @@
       labsFitbitClientSecret = cfg.fitbit_client_secret || '';
       labsFitbitRedirectUri  = cfg.fitbit_redirect_uri  || '';
     } catch { /* non-admin users can't fetch app-config; hide fields below */ }
+    // Load connection status for all users
+    try { fitbitConnectionStatus  = await NtApi.get('/api/wellness/fitbit/status');  } catch { fitbitConnectionStatus  = { connected: false }; }
+    try { withingsConnectionStatus = await NtApi.get('/api/wellness/withings/status'); } catch { withingsConnectionStatus = { connected: false }; }
+  }
+
+  async function disconnectFitbitFromSettings() {
+    disconnectingFitbit = true;
+    try {
+      await NtApi.del('/api/wellness/fitbit/disconnect');
+      fitbitConnectionStatus = { ...fitbitConnectionStatus, connected: false };
+      showSuccess('Disconnected from Fitbit');
+    } catch(e) { showError(e.message); }
+    disconnectingFitbit = false;
+  }
+
+  async function disconnectWithingsFromSettings() {
+    disconnectingWithings = true;
+    try {
+      await NtApi.del('/api/wellness/withings/disconnect');
+      withingsConnectionStatus = { ...withingsConnectionStatus, connected: false };
+      showSuccess('Disconnected from Withings');
+    } catch(e) { showError(e.message); }
+    disconnectingWithings = false;
   }
 
   async function saveLabsFitbit() {
@@ -1415,7 +1442,7 @@
           <div class="setting-row">
             <div>
               <span class="setting-label">Celebrate goals</span>
-              <span class="setting-desc">Pulse effect when you reach goals</span>
+              <div class="setting-desc">Pulse effect when you reach goals</div>
             </div>
             <Toggle checked={$goalCelebrations} on:change={e => goalCelebrations.set(e.detail)} />
           </div>
@@ -1423,7 +1450,7 @@
           <div class="setting-row">
             <div>
               <span class="setting-label">Page banners</span>
-              <span class="setting-desc">Animated page header illustrations</span>
+              <div class="setting-desc">Animated page header illustrations</div>
             </div>
             <Toggle checked={$pageBanners} on:change={e => pageBanners.set(e.detail)} />
           </div>
@@ -1432,7 +1459,7 @@
           <div class="setting-row">
             <div>
               <span class="setting-label">Loop banner animations</span>
-              <span class="setting-desc">Looping background animations</span>
+              <div class="setting-desc">Looping background animations</div>
             </div>
             <Toggle checked={$loopBannerAnimations} on:change={e => loopBannerAnimations.set(e.detail)} />
           </div>
@@ -2169,6 +2196,19 @@
                 {/each}
               </div>
             </div>
+            {#if fitbitConnectionStatus?.connected}
+              <div class="setting-divider"></div>
+              <div class="setting-row">
+                <div>
+                  <span class="setting-label">Connected device</span>
+                  <div class="setting-desc">{fitbitConnectionStatus.fitbitUserId || 'Fitbit account linked'}</div>
+                </div>
+                <button class="btn btn-ghost" style="height:32px;padding:0 12px;font-size:13px;color:var(--error,#f87171);border-color:var(--error,#f87171)"
+                  on:click={disconnectFitbitFromSettings} disabled={disconnectingFitbit}>
+                  {disconnectingFitbit ? 'Disconnecting…' : 'Disconnect'}
+                </button>
+              </div>
+            {/if}
           {/if}
         </div>
 
@@ -2252,6 +2292,19 @@
                 {/each}
               </div>
             </div>
+            {#if withingsConnectionStatus?.connected}
+              <div class="setting-divider"></div>
+              <div class="setting-row">
+                <div>
+                  <span class="setting-label">Connected device</span>
+                  <div class="setting-desc">{withingsConnectionStatus.withingsUserId ? 'User ' + withingsConnectionStatus.withingsUserId : 'Withings account linked'}</div>
+                </div>
+                <button class="btn btn-ghost" style="height:32px;padding:0 12px;font-size:13px;color:var(--error,#f87171);border-color:var(--error,#f87171)"
+                  on:click={disconnectWithingsFromSettings} disabled={disconnectingWithings}>
+                  {disconnectingWithings ? 'Disconnecting…' : 'Disconnect'}
+                </button>
+              </div>
+            {/if}
           {/if}
         </div>
 
