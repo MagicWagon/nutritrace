@@ -1267,9 +1267,8 @@
                     </div>
                     <div class="readiness-driver">
                       <span class="rd-label">Penalties</span>
-                      {@const totalPenalty = readiness.activity_penalty + readiness.interaction_penalty}
-                      <span class="rd-val" class:rd-penalty={totalPenalty > 0}>
-                        {totalPenalty > 0 ? `−${totalPenalty}` : '—'}
+                      <span class="rd-val" class:rd-penalty={(readiness.activity_penalty + readiness.interaction_penalty) > 0}>
+                        {(readiness.activity_penalty + readiness.interaction_penalty) > 0 ? `−${readiness.activity_penalty + readiness.interaction_penalty}` : '—'}
                       </span>
                     </div>
                   </div>

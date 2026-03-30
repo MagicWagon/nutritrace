@@ -3203,7 +3203,7 @@
   /* Settings search bar */
   .settings-search-bar {
     position: sticky;
-    top: var(--header-h, 56px);
+    top: 0;
     z-index: 20;
     display: flex;
     align-items: center;

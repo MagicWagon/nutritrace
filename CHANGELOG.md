@@ -5,6 +5,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.23.0-beta] — 2026-03-30
+
+### Added
+- **Daily Readiness Score** — new card on the Wellness Heart tab; calculates a 1–100 score from 30 days of personal HRV, RHR, sleep, and activity history; asymmetric HRV model (below-baseline penalised 2.75× harder than above); HRV×RHR interaction penalty fires when both signals are bad simultaneously; shows Optimal/Good/Fair/Low/Poor label with colour coding; 4-column driver breakdown (HRV · RHR · Sleep · Penalties); calibrating state shown when fewer than 7 days of HRV history exist; constants reverse-engineered from 6 actual ground-truth data points (avg error ±1.2 pts, max 2 pts)
+
+### Changed
+- **AI chat renamed AIBuddy → AIFitBot** — component file renamed to `AIFitBot.svelte`; no user-facing name change (assistant name is still configurable)
+- **AI assistant data access expanded** — system prompt and context now include Garmin data (steps, activity, sleep, HR, HRV, SpO2, body battery, stress, max HR), full Fitbit metrics (AZM, floors, distance, sleep score, SpO2, respiratory rate, VO2 Max, skin temp), full Withings metrics (bone mass, body water, visceral fat, vascular age, metabolic age), water intake, and a note when no wellness data is available; welcome screen updated with a "Sleep & recovery" quick chip
+- **AI message timestamps** — messages from today show time only (e.g. "3:45 PM"); messages from previous days show date prefix in the user's preferred format (e.g. "03/29 · 3:45 PM")
+- **Settings search bar** — changed `top` from `56px` to `0` so the bar snaps directly to the top when the banner scrolls away, eliminating the crawl-through-banner effect
+
+### Fixed
+- **Wellness goals first-load** — wellness goal progress bars were blank on first visit to the Goals page because `fitbitEnabled`/`garminEnabled` stores hadn't resolved yet when `onMount` ran; moved fetch to a reactive statement that fires as soon as either store becomes true
+
+---
+
 ## [0.22.0-beta] — 2026-03-29
 
 ### Added

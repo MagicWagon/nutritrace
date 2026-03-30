@@ -6,7 +6,7 @@
   import { localDateStr } from '../../lib/db.js';
   import { Nutrition } from '../../lib/nutrition.js';
   import { callAI, callAIProxy } from '../../lib/aiChat.js';
-  import { aiEnabled, aiAssistantName, aiApiKey, aiProvider, aiModel, goals, mealNames, energyUnit } from '../../stores/settings.js';
+  import { aiEnabled, aiAssistantName, aiApiKey, aiProvider, aiModel, goals, mealNames, energyUnit, dateFormat } from '../../stores/settings.js';
   import { showError } from '../../stores/toast.js';
 
   // ── State ──────────────────────────────────────────────────────────────────
@@ -65,7 +65,18 @@
 
   function _fmtCreatedAt(iso) {
     if (!iso) return fmtTime();
-    return new Date(iso + 'Z').toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    const d       = new Date(iso + 'Z');
+    const timeStr = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    // Compare date portion in local time
+    const msgDate = d.toLocaleDateString('sv-SE'); // reliable YYYY-MM-DD in local tz
+    if (msgDate === localDateStr()) return timeStr;
+    // Older message — prefix with date in user's preferred format
+    const fmt = dateFormat.get() || 'ISO';
+    const mo  = String(d.getMonth() + 1).padStart(2, '0');
+    const dy  = String(d.getDate()).padStart(2, '0');
+    const y   = d.getFullYear();
+    const dateLabel = fmt === 'US' ? `${mo}/${dy}` : fmt === 'EU' ? `${dy}/${mo}` : `${y}-${mo}-${dy}`;
+    return `${dateLabel} · ${timeStr}`;
   }
 
   // ── Draggable FAB ──────────────────────────────────────────────────────────
@@ -152,29 +163,60 @@
     }
 
     let statsText = '';
-    if (entry?.bodyStats) {
-      const bs    = entry.bodyStats;
-      const parts = [];
-      if (bs.weight)   parts.push(`Weight: ${bs.weight}`);
-      if (bs.body_fat) parts.push(`Body fat: ${bs.body_fat}%`);
-      if (parts.length) statsText = parts.join(', ');
-    }
+    const bs = entry?.bodyStats || entry?.body_stats || {};
+    const bsParts = [];
+    if (bs.weight)   bsParts.push(`Weight: ${bs.weight}`);
+    if (bs.body_fat) bsParts.push(`Body fat: ${bs.body_fat}%`);
+    if (bsParts.length) statsText = bsParts.join(', ');
 
-    // Wellness data (Fitbit + Withings) — best-effort, silent on failure
+    // Water intake
+    const waterMl   = (entry?.water || []).reduce((s, l) => s + (l.amount || 0), 0);
+    const waterText  = waterMl > 0 ? `${(waterMl / 1000).toFixed(2)} L (${Math.round(waterMl)} ml)` : 'None logged';
+
+    // Wellness data — Fitbit + Garmin + Withings, best-effort, silent on failure
     let wellnessText = '';
     try {
       const fitbitRes = await NtApi.get(`/api/wellness/fitbit/data?date=${today}`);
       const fd = fitbitRes[today];
       if (fd) {
         const parts = [];
-        if (fd.steps != null)              parts.push(`Steps: ${Math.round(fd.steps).toLocaleString()}`);
-        if (fd.active_minutes != null)     parts.push(`Active minutes: ${Math.round(fd.active_minutes)}`);
-        if (fd.calories_out != null)       parts.push(`Calories burned: ${Math.round(fd.calories_out)}`);
-        if (fd.sleep_duration_min != null) { const h = Math.floor(fd.sleep_duration_min/60); parts.push(`Sleep: ${h}h ${Math.round(fd.sleep_duration_min%60)}m`); }
-        if (fd.sleep_efficiency != null)   parts.push(`Sleep efficiency: ${fd.sleep_efficiency.toFixed(0)}%`);
-        if (fd.resting_hr != null)         parts.push(`Resting HR: ${Math.round(fd.resting_hr)} bpm`);
-        if (fd.hrv_daily_rmssd != null)    parts.push(`HRV: ${fd.hrv_daily_rmssd.toFixed(1)} ms`);
+        if (fd.steps != null)                parts.push(`Steps: ${Math.round(fd.steps).toLocaleString()}`);
+        if (fd.active_minutes != null)        parts.push(`Active minutes: ${Math.round(fd.active_minutes)}`);
+        if (fd.active_zone_minutes != null)   parts.push(`Active zone min: ${Math.round(fd.active_zone_minutes)}`);
+        if (fd.calories_out != null)          parts.push(`Calories burned: ${Math.round(fd.calories_out)}`);
+        if (fd.floors != null)                parts.push(`Floors: ${Math.round(fd.floors)}`);
+        if (fd.distance_km != null)           parts.push(`Distance: ${fd.distance_km.toFixed(2)} km`);
+        if (fd.sleep_duration_min != null)    { const h = Math.floor(fd.sleep_duration_min/60); parts.push(`Sleep: ${h}h ${Math.round(fd.sleep_duration_min%60)}m`); }
+        if (fd.sleep_efficiency != null)      parts.push(`Sleep efficiency: ${fd.sleep_efficiency.toFixed(0)}%`);
+        if (fd.sleep_score != null)           parts.push(`Sleep score: ${Math.round(fd.sleep_score)}/100`);
+        if (fd.resting_hr != null)            parts.push(`Resting HR: ${Math.round(fd.resting_hr)} bpm`);
+        if (fd.hrv_daily_rmssd != null)       parts.push(`HRV: ${fd.hrv_daily_rmssd.toFixed(1)} ms`);
+        if (fd.spo2_avg != null)              parts.push(`SpO2: ${fd.spo2_avg.toFixed(1)}%`);
+        if (fd.respiratory_rate != null)      parts.push(`Respiratory rate: ${fd.respiratory_rate.toFixed(1)} brpm`);
+        if (fd.vo2_max != null)               parts.push(`Cardio fitness (VO2 Max): ${fd.vo2_max.toFixed(1)} mL/kg/min`);
+        if (fd.skin_temp_variation != null)   parts.push(`Skin temp variation: ${fd.skin_temp_variation >= 0 ? '+' : ''}${fd.skin_temp_variation.toFixed(2)}°C`);
         if (parts.length) wellnessText += `Fitbit: ${parts.join(', ')}`;
+      }
+    } catch {}
+    try {
+      const garminRes = await NtApi.get(`/api/wellness/garmin/data?date=${today}`);
+      const gd = garminRes[today];
+      if (gd) {
+        const parts = [];
+        if (gd.steps != null)                parts.push(`Steps: ${Math.round(gd.steps).toLocaleString()}`);
+        if (gd.active_minutes != null)        parts.push(`Active minutes: ${Math.round(gd.active_minutes)}`);
+        if (gd.calories_out != null)          parts.push(`Calories burned: ${Math.round(gd.calories_out)}`);
+        if (gd.distance_km != null)           parts.push(`Distance: ${gd.distance_km.toFixed(2)} km`);
+        if (gd.sleep_duration_min != null)    { const h = Math.floor(gd.sleep_duration_min/60); parts.push(`Sleep: ${h}h ${Math.round(gd.sleep_duration_min%60)}m`); }
+        if (gd.sleep_score != null)           parts.push(`Sleep score: ${Math.round(gd.sleep_score)}/100`);
+        if (gd.resting_hr != null)            parts.push(`Resting HR: ${Math.round(gd.resting_hr)} bpm`);
+        if (gd.hrv_daily_rmssd != null)       parts.push(`HRV: ${gd.hrv_daily_rmssd.toFixed(1)} ms`);
+        if (gd.spo2_avg != null)              parts.push(`SpO2: ${gd.spo2_avg.toFixed(1)}%`);
+        if (gd.body_battery_high != null)     parts.push(`Body battery peak: ${Math.round(gd.body_battery_high)}`);
+        if (gd.body_battery_low != null)      parts.push(`Body battery low: ${Math.round(gd.body_battery_low)}`);
+        if (gd.stress_avg != null)            parts.push(`Avg stress: ${Math.round(gd.stress_avg)}/100`);
+        if (gd.max_hr != null)                parts.push(`Max HR: ${Math.round(gd.max_hr)} bpm`);
+        if (parts.length) wellnessText += (wellnessText ? '\n' : '') + `Garmin: ${parts.join(', ')}`;
       }
     } catch {}
     try {
@@ -182,26 +224,36 @@
       const wd = withingsRes[today];
       if (wd) {
         const parts = [];
-        if (wd.weight_kg?.value != null)    parts.push(`Weight: ${wd.weight_kg.value.toFixed(1)} kg`);
-        if (wd.body_fat_pct?.value != null)  parts.push(`Body fat: ${wd.body_fat_pct.value.toFixed(1)}%`);
-        if (wd.muscle_mass_kg?.value != null) parts.push(`Muscle mass: ${wd.muscle_mass_kg.value.toFixed(1)} kg`);
+        if (wd.weight_kg?.value != null)      parts.push(`Weight: ${wd.weight_kg.value.toFixed(1)} kg`);
+        if (wd.body_fat_pct?.value != null)    parts.push(`Body fat: ${wd.body_fat_pct.value.toFixed(1)}%`);
+        if (wd.muscle_mass_kg?.value != null)  parts.push(`Muscle mass: ${wd.muscle_mass_kg.value.toFixed(1)} kg`);
+        if (wd.bone_mass_kg?.value != null)    parts.push(`Bone mass: ${wd.bone_mass_kg.value.toFixed(2)} kg`);
+        if (wd.body_water_pct?.value != null)  parts.push(`Body water: ${wd.body_water_pct.value.toFixed(1)}%`);
+        if (wd.visceral_fat?.value != null)    parts.push(`Visceral fat: ${wd.visceral_fat.value.toFixed(1)}`);
+        if (wd.vascular_age?.value != null)    parts.push(`Vascular age: ${Math.round(wd.vascular_age.value)} yrs`);
+        if (wd.metabolic_age?.value != null)   parts.push(`Metabolic age: ${Math.round(wd.metabolic_age.value)} yrs`);
         if (parts.length) wellnessText += (wellnessText ? '\n' : '') + `Withings: ${parts.join(', ')}`;
       }
     } catch {}
 
-    return { today, diaryText, goalsText, statsText, wellnessText };
+    return { today, diaryText, goalsText, statsText, wellnessText, waterText };
   }
 
   function buildSystemPrompt(ctx) {
     const name = $aiAssistantName;
-    return `You are ${name}, a friendly AI nutrition and fitness coach built into the NutriTrace app. `
-         + `You help users make healthy food choices, understand their nutrition, and reach their fitness goals. `
-         + `Be warm, encouraging, and concise. Give practical, evidence-based advice. Keep responses focused.\n\n`
+    return `You are ${name}, a friendly and knowledgeable AI nutrition and fitness coach built into NutriTrace. `
+         + `You have full access to the user's health data: food diary, nutrition goals, body stats, water intake, `
+         + `and all wellness metrics from connected devices (Fitbit, Garmin, Withings). `
+         + `You can discuss and provide insight on all of it — food choices, macros, sleep quality, activity, `
+         + `heart health, recovery, hydration, body composition, and more. `
+         + `Be warm, encouraging, and concise. Give practical, evidence-based advice.\n\n`
          + `Current date: ${ctx.today}\n\n`
          + `TODAY'S FOOD LOG:\n${ctx.diaryText}\n`
-         + `DAILY GOALS:\n${ctx.goalsText}`
-         + (ctx.statsText ? `\n\nBODY STATS TODAY:\n${ctx.statsText}` : '')
-         + (ctx.wellnessText ? `\n\nWELLNESS DATA TODAY:\n${ctx.wellnessText}` : '');
+         + `NUTRITION GOALS:\n${ctx.goalsText}\n\n`
+         + `WATER INTAKE TODAY:\n${ctx.waterText}`
+         + (ctx.statsText    ? `\n\nBODY STATS TODAY:\n${ctx.statsText}` : '')
+         + (ctx.wellnessText ? `\n\nWELLNESS / FITNESS DATA TODAY:\n${ctx.wellnessText}`
+                             : '\n\nWELLNESS DATA: No device data synced for today yet.');
   }
 
   function fmtTime() {
@@ -320,7 +372,7 @@
           </div>
           <div>
             <div class="ai-header-name">{assistantName}</div>
-            <div class="ai-header-sub">Your AI nutrition coach</div>
+            <div class="ai-header-sub">Your AI health & nutrition coach</div>
           </div>
         </div>
         <div class="ai-header-actions">
@@ -354,13 +406,16 @@
               <span class="material-symbols-rounded">smart_toy</span>
             </div>
             <p class="ai-welcome-name">Hi, I'm {assistantName}!</p>
-            <p class="ai-welcome-desc">Ask me about your nutrition, goals, or any health questions. I can see today's diary and your goals.</p>
+            <p class="ai-welcome-desc">Ask me anything — nutrition, sleep, activity, recovery, hydration, body composition. I have access to all your data from today.</p>
             <div class="ai-quick-chips">
               <button class="ai-chip" on:click={() => quickAsk("How am I doing today?")}>
                 How am I doing today?
               </button>
               <button class="ai-chip" on:click={() => quickAsk("What should I eat for my next meal?")}>
                 Meal suggestion
+              </button>
+              <button class="ai-chip" on:click={() => quickAsk("How was my sleep and recovery?")}>
+                Sleep & recovery
               </button>
               <button class="ai-chip" on:click={() => quickAsk("Am I on track with my goals?")}>
                 Goal progress
