@@ -289,7 +289,9 @@ async function _syncDate(u, dateStr) {
     metrics.active_zone_minutes = d['activities-active-zone-minutes']?.[0]?.value?.activeZoneMinutes ?? null;
   } catch (e) { errors.push('azm: ' + e.message); }
 
-  // Cardio Fitness Score (Fitbit returns a range string like "39-43"; store midpoint)
+  // Cardio Fitness Score (Fitbit returns a range string like "39-43")
+  // Store midpoint as vo2_max (numeric, used for charting/goals) and raw
+  // range string as vo2_max_range (used for display)
   try {
     const d = await _get(u, `/1/user/-/cardioscore/date/${dateStr}.json`);
     const raw = d['cardioScore']?.[0]?.value?.vo2Max ?? null;
@@ -297,7 +299,8 @@ async function _syncDate(u, dateStr) {
       metrics.vo2_max = raw;
     } else if (typeof raw === 'string' && raw.includes('-')) {
       const [lo, hi] = raw.split('-').map(Number);
-      metrics.vo2_max = (lo + hi) / 2;
+      metrics.vo2_max       = (lo + hi) / 2;
+      metrics.vo2_max_range = raw.trim(); // e.g. "39-43"
     } else {
       metrics.vo2_max = raw != null ? Number(raw) : null;
     }

@@ -137,6 +137,10 @@
     if (SLEEP_TIME_IDS.has(m.id)) {
       return fmtSleep(rawValue);
     }
+    // Cardio Fitness: prefer the range string (e.g. "39-43") when available
+    if (m.id === 'vo2_max' && displayData.vo2_max_range) {
+      return { value: displayData.vo2_max_range, unit: m.unit };
+    }
     const val = m.fmt ? m.fmt(rawValue) : rawValue;
     return { value: String(val), unit: m.unit };
   }
@@ -892,17 +896,6 @@
         {/if}
       </button>
     {/if}
-    {#if withingsStatus?.connected}
-      <button class="wl-sync-icon-btn" class:wl-syncing={withingsSyncing}
-        on:click={() => syncWithings()} disabled={withingsSyncing}
-        title="Sync Withings{withingsStatus.withingsUserId ? ' · User ' + withingsStatus.withingsUserId : ''}">
-        {#if withingsSyncing}
-          <span class="material-symbols-rounded wl-spin-icon">sync</span>
-        {:else}
-          <span class="wl-brand-icon"><WithingsIcon /></span>
-        {/if}
-      </button>
-    {/if}
     {#if garminStatus?.connected}
       <button class="wl-sync-icon-btn" class:wl-syncing={garminSyncing}
         on:click={() => syncGarmin()} disabled={garminSyncing}
@@ -911,6 +904,17 @@
           <span class="material-symbols-rounded wl-spin-icon">sync</span>
         {:else}
           <span class="wl-brand-icon"><GarminIcon /></span>
+        {/if}
+      </button>
+    {/if}
+    {#if withingsStatus?.connected}
+      <button class="wl-sync-icon-btn" class:wl-syncing={withingsSyncing}
+        on:click={() => syncWithings()} disabled={withingsSyncing}
+        title="Sync Withings{withingsStatus.withingsUserId ? ' · User ' + withingsStatus.withingsUserId : ''}">
+        {#if withingsSyncing}
+          <span class="material-symbols-rounded wl-spin-icon">sync</span>
+        {:else}
+          <span class="wl-brand-icon"><WithingsIcon /></span>
         {/if}
       </button>
     {/if}
