@@ -305,6 +305,17 @@ async function _syncRange(u, fromDate, toDate) {
       for (const night of (data.sleeps || [])) {
         const date = night.calendarDate || _epochToDate(night.startTimeInSeconds);
         if (!date) continue;
+        // Sleep timing — convert UTC epoch + local offset to minutes past midnight
+        const offset = night.startTimeOffsetInSeconds ?? 0;
+        let sleep_start_min = null, sleep_end_min = null;
+        if (night.startTimeInSeconds != null) {
+          const localStart = new Date((night.startTimeInSeconds + offset) * 1000);
+          sleep_start_min = localStart.getUTCHours() * 60 + localStart.getUTCMinutes();
+        }
+        if (night.startTimeInSeconds != null && night.durationInSeconds != null) {
+          const localEnd = new Date((night.startTimeInSeconds + offset + night.durationInSeconds) * 1000);
+          sleep_end_min = localEnd.getUTCHours() * 60 + localEnd.getUTCMinutes();
+        }
         const m = {
           sleep_duration_min: night.durationInSeconds  != null ? Math.round(night.durationInSeconds / 60) : null,
           sleep_deep_min:     night.deepSleepDurationInSeconds  != null ? Math.round(night.deepSleepDurationInSeconds / 60)  : null,
@@ -313,6 +324,8 @@ async function _syncRange(u, fromDate, toDate) {
           sleep_wake_min:     night.awakeDurationInSeconds  != null ? Math.round(night.awakeDurationInSeconds / 60) : null,
           respiratory_rate:   night.averageRespirationValue ?? null,
           sleep_score:        night.sleepScores?.overallSleepScore ?? night.overallSleepScore ?? null,
+          sleep_start_min,
+          sleep_end_min,
         };
         for (const [type, value] of Object.entries(m)) {
           if (value != null) upsert.run(u, date, type, value);

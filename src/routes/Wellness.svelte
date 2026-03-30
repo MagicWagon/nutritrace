@@ -289,6 +289,7 @@
       if (!silent) showError('Garmin sync failed: ' + e.message);
     }
     garminSyncing = false;
+    _insightsLoaded = false;
   }
 
   async function connectGarmin() {
@@ -311,140 +312,132 @@
     } catch(e) { showError(e.message); }
   }
 
-  // ── Trends ─────────────────────────────────────────────────────────────────
-  let trendsRange    = 7;
-  let trendsLoading  = false;
-  let trendsData     = [];
-  let _trendCharts   = [];
-  let _trendsVersion = 0; // incremented on each loadTrends call; stale calls abort before creating charts
+  // ── Sleep Insights: Debt + Chronotype ─────────────────────────────────────
+  let sleepInsightsRange = 14; // nights to look back for debt calculation
+  let sleepDebt     = null;    // { debtMin, nights, goalMin } | null
+  let chronotype    = null;    // { label, emoji, desc, midpointMin, nights } | { nights, needed } | null
+  let _insightsLoaded = false;
 
-  let TREND_CHARTS = [
-    { id: 'steps',              label: 'Steps',       icon: 'directions_walk', source: 'fitbit',   fmtLatest: v => Math.round(v).toLocaleString() + ' steps', canvasEl: null, hasData: false, latest: null },
-    { id: 'sleep_duration_min', label: 'Sleep',       icon: 'bedtime',         source: 'fitbit',   fmtLatest: v => { const h=Math.floor(v/60); return `${h}h ${Math.round(v%60)}m`; }, canvasEl: null, hasData: false, latest: null },
-    { id: 'resting_hr',         label: 'Resting HR',  icon: 'favorite',        source: 'fitbit',   fmtLatest: v => Math.round(v) + ' bpm', canvasEl: null, hasData: false, latest: null },
-    { id: 'hrv_daily_rmssd',    label: 'HRV',         icon: 'monitor_heart',   source: 'fitbit',   fmtLatest: v => v.toFixed(1) + ' ms', canvasEl: null, hasData: false, latest: null },
-    { id: 'weight_kg',          label: 'Weight',      icon: 'monitor_weight',  source: 'withings', fmtLatest: v => $weightUnit === 'lb' ? (v * 2.20462).toFixed(1) + ' lbs' : v.toFixed(1) + ' kg', canvasEl: null, hasData: false, latest: null },
-    { id: 'body_fat_pct',       label: 'Body Fat',    icon: 'percent',         source: 'withings', fmtLatest: v => v.toFixed(1) + '%', canvasEl: null, hasData: false, latest: null },
-    { id: 'muscle_mass_kg',     label: 'Muscle Mass', icon: 'fitness_center',  source: 'withings', fmtLatest: v => v.toFixed(1) + ' kg', canvasEl: null, hasData: false, latest: null },
-  ];
+  function _sleepMidpoint(startMin, endMin) {
+    if (startMin == null || endMin == null) return null;
+    // endMin may be less than startMin if sleep crosses midnight (e.g. start=22:30, end=06:45)
+    const effectiveEnd = endMin < startMin ? endMin + 1440 : endMin;
+    const mid = (startMin + effectiveEnd) / 2;
+    return mid >= 1440 ? mid - 1440 : mid;
+  }
 
-  async function loadTrends() {
-    const myVersion = ++_trendsVersion;
-    trendsLoading = true;
-    _trendCharts.forEach(c => c.destroy?.());
-    _trendCharts = [];
+  function _classifyChronotype(avgMidMin) {
+    const h = avgMidMin / 60;
+    if (h < 2.0) return { label: 'Early Bird',   emoji: '🌅', desc: 'You naturally wake early and feel most energized in the morning. Your body clock runs ahead of most — mornings are your prime time.' };
+    if (h < 3.5) return { label: 'Morning Type',  emoji: '☀️', desc: 'You do your best work in the first half of the day and tend to wake up feeling refreshed. Most schedules suit you well.' };
+    if (h < 5.0) return { label: 'Intermediate',  emoji: '⚖️', desc: 'Your body clock is well-aligned with typical schedules — you adapt easily between early mornings and late evenings.' };
+    if (h < 6.5) return { label: 'Evening Type',  emoji: '🌆', desc: 'You come alive in the afternoon and evening. Mornings can be a challenge — your peak energy arrives later in the day.' };
+    return        { label: 'Night Owl',           emoji: '🦉', desc: "Your body clock runs late. You're at your sharpest in the evening and may struggle with early alarms. Late nights feel natural." };
+  }
 
-    // Reset chart state
-    TREND_CHARTS = TREND_CHARTS.map(c => ({ ...c, hasData: false, latest: null, canvasEl: null }));
+  function fmtTimeMin(min) {
+    if (min == null) return '—';
+    const h    = Math.floor(min / 60) % 24;
+    const m    = Math.round(min % 60);
+    const ampm = h < 12 ? 'AM' : 'PM';
+    const h12  = h === 0 ? 12 : h > 12 ? h - 12 : h;
+    return `${h12}:${String(m).padStart(2,'0')} ${ampm}`;
+  }
 
-    const today = new Date();
-    const from = new Date(today);
-    from.setDate(from.getDate() - (trendsRange - 1));
+  async function loadSleepInsights() {
+    const today   = new Date();
+    const lookback = Math.max(sleepInsightsRange, 30); // 30d window for enough chronotype data
+    const from    = new Date(today);
+    from.setDate(from.getDate() - lookback + 1);
     const fromStr = from.toISOString().slice(0, 10);
     const toStr   = today.toISOString().slice(0, 10);
 
-    let fitbitRows = {};
-    try {
-      fitbitRows = await NtApi.get(`/api/wellness/fitbit/data?from=${fromStr}&to=${toStr}`);
-    } catch { /* no fitbit */ }
+    let fitbitRows = {}, garminRows = {};
+    try { if ($fitbitEnabled)  fitbitRows  = await NtApi.get(`/api/wellness/fitbit/data?from=${fromStr}&to=${toStr}`); } catch {}
+    try { if ($garminEnabled)  garminRows  = await NtApi.get(`/api/wellness/garmin/data?from=${fromStr}&to=${toStr}`); } catch {}
 
-    let withingsRows = {};
-    try {
-      withingsRows = await NtApi.get(`/api/wellness/withings/data?from=${fromStr}&to=${toStr}`);
-    } catch { /* no withings */ }
-
-    // Build date axis
+    // Build merged per-date sleep records, most recent last
     const dates = [];
-    const cursor = new Date(fromStr + 'T12:00:00');
-    while (cursor <= today) {
-      dates.push(cursor.toISOString().slice(0, 10));
-      cursor.setDate(cursor.getDate() + 1);
+    const cur = new Date(fromStr + 'T12:00:00');
+    while (cur <= today) {
+      dates.push(cur.toISOString().slice(0, 10));
+      cur.setDate(cur.getDate() + 1);
     }
+    const merged = dates.map(d => {
+      const g = garminRows[d] || {}, f = fitbitRows[d] || {};
+      return {
+        sleep_duration_min: g.sleep_duration_min ?? f.sleep_duration_min ?? null,
+        sleep_start_min:    g.sleep_start_min    ?? f.sleep_start_min    ?? null,
+        sleep_end_min:      g.sleep_end_min      ?? f.sleep_end_min      ?? null,
+      };
+    });
 
-    // Pre-compute which dates have any data
-    const datesWithData = dates.filter(d =>
-      TREND_CHARTS.some(chart => {
-        if (chart.source === 'fitbit') return fitbitRows[d]?.[chart.id] != null;
-        if (chart.source === 'withings') return withingsRows[d]?.[chart.id]?.value != null;
-        return false;
-      })
-    );
-    trendsData = datesWithData;
-    trendsLoading = false;
-
-    // Wait for DOM to render canvases
-    await new Promise(r => setTimeout(r, 50));
-
-    for (const chart of TREND_CHARTS) {
-      const points = dates.map(d => {
-        if (chart.source === 'fitbit') return fitbitRows[d]?.[chart.id] ?? null;
-        if (chart.source === 'withings') return withingsRows[d]?.[chart.id]?.value ?? null;
-        return null;
-      });
-
-      chart.hasData = points.some(v => v != null);
-      chart.latest  = points.filter(v => v != null).at(-1) ?? null;
+    // Sleep Debt — last sleepInsightsRange nights
+    const goalMin     = goals.get().sleep_duration_min?.min ?? 480;
+    const debtNights  = merged.slice(-sleepInsightsRange);
+    let   totalDebt   = 0, counted = 0;
+    for (const n of debtNights) {
+      if (n.sleep_duration_min != null) {
+        totalDebt += Math.max(0, goalMin - n.sleep_duration_min);
+        counted++;
+      }
     }
+    sleepDebt = counted > 0 ? { debtMin: Math.round(totalDebt), nights: counted, goalMin } : null;
 
-    // Trigger reactivity
-    TREND_CHARTS = TREND_CHARTS;
-
-    // Another tick for canvases to render
-    await new Promise(r => setTimeout(r, 50));
-
-    // Abort if a newer loadTrends call has started
-    if (myVersion !== _trendsVersion) return;
-
-    for (const chart of TREND_CHARTS) {
-      if (!chart.hasData || !chart.canvasEl) continue;
-
-      const points = dates.map(d => {
-        if (chart.source === 'fitbit') return fitbitRows[d]?.[chart.id] ?? null;
-        if (chart.source === 'withings') return withingsRows[d]?.[chart.id]?.value ?? null;
-        return null;
-      });
-
-      const labels = dates.map(d => {
-        const dt = new Date(d + 'T12:00:00');
-        return dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-      });
-
-      const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#4fffb0';
-
-      const c = new Chart(chart.canvasEl, {
-        type: 'line',
-        data: {
-          labels,
-          datasets: [{
-            data: points,
-            borderColor: accent,
-            backgroundColor: accent + '18',
-            fill: true,
-            tension: 0.35,
-            pointRadius: points.map(v => v != null ? 3 : 0),
-            pointBackgroundColor: accent,
-            spanGaps: true,
-          }],
-        },
-        options: {
-          animation: false,
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false }, tooltip: {
-            callbacks: { label: ctx => chart.fmtLatest(ctx.raw) }
-          }},
-          scales: {
-            x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#888', maxTicksLimit: 7, maxRotation: 0 } },
-            y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#888' }, beginAtZero: false },
-          },
-        },
-      });
-      _trendCharts.push(c);
+    // Chronotype — average sleep midpoint across all available nights
+    const midpoints = merged
+      .map(n => _sleepMidpoint(n.sleep_start_min, n.sleep_end_min))
+      .filter(v => v != null);
+    if (midpoints.length >= 5) {
+      const avg = midpoints.reduce((a, b) => a + b, 0) / midpoints.length;
+      chronotype = { ..._classifyChronotype(avg), midpointMin: Math.round(avg), nights: midpoints.length };
+    } else {
+      chronotype = midpoints.length > 0 ? { label: null, nights: midpoints.length, needed: 5 } : null;
     }
+    _insightsLoaded = true;
   }
 
-  // Reload trends when tab becomes active or range changes
-  $: if (activeTab === 'trends') { trendsRange; loadTrends(); }
+  // ── 7-day sparklines ───────────────────────────────────────────────────────
+  let _sparklineData = {}; // { [metricId]: (number|null)[] } — 7 values, oldest first
+
+  async function loadSparklines() {
+    const today   = new Date();
+    const from    = new Date(today);
+    from.setDate(from.getDate() - 6);
+    const fromStr = from.toISOString().slice(0, 10);
+    const toStr   = today.toISOString().slice(0, 10);
+    const dates   = [];
+    const cur     = new Date(fromStr + 'T12:00:00');
+    while (cur <= today) { dates.push(cur.toISOString().slice(0, 10)); cur.setDate(cur.getDate() + 1); }
+
+    let fitbitRange = {}, garminRange = {};
+    try { if ($fitbitEnabled)  fitbitRange  = await NtApi.get(`/api/wellness/fitbit/data?from=${fromStr}&to=${toStr}`); } catch {}
+    try { if ($garminEnabled)  garminRange  = await NtApi.get(`/api/wellness/garmin/data?from=${fromStr}&to=${toStr}`); } catch {}
+
+    const result = {};
+    for (const m of ALL_METRICS) {
+      result[m.id] = dates.map(d => garminRange[d]?.[m.id] ?? fitbitRange[d]?.[m.id] ?? null);
+    }
+    _sparklineData = result;
+  }
+
+  // Tiny SVG sparkline path from an array of values (nulls = gaps)
+  function sparklinePath(vals, w = 56, h = 24) {
+    const pts = vals.map((v, i) => v != null ? [i, v] : null).filter(Boolean);
+    if (pts.length < 2) return '';
+    const xMax   = vals.length - 1;
+    const ys     = pts.map(p => p[1]);
+    const yMin   = Math.min(...ys), yMax = Math.max(...ys);
+    const yRange = yMax - yMin || 1;
+    const toX    = i => (i / xMax) * w;
+    const toY    = v => h - ((v - yMin) / yRange) * (h - 4) - 2;
+    return pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${toX(p[0]).toFixed(1)},${toY(p[1]).toFixed(1)}`).join(' ');
+  }
+
+  // Mark insights stale when tab activates or range changes (so the next check loads them)
+  $: { sleepInsightsRange; activeTab; if (activeTab === 'sleep') _insightsLoaded = false; }
+  // Load whenever stale and on sleep tab (also fires after syncs set _insightsLoaded = false)
+  $: if (activeTab === 'sleep' && !_insightsLoaded) loadSleepInsights();
 
   // ── Integration availability ───────────────────────────────────────────────
   $: fitbitAvailable   = $fitbitEnabled;
@@ -457,7 +450,6 @@
   $: _wlTabList = [
     ...(fitbitAvailable || garminAvailable ? ['movement', 'sleep', 'heart'] : []),
     ...(withingsAvailable ? ['body'] : []),
-    'trends',
   ];
   $: _wlActiveIdx  = Math.max(0, _wlTabList.indexOf(activeTab));
   $: _wlPillWidth  = `calc((100% - 8px) / ${_wlTabList.length})`;
@@ -466,8 +458,8 @@
   // Auto-correct activeTab when an integration's availability changes
   $: if (status !== null && withingsStatus !== null && garminStatus !== null) {
     const isActivityTab = activeTab === 'movement' || activeTab === 'sleep' || activeTab === 'heart';
-    if (isActivityTab && !fitbitAvailable && !garminAvailable) activeTab = withingsAvailable ? 'body' : 'trends';
-    if (activeTab === 'body' && !withingsAvailable) activeTab = (fitbitAvailable || garminAvailable) ? 'movement' : 'trends';
+    if (isActivityTab && !fitbitAvailable && !garminAvailable) activeTab = withingsAvailable ? 'body' : 'movement';
+    if (activeTab === 'body' && !withingsAvailable) activeTab = (fitbitAvailable || garminAvailable) ? 'movement' : 'body';
   }
 
   // ── Date navigation ────────────────────────────────────────────────────────
@@ -613,6 +605,8 @@
     await loadGarminData();
     _checkWellnessGoals({ ...garminData, ...data }, withingsData);
     loadingData = false;
+    // Load sparklines in background (not awaited — don't block date display)
+    loadSparklines();
   }
 
   async function sync(silent = false) {
@@ -649,6 +643,7 @@
       if (!silent) showError('Sync failed: ' + e.message);
     }
     syncing = false;
+    _insightsLoaded = false; // refresh sleep insights after sync
   }
 
   async function connect() {
@@ -697,7 +692,7 @@
     init();
   });
 
-  onDestroy(() => { _trendCharts.forEach(c => c.destroy?.()); });
+  onDestroy(() => {});
 
   // ── Goal celebrations ─────────────────────────────────────────────────────
   let _celebratingMetrics = new Set();
@@ -863,9 +858,6 @@
             <span class="material-symbols-rounded tab-icon">monitor_weight</span> Body
           </button>
         {/if}
-        <button class="tab-btn" class:active={activeTab === 'trends'} on:click={() => activeTab = 'trends'}>
-          <span class="material-symbols-rounded tab-icon">show_chart</span> Trends
-        </button>
       </div>
 
       <!-- ── Fitbit tabs (Movement / Sleep / Heart) ── -->
@@ -919,6 +911,7 @@
             <div class="metric-grid">
               {#each ALL_METRICS.filter(m => m.group === 'movement' && isVisible(m.id) && isSourceEnabled(m)) as m}
                 {@const fmt = fmtMetric(m, displayData[m.id])}
+                {@const spark = sparklinePath(_sparklineData[m.id] ?? [])}
                 <div class="metric-card" class:no-data={fmt == null && !loadingData} class:celebrating={_celebratingMetrics.has(m.id)}>
                   <div class="metric-icon-wrap">
                     <span class="material-symbols-rounded metric-icon">{m.icon}</span>
@@ -933,6 +926,11 @@
                       <span class="metric-value no-val">—</span>
                     {/if}
                   </div>
+                  {#if spark}
+                    <svg class="sparkline" viewBox="0 0 56 24" preserveAspectRatio="none">
+                      <path d={spark} fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                  {/if}
                 </div>
               {/each}
             </div>
@@ -975,6 +973,7 @@
             <div class="metric-grid">
               {#each ALL_METRICS.filter(m => m.group === 'sleep' && isVisible(m.id) && isSourceEnabled(m)) as m}
                 {@const fmt = fmtMetric(m, displayData[m.id])}
+                {@const spark = sparklinePath(_sparklineData[m.id] ?? [])}
                 <div class="metric-card" class:no-data={fmt == null && !loadingData} class:celebrating={_celebratingMetrics.has(m.id)}>
                   <div class="metric-icon-wrap">
                     <span class="material-symbols-rounded metric-icon">{m.icon}</span>
@@ -989,15 +988,71 @@
                       <span class="metric-value no-val">—</span>
                     {/if}
                   </div>
+                  {#if spark}
+                    <svg class="sparkline" viewBox="0 0 56 24" preserveAspectRatio="none">
+                      <path d={spark} fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                  {/if}
                 </div>
               {/each}
             </div>
+
+            <!-- Sleep Debt card -->
+            {#if sleepDebt != null}
+              <div class="card sleep-insight-card" style="margin-bottom:10px">
+                <div class="si-header">
+                  <span class="material-symbols-rounded si-icon">battery_low</span>
+                  <div class="si-title-wrap">
+                    <span class="si-title">Sleep Debt</span>
+                    <span class="si-sub">Last {sleepDebt.nights} nights</span>
+                  </div>
+                  <span class="si-value {sleepDebt.debtMin === 0 ? 'si-good' : sleepDebt.debtMin < 120 ? 'si-warn' : 'si-bad'}">
+                    {sleepDebt.debtMin === 0 ? 'On track' : fmtSleepStr(sleepDebt.debtMin)}
+                  </span>
+                </div>
+                {#if sleepDebt.debtMin > 0}
+                  <p class="si-desc">
+                    You're {fmtSleepStr(sleepDebt.debtMin)} short of your {fmtSleepStr(sleepDebt.goalMin)} sleep goal across the last {sleepDebt.nights} nights.
+                    {#if sleepDebt.debtMin >= 120}Prioritize early bedtimes this week to recover.{:else}A consistent schedule should close the gap quickly.{/if}
+                  </p>
+                {:else}
+                  <p class="si-desc">You're meeting your sleep goal. Keep it up!</p>
+                {/if}
+                <div class="si-range-chips">
+                  {#each [7, 14] as n}
+                    <button class="chip" class:chip-active={sleepInsightsRange === n} on:click={() => sleepInsightsRange = n}>{n}d</button>
+                  {/each}
+                </div>
+              </div>
+            {/if}
+
+            <!-- Chronotype card -->
+            {#if chronotype != null}
+              <div class="card sleep-insight-card">
+                <div class="si-header">
+                  <span class="si-emoji">{chronotype.emoji ?? '⏳'}</span>
+                  <div class="si-title-wrap">
+                    <span class="si-title">{chronotype.label ?? 'Building Profile…'}</span>
+                    <span class="si-sub">
+                      {#if chronotype.label}Avg sleep midpoint: {fmtTimeMin(chronotype.midpointMin)} · {chronotype.nights} nights
+                      {:else}{chronotype.nights}/{chronotype.needed} nights collected{/if}
+                    </span>
+                  </div>
+                </div>
+                {#if chronotype.label}
+                  <p class="si-desc">{chronotype.desc}</p>
+                {:else}
+                  <p class="si-desc">Syncing more nights will unlock your chronotype. Once {chronotype.needed} nights of sleep timing are available your profile will appear here.</p>
+                {/if}
+              </div>
+            {/if}
 
           <!-- ── Heart tab ── -->
           {:else if activeTab === 'heart'}
             <div class="metric-grid">
               {#each ALL_METRICS.filter(m => m.group === 'heart' && isVisible(m.id) && isSourceEnabled(m)) as m}
                 {@const fmt = fmtMetric(m, displayData[m.id])}
+                {@const spark = sparklinePath(_sparklineData[m.id] ?? [])}
                 <div class="metric-card" class:no-data={fmt == null && !loadingData} class:celebrating={_celebratingMetrics.has(m.id)}>
                   <div class="metric-icon-wrap">
                     <span class="material-symbols-rounded metric-icon" style="color:#ef4444">{m.icon}</span>
@@ -1012,6 +1067,11 @@
                       <span class="metric-value no-val">—</span>
                     {/if}
                   </div>
+                  {#if spark}
+                    <svg class="sparkline" viewBox="0 0 56 24" preserveAspectRatio="none">
+                      <path d={spark} fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                  {/if}
                 </div>
               {/each}
             </div>
@@ -1174,42 +1234,6 @@
           </div>
         {/if}
 
-      <!-- ── Trends tab ── -->
-      {:else if activeTab === 'trends'}
-        <div class="trends-range-bar">
-          {#each [{v:7,l:'7d'},{v:30,l:'30d'},{v:90,l:'90d'}] as r}
-            <button class="chip" class:chip-active={trendsRange === r.v} on:click={() => trendsRange = r.v}>{r.l}</button>
-          {/each}
-        </div>
-
-        {#if trendsLoading}
-          <div class="wellness-loading"><span class="material-symbols-rounded spin">sync</span></div>
-        {:else if trendsData.length === 0}
-          <div class="empty-state">
-            <span class="material-symbols-rounded" style="font-size:48px;opacity:0.18">show_chart</span>
-            <p>No trend data yet.</p>
-            <p class="text-3 text-sm">Sync Fitbit or Withings data to see trends.</p>
-          </div>
-        {:else}
-          <div class="trends-charts">
-            {#each TREND_CHARTS as chart}
-              {#if chart.hasData}
-                <div class="card trends-card">
-                  <div class="trends-card-header">
-                    <span class="material-symbols-rounded" style="color:var(--accent)">{chart.icon}</span>
-                    <span class="trends-card-title">{chart.label}</span>
-                    {#if chart.latest != null}
-                      <span class="trends-latest">{chart.fmtLatest(chart.latest)}</span>
-                    {/if}
-                  </div>
-                  <div class="trends-canvas-wrap">
-                    <canvas bind:this={chart.canvasEl}></canvas>
-                  </div>
-                </div>
-              {/if}
-            {/each}
-          </div>
-        {/if}
       {/if}
 
     {/if}
@@ -1692,7 +1716,7 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   .spin { animation: spin 1s linear infinite; }
 
-  /* Chip styles (used in Trends range bar) */
+  /* Chip styles */
   .chip {
     padding: 6px 14px;
     border-radius: 99px;
@@ -1712,40 +1736,67 @@
     font-weight: 600;
   }
 
-  /* Trends */
-  .trends-range-bar {
-    display: flex;
-    gap: 8px;
-    padding: 4px 0 12px;
+  /* Sparkline */
+  .sparkline {
+    width: 100%;
+    height: 24px;
+    display: block;
+    opacity: 0.6;
+    margin-top: 4px;
   }
-  .trends-charts {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-  .trends-card {
+
+  /* Sleep Insight cards (Debt + Chronotype) */
+  .sleep-insight-card {
     padding: 14px 16px;
   }
-  .trends-card-header {
+  .si-header {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-bottom: 10px;
+    gap: 10px;
+    margin-bottom: 8px;
   }
-  .trends-card-title {
-    font-size: 14px;
-    font-weight: 600;
+  .si-icon {
+    font-size: 22px;
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+  .si-emoji {
+    font-size: 22px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .si-title-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
     flex: 1;
   }
-  .trends-latest {
-    font-size: 13px;
-    color: var(--accent);
+  .si-title {
+    font-size: 14px;
     font-weight: 600;
+    color: var(--text-1);
   }
-  .trends-canvas-wrap {
-    height: 160px;
-    position: relative;
-    overflow: hidden;
+  .si-sub {
+    font-size: 11px;
+    color: var(--text-3);
+  }
+  .si-value {
+    font-size: 16px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .si-good { color: var(--accent); }
+  .si-warn { color: #f59e0b; }
+  .si-bad  { color: #ef4444; }
+  .si-desc {
+    font-size: 13px;
+    color: var(--text-2);
+    line-height: 1.5;
+    margin: 0 0 10px;
+  }
+  .si-range-chips {
+    display: flex;
+    gap: 6px;
   }
 
   @media (max-width: 400px) {

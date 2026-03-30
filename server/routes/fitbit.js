@@ -241,6 +241,15 @@ async function _syncDate(u, dateStr) {
       metrics.sleep_light_min = stg?.light?.minutes ?? null;
       metrics.sleep_rem_min   = stg?.rem?.minutes   ?? null;
       metrics.sleep_wake_min  = stg?.wake?.minutes  ?? null;
+      // Sleep timing for chronotype — Fitbit returns local time strings e.g. "2024-01-15T22:30:00.000"
+      if (main.startTime) {
+        const [, hh, mm] = main.startTime.match(/T(\d{2}):(\d{2})/) || [];
+        if (hh != null) metrics.sleep_start_min = parseInt(hh) * 60 + parseInt(mm);
+      }
+      if (main.endTime) {
+        const [, hh, mm] = main.endTime.match(/T(\d{2}):(\d{2})/) || [];
+        if (hh != null) metrics.sleep_end_min = parseInt(hh) * 60 + parseInt(mm);
+      }
     }
   } catch (e) { errors.push('sleep: ' + e.message); }
 

@@ -5,6 +5,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.21.0-beta] — 2026-03-29
+
+### Added
+- **Withings segmental lean + muscle mass** — correct positional type mapping for types 173 (lean mass) and 175 (muscle mass); five readings per measurement group are assigned to torso, left leg, left arm, right leg, right arm in order; removed incorrect prior type mappings
+- **Withings additional body metrics** — extracellular water (type 168), intracellular water (type 169), visceral fat index (type 170), metabolic age (type 227); displayed on Body tab and togglable in Settings
+- **Fitbit Cardio Fitness (VO2 Max)** — fixed endpoint (removed erroneous `/1d` suffix); range response (e.g. "39-43") stored as midpoint; label renamed to "Cardio Fitness" throughout to match Fitbit's own terminology
+- **Fitbit skin temperature variation** — synced from `/temp/skin` endpoint (Pixel Watch 4 and compatible devices); shown on Sleep tab
+- **Garmin max heart rate** — extracted from dailies `maxHeartRate` field; shown on Heart tab
+- **Sleep score estimation (Fitbit)** — sleep score endpoint not available in public API; estimated from duration, deep+REM%, SpO2, and HRV; calibrated to within ±1 pt on 3 actual days; Garmin device score takes priority when both sources are present
+- **Settings toggles** — added for all new metrics: skin temp variation (Fitbit), max HR (Garmin), extracellular water, intracellular water, visceral fat index, metabolic age (Withings)
+
+### Changed
+- **Segmental Analysis** — removed the % toggle (values were misleading); replaced with an explanatory note; "Fat" column renamed to "Lean" to correctly reflect what the data represents (lean mass, not fat mass)
+- **Sleep stage legend** — values now display in h/m format (e.g. "1h 13m") instead of raw minutes; applied to both the legend and bar tooltips
+- **displayData merge** — Garmin sleep score takes priority over Fitbit estimated score; all other metrics still prefer Fitbit when both are present
+
+### Fixed
+- **Withings OAuth scope** — removed `user.cardiovascular` from default scope (caused re-auth failures); ECG requires re-auth only when explicitly needed
+- **Wellness Trends unit conversion** — muscle mass and weight charts now correctly convert to lbs on the y-axis and in tooltips when the app unit is set to lb
+
+---
+
 ## [0.20.0-beta] — 2026-03-29
 
 ### Added

@@ -7,7 +7,8 @@
   import { NtApi } from '../lib/api.js';
   import { NUTRIMENTS, Nutrition } from '../lib/nutrition.js';
   import { goals, energyUnit, weightUnit, lengthUnit, statsChartType, statsYZero,
-           statsAvgLine, statsGoalLine, statsTrendLine, hiddenBodyStats, dateFormat, pageBanners } from '../stores/settings.js';
+           statsAvgLine, statsGoalLine, statsTrendLine, hiddenBodyStats, dateFormat, pageBanners,
+           fitbitEnabled, garminEnabled, withingsEnabled } from '../stores/settings.js';
   import StatsBanner from '../components/banners/StatsBanner.svelte';
   let _waterShowInStats = DB.getSetting('waterShowInStats', true);
   let _waterUnit        = DB.getSetting('waterUnit', 'ml');
@@ -30,7 +31,26 @@
   let summary = null; // { avg, min, max, total, daysWithData }
   let _loadVer = 0;   // cancel stale concurrent loadData calls
 
-  // All available metrics = NUTRIMENTS + body stats
+  // Source toggle for body composition stats (diary manual vs device sync)
+  let bodyStatSource = 'diary'; // 'diary' | 'device'
+  $: bodyStatSourceToggleVisible = (metric === 'weight' || metric === 'body_fat') && $withingsEnabled;
+
+  // Wellness metrics — shown only when relevant integration is enabled
+  $: WELLNESS_METRICS = [
+    ...($fitbitEnabled || $garminEnabled ? [
+      { value: 'wl_steps',  label: 'Steps',        unit: 'steps', apiSource: 'fitgarm', apiField: 'steps' },
+      { value: 'wl_active', label: 'Active Min.',   unit: 'min',   apiSource: 'fitgarm', apiField: 'active_minutes' },
+      { value: 'wl_sleep',  label: 'Sleep',         unit: 'hr',    apiSource: 'fitgarm', apiField: 'sleep_duration_min', fmtVal: v => Math.round(v / 6) / 10 },
+      { value: 'wl_rhr',    label: 'Resting HR',    unit: 'bpm',   apiSource: 'fitgarm', apiField: 'resting_hr' },
+      { value: 'wl_hrv',    label: 'HRV',           unit: 'ms',    apiSource: 'fitgarm', apiField: 'hrv_daily_rmssd' },
+      { value: 'wl_spo2',   label: 'SpO2',          unit: '%',     apiSource: 'fitgarm', apiField: 'spo2_avg' },
+    ] : []),
+    ...($withingsEnabled ? [
+      { value: 'wl_muscle', label: 'Muscle Mass',   unit: '',      apiSource: 'withings', apiField: 'muscle_mass_kg', isWeight: true },
+    ] : []),
+  ];
+
+  // All available metrics = NUTRIMENTS + body stats + wellness
   $: BODY_STATS = [
     { value: 'weight',   label: 'Weight',    unit: $weightUnit || 'lb' },
     { value: 'neck',     label: 'Neck',      unit: $lengthUnit || 'in' },
@@ -46,6 +66,7 @@
     ...NUTRIMENTS.filter(n => n.default),
     ...BODY_STATS.filter(s => !($hiddenBodyStats||[]).includes(s.value)),
     ...(_waterShowInStats ? [{ value: 'water', label: 'Water', unit: _waterUnit }] : []),
+    ...WELLNESS_METRICS,
   ];
 
   const RANGES = [
@@ -63,55 +84,104 @@
     loading = true;
     const now = new Date();
     let dates = [];
+    let fromStr = '', toStr = localDateStr();
 
-    if (range === 'all') {
+    const isWellness    = metric.startsWith('wl_');
+    const isDeviceBody  = (metric === 'weight' || metric === 'body_fat') && bodyStatSource === 'device';
+
+    if (range === 'all' && (isWellness || isDeviceBody)) {
+      // Wellness data doesn't come from diary — use last 365 days
+      const n = 365;
+      for (let i = n - 1; i >= 0; i--) {
+        const d = new Date(now); d.setDate(d.getDate() - i);
+        dates.push(localDateStr(d));
+      }
+      fromStr = dates[0]; toStr = dates[dates.length - 1];
+    } else if (range === 'all') {
       const all = await NtApi.getAllDiary();
       dates = [...new Set(all.map(e => e.date))].sort();
+      fromStr = dates[0] || toStr;
     } else if (range === 'custom') {
       if (!customStart || !customEnd) { loading = false; return; }
       const start = new Date(customStart + 'T12:00:00');
       const end   = new Date(customEnd   + 'T12:00:00');
       if (start > end) { loading = false; return; }
       const d = new Date(start);
-      while (d <= end) {
-        dates.push(localDateStr(d));
-        d.setDate(d.getDate() + 1);
-      }
+      while (d <= end) { dates.push(localDateStr(d)); d.setDate(d.getDate() + 1); }
+      fromStr = customStart; toStr = customEnd;
     } else {
       const n = parseInt(range);
       for (let i = n - 1; i >= 0; i--) {
-        const d = new Date(now);
-        d.setDate(d.getDate() - i);
+        const d = new Date(now); d.setDate(d.getDate() - i);
         dates.push(localDateStr(d));
       }
+      fromStr = dates[0]; toStr = dates[dates.length - 1];
     }
 
-    const isBodyStat = BODY_STATS.some(s => s.value === metric);
-    const isWater    = metric === 'water';
+    const isBodyStat    = BODY_STATS.some(s => s.value === metric);
+    const isWater       = metric === 'water';
 
-    // Fetch all entries for the date range in one request
-    if (ver !== _loadVer) return;
-    const allEntries = await NtApi.getAllDiary();
-    const entryMap = Object.fromEntries(allEntries.map(e => [e.date, e]));
+    let rows = [];
 
-    const rows = [];
-    for (const date of dates) {
-      if (ver !== _loadVer) return; // newer call started — abort
-      const entry = entryMap[date];
-      let val = null;
-      if (entry) {
-        if (isWater) {
-          const total = (entry.water || []).reduce((s, l) => s + (l.amount || 0), 0);
-          val = total > 0 ? total : null;
-        } else if (isBodyStat) {
-          const bs = entry.body_stats || entry.bodyStats || {};
-          val = bs[metric] ? Number(bs[metric]) : null;
-        } else {
-          const totals = Nutrition.sum((entry.items || []).map(i => Nutrition.calculate(i)));
-          val = totals[metric] ? Math.round(totals[metric] * 10) / 10 : null;
-        }
+    if (isWellness) {
+      // Load from wellness API
+      const wlMeta = WELLNESS_METRICS.find(m => m.value === metric);
+      if (!wlMeta || ver !== _loadVer) { loading = false; return; }
+
+      if (wlMeta.apiSource === 'fitgarm') {
+        let fitbitData = {}, garminData = {};
+        try { if ($fitbitEnabled)  fitbitData  = await NtApi.get(`/api/wellness/fitbit/data?from=${fromStr}&to=${toStr}`); } catch {}
+        try { if ($garminEnabled)  garminData  = await NtApi.get(`/api/wellness/garmin/data?from=${fromStr}&to=${toStr}`); } catch {}
+        rows = dates.map(d => {
+          const raw = garminData[d]?.[wlMeta.apiField] ?? fitbitData[d]?.[wlMeta.apiField] ?? null;
+          const val = raw != null && wlMeta.fmtVal ? wlMeta.fmtVal(raw) : raw;
+          return { date: d, val };
+        });
+      } else if (wlMeta.apiSource === 'withings') {
+        let withingsData = {};
+        try { withingsData = await NtApi.get(`/api/wellness/withings/data?from=${fromStr}&to=${toStr}`); } catch {}
+        rows = dates.map(d => {
+          const raw = withingsData[d]?.[wlMeta.apiField]?.value ?? null;
+          const val = raw != null && wlMeta.isWeight && $weightUnit === 'lb' ? raw * 2.20462 : raw;
+          return { date: d, val };
+        });
       }
-      rows.push({ date, val });
+
+    } else if (isDeviceBody) {
+      // Load body comp from Withings wellness data
+      const apiField = metric === 'weight' ? 'weight_kg' : 'body_fat_pct';
+      let withingsData = {};
+      try { withingsData = await NtApi.get(`/api/wellness/withings/data?from=${fromStr}&to=${toStr}`); } catch {}
+      rows = dates.map(d => {
+        const raw = withingsData[d]?.[apiField]?.value ?? null;
+        const val = raw != null && metric === 'weight' && $weightUnit === 'lb' ? raw * 2.20462 : raw;
+        return { date: d, val };
+      });
+
+    } else {
+      // Load from diary (original path)
+      if (ver !== _loadVer) { loading = false; return; }
+      const allEntries = await NtApi.getAllDiary();
+      const entryMap = Object.fromEntries(allEntries.map(e => [e.date, e]));
+
+      for (const date of dates) {
+        if (ver !== _loadVer) { loading = false; return; }
+        const entry = entryMap[date];
+        let val = null;
+        if (entry) {
+          if (isWater) {
+            const total = (entry.water || []).reduce((s, l) => s + (l.amount || 0), 0);
+            val = total > 0 ? total : null;
+          } else if (isBodyStat) {
+            const bs = entry.body_stats || entry.bodyStats || {};
+            val = bs[metric] ? Number(bs[metric]) : null;
+          } else {
+            const totals = Nutrition.sum((entry.items || []).map(i => Nutrition.calculate(i)));
+            val = totals[metric] ? Math.round(totals[metric] * 10) / 10 : null;
+          }
+        }
+        rows.push({ date, val });
+      }
     }
 
     if (ver !== _loadVer) return; // stale — don't commit
@@ -279,11 +349,13 @@
 
   function getMetricUnit() {
     if (metric === 'water') return _waterUnit;
+    const wl = WELLNESS_METRICS.find(x => x.value === metric);
+    if (wl) return wl.isWeight ? ($weightUnit === 'lb' ? 'lbs' : 'kg') : wl.unit;
     const m = [...NUTRIMENTS, ...BODY_STATS].find(x => x.value === metric || x.id === metric);
     return m ? (m.unit || '') : '';
   }
 
-  $: { metric; range; customStart; customEnd; $statsChartType; $statsYZero; $statsAvgLine; $statsGoalLine; $statsTrendLine;
+  $: { metric; range; customStart; customEnd; bodyStatSource; $statsChartType; $statsYZero; $statsAvgLine; $statsGoalLine; $statsTrendLine;
        if (canvasEl) loadData(); }
 
   onDestroy(() => { if (chart) chart.destroy(); });
@@ -354,6 +426,15 @@
         </button>
       {/each}
     </div>
+
+    <!-- Source toggle for body composition metrics when device sync is available -->
+    {#if bodyStatSourceToggleVisible}
+      <div class="source-toggle-row">
+        <span class="source-toggle-label">Source:</span>
+        <button class="source-chip" class:active={bodyStatSource === 'diary'} on:click={() => bodyStatSource = 'diary'}>Diary</button>
+        <button class="source-chip" class:active={bodyStatSource === 'device'} on:click={() => bodyStatSource = 'device'}>Device</button>
+      </div>
+    {/if}
 
     <!-- Range + chart-type row -->
     <div class="ctrl-row">
@@ -545,6 +626,36 @@
     scrollbar-width: none;
   }
   .metric-scroll::-webkit-scrollbar { display: none; }
+
+  .source-toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 0 2px;
+  }
+  .source-toggle-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-3);
+  }
+  .source-chip {
+    padding: 4px 12px;
+    border-radius: 99px;
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text-2);
+    cursor: pointer;
+    transition: all var(--dur-fast);
+  }
+  .source-chip.active {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
 
   .ctrl-row {
     display: flex;
