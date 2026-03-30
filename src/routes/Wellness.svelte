@@ -1246,12 +1246,12 @@
 
             <!-- Sleep Debt card -->
             {#if sleepDebt != null}
-              <div class="card sleep-insight-card" style="margin-bottom:10px">
+              <div class="card sleep-insight-card" style="margin-bottom:10px" title="Sleep Debt — the total sleep you've missed relative to your goal over the selected window. Calculated as a rolling total from today backwards — always reflects the most recent nights, not the date you're viewing."  >
                 <div class="si-header">
                   <span class="material-symbols-rounded si-icon">battery_low</span>
                   <div class="si-title-wrap">
                     <span class="si-title">Sleep Debt</span>
-                    <span class="si-sub">Last {sleepDebt.nights} nights · always current, not date-specific</span>
+                    <span class="si-sub">Last {sleepDebt.nights} nights</span>
                   </div>
                   <span class="si-value {sleepDebt.debtMin === 0 ? 'si-good' : sleepDebt.debtMin < 120 ? 'si-warn' : 'si-bad'}">
                     {sleepDebt.debtMin === 0 ? 'On track' : fmtSleepStr(sleepDebt.debtMin)}
@@ -1275,14 +1275,14 @@
 
             <!-- Chronotype card -->
             {#if chronotype != null}
-              <div class="card sleep-insight-card">
+              <div class="card sleep-insight-card" title="Chronotype — your natural sleep timing preference, derived from your average sleep midpoint over all available nights. This is a long-term trait that updates as more nights are synced — it always reflects your full history, not the specific date you're viewing."  >
                 <div class="si-header">
                   <span class="si-emoji">{chronotype.emoji ?? '⏳'}</span>
                   <div class="si-title-wrap">
                     <span class="si-title">{chronotype.label ?? 'Building Profile…'}</span>
                     <span class="si-sub">
-                      {#if chronotype.label}Avg sleep midpoint: {fmtTimeMin(chronotype.midpointMin)} · {chronotype.nights} nights · always current, not date-specific
-                      {:else}{chronotype.nights}/{chronotype.needed} nights collected · always current, not date-specific{/if}
+                      {#if chronotype.label}Avg sleep midpoint: {fmtTimeMin(chronotype.midpointMin)} · {chronotype.nights} nights
+                      {:else}{chronotype.nights}/{chronotype.needed} nights collected{/if}
                     </span>
                   </div>
                 </div>
@@ -1350,7 +1350,7 @@
 
             <!-- Daily Readiness card -->
             {#if readiness != null}
-              <div class="card sleep-insight-card readiness-card" style="margin-top:10px">
+              <div class="card sleep-insight-card readiness-card" style="margin-top:10px" title="Daily Readiness — how recovered and prepared your body is for today, scored 1–100. Calculated from today's HRV and RHR compared to your 30-day personal baseline, plus last night's sleep score. Always reflects today's data — not the date you're viewing."  >
                 {#if readiness.calibrating}
                   <div class="si-header">
                     <span class="material-symbols-rounded si-icon">battery_charging_full</span>
@@ -1402,7 +1402,7 @@
 
             <!-- Stress Management Score card -->
             {#if stressScore != null}
-              <div class="card sleep-insight-card readiness-card" style="margin-top:10px">
+              <div class="card sleep-insight-card readiness-card" style="margin-top:10px" title="Stress Management — how well your body is handling stress, scored 1–100. Calculated from HRV, RHR, and sleep quality relative to your 30-day baseline, with exponential smoothing so the score moves gradually over time. Always reflects today's data — not the date you're viewing."  >
                 {#if stressScore.calibrating}
                   <div class="si-header">
                     <span class="material-symbols-rounded si-icon">self_improvement</span>
