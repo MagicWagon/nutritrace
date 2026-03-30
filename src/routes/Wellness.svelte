@@ -16,37 +16,37 @@
   // when their only source integration is disabled.
   const ALL_METRICS = [
     // Movement — both Fitbit and Garmin
-    { id: 'steps',            label: 'Steps',             unit: 'steps', group: 'movement', icon: 'directions_walk',       fmt: v => Math.round(v).toLocaleString(),  sources: ['fitbit','garmin'] },
-    { id: 'distance_km',      label: 'Distance',          unit: '',      group: 'movement', icon: 'straighten',            fmt: null,                                  sources: ['fitbit','garmin'] },
-    { id: 'floors',           label: 'Floors Climbed',    unit: 'floors',group: 'movement', icon: 'stairs',                fmt: v => Math.round(v),                   sources: ['fitbit','garmin'] },
-    { id: 'active_minutes',   label: 'Active Minutes',    unit: 'min',   group: 'movement', icon: 'timer',                 fmt: v => Math.round(v),                   sources: ['fitbit','garmin'] },
-    { id: 'calories_out',     label: 'Calories Burned',   unit: 'kcal',  group: 'movement', icon: 'local_fire_department', fmt: v => Math.round(v).toLocaleString(),  sources: ['fitbit','garmin'] },
+    { id: 'steps',            label: 'Steps',             unit: 'steps', group: 'movement', icon: 'directions_walk',       fmt: v => Math.round(v).toLocaleString(),  sources: ['fitbit','garmin'], desc: 'Total steps taken today.' },
+    { id: 'distance_km',      label: 'Distance',          unit: '',      group: 'movement', icon: 'straighten',            fmt: null,                                  sources: ['fitbit','garmin'], desc: 'Total distance covered today.' },
+    { id: 'floors',           label: 'Floors Climbed',    unit: 'floors',group: 'movement', icon: 'stairs',                fmt: v => Math.round(v),                   sources: ['fitbit','garmin'], desc: 'Floors climbed based on elevation gain detected by your device.' },
+    { id: 'active_minutes',   label: 'Active Minutes',    unit: 'min',   group: 'movement', icon: 'timer',                 fmt: v => Math.round(v),                   sources: ['fitbit','garmin'], desc: 'Time spent at a moderate or higher activity level.' },
+    { id: 'calories_out',     label: 'Calories Burned',   unit: 'kcal',  group: 'movement', icon: 'local_fire_department', fmt: v => Math.round(v).toLocaleString(),  sources: ['fitbit','garmin'], desc: 'Total calories burned including your resting metabolic rate.' },
     // Movement — Fitbit only
-    { id: 'active_zone_minutes',    label: 'Active Zone Min',   unit: 'min',  group: 'movement', icon: 'local_fire_department', fmt: v => Math.round(v), sources: ['fitbit'] },
+    { id: 'active_zone_minutes', label: 'Active Zone Min', unit: 'min',  group: 'movement', icon: 'local_fire_department', fmt: v => Math.round(v), sources: ['fitbit'], desc: 'Minutes spent in Fat Burn, Cardio, or Peak heart rate zones — counts double for Cardio and Peak.' },
     // Movement — Garmin only
-    { id: 'moderate_intensity_min', label: 'Moderate Intensity',unit: 'min',  group: 'movement', icon: 'directions_run',        fmt: v => Math.round(v), sources: ['garmin'] },
-    { id: 'vigorous_intensity_min', label: 'Vigorous Intensity',unit: 'min',  group: 'movement', icon: 'sprint',                fmt: v => Math.round(v), sources: ['garmin'] },
+    { id: 'moderate_intensity_min', label: 'Moderate Intensity', unit: 'min', group: 'movement', icon: 'directions_run', fmt: v => Math.round(v), sources: ['garmin'], desc: 'Time at moderate intensity (brisk walking, light cycling). WHO recommends 150–300 min/week.' },
+    { id: 'vigorous_intensity_min', label: 'Vigorous Intensity', unit: 'min', group: 'movement', icon: 'sprint',         fmt: v => Math.round(v), sources: ['garmin'], desc: 'Time at high intensity (running, hard effort). Counts double toward weekly activity targets.' },
     // Sleep — both
-    { id: 'sleep_duration_min', label: 'Sleep Duration',  unit: '',      group: 'sleep',    icon: 'bedtime',               fmt: null,                 sources: ['fitbit','garmin'] },
-    { id: 'sleep_deep_min',     label: 'Deep Sleep',      unit: 'min',   group: 'sleep',    icon: 'nights_stay',           fmt: v => Math.round(v),   sources: ['fitbit','garmin'] },
-    { id: 'sleep_light_min',    label: 'Light Sleep',     unit: 'min',   group: 'sleep',    icon: 'cloud',                 fmt: v => Math.round(v),   sources: ['fitbit','garmin'] },
-    { id: 'sleep_rem_min',      label: 'REM Sleep',       unit: 'min',   group: 'sleep',    icon: 'psychology',            fmt: v => Math.round(v),   sources: ['fitbit','garmin'] },
-    { id: 'sleep_wake_min',     label: 'Awake',           unit: 'min',   group: 'sleep',    icon: 'wb_twilight',           fmt: v => Math.round(v),   sources: ['fitbit','garmin'] },
+    { id: 'sleep_duration_min', label: 'Sleep Duration', unit: '',     group: 'sleep', icon: 'bedtime',               fmt: null,               sources: ['fitbit','garmin'], desc: 'Total time asleep last night. Adults generally need 7–9 hours.' },
+    { id: 'sleep_deep_min',     label: 'Deep Sleep',     unit: 'min',  group: 'sleep', icon: 'nights_stay',           fmt: v => Math.round(v), sources: ['fitbit','garmin'], desc: 'Deep (slow-wave) sleep — the most restorative stage. Critical for physical recovery and immune function.' },
+    { id: 'sleep_light_min',    label: 'Light Sleep',    unit: 'min',  group: 'sleep', icon: 'cloud',                 fmt: v => Math.round(v), sources: ['fitbit','garmin'], desc: 'Light sleep is the transition between wakefulness and deeper stages. Makes up the majority of most sleep cycles.' },
+    { id: 'sleep_rem_min',      label: 'REM Sleep',      unit: 'min',  group: 'sleep', icon: 'psychology',            fmt: v => Math.round(v), sources: ['fitbit','garmin'], desc: 'REM sleep supports memory consolidation, learning, and emotional regulation. Increases in later sleep cycles.' },
+    { id: 'sleep_wake_min',     label: 'Awake',          unit: 'min',  group: 'sleep', icon: 'wb_twilight',           fmt: v => Math.round(v), sources: ['fitbit','garmin'], desc: 'Time spent awake or restless during the night. Brief awakenings are normal; frequent ones may signal poor sleep quality.' },
     // Sleep — Fitbit only
-    { id: 'sleep_efficiency',   label: 'Sleep Efficiency',unit: '%',     group: 'sleep',    icon: 'battery_charging_full', fmt: v => v.toFixed(0),    sources: ['fitbit'] },
-    // Sleep — Garmin (device-measured); Fitbit (estimated from stages + SpO2)
-    { id: 'sleep_score',        label: 'Sleep Score',     unit: '/100',  group: 'sleep',    icon: 'star',                  fmt: v => Math.round(v),   sources: ['fitbit','garmin'] },
+    { id: 'sleep_efficiency',   label: 'Sleep Efficiency', unit: '%',  group: 'sleep', icon: 'battery_charging_full', fmt: v => v.toFixed(0),  sources: ['fitbit'], desc: 'Percentage of time in bed actually spent asleep. Above 85% is generally considered good.' },
+    // Sleep — Garmin (device-measured); Fitbit (estimated from stages + SpO2 + HRV)
+    { id: 'sleep_score',        label: 'Sleep Score',    unit: '/100', group: 'sleep', icon: 'star',                  fmt: v => Math.round(v), sources: ['fitbit','garmin'], desc: 'Overall sleep quality score out of 100. Factors in duration, sleep stage balance, SpO2, and HRV.' },
+    // Sleep — Fitbit only
+    { id: 'skin_temp_variation', label: 'Skin Temp Var.', unit: '°C', group: 'sleep', icon: 'thermometer',           fmt: v => (v >= 0 ? '+' : '') + v.toFixed(2), sources: ['fitbit'], desc: 'Nightly skin temperature relative to your personal baseline. Elevated readings can indicate illness or hormonal changes.' },
     // Heart — both
-    { id: 'resting_hr',         label: 'Resting Heart Rate', unit: 'bpm',      group: 'heart', icon: 'favorite',        fmt: v => Math.round(v),  sources: ['fitbit','garmin'] },
-    { id: 'hrv_daily_rmssd',    label: 'HRV (RMSSD)',        unit: 'ms',       group: 'heart', icon: 'monitor_heart',   fmt: v => v.toFixed(1),   sources: ['fitbit','garmin'] },
-    { id: 'spo2_avg',           label: 'SpO2',               unit: '%',        group: 'heart', icon: 'water_drop',      fmt: v => v.toFixed(1),   sources: ['fitbit','garmin'] },
-    { id: 'respiratory_rate',   label: 'Respiratory Rate',   unit: 'brpm',     group: 'heart', icon: 'air',             fmt: v => v.toFixed(1),   sources: ['fitbit','garmin'] },
-    // Sleep — Fitbit only
-    { id: 'skin_temp_variation', label: 'Skin Temp Var.',   unit: '°C',       group: 'sleep', icon: 'thermometer',     fmt: v => (v >= 0 ? '+' : '') + v.toFixed(2), sources: ['fitbit'] },
+    { id: 'resting_hr',       label: 'Resting Heart Rate', unit: 'bpm',       group: 'heart', icon: 'favorite',       fmt: v => Math.round(v), sources: ['fitbit','garmin'], desc: 'Heart rate when fully at rest. Lower is generally better — a downward trend over time reflects improving cardiovascular fitness.' },
+    { id: 'hrv_daily_rmssd',  label: 'HRV (RMSSD)',        unit: 'ms',        group: 'heart', icon: 'monitor_heart',  fmt: v => v.toFixed(1),  sources: ['fitbit','garmin'], desc: 'Heart rate variability — the variation between heartbeats. Higher values indicate better recovery and autonomic nervous system balance.' },
+    { id: 'spo2_avg',         label: 'SpO2',               unit: '%',         group: 'heart', icon: 'water_drop',     fmt: v => v.toFixed(1),  sources: ['fitbit','garmin'], desc: 'Blood oxygen saturation measured overnight. Healthy range is typically 95–100%. Dips below 90% may indicate sleep apnea.' },
+    { id: 'respiratory_rate', label: 'Respiratory Rate',   unit: 'brpm',      group: 'heart', icon: 'air',            fmt: v => v.toFixed(1),  sources: ['fitbit','garmin'], desc: 'Average breaths per minute during sleep. Normal adult range is 12–20 breaths/min. Elevated values may signal illness or stress.' },
     // Heart — Fitbit only
-    { id: 'vo2_max',            label: 'Cardio Fitness',     unit: 'mL/kg/min',group: 'heart', icon: 'fitness_center',  fmt: v => v.toFixed(1),   sources: ['fitbit'] },
+    { id: 'vo2_max',          label: 'Cardio Fitness',     unit: 'mL/kg/min', group: 'heart', icon: 'fitness_center', fmt: v => v.toFixed(1),  sources: ['fitbit'], desc: 'Estimated VO₂ Max — the maximum oxygen your body can use during exercise. A key indicator of long-term cardiovascular health.' },
     // Heart — Garmin only
-    { id: 'max_hr',             label: 'Max Heart Rate',     unit: 'bpm',      group: 'heart', icon: 'favorite',        fmt: v => Math.round(v),  sources: ['garmin'] },
+    { id: 'max_hr',           label: 'Max Heart Rate',     unit: 'bpm',       group: 'heart', icon: 'favorite',       fmt: v => Math.round(v), sources: ['garmin'], desc: 'Highest heart rate recorded during the day. Useful for tracking workout intensity and your true max effort.' },
   ];
 
   // Returns true if at least one of this metric's source integrations is enabled
@@ -912,7 +912,7 @@
               {#each ALL_METRICS.filter(m => m.group === 'movement' && isVisible(m.id) && isSourceEnabled(m)) as m}
                 {@const fmt = fmtMetric(m, displayData[m.id])}
                 {@const spark = sparklinePath(_sparklineData[m.id] ?? [])}
-                <div class="metric-card" class:no-data={fmt == null && !loadingData} class:celebrating={_celebratingMetrics.has(m.id)}>
+                <div class="metric-card" class:no-data={fmt == null && !loadingData} class:celebrating={_celebratingMetrics.has(m.id)} title={m.desc}>
                   <div class="metric-icon-wrap">
                     <span class="material-symbols-rounded metric-icon">{m.icon}</span>
                   </div>
@@ -977,7 +977,7 @@
               {#each ALL_METRICS.filter(m => m.group === 'sleep' && isVisible(m.id) && isSourceEnabled(m)) as m}
                 {@const fmt = fmtMetric(m, displayData[m.id])}
                 {@const spark = sparklinePath(_sparklineData[m.id] ?? [])}
-                <div class="metric-card" class:no-data={fmt == null && !loadingData} class:celebrating={_celebratingMetrics.has(m.id)}>
+                <div class="metric-card" class:no-data={fmt == null && !loadingData} class:celebrating={_celebratingMetrics.has(m.id)} title={m.desc}>
                   <div class="metric-icon-wrap">
                     <span class="material-symbols-rounded metric-icon">{m.icon}</span>
                   </div>
@@ -1056,7 +1056,7 @@
               {#each ALL_METRICS.filter(m => m.group === 'heart' && isVisible(m.id) && isSourceEnabled(m)) as m}
                 {@const fmt = fmtMetric(m, displayData[m.id])}
                 {@const spark = sparklinePath(_sparklineData[m.id] ?? [])}
-                <div class="metric-card" class:no-data={fmt == null && !loadingData} class:celebrating={_celebratingMetrics.has(m.id)}>
+                <div class="metric-card" class:no-data={fmt == null && !loadingData} class:celebrating={_celebratingMetrics.has(m.id)} title={m.desc}>
                   <div class="metric-icon-wrap">
                     <span class="material-symbols-rounded metric-icon" style="color:#ef4444">{m.icon}</span>
                   </div>
