@@ -411,14 +411,19 @@
 
   function _calcReadiness(todayHrv, todayRhr, todaySleepScore, todayCalories, history30d) {
     if (todayHrv == null) return null;
-    // Include today's value in baseline — it's a valid data point even though
-    // it's excluded from history (which only holds past days for rolling context)
-    const hrvVals = [...history30d.map(d => d.hrv_daily_rmssd).filter(v => v != null), todayHrv];
-    if (hrvVals.length < 3) return { calibrating: true, data_days: hrvVals.length - 1, needed: 3 };
 
     const mean = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
 
-    const hrvBaseline = mean(hrvVals);
+    // History-only HRV values for baseline (today excluded — including it is circular:
+    // if today's HRV is low, it pulls the baseline down, making the ratio look better
+    // than it is and inflating the score).
+    const histHrvVals = history30d.map(d => d.hrv_daily_rmssd).filter(v => v != null);
+    // Count today for the "do we have enough data?" threshold, but NOT in the mean.
+    const totalHrvCount = histHrvVals.length + 1; // +1 = today
+    if (totalHrvCount < 3) return { calibrating: true, data_days: histHrvVals.length, needed: 3 };
+    if (histHrvVals.length < 2) return { calibrating: true, data_days: histHrvVals.length, needed: 3 };
+
+    const hrvBaseline = mean(histHrvVals);
     const rhrVals     = [...history30d.map(d => d.resting_hr).filter(v => v != null), ...(todayRhr != null ? [todayRhr] : [])];
     const rhrBaseline = rhrVals.length >= 3 ? mean(rhrVals) : null;
 
@@ -479,7 +484,7 @@
       interaction_penalty:  Math.round(interaction_penalty),
       hrv_baseline:         Math.round(hrvBaseline * 10) / 10,
       rhr_baseline:         rhrBaseline != null ? Math.round(rhrBaseline) : null,
-      data_days:            hrvVals.length,
+      data_days:            totalHrvCount,
     };
   }
 
@@ -556,11 +561,15 @@
 
   function _calcStressScore(todayHrv, todayRhr, todaySleepScore, history30d) {
     if (todayHrv == null) return null;
-    const hrvVals = [...history30d.map(d => d.hrv_daily_rmssd).filter(v => v != null), todayHrv];
-    if (hrvVals.length < 3) return { calibrating: true, data_days: hrvVals.length - 1, needed: 3 };
 
     const mean = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
-    const hrvBaseline = mean(hrvVals);
+
+    // Same separation as readiness: history-only baseline, today counted for threshold only.
+    const histHrvVals  = history30d.map(d => d.hrv_daily_rmssd).filter(v => v != null);
+    const totalHrvCount = histHrvVals.length + 1;
+    if (totalHrvCount < 3 || histHrvVals.length < 2) return { calibrating: true, data_days: histHrvVals.length, needed: 3 };
+
+    const hrvBaseline = mean(histHrvVals);
     const rhrVals     = [...history30d.map(d => d.resting_hr).filter(v => v != null), ...(todayRhr != null ? [todayRhr] : [])];
     const rhrBaseline = rhrVals.length >= 3 ? mean(rhrVals) : null;
 
@@ -589,7 +598,7 @@
       score, label, color,
       hrv_baseline: Math.round(hrvBaseline * 10) / 10,
       rhr_baseline: rhrBaseline != null ? Math.round(rhrBaseline) : null,
-      data_days:    hrvVals.length,
+      data_days:    totalHrvCount,
     };
   }
 
