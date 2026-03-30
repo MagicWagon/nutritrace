@@ -288,8 +288,9 @@
     } catch(e) {
       if (!silent) showError('Garmin sync failed: ' + e.message);
     }
-    garminSyncing = false;
-    _insightsLoaded = false;
+    garminSyncing    = false;
+    _insightsLoaded  = false;
+    _readinessLoaded = false;
   }
 
   async function connectGarmin() {
@@ -396,6 +397,111 @@
     }
     _insightsLoaded = true;
   }
+
+  // ── Daily Readiness Score ─────────────────────────────────────────────────
+  let readiness        = null;  // result obj | { data_days, needed } | null
+  let _readinessLoaded = false;
+
+  function _clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+  function _calcReadiness(todayHrv, todayRhr, todaySleepScore, todayCalories, history30d) {
+    const hrvVals = history30d.map(d => d.hrv_daily_rmssd).filter(v => v != null);
+    if (hrvVals.length < 7) return { calibrating: true, data_days: hrvVals.length, needed: 7 };
+    if (todayHrv == null)   return null;
+
+    const mean = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
+
+    const hrvBaseline = mean(hrvVals);
+    const rhrVals     = history30d.map(d => d.resting_hr).filter(v => v != null);
+    const rhrBaseline = rhrVals.length >= 5 ? mean(rhrVals) : null;
+
+    // HRV score (60% weight) — asymmetric: below baseline penalised harder
+    const hrvRatio = todayHrv / hrvBaseline;
+    let hrv_score  = hrvRatio >= 1.0
+      ? 70 + (hrvRatio - 1.0) * 100
+      : 70 - (1.0 - hrvRatio) * 180;
+    hrv_score = _clamp(hrv_score, 0, 100);
+
+    // RHR score (20% weight) — inverse: lower today is better
+    let rhr_score = 75; // neutral if no baseline
+    if (rhrBaseline != null && todayRhr != null) {
+      const rhrRatio = rhrBaseline / todayRhr;
+      rhr_score = 75 + (rhrRatio - 1.0) * 150;
+      rhr_score = _clamp(rhr_score, 0, 100);
+    }
+
+    // Sleep score used for contribution (15% weight)
+    const sleepBase     = todaySleepScore != null ? todaySleepScore : 75;
+    const sleep_cap     = (todaySleepScore != null && todaySleepScore < 55) ? 72 : 100;
+
+    // Activity penalty — only when today spikes above 7d rolling avg
+    const calHistory7 = history30d.slice(-7).map(d => d.calories_out).filter(v => v != null);
+    let activity_penalty = 0;
+    if (calHistory7.length >= 3 && todayCalories != null) {
+      const calMean   = mean(calHistory7);
+      const spikeRatio = todayCalories / calMean;
+      if (spikeRatio > 1.25) activity_penalty += (spikeRatio - 1.25) * 40;
+      // Multi-day accumulation bonus penalty
+      const daysAbove = history30d.slice(-3).filter(d => d.calories_out != null && d.calories_out > calMean * 1.1).length;
+      activity_penalty += daysAbove * 3;
+      activity_penalty = _clamp(activity_penalty, 0, 20);
+    }
+
+    let score = (0.60 * hrv_score) + (0.20 * rhr_score) + (0.15 * sleepBase) - activity_penalty;
+    score     = Math.min(_clamp(Math.round(score), 1, 100), sleep_cap);
+
+    const label = score >= 80 ? 'Optimal' : score >= 65 ? 'Good' : score >= 50 ? 'Fair' : score >= 35 ? 'Low' : 'Poor';
+    const color = score >= 65 ? 'var(--accent)' : score >= 50 ? '#f59e0b' : '#ef4444';
+
+    return {
+      score, label, color,
+      hrv_score:        Math.round(hrv_score),
+      rhr_score:        Math.round(rhr_score),
+      sleep_score_used: Math.round(sleepBase),
+      activity_penalty: Math.round(activity_penalty),
+      hrv_baseline:     Math.round(hrvBaseline * 10) / 10,
+      rhr_baseline:     rhrBaseline != null ? Math.round(rhrBaseline) : null,
+      data_days:        hrvVals.length,
+    };
+  }
+
+  async function loadReadiness() {
+    _readinessLoaded = true;
+    const today   = new Date();
+    const from    = new Date(today);
+    from.setDate(from.getDate() - 30);
+    const fromStr = from.toISOString().slice(0, 10);
+    const toStr   = today.toISOString().slice(0, 10);
+
+    const dates = [];
+    const cur   = new Date(fromStr + 'T12:00:00');
+    while (cur <= today) { dates.push(cur.toISOString().slice(0, 10)); cur.setDate(cur.getDate() + 1); }
+
+    let fitbitRows = {}, garminRows = {};
+    try { if ($fitbitEnabled) fitbitRows = await NtApi.get(`/api/wellness/fitbit/data?from=${fromStr}&to=${toStr}`); } catch {}
+    try { if ($garminEnabled) garminRows = await NtApi.get(`/api/wellness/garmin/data?from=${fromStr}&to=${toStr}`); } catch {}
+
+    // History = all days EXCEPT today (today's values come from displayData)
+    const history = dates.slice(0, -1).map(d => {
+      const g = garminRows[d] || {}, f = fitbitRows[d] || {};
+      return {
+        hrv_daily_rmssd: g.hrv_daily_rmssd ?? f.hrv_daily_rmssd ?? null,
+        resting_hr:      g.resting_hr      ?? f.resting_hr      ?? null,
+        calories_out:    g.calories_out    ?? f.calories_out    ?? null,
+      };
+    });
+
+    readiness = _calcReadiness(
+      displayData.hrv_daily_rmssd,
+      displayData.resting_hr,
+      displayData.sleep_score,
+      displayData.calories_out,
+      history
+    );
+  }
+
+  $: { activeTab; if (activeTab === 'heart') _readinessLoaded = false; }
+  $: if (activeTab === 'heart' && !_readinessLoaded) loadReadiness();
 
   // ── 7-day sparklines ───────────────────────────────────────────────────────
   let _sparklineData = {}; // { [metricId]: (number|null)[] } — 7 values, oldest first
@@ -605,6 +711,8 @@
     await loadGarminData();
     _checkWellnessGoals({ ...garminData, ...data }, withingsData);
     loadingData = false;
+    // Refresh readiness if on heart tab (today's values just changed)
+    if (activeTab === 'heart') _readinessLoaded = false;
     // Load sparklines in background (not awaited — don't block date display)
     loadSparklines();
   }
@@ -643,7 +751,8 @@
       if (!silent) showError('Sync failed: ' + e.message);
     }
     syncing = false;
-    _insightsLoaded = false; // refresh sleep insights after sync
+    _insightsLoaded  = false; // refresh sleep insights after sync
+    _readinessLoaded = false; // refresh readiness after sync
   }
 
   async function connect() {
@@ -1101,6 +1210,58 @@
                     {/if}
                   {/each}
                 </div>
+              </div>
+            {/if}
+
+            <!-- Daily Readiness card -->
+            {#if readiness != null}
+              <div class="card sleep-insight-card readiness-card" style="margin-top:10px">
+                {#if readiness.calibrating}
+                  <div class="si-header">
+                    <span class="material-symbols-rounded si-icon">battery_charging_full</span>
+                    <div class="si-title-wrap">
+                      <span class="si-title">Daily Readiness</span>
+                      <span class="si-sub">Calibrating… {readiness.data_days}/{readiness.needed} days of HRV history</span>
+                    </div>
+                  </div>
+                  <p class="si-desc">Keep syncing — once {readiness.needed} days of HRV data are collected, your personal baseline will unlock and your readiness score will appear here.</p>
+                {:else}
+                  <div class="readiness-header">
+                    <div class="readiness-header-left">
+                      <span class="material-symbols-rounded si-icon">battery_charging_full</span>
+                      <div class="si-title-wrap">
+                        <span class="si-title">Daily Readiness</span>
+                        <span class="si-sub">
+                          HRV baseline {readiness.hrv_baseline} ms{readiness.rhr_baseline != null ? ` · RHR baseline ${readiness.rhr_baseline} bpm` : ''} · {readiness.data_days} days
+                        </span>
+                      </div>
+                    </div>
+                    <div class="readiness-score-wrap">
+                      <span class="readiness-score" style="color:{readiness.color}">{readiness.score}</span>
+                      <span class="readiness-label" style="color:{readiness.color}">{readiness.label}</span>
+                    </div>
+                  </div>
+                  <div class="readiness-drivers">
+                    <div class="readiness-driver">
+                      <span class="rd-label">HRV</span>
+                      <span class="rd-val" style="color:{readiness.hrv_score >= 65 ? 'var(--accent)' : readiness.hrv_score >= 50 ? '#f59e0b' : '#ef4444'}">{readiness.hrv_score}</span>
+                    </div>
+                    <div class="readiness-driver">
+                      <span class="rd-label">Resting HR</span>
+                      <span class="rd-val" style="color:{readiness.rhr_score >= 65 ? 'var(--accent)' : readiness.rhr_score >= 50 ? '#f59e0b' : '#ef4444'}">{readiness.rhr_score}</span>
+                    </div>
+                    <div class="readiness-driver">
+                      <span class="rd-label">Sleep</span>
+                      <span class="rd-val" style="color:{readiness.sleep_score_used >= 65 ? 'var(--accent)' : readiness.sleep_score_used >= 50 ? '#f59e0b' : '#ef4444'}">{readiness.sleep_score_used}</span>
+                    </div>
+                    <div class="readiness-driver">
+                      <span class="rd-label">Activity</span>
+                      <span class="rd-val" class:rd-penalty={readiness.activity_penalty > 0}>
+                        {readiness.activity_penalty > 0 ? `−${readiness.activity_penalty}` : '—'}
+                      </span>
+                    </div>
+                  </div>
+                {/if}
               </div>
             {/if}
           {/if}
@@ -1808,6 +1969,67 @@
     display: flex;
     gap: 6px;
   }
+
+  /* Daily Readiness card */
+  .readiness-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .readiness-header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+  }
+  .readiness-score-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .readiness-score {
+    font-size: 38px;
+    font-weight: 800;
+    line-height: 1;
+  }
+  .readiness-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-top: 1px;
+  }
+  .readiness-drivers {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    background: var(--surface-2);
+    border-radius: 8px;
+    padding: 10px 8px;
+  }
+  .readiness-driver {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+  }
+  .rd-label {
+    font-size: 9px;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    text-align: center;
+  }
+  .rd-val {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-1);
+  }
+  .rd-penalty { color: #f59e0b; }
 
   @media (max-width: 400px) {
     .metric-grid { grid-template-columns: 1fr 1fr; }

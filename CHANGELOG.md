@@ -5,6 +5,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.22.0-beta] — 2026-03-29
+
+### Added
+- **Sleep Debt card** — Sleep tab now shows cumulative sleep debt over last 7 or 14 nights (configurable with range chips); calculated as sum of `max(0, goal − actual)` per night
+- **Chronotype card** — classifies sleep type (Early Bird / Morning Type / Intermediate / Evening Type / Night Owl) from average sleep midpoint across the selected range; requires ≥5 nights of timing data; shows "Building profile…" with count when insufficient data; includes emoji + plain-language description matching Fitbit's style
+- **Sleep start/end extraction (Fitbit)** — `sleep_start_min` and `sleep_end_min` now parsed from Fitbit `startTime`/`endTime` fields and stored in wellness_data (minutes past midnight)
+- **Sleep start/end extraction (Garmin)** — `sleep_start_min` and `sleep_end_min` derived from `startTimeInSeconds + startTimeOffsetInSeconds` (local epoch → UTC hours/minutes); `sleep_end_min` computed from start + `durationInSeconds`
+- **7-day sparklines on metric cards** — each Movement / Sleep / Heart metric card now displays a small inline SVG sparkline showing the last 7 days of that metric; loaded in background, does not block current-day display
+- **Statistics — wellness metrics** — Statistics page now includes a Wellness section (when Fitbit/Garmin/Withings are enabled) with Steps, Active Minutes, Sleep, Resting HR, HRV, SpO2, and Muscle Mass; supports all date ranges including a 365-day window for the 'all' range
+- **Statistics — device-first body composition** — when Withings is connected, weight and body fat pull from Withings device data first and fall back to diary manual entries; no source toggle needed; applied automatically
+- **Hover tooltips on wellness metric cards** — each metric card has a `title` attribute with a plain-language explanation of what the metric measures and why it matters
+
+### Changed
+- **Trends tab removed** — the Wellness Trends tab has been replaced by inline sparklines on each metric card; reduces duplication with Statistics and keeps the view focused
+- **Sleep stage legend redesigned** — proportional flex row below the bar; each segment's label and value are centered under its corresponding bar segment; segments narrower than 3% are hidden to avoid overflow
+- **Wellness goals — today's progress** — Wellness goals now show the actual today total and a progress bar (same as nutrient/body stat goals); fetches today's Fitbit + Garmin data on Goals load
+- **Statistics body composition** — device-first merge replaces the manual Diary/Device source toggle; cleaner UX, no extra UI state
+
+### Fixed
+- **Reactive double-load for sleep insights** — split the reactive block into two: one marks `_insightsLoaded = false` when deps change, the other calls `loadSleepInsights()` only when stale; eliminates the race condition that caused duplicate fetches
+
+---
+
 ## [0.21.0-beta] — 2026-03-29
 
 ### Added
