@@ -306,6 +306,14 @@ async function _syncDate(u, dateStr) {
     }
   } catch (e) { errors.push('vo2max: ' + e.message); }
 
+  // Stress Management Score (Fitbit Premium — silently skipped if not available)
+  // Score: 1–100, higher = better stress management. Returns null for non-Premium accounts.
+  try {
+    const d = await _get(u, `/1/user/-/stress/date/${dateStr}.json`);
+    const score = d?.stress?.stressManagementScore ?? null;
+    if (score != null) metrics.stress_score = Number(score);
+  } catch (e) { /* Premium-gated — silent */ }
+
   // Sleep Score — not in public Fitbit API; estimated from sleep components.
   // Formula: Duration (0-30) + Quality/deep+REM% (0-40) + QualBonus for >35% (0-8)
   //        + SpO2 restoration (0-15) + HRV (0-15)
