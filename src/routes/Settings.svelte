@@ -318,6 +318,7 @@
     { id: 'resting_hr',           label: 'Resting HR'       },
     { id: 'sleep_duration_min',   label: 'Sleep Duration'   },
     { id: 'sleep_efficiency',     label: 'Sleep Efficiency' },
+    { id: 'skin_temp_variation',  label: 'Skin Temp Var.'   },
     { id: 'sleep_score',          label: 'Sleep Score'      },
     { id: 'spo2_avg',             label: 'SpO2'             },
     { id: 'steps',                label: 'Steps'            },

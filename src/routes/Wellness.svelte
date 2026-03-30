@@ -34,13 +34,15 @@
     { id: 'sleep_wake_min',     label: 'Awake',           unit: 'min',   group: 'sleep',    icon: 'wb_twilight',           fmt: v => Math.round(v),   sources: ['fitbit','garmin'] },
     // Sleep — Fitbit only
     { id: 'sleep_efficiency',   label: 'Sleep Efficiency',unit: '%',     group: 'sleep',    icon: 'battery_charging_full', fmt: v => v.toFixed(0),    sources: ['fitbit'] },
-    // Sleep — both (Fitbit and Garmin each generate their own score)
+    // Sleep — Garmin (device-measured); Fitbit (estimated from stages + SpO2)
     { id: 'sleep_score',        label: 'Sleep Score',     unit: '/100',  group: 'sleep',    icon: 'star',                  fmt: v => Math.round(v),   sources: ['fitbit','garmin'] },
     // Heart — both
     { id: 'resting_hr',         label: 'Resting Heart Rate', unit: 'bpm',      group: 'heart', icon: 'favorite',        fmt: v => Math.round(v),  sources: ['fitbit','garmin'] },
     { id: 'hrv_daily_rmssd',    label: 'HRV (RMSSD)',        unit: 'ms',       group: 'heart', icon: 'monitor_heart',   fmt: v => v.toFixed(1),   sources: ['fitbit','garmin'] },
     { id: 'spo2_avg',           label: 'SpO2',               unit: '%',        group: 'heart', icon: 'water_drop',      fmt: v => v.toFixed(1),   sources: ['fitbit','garmin'] },
     { id: 'respiratory_rate',   label: 'Respiratory Rate',   unit: 'brpm',     group: 'heart', icon: 'air',             fmt: v => v.toFixed(1),   sources: ['fitbit','garmin'] },
+    // Sleep — Fitbit only
+    { id: 'skin_temp_variation', label: 'Skin Temp Var.',   unit: '°C',       group: 'sleep', icon: 'thermometer',     fmt: v => (v >= 0 ? '+' : '') + v.toFixed(2), sources: ['fitbit'] },
     // Heart — Fitbit only
     { id: 'vo2_max',            label: 'Cardio Fitness',     unit: 'mL/kg/min',group: 'heart', icon: 'fitness_center',  fmt: v => v.toFixed(1),   sources: ['fitbit'] },
     // Heart — Garmin only
@@ -116,6 +118,12 @@
     if (h === 0) return { value: `${m}`, unit: 'min' };
     if (m === 0) return { value: `${h}h`, unit: '' };
     return { value: `${h}h ${m}m`, unit: '' };
+  }
+
+  function fmtSleepStr(min) {
+    const s = fmtSleep(min);
+    if (!s) return '—';
+    return s.unit ? `${s.value} ${s.unit}` : s.value;
   }
 
   const SLEEP_TIME_IDS = new Set(['sleep_duration_min','sleep_deep_min','sleep_light_min','sleep_rem_min','sleep_wake_min']);
@@ -946,7 +954,7 @@
                     {#each sleepStages as stage}
                       {@const pct = sleepTotal > 0 ? ((displayData[stage.key] || 0) / sleepTotal * 100) : 0}
                       {#if pct > 0}
-                        <div class="stage-seg" style="width:{pct.toFixed(1)}%;background:{stage.color}" title="{stage.label}: {Math.round(displayData[stage.key] || 0)} min"></div>
+                        <div class="stage-seg" style="width:{pct.toFixed(1)}%;background:{stage.color}" title="{stage.label}: {fmtSleepStr(displayData[stage.key])}"></div>
                       {/if}
                     {/each}
                   </div>
@@ -955,7 +963,7 @@
                       <div class="stage-legend-item">
                         <span class="stage-dot" style="background:{stage.color}"></span>
                         <span class="stage-leg-label">{stage.label}</span>
-                        <span class="stage-leg-val">{displayData[stage.key] != null ? Math.round(displayData[stage.key]) + ' min' : '—'}</span>
+                        <span class="stage-leg-val">{fmtSleepStr(displayData[stage.key])}</span>
                       </div>
                     {/each}
                   </div>
