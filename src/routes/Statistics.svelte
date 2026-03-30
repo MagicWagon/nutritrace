@@ -31,10 +31,6 @@
   let summary = null; // { avg, min, max, total, daysWithData }
   let _loadVer = 0;   // cancel stale concurrent loadData calls
 
-  // Source toggle for body composition stats (diary manual vs device sync)
-  let bodyStatSource = 'diary'; // 'diary' | 'device'
-  $: bodyStatSourceToggleVisible = (metric === 'weight' || metric === 'body_fat') && $withingsEnabled;
-
   // Wellness metrics — shown only when relevant integration is enabled
   $: WELLNESS_METRICS = [
     ...($fitbitEnabled || $garminEnabled ? [
@@ -86,10 +82,10 @@
     let dates = [];
     let fromStr = '', toStr = localDateStr();
 
-    const isWellness    = metric.startsWith('wl_');
-    const isDeviceBody  = (metric === 'weight' || metric === 'body_fat') && bodyStatSource === 'device';
+    const isWellness   = metric.startsWith('wl_');
+    const isBodyDevice = (metric === 'weight' || metric === 'body_fat') && $withingsEnabled;
 
-    if (range === 'all' && (isWellness || isDeviceBody)) {
+    if (range === 'all' && (isWellness || isBodyDevice)) {
       // Wellness data doesn't come from diary — use last 365 days
       const n = 365;
       for (let i = n - 1; i >= 0; i--) {
@@ -147,37 +143,45 @@
         });
       }
 
-    } else if (isDeviceBody) {
-      // Load body comp from Withings wellness data
-      const apiField = metric === 'weight' ? 'weight_kg' : 'body_fat_pct';
-      let withingsData = {};
-      try { withingsData = await NtApi.get(`/api/wellness/withings/data?from=${fromStr}&to=${toStr}`); } catch {}
-      rows = dates.map(d => {
-        const raw = withingsData[d]?.[apiField]?.value ?? null;
-        const val = raw != null && metric === 'weight' && $weightUnit === 'lb' ? raw * 2.20462 : raw;
-        return { date: d, val };
-      });
-
     } else {
-      // Load from diary (original path)
+      // Load from diary; body comp metrics also check Withings and prefer device data
+      let withingsData = {};
+      if (isBodyDevice) {
+        try { withingsData = await NtApi.get(`/api/wellness/withings/data?from=${fromStr}&to=${toStr}`); } catch {}
+      }
+
       if (ver !== _loadVer) { loading = false; return; }
       const allEntries = await NtApi.getAllDiary();
       const entryMap = Object.fromEntries(allEntries.map(e => [e.date, e]));
 
       for (const date of dates) {
         if (ver !== _loadVer) { loading = false; return; }
-        const entry = entryMap[date];
         let val = null;
-        if (entry) {
-          if (isWater) {
-            const total = (entry.water || []).reduce((s, l) => s + (l.amount || 0), 0);
-            val = total > 0 ? total : null;
-          } else if (isBodyStat) {
-            const bs = entry.body_stats || entry.bodyStats || {};
-            val = bs[metric] ? Number(bs[metric]) : null;
+
+        if (isBodyDevice) {
+          // Device-first: Withings wins; fall back to diary if no device reading
+          const apiField = metric === 'weight' ? 'weight_kg' : 'body_fat_pct';
+          const raw = withingsData[date]?.[apiField]?.value ?? null;
+          if (raw != null) {
+            val = metric === 'weight' && $weightUnit === 'lb' ? raw * 2.20462 : raw;
           } else {
-            const totals = Nutrition.sum((entry.items || []).map(i => Nutrition.calculate(i)));
-            val = totals[metric] ? Math.round(totals[metric] * 10) / 10 : null;
+            const entry = entryMap[date];
+            const bs = entry?.body_stats || entry?.bodyStats || {};
+            val = bs[metric] ? Number(bs[metric]) : null;
+          }
+        } else {
+          const entry = entryMap[date];
+          if (entry) {
+            if (isWater) {
+              const total = (entry.water || []).reduce((s, l) => s + (l.amount || 0), 0);
+              val = total > 0 ? total : null;
+            } else if (isBodyStat) {
+              const bs = entry.body_stats || entry.bodyStats || {};
+              val = bs[metric] ? Number(bs[metric]) : null;
+            } else {
+              const totals = Nutrition.sum((entry.items || []).map(i => Nutrition.calculate(i)));
+              val = totals[metric] ? Math.round(totals[metric] * 10) / 10 : null;
+            }
           }
         }
         rows.push({ date, val });
@@ -355,7 +359,7 @@
     return m ? (m.unit || '') : '';
   }
 
-  $: { metric; range; customStart; customEnd; bodyStatSource; $statsChartType; $statsYZero; $statsAvgLine; $statsGoalLine; $statsTrendLine;
+  $: { metric; range; customStart; customEnd; $statsChartType; $statsYZero; $statsAvgLine; $statsGoalLine; $statsTrendLine;
        if (canvasEl) loadData(); }
 
   onDestroy(() => { if (chart) chart.destroy(); });
@@ -426,15 +430,6 @@
         </button>
       {/each}
     </div>
-
-    <!-- Source toggle for body composition metrics when device sync is available -->
-    {#if bodyStatSourceToggleVisible}
-      <div class="source-toggle-row">
-        <span class="source-toggle-label">Source:</span>
-        <button class="source-chip" class:active={bodyStatSource === 'diary'} on:click={() => bodyStatSource = 'diary'}>Diary</button>
-        <button class="source-chip" class:active={bodyStatSource === 'device'} on:click={() => bodyStatSource = 'device'}>Device</button>
-      </div>
-    {/if}
 
     <!-- Range + chart-type row -->
     <div class="ctrl-row">
@@ -626,36 +621,6 @@
     scrollbar-width: none;
   }
   .metric-scroll::-webkit-scrollbar { display: none; }
-
-  .source-toggle-row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 0 2px;
-  }
-  .source-toggle-label {
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--text-3);
-  }
-  .source-chip {
-    padding: 4px 12px;
-    border-radius: 99px;
-    font-size: 12px;
-    font-weight: 600;
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    color: var(--text-2);
-    cursor: pointer;
-    transition: all var(--dur-fast);
-  }
-  .source-chip.active {
-    background: var(--accent-dim);
-    border-color: var(--accent);
-    color: var(--accent);
-  }
 
   .ctrl-row {
     display: flex;
