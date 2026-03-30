@@ -1251,7 +1251,7 @@
                   <span class="material-symbols-rounded si-icon">battery_low</span>
                   <div class="si-title-wrap">
                     <span class="si-title">Sleep Debt</span>
-                    <span class="si-sub">Last {sleepDebt.nights} nights</span>
+                    <span class="si-sub">Last {sleepDebt.nights} nights · always current, not date-specific</span>
                   </div>
                   <span class="si-value {sleepDebt.debtMin === 0 ? 'si-good' : sleepDebt.debtMin < 120 ? 'si-warn' : 'si-bad'}">
                     {sleepDebt.debtMin === 0 ? 'On track' : fmtSleepStr(sleepDebt.debtMin)}
@@ -1281,8 +1281,8 @@
                   <div class="si-title-wrap">
                     <span class="si-title">{chronotype.label ?? 'Building Profile…'}</span>
                     <span class="si-sub">
-                      {#if chronotype.label}Avg sleep midpoint: {fmtTimeMin(chronotype.midpointMin)} · {chronotype.nights} nights
-                      {:else}{chronotype.nights}/{chronotype.needed} nights collected{/if}
+                      {#if chronotype.label}Avg sleep midpoint: {fmtTimeMin(chronotype.midpointMin)} · {chronotype.nights} nights · always current, not date-specific
+                      {:else}{chronotype.nights}/{chronotype.needed} nights collected · always current, not date-specific{/if}
                     </span>
                   </div>
                 </div>
