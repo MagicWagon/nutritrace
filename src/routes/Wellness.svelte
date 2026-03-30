@@ -411,7 +411,7 @@
 
   function _calcReadiness(todayHrv, todayRhr, todaySleepScore, todayCalories, history30d) {
     const hrvVals = history30d.map(d => d.hrv_daily_rmssd).filter(v => v != null);
-    if (hrvVals.length < 7) return { calibrating: true, data_days: hrvVals.length, needed: 7 };
+    if (hrvVals.length < 5) return { calibrating: true, data_days: hrvVals.length, needed: 5 };
     if (todayHrv == null)   return null;
 
     const mean = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
@@ -554,7 +554,7 @@
 
   function _calcStressScore(todayHrv, todayRhr, todaySleepScore, history30d) {
     const hrvVals = history30d.map(d => d.hrv_daily_rmssd).filter(v => v != null);
-    if (hrvVals.length < 7) return { calibrating: true, data_days: hrvVals.length, needed: 7 };
+    if (hrvVals.length < 5) return { calibrating: true, data_days: hrvVals.length, needed: 5 };
     if (todayHrv == null) return null;
 
     const mean = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
@@ -1346,10 +1346,10 @@
                     <span class="material-symbols-rounded si-icon">battery_charging_full</span>
                     <div class="si-title-wrap">
                       <span class="si-title">Daily Readiness</span>
-                      <span class="si-sub">Calibrating… {readiness.data_days}/{readiness.needed} days of HRV history</span>
+                      <span class="si-sub">Calibrating… {readiness.data_days}/{readiness.needed} nights with HRV data</span>
                     </div>
                   </div>
-                  <p class="si-desc">Keep syncing — once {readiness.needed} days of HRV data are collected, your personal baseline will unlock and your readiness score will appear here.</p>
+                  <p class="si-desc">Needs {readiness.needed} nights where your device recorded HRV during sleep. Fitbit only captures HRV on nights with a clean optical reading — wearing the device snugly helps.</p>
                 {:else}
                   <div class="readiness-header">
                     <div class="readiness-header-left">
@@ -1398,10 +1398,10 @@
                     <span class="material-symbols-rounded si-icon">self_improvement</span>
                     <div class="si-title-wrap">
                       <span class="si-title">Stress Management</span>
-                      <span class="si-sub">Calibrating… {stressScore.data_days}/{stressScore.needed} days of HRV history</span>
+                      <span class="si-sub">Calibrating… {stressScore.data_days}/{stressScore.needed} nights with HRV data</span>
                     </div>
                   </div>
-                  <p class="si-desc">Keep syncing — once {stressScore.needed} days of HRV data are collected your stress management score will appear here.</p>
+                  <p class="si-desc">Needs {stressScore.needed} nights where your device recorded HRV during sleep. Fitbit only captures HRV on nights with a clean optical reading — wearing the device snugly helps.</p>
                 {:else}
                   <div class="readiness-header">
                     <div class="readiness-header-left">
