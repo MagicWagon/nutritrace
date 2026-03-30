@@ -410,15 +410,17 @@
   function _clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
   function _calcReadiness(todayHrv, todayRhr, todaySleepScore, todayCalories, history30d) {
-    const hrvVals = history30d.map(d => d.hrv_daily_rmssd).filter(v => v != null);
-    if (hrvVals.length < 5) return { calibrating: true, data_days: hrvVals.length, needed: 5 };
-    if (todayHrv == null)   return null;
+    if (todayHrv == null) return null;
+    // Include today's value in baseline — it's a valid data point even though
+    // it's excluded from history (which only holds past days for rolling context)
+    const hrvVals = [...history30d.map(d => d.hrv_daily_rmssd).filter(v => v != null), todayHrv];
+    if (hrvVals.length < 5) return { calibrating: true, data_days: hrvVals.length - 1, needed: 5 };
 
     const mean = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
 
     const hrvBaseline = mean(hrvVals);
-    const rhrVals     = history30d.map(d => d.resting_hr).filter(v => v != null);
-    const rhrBaseline = rhrVals.length >= 5 ? mean(rhrVals) : null;
+    const rhrVals     = [...history30d.map(d => d.resting_hr).filter(v => v != null), ...(todayRhr != null ? [todayRhr] : [])];
+    const rhrBaseline = rhrVals.length >= 3 ? mean(rhrVals) : null;
 
     // HRV score (60% weight) — calibrated constants from 6 ground-truth days:
     // baseline=65, below penalty=220 (steep), above boost=80 (gentle)
@@ -553,14 +555,14 @@
   }
 
   function _calcStressScore(todayHrv, todayRhr, todaySleepScore, history30d) {
-    const hrvVals = history30d.map(d => d.hrv_daily_rmssd).filter(v => v != null);
-    if (hrvVals.length < 5) return { calibrating: true, data_days: hrvVals.length, needed: 5 };
     if (todayHrv == null) return null;
+    const hrvVals = [...history30d.map(d => d.hrv_daily_rmssd).filter(v => v != null), todayHrv];
+    if (hrvVals.length < 5) return { calibrating: true, data_days: hrvVals.length - 1, needed: 5 };
 
     const mean = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
     const hrvBaseline = mean(hrvVals);
-    const rhrVals     = history30d.map(d => d.resting_hr).filter(v => v != null);
-    const rhrBaseline = rhrVals.length >= 5 ? mean(rhrVals) : null;
+    const rhrVals     = [...history30d.map(d => d.resting_hr).filter(v => v != null), ...(todayRhr != null ? [todayRhr] : [])];
+    const rhrBaseline = rhrVals.length >= 3 ? mean(rhrVals) : null;
 
     // Build smoothed score chain over history (oldest → newest)
     // Seed from first day with enough data — no stored scores needed.
