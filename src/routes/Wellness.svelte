@@ -414,7 +414,7 @@
     // Include today's value in baseline — it's a valid data point even though
     // it's excluded from history (which only holds past days for rolling context)
     const hrvVals = [...history30d.map(d => d.hrv_daily_rmssd).filter(v => v != null), todayHrv];
-    if (hrvVals.length < 5) return { calibrating: true, data_days: hrvVals.length - 1, needed: 5 };
+    if (hrvVals.length < 3) return { calibrating: true, data_days: hrvVals.length - 1, needed: 3 };
 
     const mean = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
 
@@ -557,7 +557,7 @@
   function _calcStressScore(todayHrv, todayRhr, todaySleepScore, history30d) {
     if (todayHrv == null) return null;
     const hrvVals = [...history30d.map(d => d.hrv_daily_rmssd).filter(v => v != null), todayHrv];
-    if (hrvVals.length < 5) return { calibrating: true, data_days: hrvVals.length - 1, needed: 5 };
+    if (hrvVals.length < 3) return { calibrating: true, data_days: hrvVals.length - 1, needed: 3 };
 
     const mean = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
     const hrvBaseline = mean(hrvVals);
