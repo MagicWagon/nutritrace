@@ -295,6 +295,7 @@
     garminSyncing    = false;
     _insightsLoaded  = false;
     _readinessLoaded = false;
+    _stressLoaded    = false;
   }
 
   async function connectGarmin() {
@@ -525,6 +526,107 @@
   $: { activeTab; if (activeTab === 'heart') _readinessLoaded = false; }
   $: if (activeTab === 'heart' && !_readinessLoaded) loadReadiness();
 
+  // ── Stress Management Score ───────────────────────────────────────────────
+  // Reverse-engineered from Fitbit's model using 6 ground-truth data points.
+  // Key difference from readiness: sleep weighted more heavily, HRV gentler,
+  // and exponential smoothing (0.65 × prev_computed + 0.35 × raw) which is
+  // why the score moves slowly day-to-day. The smoothing chain is computed
+  // over 30 days of history so no prior score storage is needed.
+  let stressScore      = null;
+  let _stressLoaded    = false;
+
+  function _rawStressScore(hrv, rhr, sleepScore, hrvBaseline, rhrBaseline) {
+    if (hrv == null) return null;
+    // HRV component — symmetric, gentler than readiness (±120 per ratio unit vs ±220/80)
+    const hrvRatio = hrv / hrvBaseline;
+    let hrv_s = 75 + (hrvRatio - 1.0) * 120;
+    hrv_s = _clamp(hrv_s, 0, 100);
+    // RHR component — mild modifier
+    let rhr_s = 75;
+    if (rhrBaseline != null && rhr != null) {
+      rhr_s = 75 + (rhrBaseline / rhr - 1.0) * 80;
+      rhr_s = _clamp(rhr_s, 0, 100);
+    }
+    // Sleep component — stronger weight than readiness (35% vs 15%)
+    const sleep_s = sleepScore != null ? sleepScore : 75;
+    return (0.40 * hrv_s) + (0.35 * sleep_s) + (0.15 * rhr_s) + 10; // +10 offset to center ~75
+  }
+
+  function _calcStressScore(todayHrv, todayRhr, todaySleepScore, history30d) {
+    const hrvVals = history30d.map(d => d.hrv_daily_rmssd).filter(v => v != null);
+    if (hrvVals.length < 7) return { calibrating: true, data_days: hrvVals.length, needed: 7 };
+    if (todayHrv == null) return null;
+
+    const mean = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
+    const hrvBaseline = mean(hrvVals);
+    const rhrVals     = history30d.map(d => d.resting_hr).filter(v => v != null);
+    const rhrBaseline = rhrVals.length >= 5 ? mean(rhrVals) : null;
+
+    // Build smoothed score chain over history (oldest → newest)
+    // Seed from first day with enough data — no stored scores needed.
+    let smoothed = null;
+    for (const d of history30d) {
+      const raw = _rawStressScore(d.hrv_daily_rmssd, d.resting_hr, d.sleep_score, hrvBaseline, rhrBaseline);
+      if (raw == null) continue;
+      smoothed = smoothed == null ? raw : 0.65 * smoothed + 0.35 * raw;
+    }
+
+    // Today's score
+    const todayRaw = _rawStressScore(todayHrv, todayRhr, todaySleepScore, hrvBaseline, rhrBaseline);
+    if (todayRaw == null) return null;
+    const score = Math.round(_clamp(
+      smoothed != null ? 0.65 * smoothed + 0.35 * todayRaw : todayRaw,
+      1, 100
+    ));
+
+    // Fitbit: higher = better managed (less stressed)
+    const label = score >= 80 ? 'Well managed' : score >= 65 ? 'Balanced' : score >= 50 ? 'Moderate' : score >= 35 ? 'Elevated' : 'High';
+    const color = score >= 65 ? 'var(--accent)' : score >= 50 ? '#f59e0b' : '#ef4444';
+
+    return {
+      score, label, color,
+      hrv_baseline: Math.round(hrvBaseline * 10) / 10,
+      rhr_baseline: rhrBaseline != null ? Math.round(rhrBaseline) : null,
+      data_days:    hrvVals.length,
+    };
+  }
+
+  async function loadStressScore() {
+    _stressLoaded = true;
+    const today = new Date();
+    const from  = new Date(today);
+    from.setDate(from.getDate() - 30);
+    const fromStr = from.toISOString().slice(0, 10);
+    const toStr   = today.toISOString().slice(0, 10);
+
+    const dates = [];
+    const cur   = new Date(fromStr + 'T12:00:00');
+    while (cur <= today) { dates.push(cur.toISOString().slice(0, 10)); cur.setDate(cur.getDate() + 1); }
+
+    let fitbitRows = {}, garminRows = {};
+    try { if ($fitbitEnabled) fitbitRows = await NtApi.get(`/api/wellness/fitbit/data?from=${fromStr}&to=${toStr}`); } catch {}
+    try { if ($garminEnabled) garminRows = await NtApi.get(`/api/wellness/garmin/data?from=${fromStr}&to=${toStr}`); } catch {}
+
+    const history = dates.slice(0, -1).map(d => {
+      const g = garminRows[d] || {}, f = fitbitRows[d] || {};
+      return {
+        hrv_daily_rmssd: g.hrv_daily_rmssd ?? f.hrv_daily_rmssd ?? null,
+        resting_hr:      g.resting_hr      ?? f.resting_hr      ?? null,
+        sleep_score:     g.sleep_score     ?? f.sleep_score     ?? null,
+      };
+    });
+
+    stressScore = _calcStressScore(
+      displayData.hrv_daily_rmssd,
+      displayData.resting_hr,
+      displayData.sleep_score,
+      history
+    );
+  }
+
+  $: { activeTab; if (activeTab === 'heart') _stressLoaded = false; }
+  $: if (activeTab === 'heart' && !_stressLoaded) loadStressScore();
+
   // ── 7-day sparklines ───────────────────────────────────────────────────────
   let _sparklineData = {}; // { [metricId]: (number|null)[] } — 7 values, oldest first
 
@@ -733,8 +835,8 @@
     await loadGarminData();
     _checkWellnessGoals({ ...garminData, ...data }, withingsData);
     loadingData = false;
-    // Refresh readiness if on heart tab (today's values just changed)
-    if (activeTab === 'heart') _readinessLoaded = false;
+    // Refresh readiness + stress if on heart tab (today's values just changed)
+    if (activeTab === 'heart') { _readinessLoaded = false; _stressLoaded = false; }
     // Load sparklines in background (not awaited — don't block date display)
     loadSparklines();
   }
@@ -773,8 +875,9 @@
       if (!silent) showError('Sync failed: ' + e.message);
     }
     syncing = false;
-    _insightsLoaded  = false; // refresh sleep insights after sync
-    _readinessLoaded = false; // refresh readiness after sync
+    _insightsLoaded  = false;
+    _readinessLoaded = false;
+    _stressLoaded    = false;
   }
 
   async function connect() {
@@ -1283,6 +1386,39 @@
                       </span>
                     </div>
                   </div>
+                {/if}
+              </div>
+            {/if}
+
+            <!-- Stress Management Score card -->
+            {#if stressScore != null}
+              <div class="card sleep-insight-card readiness-card" style="margin-top:10px">
+                {#if stressScore.calibrating}
+                  <div class="si-header">
+                    <span class="material-symbols-rounded si-icon">self_improvement</span>
+                    <div class="si-title-wrap">
+                      <span class="si-title">Stress Management</span>
+                      <span class="si-sub">Calibrating… {stressScore.data_days}/{stressScore.needed} days of HRV history</span>
+                    </div>
+                  </div>
+                  <p class="si-desc">Keep syncing — once {stressScore.needed} days of HRV data are collected your stress management score will appear here.</p>
+                {:else}
+                  <div class="readiness-header">
+                    <div class="readiness-header-left">
+                      <span class="material-symbols-rounded si-icon">self_improvement</span>
+                      <div class="si-title-wrap">
+                        <span class="si-title">Stress Management</span>
+                        <span class="si-sub">
+                          HRV baseline {stressScore.hrv_baseline} ms{stressScore.rhr_baseline != null ? ` · RHR baseline ${stressScore.rhr_baseline} bpm` : ''} · {stressScore.data_days} days
+                        </span>
+                      </div>
+                    </div>
+                    <div class="readiness-score-wrap">
+                      <span class="readiness-score" style="color:{stressScore.color}">{stressScore.score}</span>
+                      <span class="readiness-label" style="color:{stressScore.color}">{stressScore.label}</span>
+                    </div>
+                  </div>
+                  <p class="si-desc" style="margin-top:6px;margin-bottom:0">Higher = nervous system is well balanced. Driven by HRV, sleep quality, and resting HR compared to your personal baselines. Moves gradually — reflects multi-day trends, not just today.</p>
                 {/if}
               </div>
             {/if}
