@@ -352,7 +352,7 @@
 
   async function loadSleepInsights() {
     const today   = new Date();
-    const lookback = Math.max(sleepInsightsRange, 30); // 30d window for enough chronotype data
+    const lookback = Math.max(sleepInsightsRange, 45); // 45d window: covers 30d debt + extra for chronotype
     const from    = new Date(today);
     from.setDate(from.getDate() - lookback + 1);
     const fromStr = from.toISOString().slice(0, 10);
@@ -1256,7 +1256,7 @@
                   <p class="si-desc">You're meeting your sleep goal. Keep it up!</p>
                 {/if}
                 <div class="si-range-chips">
-                  {#each [7, 14] as n}
+                  {#each [7, 14, 30] as n}
                     <button class="chip" class:chip-active={sleepInsightsRange === n} on:click={() => sleepInsightsRange = n}>{n}d</button>
                   {/each}
                 </div>
