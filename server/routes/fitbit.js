@@ -10,9 +10,22 @@ router.use(requireAuth);
 // In single-user mode, use user_id = 0 (auto-increment users start at 1, so no collision)
 const uid = req => userMgmtActive() ? req.user.id : 0;
 
-// In-memory PKCE store: state → { codeVerifier, userId, expiresAt }
-// Only used during the brief OAuth redirect dance (~10 min window)
-const _pkce = new Map();
+// DB-backed PKCE helpers — survive server restarts during the OAuth redirect dance
+function _pkceSet(state, userId, codeVerifier) {
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+  db.prepare(`INSERT OR REPLACE INTO oauth_state (state, user_id, provider, data, expires_at)
+              VALUES (?, ?, 'fitbit', ?, ?)`).run(state, userId, JSON.stringify({ codeVerifier }), expiresAt);
+  // Clean up any expired states
+  db.prepare(`DELETE FROM oauth_state WHERE expires_at < datetime('now')`).run();
+}
+function _pkceGet(state) {
+  const row = db.prepare(`SELECT * FROM oauth_state WHERE state = ? AND provider = 'fitbit'`).get(state);
+  if (!row) return null;
+  db.prepare(`DELETE FROM oauth_state WHERE state = ?`).run(state);
+  if (row.expires_at < new Date().toISOString()) return null;
+  const data = JSON.parse(row.data);
+  return { codeVerifier: data.codeVerifier, userId: row.user_id };
+}
 
 // Read credential: user_settings first (multi-user), app_config fallback (single-user / migration)
 function _userCfg(key, userId) {
@@ -142,9 +155,7 @@ router.get('/authorize', wrap((req, res) => {
   const codeChallenge = createHash('sha256').update(codeVerifier).digest('base64url');
   const state         = randomBytes(16).toString('hex');
 
-  // Store for 10 minutes then auto-expire
-  _pkce.set(state, { codeVerifier, userId: u, expiresAt: Date.now() + 10 * 60 * 1000 });
-  for (const [k, v] of _pkce) { if (v.expiresAt < Date.now()) _pkce.delete(k); }
+  _pkceSet(state, u, codeVerifier);
 
   const url = new URL('https://www.fitbit.com/oauth2/authorize');
   url.searchParams.set('response_type',          'code');
@@ -167,12 +178,10 @@ router.get('/callback', wrap(async (req, res) => {
     return res.redirect(`/?fitbit=error&msg=${encodeURIComponent(error)}#/wellness`);
   }
 
-  const pkce = _pkce.get(state);
-  if (!pkce || pkce.expiresAt < Date.now()) {
-    _pkce.delete(state);
+  const pkce = _pkceGet(state);
+  if (!pkce) {
     return res.redirect('/?fitbit=error&msg=invalid_state#/wellness');
   }
-  _pkce.delete(state);
 
   const clientId    = _userCfg('fitbit_client_id',     pkce.userId);
   const clientSecret = _userCfg('fitbit_client_secret', pkce.userId);

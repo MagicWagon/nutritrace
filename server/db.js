@@ -140,6 +140,15 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now'))
   );
   CREATE INDEX IF NOT EXISTS idx_ai_chat_history_user ON ai_chat_history(user_id, created_at);
+
+  -- OAuth PKCE state store — persisted so server restarts during auth flow don't break it
+  CREATE TABLE IF NOT EXISTS oauth_state (
+    state       TEXT PRIMARY KEY,
+    user_id     INTEGER,
+    provider    TEXT NOT NULL,
+    data        TEXT NOT NULL DEFAULT '{}',
+    expires_at  TEXT NOT NULL
+  );
 `);
 
 // ── Migrations ─────────────────────────────────────────────────────────────

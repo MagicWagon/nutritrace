@@ -24,8 +24,20 @@ function _getTokens(userId) {
   return db.prepare('SELECT * FROM withings_tokens WHERE user_id = ?').get(userId);
 }
 
-// State store for OAuth (brief window, like Fitbit's _pkce map)
-const _stateStore = new Map();
+// DB-backed OAuth state helpers — survive server restarts during the redirect dance
+function _stateSet(state, userId) {
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+  db.prepare(`INSERT OR REPLACE INTO oauth_state (state, user_id, provider, data, expires_at)
+              VALUES (?, ?, 'withings', '{}', ?)`).run(state, userId, expiresAt);
+  db.prepare(`DELETE FROM oauth_state WHERE expires_at < datetime('now')`).run();
+}
+function _stateGet(state) {
+  const row = db.prepare(`SELECT * FROM oauth_state WHERE state = ? AND provider = 'withings'`).get(state);
+  if (!row) return null;
+  db.prepare(`DELETE FROM oauth_state WHERE state = ?`).run(state);
+  if (row.expires_at < new Date().toISOString()) return null;
+  return { userId: row.user_id };
+}
 
 // Token refresh
 async function _refresh(userId) {
@@ -138,9 +150,7 @@ router.get('/authorize', wrap((req, res) => {
     return res.status(400).json({ error: 'Withings client_id and redirect_uri must be configured in Settings → Wellness.' });
   }
   const state = randomBytes(16).toString('hex');
-  _stateStore.set(state, { userId: uid(req), expiresAt: Date.now() + 10 * 60 * 1000 });
-  // Clean up old states
-  for (const [k, v] of _stateStore) { if (Date.now() > v.expiresAt) _stateStore.delete(k); }
+  _stateSet(state, uid(req));
 
   const url = 'https://account.withings.com/oauth2_user/authorize2?' + new URLSearchParams({
     response_type: 'code',
@@ -162,11 +172,10 @@ router.get('/callback', wrap(async (req, res) => {
     return res.redirect(`/?withings=error&msg=${encodeURIComponent(error || 'No code')}#/wellness`);
   }
 
-  const stored = _stateStore.get(state);
-  if (!stored || Date.now() > stored.expiresAt) {
+  const stored = _stateGet(state);
+  if (!stored) {
     return res.redirect(`/?withings=error&msg=state_mismatch#/wellness`);
   }
-  _stateStore.delete(state);
 
   const clientId     = _userCfg('withings_client_id',     stored.userId);
   const clientSecret = _userCfg('withings_client_secret', stored.userId);

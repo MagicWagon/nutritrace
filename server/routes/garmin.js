@@ -76,8 +76,20 @@ function _oauthHeader(method, url, extraParams, consumerKey, consumerSecret, tok
   return header;
 }
 
-// In-memory store for request tokens (brief OAuth 1.0a handshake window)
-const _reqTokens = new Map(); // token → { secret, userId, expiresAt }
+// DB-backed request token helpers — survive server restarts during the OAuth handshake
+function _reqTokenSet(token, userId, secret) {
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+  db.prepare(`INSERT OR REPLACE INTO oauth_state (state, user_id, provider, data, expires_at)
+              VALUES (?, ?, 'garmin', ?, ?)`).run(token, userId, JSON.stringify({ secret }), expiresAt);
+  db.prepare(`DELETE FROM oauth_state WHERE expires_at < datetime('now')`).run();
+}
+function _reqTokenGet(token) {
+  const row = db.prepare(`SELECT * FROM oauth_state WHERE state = ? AND provider = 'garmin'`).get(token);
+  if (!row) return null;
+  db.prepare(`DELETE FROM oauth_state WHERE state = ?`).run(token);
+  if (row.expires_at < new Date().toISOString()) return null;
+  return { secret: JSON.parse(row.data).secret, userId: row.user_id };
+}
 
 // ── GET /config ────────────────────────────────────────────────────────────────
 router.get('/config', wrap((req, res) => {
@@ -153,8 +165,7 @@ router.get('/authorize', wrap(async (req, res) => {
 
   if (!oauth_token) return res.status(502).json({ error: 'No oauth_token in Garmin response' });
 
-  _reqTokens.set(oauth_token, { secret: oauth_token_secret, userId: u, expiresAt: Date.now() + 10 * 60 * 1000 });
-  for (const [k, v] of _reqTokens) { if (v.expiresAt < Date.now()) _reqTokens.delete(k); }
+  _reqTokenSet(oauth_token, u, oauth_token_secret);
 
   const authorizeUrl = `${GARMIN_OAUTH}/oauth-service/oauth/authorize?oauth_token=${encodeURIComponent(oauth_token)}`;
   res.json({ url: authorizeUrl });
@@ -169,12 +180,10 @@ router.get('/callback', wrap(async (req, res) => {
     return res.redirect('/?garmin=error&msg=missing_params#/wellness');
   }
 
-  const stored = _reqTokens.get(oauth_token);
-  if (!stored || stored.expiresAt < Date.now()) {
-    _reqTokens.delete(oauth_token);
+  const stored = _reqTokenGet(oauth_token);
+  if (!stored) {
     return res.redirect('/?garmin=error&msg=token_expired#/wellness');
   }
-  _reqTokens.delete(oauth_token);
 
   const u              = stored.userId;
   const consumerKey    = _userCfg('garmin_consumer_key',    u);
