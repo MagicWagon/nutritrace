@@ -956,13 +956,16 @@
                       {/if}
                     {/each}
                   </div>
-                  <div class="stage-legend">
+                  <!-- Legend: each label floats at its segment's midpoint -->
+                  <div class="stage-legend-bar">
                     {#each sleepStages as stage}
-                      <div class="stage-legend-item">
-                        <span class="stage-dot" style="background:{stage.color}"></span>
-                        <span class="stage-leg-label">{stage.label}</span>
-                        <span class="stage-leg-val">{fmtSleepStr(displayData[stage.key])}</span>
-                      </div>
+                      {@const pct = sleepTotal > 0 ? ((displayData[stage.key] || 0) / sleepTotal * 100) : 0}
+                      {#if pct >= 3}
+                        <div class="stage-leg-seg" style="width:{pct.toFixed(1)}%">
+                          <span class="stage-leg-label" style="color:{stage.color}">{stage.label}</span>
+                          <span class="stage-leg-val">{fmtSleepStr(displayData[stage.key])}</span>
+                        </div>
+                      {/if}
                     {/each}
                   </div>
                 {:else}
@@ -1674,31 +1677,38 @@
     min-width: 4px;
     transition: width var(--dur-base);
   }
-  .stage-legend {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 6px;
-  }
-  .stage-legend-item {
+  /* Sleep stage legend — proportional segments matching bar */
+  .stage-legend-bar {
     display: flex;
-    align-items: center;
-    gap: 6px;
+    margin-top: 8px;
+    overflow: hidden;
   }
-  .stage-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0;
+  .stage-leg-seg {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 0;
+    padding: 0 2px;
+    overflow: hidden;
   }
   .stage-leg-label {
-    font-size: 12px;
-    color: var(--text-2);
-    flex: 1;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
   }
   .stage-leg-val {
     font-size: 12px;
     font-weight: 600;
     color: var(--text-1);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
   }
 
   /* Empty state */

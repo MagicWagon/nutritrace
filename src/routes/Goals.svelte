@@ -3,7 +3,7 @@
   import { DB, localDateStr } from '../lib/db.js';
   import { NtApi } from '../lib/api.js';
   import { portal } from '../lib/portal.js';
-  import { goals, goalTemplates, energyUnit, weightUnit, heightUnit, lengthUnit, visibleNutriments, hiddenBodyStats, waterGoalMl, waterUnit, pageBanners, wellnessEnabled } from '../stores/settings.js';
+  import { goals, goalTemplates, energyUnit, weightUnit, heightUnit, lengthUnit, visibleNutriments, hiddenBodyStats, waterGoalMl, waterUnit, pageBanners, wellnessEnabled, fitbitEnabled, garminEnabled } from '../stores/settings.js';
   import GoalsBanner from '../components/banners/GoalsBanner.svelte';
   import { NUTRIMENTS, Nutrition } from '../lib/nutrition.js';
   import { loadEntry } from '../stores/diary.js';
@@ -108,6 +108,7 @@
   let todayTotals = {};
   let todayBodyStats = {};
   let todayWaterMl = 0;
+  let todayWellness = {}; // merged fitbit + garmin for today
 
   onMount(async () => {
     const entry = await NtApi.getDiaryDate(today).catch(() => null);
@@ -115,6 +116,13 @@
       todayBodyStats = entry.body_stats || entry.bodyStats || {};
       todayTotals = Nutrition.sum((entry.items || []).map(i => Nutrition.calculate(i)));
       todayWaterMl = (entry.water || []).reduce((s, l) => s + (l.amount || 0), 0);
+    }
+    // Load wellness data for today's progress
+    if ($wellnessEnabled) {
+      let fitbit = {}, garmin = {};
+      try { if ($fitbitEnabled)  { const r = await NtApi.get(`/api/wellness/fitbit/data?date=${today}`);  fitbit  = r[today] || {}; } } catch {}
+      try { if ($garminEnabled)  { const r = await NtApi.get(`/api/wellness/garmin/data?date=${today}`);  garmin  = r[today] || {}; } } catch {}
+      todayWellness = { ...fitbit, ...garmin }; // garmin wins for shared metrics
     }
   });
 
@@ -234,6 +242,7 @@
   function getTodayValue(stat, totals, bodyStats) {
     const t = totals    ?? todayTotals;
     const b = bodyStats ?? todayBodyStats;
+    if (stat.isWellness) return todayWellness[stat.id] ?? null;
     if (stat.isBody) return b[stat.id] ?? null;
     return t[stat.id] ?? null;
   }
@@ -381,8 +390,13 @@
               <div class="goal-info">
                 <span class="font-medium">{stat.label}</span>
                 {#if getTarget(stat) != null}
+                  {@const pct = getPct(stat, todayTotals, todayBodyStats)}
                   {@const tgt = getTarget(stat)}
-                  <span class="text-3 text-sm">Goal: {tgt} {stat.unit}</span>
+                  {@const cur = getTodayValue(stat)}
+                  <div class="goal-progress-bar">
+                    <div class="goal-progress-fill" style="width:{pct}%"></div>
+                  </div>
+                  <span class="text-3 text-sm">{cur != null ? Math.round(cur*10)/10 : '—'} / {tgt} {stat.unit}</span>
                 {:else}
                   <span class="text-3 text-sm">Not set</span>
                 {/if}
@@ -472,8 +486,13 @@
               <div class="goal-info">
                 <span class="font-medium">{stat.label}</span>
                 {#if $goals[stat.id]}
+                  {@const pct = getPct(stat, todayTotals, todayBodyStats)}
                   {@const tgt = getTarget(stat)}
-                  <span class="text-3 text-sm">Goal: {tgt} {stat.unit}</span>
+                  {@const cur = getTodayValue(stat)}
+                  <div class="goal-progress-bar">
+                    <div class="goal-progress-fill" style="width:{pct}%"></div>
+                  </div>
+                  <span class="text-3 text-sm">{cur != null ? Math.round(cur*10)/10 : '—'} / {tgt} {stat.unit}</span>
                 {:else}
                   <span class="text-3 text-sm" style="opacity:0.4">No goal</span>
                 {/if}
