@@ -5,6 +5,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.24.0-beta] — 2026-03-30
+
+### Added
+- **Card tooltips** — Sleep Debt, Chronotype, Daily Readiness, and Stress Management cards now have hover tooltips explaining what each metric measures and noting that they always reflect current/rolling data, not the specific date selected in the date picker
+
+### Changed
+- **Heart tab metric order** — reordered to match Fitbit's Vitals section: Resting HR → SpO2 → Respiratory Rate → HRV → Skin Temp Variation → Cardio Fitness
+- **Skin Temp Variation moved to Heart tab** — was incorrectly grouped under Sleep; moved to Heart where it belongs
+- **Skin Temp Variation displayed in °F** — stored as °C from Fitbit API, converted to °F for display (variation × 9/5, no offset since it's a delta)
+
+### Fixed
+- **Daily Readiness / Stress Management score inflation** — today's HRV was included in the baseline mean (circular: a low-HRV day pulled the baseline down, making the ratio look better). Fixed by using history-only values for baseline calculation; today is counted only for the minimum-data threshold check. Scores now match Fitbit's (readiness ±1, stress converging)
+- **Fitbit `temperature` scope added** — skin temp variation was always returning null because the `/temp/skin` endpoint requires the `temperature` OAuth scope which was not being requested; users need to re-authorize Fitbit to grant this scope
+- **Withings `user.cardiovascular` scope removed** — added in previous version but Withings requires explicit developer approval for this scope; caused "scope not allowed" errors on reconnect for standard developer apps
+- **OAuth state persisted to DB** — all three integrations (Fitbit PKCE, Withings state, Garmin request tokens) now store OAuth state in a new `oauth_state` table instead of in-memory Maps; server restarts during the auth redirect window no longer cause "invalid state" or "token expired" errors
+
+---
+
 ## [0.23.0-beta] — 2026-03-30
 
 ### Added
