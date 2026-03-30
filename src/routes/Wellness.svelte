@@ -45,7 +45,6 @@
     { id: 'respiratory_rate', label: 'Respiratory Rate',   unit: 'brpm',      group: 'heart', icon: 'air',            fmt: v => v.toFixed(1),  sources: ['fitbit','garmin'], desc: 'Average breaths per minute during sleep. Normal adult range is 12–20 breaths/min. Elevated values may signal illness or stress.' },
     // Heart — Fitbit only
     { id: 'vo2_max',          label: 'Cardio Fitness',     unit: '',          group: 'heart', icon: 'fitness_center', fmt: v => v.toFixed(1),  sources: ['fitbit'], desc: 'Estimated VO₂ Max — the maximum oxygen your body can use during exercise. Fitbit shows this as a range (e.g. 39–43 mL/kg/min). A key indicator of long-term cardiovascular health.' },
-    { id: 'stress_score',     label: 'Stress Management',  unit: '/100',      group: 'heart', icon: 'self_improvement', fmt: v => Math.round(v), sources: ['fitbit'], desc: 'Fitbit Premium stress management score (1–100). Higher = better managed stress. Based on HRV, sleep, and activity patterns. Requires Fitbit Premium.' },
     // Heart — Garmin only
     { id: 'max_hr',           label: 'Max Heart Rate',     unit: 'bpm',       group: 'heart', icon: 'favorite',       fmt: v => Math.round(v), sources: ['garmin'], desc: 'Highest heart rate recorded during the day. Useful for tracking workout intensity and your true max effort.' },
   ];

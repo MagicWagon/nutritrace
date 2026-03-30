@@ -323,7 +323,6 @@
     { id: 'spo2_avg',             label: 'SpO2'             },
     { id: 'steps',                label: 'Steps'            },
     { id: 'vo2_max',              label: 'Cardio Fitness'   },
-    { id: 'stress_score',         label: 'Stress Management'},
     { id: 'sleep_wake_min',       label: 'Wake Time'        },
   ];
   const GARMIN_METRICS = [
