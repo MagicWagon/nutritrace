@@ -108,7 +108,20 @@
   let todayTotals = {};
   let todayBodyStats = {};
   let todayWaterMl = 0;
-  let todayWellness = {}; // merged fitbit + garmin for today
+  let todayWellness    = {}; // merged fitbit + garmin for today
+  let _wellnessLoaded  = false;
+
+  async function loadWellnessToday() {
+    _wellnessLoaded = true;
+    let fitbit = {}, garmin = {};
+    try { if ($fitbitEnabled) { const r = await NtApi.get(`/api/wellness/fitbit/data?date=${today}`); fitbit = r[today] || {}; } } catch {}
+    try { if ($garminEnabled) { const r = await NtApi.get(`/api/wellness/garmin/data?date=${today}`); garmin = r[today] || {}; } } catch {}
+    todayWellness = { ...fitbit, ...garmin };
+  }
+
+  // Fire as soon as settings stores resolve true — avoids the first-load race
+  // where onMount ran before settings loaded from server (both start false).
+  $: if (($fitbitEnabled || $garminEnabled) && !_wellnessLoaded) loadWellnessToday();
 
   onMount(async () => {
     const entry = await NtApi.getDiaryDate(today).catch(() => null);
@@ -116,13 +129,6 @@
       todayBodyStats = entry.body_stats || entry.bodyStats || {};
       todayTotals = Nutrition.sum((entry.items || []).map(i => Nutrition.calculate(i)));
       todayWaterMl = (entry.water || []).reduce((s, l) => s + (l.amount || 0), 0);
-    }
-    // Load wellness data for today's progress
-    if ($wellnessEnabled) {
-      let fitbit = {}, garmin = {};
-      try { if ($fitbitEnabled)  { const r = await NtApi.get(`/api/wellness/fitbit/data?date=${today}`);  fitbit  = r[today] || {}; } } catch {}
-      try { if ($garminEnabled)  { const r = await NtApi.get(`/api/wellness/garmin/data?date=${today}`);  garmin  = r[today] || {}; } } catch {}
-      todayWellness = { ...fitbit, ...garmin }; // garmin wins for shared metrics
     }
   });
 
