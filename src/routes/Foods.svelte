@@ -55,7 +55,7 @@
   $: _sourceLabel = availableSources.find(s => s.value === searchSource)?.label || '';
 
   // Sharing
-  const sharingEnabled = _DB2.getSetting('sharingEnabled', false); // seeded from app_config on load
+  let sharingEnabled = false;
   let showGroupCatalogue = false;  // when true, list shows group items instead of own
   let groupFoods = [];
   let groupMeals = [];
@@ -409,6 +409,11 @@
       if (activeTab === 1) openMealEditor(selectedItem, false);
       else if (activeTab === 2) openMealEditor(selectedItem, true);
       else openEditor(selectedItem, 'foodList');
+    } else if (detail.value === 'share') {
+      // Open editor scrolled to sharing section
+      if (activeTab === 1) openMealEditor(selectedItem, false);
+      else if (activeTab === 2) openMealEditor(selectedItem, true);
+      else openEditor(selectedItem, 'foodList');
     } else if (detail.value === 'clone') {
       cloneItem(selectedItem);
     } else if (detail.value === 'copy') {
@@ -482,6 +487,7 @@
       activeTab = editorState.foodsActiveTab;
       editorState.foodsActiveTab = null;
     }
+    try { const s = await NtApi.getSharingStatus(); sharingEnabled = s.sharing_enabled === true; } catch {}
     await load();
     await loadYesterdayMeals();
     // Restore scroll position after Svelte has flushed the list to the DOM
@@ -826,6 +832,7 @@
     { label: 'Save to My Catalogue', icon: 'bookmark_add', value: 'copy' },
   ] : [
     { label: 'Edit',   icon: 'edit',             value: 'edit' },
+    ...(sharingEnabled ? [{ label: 'Share', icon: 'share', value: 'share' }] : []),
     ...(activeTab !== 0 ? [{ label: 'Clone', icon: 'content_copy', value: 'clone' }] : []),
     { label: 'Delete', icon: 'delete',            value: 'delete', danger: true },
   ]}
