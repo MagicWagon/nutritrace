@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import db from '../db.js';
 import { wrap } from '../logger.js';
-import { requireAuth, requireAdmin } from '../middleware/auth.js';
+import { requireAuth, requireAdmin, userMgmtActive } from '../middleware/auth.js';
 import { testSmtp, isSmtpEnvLocked } from '../email.js';
 import { isAiEnvLocked } from '../ai.js';
 
@@ -22,10 +22,30 @@ router.get('/env-locks', requireAuth, wrap((req, res) => {
   res.json({ smtp: isSmtpEnvLocked(), ai: isAiEnvLocked() });
 }));
 
-// ── GET /api/app-config/sharing — public sharing status (any auth user) ───
+// ── GET /api/app-config/sharing — sharing status + per-category counts (any auth user) ───
 router.get('/sharing', requireAuth, wrap((req, res) => {
   const row = db.prepare('SELECT value FROM app_config WHERE key = ?').get('sharing_enabled');
-  res.json({ sharing_enabled: row?.value === 'true' });
+  const enabled = row?.value === 'true';
+  if (!enabled) return res.json({ sharing_enabled: false, foods: 0, meals: 0, recipes: 0 });
+
+  const u = userMgmtActive() ? req.user.id : null;
+  if (u == null) return res.json({ sharing_enabled: true, foods: 0, meals: 0, recipes: 0 });
+
+  // Count items from OTHER users visible to this user
+  const countVisible = (table, shareTable, shareCol, extraWhere = '') => {
+    const groupCount = db.prepare(`SELECT COUNT(*) as c FROM ${table} t WHERE t.user_id != ? AND t.visibility = 'group' ${extraWhere}`).get(u).c;
+    const specificCount = db.prepare(
+      `SELECT COUNT(*) as c FROM ${table} t JOIN ${shareTable} s ON s.${shareCol} = t.id WHERE t.user_id != ? AND t.visibility = 'specific' AND s.user_id = ? ${extraWhere}`
+    ).get(u, u).c;
+    return groupCount + specificCount;
+  };
+
+  res.json({
+    sharing_enabled: true,
+    foods:   countVisible('foods', 'food_shares', 'food_id'),
+    meals:   countVisible('meals', 'meal_shares', 'meal_id', 'AND t.is_recipe = 0'),
+    recipes: countVisible('meals', 'meal_shares', 'meal_id', 'AND t.is_recipe = 1'),
+  });
 }));
 
 // ── GET /api/app-config — return all config (passwords redacted) ───────────

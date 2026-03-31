@@ -39,7 +39,7 @@
     { label: 'Recipes', value: 'recipes' },
   ];
   let activeTab = 0;
-  $: { activeTab; activeCategoryFilter = ''; if (activeTab !== 0 && searchSource !== 'local') searchSource = 'local'; }
+  $: { activeTab; activeCategoryFilter = ''; if (searchSource !== 'local' && searchSource !== 'shared') searchSource = 'local'; if (searchSource === 'shared' && !_tabHasShared) searchSource = 'local'; }
   $: _tabIcon = activeTab === 0 ? 'restaurant' : activeTab === 1 ? 'dinner_dining' : 'menu_book';
   $: { if (pickMode) loadYesterdayMeals(); }
 
@@ -51,12 +51,14 @@
     { value: 'off',    label: 'OFF'    },
     ...($usdaEnabled   ? [{ value: 'usda',   label: 'USDA'   }] : []),
     ...(_mealieEnabled ? [{ value: 'mealie', label: 'Mealie' }] : []),
-    ...(sharingEnabled ? [{ value: 'shared', label: 'Shared' }] : []),
+    ...(_tabHasShared  ? [{ value: 'shared', label: 'From Others' }] : []),
   ];
   $: _sourceLabel = availableSources.find(s => s.value === searchSource)?.label || '';
 
-  // Sharing — "Shared" source filter
+  // Sharing — "From Others" source filter (per-category)
   let sharingEnabled = false;
+  let sharedCounts = { foods: 0, meals: 0, recipes: 0 };
+  $: _tabHasShared = activeTab === 0 ? sharedCounts.foods > 0 : activeTab === 1 ? sharedCounts.meals > 0 : sharedCounts.recipes > 0;
   let groupFoods = [];
   let groupMeals = [];
   let groupRecipes = [];
@@ -128,7 +130,7 @@
   $: _ownList = activeTab === 0 ? localFoods : activeTab === 1 ? localMeals : localRecipes;
   $: _groupList = activeTab === 0 ? groupFoods : activeTab === 1 ? groupMeals : groupRecipes;
   $: displayList = searchSource === 'shared' ? _groupList : _ownList;
-  $: { if (searchSource === 'shared' && sharingEnabled && !groupFoods.length && !groupMeals.length && !groupRecipes.length) loadGroupCatalogue(); }
+  $: { if (searchSource === 'shared' && _tabHasShared && !groupFoods.length && !groupMeals.length && !groupRecipes.length) loadGroupCatalogue(); }
   $: filteredBySearch = search
     ? displayList.filter(f =>
         (f.name||'').toLowerCase().includes(search.toLowerCase()) ||
@@ -479,7 +481,11 @@
       activeTab = editorState.foodsActiveTab;
       editorState.foodsActiveTab = null;
     }
-    try { const s = await NtApi.getSharingStatus(); sharingEnabled = s.sharing_enabled === true; } catch {}
+    try {
+      const s = await NtApi.getSharingStatus();
+      sharingEnabled = s.sharing_enabled === true;
+      sharedCounts = { foods: s.foods || 0, meals: s.meals || 0, recipes: s.recipes || 0 };
+    } catch {}
     await load();
     await loadYesterdayMeals();
     // Restore scroll position after Svelte has flushed the list to the DOM
