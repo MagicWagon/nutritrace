@@ -447,13 +447,13 @@
     const rhrVals     = [...history30d.map(d => d.resting_hr).filter(v => v != null), ...(todayRhr != null ? [todayRhr] : [])];
     const rhrBaseline = rhrVals.length >= 3 ? mean(rhrVals) : null;
 
-    // HRV score (60% weight) — calibrated constants from 6 ground-truth days:
-    // baseline=65, below penalty=220 (steep), above boost=80 (gentle)
-    // Fits observed data to ±2 pts vs Fitbit's own score.
+    // HRV score (60% weight) — calibrated from ground-truth data.
+    // Below-baseline penalty reduced from 220→180 to better match Fitbit for low-HRV users
+    // where small absolute changes create large ratio swings.
     const hrvRatio = todayHrv / hrvBaseline;
     let hrv_score  = hrvRatio >= 1.0
       ? 65 + (hrvRatio - 1.0) * 80
-      : 65 - (1.0 - hrvRatio) * 220;
+      : 65 - (1.0 - hrvRatio) * 180;
     hrv_score = _clamp(hrv_score, 0, 100);
 
     // RHR score (20% weight) — inverse: lower today is better
@@ -583,7 +583,7 @@
     }
     // Sleep component — stronger weight than readiness (35% vs 15%)
     const sleep_s = sleepScore != null ? sleepScore : 75;
-    return (0.40 * hrv_s) + (0.35 * sleep_s) + (0.15 * rhr_s) + 10; // +10 offset to center ~75
+    return (0.40 * hrv_s) + (0.35 * sleep_s) + (0.15 * rhr_s) + 8; // +8 offset — tuned to ±2 pts of Fitbit
   }
 
   function _calcStressScore(todayHrv, todayRhr, todaySleepScore, history30d) {
