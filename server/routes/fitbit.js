@@ -333,6 +333,7 @@ async function _syncDate(u, dateStr) {
     const spo2Pts    = spo2 != null ? Math.min(15, Math.max(0, (spo2 - 90) / 5 * 15)) : 10;
     const hrvPts     = hrv  != null ? Math.min(15, Math.max(0, (hrv  -  5) / 45 * 15)) : 10;
     metrics.sleep_score = Math.round(durPts + qualPts + qualBonus + spo2Pts + hrvPts);
+    logger.debug(`[fitbit] sleep_score ${dateStr}: dur=${dur}m deep=${deep}m rem=${rem}m spo2=${spo2} hrv=${hrv} → ${durPts.toFixed(1)}+${qualPts.toFixed(1)}+${qualBonus.toFixed(1)}+${spo2Pts.toFixed(1)}+${hrvPts.toFixed(1)}=${metrics.sleep_score}`);
   }
 
   // Upsert all metrics

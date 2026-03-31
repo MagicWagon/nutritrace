@@ -67,7 +67,7 @@
     const all = [
       ...ALL_METRICS.map(m => m.id),
       'weight_kg','body_fat_pct','muscle_mass_kg','bone_mass_kg','body_water_pct','lean_mass_kg','fat_mass_kg','visceral_fat','visceral_fat_index','extracellular_water_kg','intracellular_water_kg',
-      'vascular_age','heart_pulse_bpm','nerve_health_score','pulse_wave_velocity','ecg_heart_rate','ecg_afib','metabolic_age',
+      'vascular_age','nerve_health_score','pulse_wave_velocity','ecg_heart_rate','ecg_afib','metabolic_age',
       'body_battery_high','body_battery_low','stress_avg',
       'segmental_analysis',
     ];
@@ -168,10 +168,9 @@
   const BODY_SCORE_METRICS = [
     { id: 'vascular_age',       label: 'Vascular Age',     unit: 'yrs',  icon: 'cardiology',   fmt: v => Math.round(v) },
     { id: 'metabolic_age',      label: 'Metabolic Age',    unit: 'yrs',  icon: 'trending_up',  fmt: v => Math.round(v) },
-    { id: 'heart_pulse_bpm',    label: 'Heart Pulse',      unit: 'bpm',  icon: 'favorite',     fmt: v => Math.round(v) },
     { id: 'nerve_health_score', label: 'Nerve Activity',   unit: ' µS',  icon: 'neurology',     fmt: v => Math.round(v) },
     { id: 'pulse_wave_velocity',label: 'Pulse Wave Vel.',  unit: 'm/s',  icon: 'show_chart',    fmt: v => v.toFixed(1) },
-    { id: 'ecg_heart_rate',     label: 'ECG Heart Rate',   unit: 'bpm',  icon: 'ecg_heart',     fmt: v => Math.round(v) },
+    { id: 'ecg_heart_rate',     label: 'Heart Rate',       unit: 'bpm',  icon: 'ecg_heart',     fmt: v => Math.round(v) },
     { id: 'ecg_afib',           label: 'AFib Detection',   unit: '',     icon: 'ecg',           fmt: v => v === 1 ? 'Detected' : 'Normal' },
   ];
 

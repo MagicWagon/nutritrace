@@ -333,6 +333,7 @@ async function _syncRange(userId, fromDate, toDate) {
       for (const measure of grp.measures) {
         const type = measure.type;
         const value = _withingsValue(measure);
+        if (type === 227) logger.debug(`[withings] metabolic_age raw: value=${measure.value} unit=${measure.unit} → ${value} (date: ${date})`);
 
         if (SEGMENTAL_TYPES[type]) {
           const seg = SEGMENTAL_TYPES[type];
