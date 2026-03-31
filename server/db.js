@@ -141,6 +141,11 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_ai_chat_history_user ON ai_chat_history(user_id, created_at);
 
+  CREATE INDEX IF NOT EXISTS idx_foods_user ON foods(user_id);
+  CREATE INDEX IF NOT EXISTS idx_meals_user ON meals(user_id);
+  CREATE INDEX IF NOT EXISTS idx_diary_user_date ON diary(user_id, date);
+  CREATE INDEX IF NOT EXISTS idx_wellness_user_date ON wellness_data(user_id, date);
+
   -- OAuth PKCE state store — persisted so server restarts during auth flow don't break it
   CREATE TABLE IF NOT EXISTS oauth_state (
     state       TEXT PRIMARY KEY,

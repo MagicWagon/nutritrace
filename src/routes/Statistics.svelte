@@ -505,6 +505,13 @@
         <div class="chart-loading">
           <span class="material-symbols-rounded spin">refresh</span>
         </div>
+      {:else if data.length === 0}
+        <div class="chart-loading" style="background:transparent">
+          <div style="text-align:center;opacity:0.5">
+            <span class="material-symbols-rounded" style="font-size:32px">show_chart</span>
+            <div class="text-3 text-sm" style="margin-top:4px">No data for this period</div>
+          </div>
+        </div>
       {/if}
       <div class="chart-wrap">
         <canvas bind:this={canvasEl}></canvas>

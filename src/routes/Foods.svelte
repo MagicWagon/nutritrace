@@ -17,7 +17,6 @@
   import { Nutrition } from '../lib/nutrition.js';
   import { Mealie } from '../lib/mealieApi.js';
   import { foodsShowThumbnails, foodsShowCategories, foodsShowLabels, foodsShowNotes, foodsSort, foodCategories, foodsShowYesterdayMeals, mealNames, usdaEnabled, usdaApiKey, catName as _catName, catDisplay as _catDisplay, pageBanners } from '../stores/settings.js';
-  import { DB as _DB2 } from '../lib/db.js';
   import FoodsBanner from '../components/banners/FoodsBanner.svelte';
 
   // Query string params
@@ -73,7 +72,7 @@
         NtApi.getGroupMeals(),
         NtApi.getGroupRecipes(),
       ]);
-    } catch(e) { console.error('[foods] group load error:', e); }
+    } catch(e) { console.error('[foods] group load error:', e); showError('Could not load shared items'); }
     finally { loadingGroup = false; }
   }
 
@@ -232,11 +231,12 @@
       return;
     }
 
-    // If item is from another user's catalogue, copy it first (silently)
+    // If item is from another user's catalogue, copy it into ours first
     if (searchSource === 'shared' && food._shared_by != null) {
       const mine = await copyAndUse(food);
       if (!mine) return;
       food = mine;
+      showSuccess('Saved to your catalogue');
       await load();
     }
 

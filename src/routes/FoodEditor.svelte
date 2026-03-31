@@ -529,7 +529,7 @@
                 </span>
               {/if}
               <a class="off-verify-link" href="https://world.openfoodfacts.org/product/{food.barcode}" target="_blank" rel="noopener">
-                View on OFF <span class="material-symbols-rounded" style="font-size:12px;vertical-align:middle">open_in_new</span>
+                View on Open Food Facts <span class="material-symbols-rounded" style="font-size:12px;vertical-align:middle">open_in_new</span>
               </a>
             </div>
           {/if}

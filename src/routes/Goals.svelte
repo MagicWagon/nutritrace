@@ -234,6 +234,7 @@
 
   function deleteGoal() {
     if (!editStat) return;
+    if (!confirm(`Remove goal for ${editStat.label || editStat.id}?`)) return;
     goals.update(g => { const n = {...g}; delete n[editStat.id]; return n; });
     editOpen = false;
   }

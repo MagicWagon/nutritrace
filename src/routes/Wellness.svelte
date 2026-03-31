@@ -1070,7 +1070,7 @@
         </div>
         <h2 class="connect-title">No integrations enabled</h2>
         <p class="connect-desc">
-          Enable Fitbit or Withings in <strong>Settings → Labs</strong> to start syncing health data.
+          Enable Fitbit or Withings in <strong>Settings → Wellness</strong> to start syncing health data.
         </p>
         <div class="connect-chips">
           <span class="connect-chip"><span class="material-symbols-rounded">directions_walk</span> Activity</span>
@@ -1117,7 +1117,7 @@
               <h2 class="connect-title">Fitbit Setup Required</h2>
               <p class="connect-desc">
                 An administrator needs to configure Fitbit API credentials in
-                <strong>Settings → Labs</strong> before you can connect.
+                <strong>Settings → Wellness</strong> before you can connect.
               </p>
             </div>
           {:else}

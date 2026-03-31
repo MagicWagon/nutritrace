@@ -68,8 +68,7 @@ router.post('/', wrap((req, res) => {
   const { name, nutrition, items, img_url, notes, is_recipe, portion, unit, visibility, source_id } = req.body;
   if (!name) return res.status(400).json({ error: 'Name required' });
   const u = uid(req);
-  const defaultVis = db.prepare(`SELECT value FROM app_config WHERE key = 'default_food_visibility'`).get()?.value || 'private';
-  const vis = visibility || defaultVis;
+  const vis = visibility || 'private';
   const result = db.prepare(
     `INSERT INTO meals (user_id, name, nutrition, items, img_url, notes, is_recipe, portion, unit, visibility, source_id)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`

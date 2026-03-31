@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import { logger } from '../logger.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
+router.use(requireAuth);
 
 // Whitelist: only these external hosts may be proxied
 const ALLOWED = ['world.openfoodfacts.org', 'search.openfoodfacts.org', 'api.nal.usda.gov'];

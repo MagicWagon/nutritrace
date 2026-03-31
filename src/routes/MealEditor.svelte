@@ -509,7 +509,10 @@
       </div>
 
       {#if meal.items.length === 0}
-        <p class="text-3 text-sm" style="padding:4px 0">No foods or recipes yet. Tap + to add.</p>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:16px 0;opacity:0.5">
+          <span class="material-symbols-rounded" style="font-size:32px">restaurant</span>
+          <span class="text-3 text-sm">No ingredients yet. Tap + to add.</span>
+        </div>
       {:else}
         <div class="ingredient-list"
           on:pointermove={e => onDragPointerMove(e, dragOver)}

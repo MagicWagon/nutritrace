@@ -155,8 +155,12 @@ router.delete('/management', requireAuth, requireAdmin, wrap((req, res) => {
 }));
 
 // ── Lockout recovery: disable user management without credentials ──────────
+// Requires RECOVERY_TOKEN env var to prevent unauthenticated account wipes.
 router.post('/recover', wrap((req, res) => {
   if (req.user) return res.status(400).json({ error: 'You are already signed in. Use Settings to disable user management.' });
+  const token = process.env.RECOVERY_TOKEN;
+  if (!token) return res.status(503).json({ error: 'Recovery not available. Set RECOVERY_TOKEN environment variable.' });
+  if (req.body?.token !== token) return res.status(403).json({ error: 'Invalid recovery token.' });
   db.prepare('DELETE FROM users').run();
   res.clearCookie('nt_token');
   res.json({ ok: true });

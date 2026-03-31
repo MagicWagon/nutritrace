@@ -8,8 +8,10 @@ import multer from 'multer';
 import db from '../db.js';
 import { seedSmtpFromEnv } from '../email.js';
 import { seedAiFromEnv } from '../ai.js';
+import { requireAuth, requireAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
+router.use(requireAuth);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const UPLOADS_DIR = process.env.UPLOADS_PATH  || path.resolve(__dirname, '..', 'uploads');
@@ -23,12 +25,6 @@ const upload = multer({
   storage: multer.diskStorage({ destination: (req, file, cb) => cb(null, os.tmpdir()) }),
   limits: { fileSize: 2 * 1024 * 1024 * 1024 }, // 2 GB
 });
-
-function requireAdmin(req, res, next) {
-  if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
-  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
-  next();
-}
 
 function restoreFromZip(zip) {
   const data = JSON.parse(zip.readAsText('database.json'));

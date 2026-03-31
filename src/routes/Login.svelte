@@ -12,6 +12,7 @@
   let showRecovery  = false;
   let recovering    = false;
   let recoveryDone  = false;
+  let recoveryToken = '';
 
   async function login() {
     if (!username.trim() || !password) return;
@@ -37,9 +38,14 @@
   }
 
   async function recover() {
+    if (!confirm('This will delete all user accounts. Your food & diary data will be kept. Continue?')) return;
     recovering = true;
     try {
-      const res = await fetch('/api/auth/recover', { method: 'POST', credentials: 'include' });
+      const res = await fetch('/api/auth/recover', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: recoveryToken.trim() }),
+      });
       const data = await res.json();
       if (!res.ok) { showError(data.error || 'Recovery failed'); return; }
       localStorage.removeItem('wl:userId');
@@ -96,8 +102,10 @@
         <div class="recovery-box" transition:slide={{ duration: 180 }}>
           <span class="material-symbols-rounded" style="font-size:20px;color:var(--warning,#f59e0b)">warning</span>
           <p>If you never set up user accounts intentionally, you can disable user management. <strong>This will delete all user accounts.</strong> Your food &amp; diary data will be kept.</p>
+          <p style="margin:0">Enter the <code>RECOVERY_TOKEN</code> from your server environment:</p>
+          <input class="input" type="password" bind:value={recoveryToken} placeholder="Recovery token" />
           <button class="btn btn-secondary" style="width:100%;border-color:var(--danger);color:var(--danger)"
-            on:click={recover} disabled={recovering}>
+            on:click={recover} disabled={recovering || !recoveryToken.trim()}>
             {recovering ? 'Disabling…' : 'Disable user management & reset'}
           </button>
         </div>

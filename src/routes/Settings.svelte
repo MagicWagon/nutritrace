@@ -3,6 +3,7 @@
   import { get } from 'svelte/store';
   import { slide } from 'svelte/transition';
   import Toggle from '../components/settings/Toggle.svelte';
+  import { APP_VERSION } from '../lib/version.js';
   import Sheet  from '../components/ui/Sheet.svelte';
   import SettingsBanner from '../components/banners/SettingsBanner.svelte';
   import Dialog from '../components/ui/Dialog.svelte';
@@ -21,13 +22,12 @@
     foodCategories, visibleNutriments, nutrimentsOrder, customNutriments,
     bodyStatsOrder, hiddenBodyStats,
     dateFormat, timeFormat,
-    sidebarPersistent, goalCelebrations, pageBanners, loopBannerAnimations,
+    sidebarPersistent, goalCelebrations, pageBanners,
     aiEnabled, aiProvider, aiApiKey, aiModel, aiAssistantName,
     waterGoalMl, waterUnit, waterContainers, waterShowInStats, waterShowInDiary,
     wellnessEnabled, fitbitEnabled, wellnessMetrics, wellnessSyncMode, wellnessSyncRange,
     withingsSyncRange, withingsEnabled,
     garminEnabled, garminSyncRange,
-    defaultFoodVisibility,
   } from '../stores/settings.js';
   import { mealIcon } from '../lib/mealIcon.js';
   import { DB } from '../lib/db.js';
@@ -51,7 +51,7 @@
   $: settingsQuery = settingsSearch.toLowerCase().trim();
 
   const SECTION_KEYWORDS = {
-    appearance:        ['appearance','theme','dark','light','accent','color','navigation','sidebar','persistent','start page','animations','celebrations','reduce motion','banner','page banner','loop','looping'],
+    appearance:        ['appearance','theme','dark','light','accent','color','navigation','sidebar','persistent','start page','animations','celebrations','reduce motion','banner','page banner'],
     regional:          ['regional','date format','time format','locale','date','time','12h','24h','units','energy unit','weight unit','height','circumference','distance','imperial','metric'],
     diary:             ['diary','brands','timestamps','thumbnails','nutrients','nutrition units','macros','macro summary','prompt quantity','portion size','nutrition bar','goals progress','meal names','meals'],
     foods:             ['foods','thumbnails','category','notes','yesterday meals','sort order','sort','barcode','scan','beep','flashlight','crop photos'],
@@ -1562,16 +1562,6 @@
             </div>
             <Toggle checked={$pageBanners} on:change={e => pageBanners.set(e.detail)} />
           </div>
-          {#if $pageBanners}
-          <div class="setting-divider"></div>
-          <div class="setting-row">
-            <div>
-              <span class="setting-label">Loop banner animations</span>
-              <div class="setting-desc">Looping background animations</div>
-            </div>
-            <Toggle checked={$loopBannerAnimations} on:change={e => loopBannerAnimations.set(e.detail)} />
-          </div>
-          {/if}
         </div>
       </div>
     {/if}
@@ -1726,133 +1716,6 @@
       </div>
     {/if}
 
-    <!-- ── Foods ───────────────────────────────────────────────────────────── -->
-    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'foods')} on:click={() => toggleSection('foods')}>
-      <span class="material-symbols-rounded si">restaurant</span>
-      <span>Foods</span>
-      <span class="material-symbols-rounded chevron" class:rotated={openSections.foods}>expand_more</span>
-    </button>
-    {#if sectionOpen(openSections, settingsQuery, 'foods') && sectionVisible(settingsQuery, 'foods')}
-      <div class="section-body" transition:slide={{ duration: 180 }}>
-        <div class="card settings-card">
-          <div class="setting-row"><span class="setting-label">Show thumbnails</span><Toggle checked={$foodsShowThumbnails} on:change={e => foodsShowThumbnails.set(e.detail)} /></div>
-          <div class="setting-divider"></div>
-          <div class="setting-row"><span class="setting-label">Show categories</span><Toggle checked={$foodsShowCategories} on:change={e => foodsShowCategories.set(e.detail)} /></div>
-          <div class="setting-divider"></div>
-          <div class="setting-row"><span class="setting-label">Show category labels</span><Toggle checked={$foodsShowLabels} on:change={e => foodsShowLabels.set(e.detail)} /></div>
-          <div class="setting-divider"></div>
-          <div class="setting-row"><span class="setting-label">Show notes</span><Toggle checked={$foodsShowNotes} on:change={e => foodsShowNotes.set(e.detail)} /></div>
-          <div class="setting-divider"></div>
-          <div class="setting-row"><span class="setting-label">Show yesterday's meals</span><Toggle checked={$foodsShowYesterdayMeals} on:change={e => foodsShowYesterdayMeals.set(e.detail)} /></div>
-          <div class="setting-divider"></div>
-          <div class="setting-row">
-            <span class="setting-label">Sort order</span>
-            <div class="select-wrap" style="width:140px">
-              <select class="select sel-sm" value={$foodsSort} on:change={e => foodsSort.set(e.target.value)}>
-                <option value="date">Recently added</option>
-                <option value="alpha">Alphabetical</option>
-              </select>
-            </div>
-          </div>
-        </div>
-        <p class="sub-label">Camera &amp; Scanning</p>
-        <div class="card settings-card">
-          <div class="setting-row"><span class="setting-label">Beep on successful scan</span><Toggle checked={$barcodeBeep} on:change={e => barcodeBeep.set(e.detail)} /></div>
-          <div class="setting-divider"></div>
-          <div class="setting-row"><span class="setting-label">Use flashlight while scanning</span><Toggle checked={$barcodeFlashlight} on:change={e => barcodeFlashlight.set(e.detail)} /></div>
-          <div class="setting-divider"></div>
-          <div class="setting-row"><span class="setting-label">Crop photos on upload</span><Toggle checked={$cropPhotos} on:change={e => cropPhotos.set(e.detail)} /></div>
-        </div>
-      </div>
-    {/if}
-
-    <!-- ── Sharing ──────────────────────────────────────────────────────────── -->
-    {#if $userMgmtActive}
-      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'sharing')} on:click={() => toggleSection('sharing')}>
-        <span class="material-symbols-rounded si">group</span>
-        <span>Sharing</span>
-        <span class="material-symbols-rounded chevron" class:rotated={openSections.sharing}>expand_more</span>
-      </button>
-      {#if sectionOpen(openSections, settingsQuery, 'sharing') && sectionVisible(settingsQuery, 'sharing')}
-        <div class="section-body" transition:slide={{ duration: 180 }}>
-          {#if $currentUser?.role === 'admin'}
-            <p class="sub-label">Admin</p>
-            <div class="card settings-card">
-              <div class="setting-row">
-                <div>
-                  <span class="setting-label">Enable food sharing</span>
-                  <span class="setting-desc">Allow group members to share foods, meals, and recipes with each other</span>
-                </div>
-                <Toggle checked={adminSharingEnabled} on:change={e => saveAdminSharingEnabled(e.detail)} />
-              </div>
-            </div>
-          {/if}
-          {#if adminSharingEnabled}
-          <p class="sub-label">My Defaults</p>
-          <div class="card settings-card">
-            <div class="setting-row">
-              <span class="setting-label">Default food visibility</span>
-              <div class="select-wrap" style="width:140px">
-                <select class="select sel-sm" value={$defaultFoodVisibility} on:change={e => defaultFoodVisibility.set(e.target.value)}>
-                  <option value="private">Private</option>
-                  <option value="group">Everyone</option>
-                  <option value="specific">Specific people</option>
-                </select>
-              </div>
-            </div>
-            <div class="setting-desc" style="padding: 0 16px 12px">New items you create will default to this visibility. Existing items are not changed.</div>
-          </div>
-          <p class="sub-label">Bulk Share</p>
-          <div class="card settings-card" style="gap:0">
-            <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px;padding:12px 16px">
-              <span class="setting-label">Apply visibility to</span>
-              <div style="display:flex;gap:8px;flex-wrap:wrap">
-                {#each ['foods','meals','recipes'] as t}
-                  <button class="chip" class:accent={bulkTargets.has(t)} on:click={() => toggleBulkTarget(t)}>
-                    {#if bulkTargets.has(t)}<span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle;margin-right:2px">check</span>{/if}{t.charAt(0).toUpperCase() + t.slice(1)}
-                  </button>
-                {/each}
-              </div>
-            </div>
-            <div class="setting-divider"></div>
-            <div class="setting-row">
-              <span class="setting-label">Set visibility to</span>
-              <div class="select-wrap" style="width:130px">
-                <select class="select sel-sm" bind:value={bulkVisibility} on:change={() => { if (bulkVisibility === 'specific') loadBulkUsers(); }}>
-                  <option value="private">Private</option>
-                  <option value="group">Everyone</option>
-                  <option value="specific">Specific people</option>
-                </select>
-              </div>
-            </div>
-            {#if bulkVisibility === 'specific'}
-              <div style="padding:0 16px 8px">
-                <div class="setting-desc" style="margin-bottom:8px">Select which members can see your items:</div>
-                <div style="display:flex;flex-wrap:wrap;gap:8px">
-                  {#each bulkUsers as u}
-                    <button class="chip" class:chip-active={bulkSelectedIds.includes(u.id)}
-                      on:click={() => toggleBulkUser(u.id)}>
-                      {#if bulkSelectedIds.includes(u.id)}
-                        <span class="material-symbols-rounded" style="font-size:14px">check</span>
-                      {/if}
-                      {u.name}
-                    </button>
-                  {/each}
-                  {#if !bulkUsersLoaded}<span class="setting-desc">Loading…</span>{/if}
-                </div>
-              </div>
-            {/if}
-            <div style="padding:8px 16px 12px">
-              <button class="btn btn-secondary w-full" on:click={applyBulkShare} disabled={bulkApplying}>
-                {bulkApplying ? 'Applying…' : 'Apply to existing items'}
-              </button>
-            </div>
-          </div>
-          {/if}
-        </div>
-      {/if}
-    {/if}
-
     <!-- ── Water ───────────────────────────────────────────────────────────── -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'water')} on:click={() => toggleSection('water')}>
       <span class="material-symbols-rounded si">water_drop</span>
@@ -1926,6 +1789,46 @@
               <button class="btn btn-primary" style="height:42px;white-space:nowrap" on:click={addContainer}>Add</button>
             </div>
           </div>
+        </div>
+      </div>
+    {/if}
+
+    <!-- ── Foods ───────────────────────────────────────────────────────────── -->
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'foods')} on:click={() => toggleSection('foods')}>
+      <span class="material-symbols-rounded si">restaurant</span>
+      <span>Foods</span>
+      <span class="material-symbols-rounded chevron" class:rotated={openSections.foods}>expand_more</span>
+    </button>
+    {#if sectionOpen(openSections, settingsQuery, 'foods') && sectionVisible(settingsQuery, 'foods')}
+      <div class="section-body" transition:slide={{ duration: 180 }}>
+        <div class="card settings-card">
+          <div class="setting-row"><span class="setting-label">Show thumbnails</span><Toggle checked={$foodsShowThumbnails} on:change={e => foodsShowThumbnails.set(e.detail)} /></div>
+          <div class="setting-divider"></div>
+          <div class="setting-row"><span class="setting-label">Show categories</span><Toggle checked={$foodsShowCategories} on:change={e => foodsShowCategories.set(e.detail)} /></div>
+          <div class="setting-divider"></div>
+          <div class="setting-row"><span class="setting-label">Show category labels</span><Toggle checked={$foodsShowLabels} on:change={e => foodsShowLabels.set(e.detail)} /></div>
+          <div class="setting-divider"></div>
+          <div class="setting-row"><span class="setting-label">Show notes</span><Toggle checked={$foodsShowNotes} on:change={e => foodsShowNotes.set(e.detail)} /></div>
+          <div class="setting-divider"></div>
+          <div class="setting-row"><span class="setting-label">Show yesterday's meals</span><Toggle checked={$foodsShowYesterdayMeals} on:change={e => foodsShowYesterdayMeals.set(e.detail)} /></div>
+          <div class="setting-divider"></div>
+          <div class="setting-row">
+            <span class="setting-label">Sort order</span>
+            <div class="select-wrap" style="width:140px">
+              <select class="select sel-sm" value={$foodsSort} on:change={e => foodsSort.set(e.target.value)}>
+                <option value="date">Recently added</option>
+                <option value="alpha">Alphabetical</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <p class="sub-label">Camera &amp; Scanning</p>
+        <div class="card settings-card">
+          <div class="setting-row"><span class="setting-label">Beep on successful scan</span><Toggle checked={$barcodeBeep} on:change={e => barcodeBeep.set(e.detail)} /></div>
+          <div class="setting-divider"></div>
+          <div class="setting-row"><span class="setting-label">Use flashlight while scanning</span><Toggle checked={$barcodeFlashlight} on:change={e => barcodeFlashlight.set(e.detail)} /></div>
+          <div class="setting-divider"></div>
+          <div class="setting-row"><span class="setting-label">Crop photos on upload</span><Toggle checked={$cropPhotos} on:change={e => cropPhotos.set(e.detail)} /></div>
         </div>
       </div>
     {/if}
@@ -2750,222 +2653,77 @@
     {/if}
 
     <p class="settings-group-label">App</p>
-    <!-- ── Backup & Restore ────────────────────────────────────────────────── -->
-    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'backup')} on:click={() => toggleSection('backup')}>
-      <span class="material-symbols-rounded si">backup</span>
-      <span>Backup & Restore</span>
-      <span class="material-symbols-rounded chevron" class:rotated={openSections.backup}>expand_more</span>
-    </button>
-    {#if sectionOpen(openSections, settingsQuery, 'backup') && sectionVisible(settingsQuery, 'backup')}
-      <div class="section-body" transition:slide={{ duration: 180 }}>
-
-        <!-- Full backup (admin only) -->
-        {#if $currentUser?.role === 'admin'}
-        <p class="sub-label">Full Backup</p>
-        <div class="card settings-card">
-          <div style="padding:12px 16px 4px">
-            <p class="setting-desc" style="margin:0 0 12px">A complete snapshot of everything — all user data, diary, foods, meals, recipes, settings, and uploaded images. Saved on the server and available to download or restore at any time.</p>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
-              <button class="btn btn-primary" style="height:36px;font-size:13px"
-                on:click={createFullBackup} disabled={fullBackupBusy}>
-                {#if fullBackupBusy}
-                  <span class="material-symbols-rounded spin" style="font-size:16px">autorenew</span> Working…
-                {:else}
-                  <span class="material-symbols-rounded" style="font-size:16px">add_circle</span> Create Backup
-                {/if}
-              </button>
-              <button class="btn btn-secondary" style="height:36px;font-size:13px"
-                on:click={pickUploadRestore} disabled={fullBackupBusy}>
-                <span class="material-symbols-rounded" style="font-size:16px">upload</span> Upload &amp; Restore
-              </button>
-            </div>
-            {#if restoreStatus}
-              <div class="restore-progress" bind:this={restoreProgressEl}>
-                <div class="restore-progress-label">
-                  <span class="material-symbols-rounded spin" style="font-size:15px;flex-shrink:0">autorenew</span>
-                  {restoreStatus.label}
+    <!-- ── Sharing ──────────────────────────────────────────────────────────── -->
+    {#if $userMgmtActive}
+      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'sharing')} on:click={() => toggleSection('sharing')}>
+        <span class="material-symbols-rounded si">group</span>
+        <span>Food Sharing</span>
+        <span class="material-symbols-rounded chevron" class:rotated={openSections.sharing}>expand_more</span>
+      </button>
+      {#if sectionOpen(openSections, settingsQuery, 'sharing') && sectionVisible(settingsQuery, 'sharing')}
+        <div class="section-body" transition:slide={{ duration: 180 }}>
+          {#if $currentUser?.role === 'admin'}
+            <p class="sub-label">Admin</p>
+            <div class="card settings-card">
+              <div class="setting-row">
+                <div>
+                  <span class="setting-label">Enable food sharing</span>
+                  <span class="setting-desc">Allow group members to share foods, meals, and recipes with each other</span>
                 </div>
-                <div class="restore-progress-track">
-                  <div class="restore-progress-fill" style="width:{restoreStatus.percent}%"></div>
+                <Toggle checked={adminSharingEnabled} on:change={e => saveAdminSharingEnabled(e.detail)} />
+              </div>
+            </div>
+          {/if}
+          {#if adminSharingEnabled}
+          <p class="sub-label">Bulk Share</p>
+          <div class="card settings-card" style="gap:0">
+            <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px;padding:12px 16px">
+              <span class="setting-label">Apply visibility to</span>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                {#each ['foods','meals','recipes'] as t}
+                  <button class="chip" class:accent={bulkTargets.has(t)} on:click={() => toggleBulkTarget(t)}>
+                    {#if bulkTargets.has(t)}<span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle;margin-right:2px">check</span>{/if}{t.charAt(0).toUpperCase() + t.slice(1)}
+                  </button>
+                {/each}
+              </div>
+            </div>
+            <div class="setting-divider"></div>
+            <div class="setting-row">
+              <span class="setting-label">Set visibility to</span>
+              <div class="select-wrap" style="width:130px">
+                <select class="select sel-sm" bind:value={bulkVisibility} on:change={() => { if (bulkVisibility === 'specific') loadBulkUsers(); }}>
+                  <option value="private">Private</option>
+                  <option value="group">Everyone</option>
+                  <option value="specific">Specific people</option>
+                </select>
+              </div>
+            </div>
+            {#if bulkVisibility === 'specific'}
+              <div style="padding:0 16px 8px">
+                <div class="setting-desc" style="margin-bottom:8px">Select which members can see your items:</div>
+                <div style="display:flex;flex-wrap:wrap;gap:8px">
+                  {#each bulkUsers as u}
+                    <button class="chip" class:chip-active={bulkSelectedIds.includes(u.id)}
+                      on:click={() => toggleBulkUser(u.id)}>
+                      {#if bulkSelectedIds.includes(u.id)}
+                        <span class="material-symbols-rounded" style="font-size:14px">check</span>
+                      {/if}
+                      {u.name}
+                    </button>
+                  {/each}
+                  {#if !bulkUsersLoaded}<span class="setting-desc">Loading…</span>{/if}
                 </div>
               </div>
             {/if}
-          </div>
-
-          {#if fullBackups.length > 0}
-            <div class="setting-divider"></div>
-            <!-- Table header -->
-            <div class="backup-table-header">
-              <span>Name</span>
-              <span>Created</span>
-              <span>Size</span>
-              <span></span>
+            <div style="padding:8px 16px 12px">
+              <button class="btn btn-secondary w-full" on:click={applyBulkShare} disabled={bulkApplying}>
+                {bulkApplying ? 'Applying…' : 'Apply to existing items'}
+              </button>
             </div>
-            <div class="setting-divider"></div>
-            {#each fullBackups as bk, i}
-              {#if i > 0}<div class="setting-divider"></div>{/if}
-              <div class="backup-row">
-                <span class="backup-name">{bk.filename}</span>
-                <span class="backup-col-date">{new Date(bk.createdAt).toLocaleDateString()}</span>
-                <span class="backup-col-size">{fmtBytes(bk.size)}</span>
-                <div class="backup-actions">
-                  <button class="btn btn-secondary backup-action-btn"
-                    on:click={() => downloadFullBackup(bk.filename)}>
-                    <span class="material-symbols-rounded" style="font-size:15px">download</span> Download
-                  </button>
-                  <button class="btn btn-secondary backup-action-btn"
-                    on:click={() => { restoreTarget = bk.filename; showRestoreDialog = true; }} disabled={fullBackupBusy}>
-                    <span class="material-symbols-rounded" style="font-size:15px">restore</span> Restore
-                  </button>
-                  <button class="btn-icon" style="color:var(--danger);padding:0 4px"
-                    on:click={() => { deleteTarget = bk.filename; showDeleteBkDialog = true; }} title="Delete backup">
-                    <span class="material-symbols-rounded" style="font-size:20px">delete</span>
-                  </button>
-                </div>
-              </div>
-            {/each}
-          {:else}
-            <div class="setting-divider"></div>
-            <p style="padding:12px 16px;font-size:13px;color:var(--text-3);margin:0">No backups yet — click Create Backup to get started.</p>
+          </div>
           {/if}
         </div>
-        {/if}
-
-        <!-- Portable JSON export/import -->
-        <p class="sub-label">Portable Export</p>
-        <div class="card settings-card">
-          <button class="setting-row setting-action" on:click={exportBackup}>
-            <span class="material-symbols-rounded si" style="color:var(--accent)">download</span>
-            <div>
-              <span class="setting-label">Export JSON</span>
-              <div class="setting-desc">Downloads your foods, meals, recipes, diary, and all settings as a JSON file. In single-user mode this is the recommended way to back up settings (the full ZIP backup only captures settings when user management is enabled). Note: server-hosted images will need to be re-uploaded separately.</div>
-            </div>
-            <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
-          </button>
-          <div class="setting-divider"></div>
-          <button class="setting-row setting-action" on:click={importBackup}>
-            <span class="material-symbols-rounded si" style="color:var(--accent)">upload</span>
-            <div>
-              <span class="setting-label">Import JSON</span>
-              <div class="setting-desc">Restores from a previously exported JSON file. Merges with existing data — does not erase what's already here. Note: server-hosted images will need to be re-uploaded separately.</div>
-            </div>
-            <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
-          </button>
-        </div>
-
-        <!-- Other tools -->
-        <p class="sub-label">Other</p>
-        <div class="card settings-card">
-          <button class="setting-row setting-action" on:click={exportCSV}>
-            <span class="material-symbols-rounded si" style="color:var(--info)">table_chart</span>
-            <div>
-              <span class="setting-label">Export diary as CSV</span>
-              <div class="setting-desc">Downloads your full diary history as a spreadsheet. Useful for analysis in Excel or Google Sheets.</div>
-            </div>
-            <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
-          </button>
-        </div>
-
-        <!-- Danger zone -->
-        <p class="sub-label danger-zone-label">Danger Zone</p>
-        <div class="card settings-card danger-zone-card">
-          <button class="setting-row setting-action danger" on:click={() => showClearDialog = true}>
-            <span class="material-symbols-rounded si" style="color:var(--danger)">delete_forever</span>
-            <div>
-              <span class="setting-label" style="color:var(--danger)">Clear all data</span>
-              <div class="setting-desc">Permanently deletes all diary entries, foods, meals, and body stats. Settings and credentials are kept.</div>
-            </div>
-            <span class="material-symbols-rounded" style="font-size:18px;color:var(--danger);flex-shrink:0">chevron_right</span>
-          </button>
-          <div class="setting-divider"></div>
-          <button class="setting-row setting-action danger" on:click={() => showClearSettingsDialog = true}>
-            <span class="material-symbols-rounded si" style="color:var(--danger)">manage_history</span>
-            <div>
-              <span class="setting-label" style="color:var(--danger)">Clear all settings</span>
-              <div class="setting-desc">Resets all preferences, credentials, and API keys to defaults. Food and diary data are kept.</div>
-            </div>
-            <span class="material-symbols-rounded" style="font-size:18px;color:var(--danger);flex-shrink:0">chevron_right</span>
-          </button>
-        </div>
-
-      </div>
-    {/if}
-
-
-    <!-- ── Email ────────────────────────────────────────────────────────────── -->
-    {#if $currentUser?.role === 'admin'}
-    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'email')} on:click={() => toggleSection('email')}>
-      <span class="material-symbols-rounded si">mail</span>
-      <span>Email</span>
-      <span class="material-symbols-rounded chevron" class:rotated={openSections.email}>expand_more</span>
-    </button>
-    {#if sectionOpen(openSections, settingsQuery, 'email') && sectionVisible(settingsQuery, 'email')}
-      <div class="section-body" transition:slide={{ duration: 180 }}>
-        <p class="sub-label" style="padding-bottom:4px">Used for password resets and user invites</p>
-        {#if envLocks.smtp}
-          <div class="env-lock-banner">
-            <span class="material-symbols-rounded">lock</span>
-            Configured via environment variables — changes are disabled.
-          </div>
-        {/if}
-        <div class="card settings-card" style="padding:16px;display:flex;flex-direction:column;gap:12px">
-          <div class="form-group">
-            <label class="form-label">SMTP Host</label>
-            <input class="input" type="text" placeholder="e.g. smtp.example.com"
-              bind:value={smtpHost} disabled={envLocks.smtp} />
-          </div>
-          <div style="display:flex;gap:10px">
-            <div class="form-group" style="flex:1">
-              <label class="form-label">Port</label>
-              <input class="input" type="number" placeholder="587"
-                bind:value={smtpPort} disabled={envLocks.smtp} />
-            </div>
-            <div class="form-group" style="display:flex;flex-direction:column;gap:6px;justify-content:flex-end;padding-bottom:2px">
-              <label class="form-label">TLS</label>
-              <Toggle checked={smtpSecure} on:change={e => smtpSecure = e.detail} disabled={envLocks.smtp} />
-            </div>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Username</label>
-            <input class="input" type="text" autocomplete="off" placeholder="SMTP username or email"
-              bind:value={smtpUser} disabled={envLocks.smtp} />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Password</label>
-            <input class="input" type="password" autocomplete="new-password" placeholder="SMTP password or app password"
-              bind:value={smtpPass} disabled={envLocks.smtp} />
-          </div>
-          <div class="form-group">
-            <label class="form-label">From address</label>
-            <input class="input" type="email" placeholder='NutriTrace <noreply@example.com>'
-              bind:value={smtpFrom} disabled={envLocks.smtp} />
-          </div>
-          <div style="display:flex;align-items:center;gap:10px">
-            <button class="btn btn-primary" style="height:36px;font-size:13px"
-              on:click={saveSmtp} disabled={smtpSaving || envLocks.smtp}>
-              {#if smtpSaved}
-                <span class="material-symbols-rounded" style="font-size:16px">check</span> Saved
-              {:else}
-                {smtpSaving ? 'Saving…' : 'Save'}
-              {/if}
-            </button>
-            <button class="btn btn-secondary" style="height:36px;font-size:13px"
-              on:click={testSmtp} disabled={!smtpHost || smtpTestStatus === 'testing'}>
-              {smtpTestStatus === 'testing' ? 'Testing…' : 'Test'}
-            </button>
-            {#if smtpTestStatus === 'ok'}
-              <span style="color:var(--macro-carbs);font-size:13px;display:flex;align-items:center;gap:4px">
-                <span class="material-symbols-rounded" style="font-size:16px">check_circle</span>Connected
-              </span>
-            {:else if smtpTestStatus === 'fail'}
-              <span style="color:var(--danger);font-size:13px;display:flex;align-items:center;gap:4px">
-                <span class="material-symbols-rounded" style="font-size:16px">error</span>Failed
-              </span>
-            {/if}
-          </div>
-        </div>
-      </div>
-    {/if}
+      {/if}
     {/if}
 
     <!-- ── User Management ──────────────────────────────────────────────────── -->
@@ -3151,6 +2909,223 @@
       </div>
     {/if}
 
+    <!-- ── Email ────────────────────────────────────────────────────────────── -->
+    {#if $currentUser?.role === 'admin'}
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'email')} on:click={() => toggleSection('email')}>
+      <span class="material-symbols-rounded si">mail</span>
+      <span>Email (SMTP)</span>
+      <span class="material-symbols-rounded chevron" class:rotated={openSections.email}>expand_more</span>
+    </button>
+    {#if sectionOpen(openSections, settingsQuery, 'email') && sectionVisible(settingsQuery, 'email')}
+      <div class="section-body" transition:slide={{ duration: 180 }}>
+        <p class="sub-label" style="padding-bottom:4px">Used for password resets and user invites</p>
+        {#if envLocks.smtp}
+          <div class="env-lock-banner">
+            <span class="material-symbols-rounded">lock</span>
+            Configured via environment variables — changes are disabled.
+          </div>
+        {/if}
+        <div class="card settings-card" style="padding:16px;display:flex;flex-direction:column;gap:12px">
+          <div class="form-group">
+            <label class="form-label">SMTP Host</label>
+            <input class="input" type="text" placeholder="e.g. smtp.example.com"
+              bind:value={smtpHost} disabled={envLocks.smtp} />
+          </div>
+          <div style="display:flex;gap:10px">
+            <div class="form-group" style="flex:1">
+              <label class="form-label">Port</label>
+              <input class="input" type="number" placeholder="587"
+                bind:value={smtpPort} disabled={envLocks.smtp} />
+            </div>
+            <div class="form-group" style="display:flex;flex-direction:column;gap:6px;justify-content:flex-end;padding-bottom:2px">
+              <label class="form-label">TLS</label>
+              <Toggle checked={smtpSecure} on:change={e => smtpSecure = e.detail} disabled={envLocks.smtp} />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Username</label>
+            <input class="input" type="text" autocomplete="off" placeholder="SMTP username or email"
+              bind:value={smtpUser} disabled={envLocks.smtp} />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Password</label>
+            <input class="input" type="password" autocomplete="new-password" placeholder="SMTP password or app password"
+              bind:value={smtpPass} disabled={envLocks.smtp} />
+          </div>
+          <div class="form-group">
+            <label class="form-label">From address</label>
+            <input class="input" type="email" placeholder='NutriTrace <noreply@example.com>'
+              bind:value={smtpFrom} disabled={envLocks.smtp} />
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <button class="btn btn-primary" style="height:36px;font-size:13px"
+              on:click={saveSmtp} disabled={smtpSaving || envLocks.smtp}>
+              {#if smtpSaved}
+                <span class="material-symbols-rounded" style="font-size:16px">check</span> Saved
+              {:else}
+                {smtpSaving ? 'Saving…' : 'Save'}
+              {/if}
+            </button>
+            <button class="btn btn-secondary" style="height:36px;font-size:13px"
+              on:click={testSmtp} disabled={!smtpHost || smtpTestStatus === 'testing'}>
+              {smtpTestStatus === 'testing' ? 'Testing…' : 'Test'}
+            </button>
+            {#if smtpTestStatus === 'ok'}
+              <span style="color:var(--macro-carbs);font-size:13px;display:flex;align-items:center;gap:4px">
+                <span class="material-symbols-rounded" style="font-size:16px">check_circle</span>Connected
+              </span>
+            {:else if smtpTestStatus === 'fail'}
+              <span style="color:var(--danger);font-size:13px;display:flex;align-items:center;gap:4px">
+                <span class="material-symbols-rounded" style="font-size:16px">error</span>Failed
+              </span>
+            {/if}
+          </div>
+        </div>
+      </div>
+    {/if}
+    {/if}
+
+    <!-- ── Backup & Restore ────────────────────────────────────────────────── -->
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'backup')} on:click={() => toggleSection('backup')}>
+      <span class="material-symbols-rounded si">backup</span>
+      <span>Backup & Restore</span>
+      <span class="material-symbols-rounded chevron" class:rotated={openSections.backup}>expand_more</span>
+    </button>
+    {#if sectionOpen(openSections, settingsQuery, 'backup') && sectionVisible(settingsQuery, 'backup')}
+      <div class="section-body" transition:slide={{ duration: 180 }}>
+
+        <!-- Full backup (admin only) -->
+        {#if $currentUser?.role === 'admin'}
+        <p class="sub-label">Full Backup</p>
+        <div class="card settings-card">
+          <div style="padding:12px 16px 4px">
+            <p class="setting-desc" style="margin:0 0 12px">A complete snapshot of everything — all user data, diary, foods, meals, recipes, settings, and uploaded images. Saved on the server and available to download or restore at any time.</p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+              <button class="btn btn-primary" style="height:36px;font-size:13px"
+                on:click={createFullBackup} disabled={fullBackupBusy}>
+                {#if fullBackupBusy}
+                  <span class="material-symbols-rounded spin" style="font-size:16px">autorenew</span> Working…
+                {:else}
+                  <span class="material-symbols-rounded" style="font-size:16px">add_circle</span> Create Backup
+                {/if}
+              </button>
+              <button class="btn btn-secondary" style="height:36px;font-size:13px"
+                on:click={pickUploadRestore} disabled={fullBackupBusy}>
+                <span class="material-symbols-rounded" style="font-size:16px">upload</span> Upload &amp; Restore
+              </button>
+            </div>
+            {#if restoreStatus}
+              <div class="restore-progress" bind:this={restoreProgressEl}>
+                <div class="restore-progress-label">
+                  <span class="material-symbols-rounded spin" style="font-size:15px;flex-shrink:0">autorenew</span>
+                  {restoreStatus.label}
+                </div>
+                <div class="restore-progress-track">
+                  <div class="restore-progress-fill" style="width:{restoreStatus.percent}%"></div>
+                </div>
+              </div>
+            {/if}
+          </div>
+
+          {#if fullBackups.length > 0}
+            <div class="setting-divider"></div>
+            <!-- Table header -->
+            <div class="backup-table-header">
+              <span>Name</span>
+              <span>Created</span>
+              <span>Size</span>
+              <span></span>
+            </div>
+            <div class="setting-divider"></div>
+            {#each fullBackups as bk, i}
+              {#if i > 0}<div class="setting-divider"></div>{/if}
+              <div class="backup-row">
+                <span class="backup-name">{bk.filename}</span>
+                <span class="backup-col-date">{new Date(bk.createdAt).toLocaleDateString()}</span>
+                <span class="backup-col-size">{fmtBytes(bk.size)}</span>
+                <div class="backup-actions">
+                  <button class="btn btn-secondary backup-action-btn"
+                    on:click={() => downloadFullBackup(bk.filename)}>
+                    <span class="material-symbols-rounded" style="font-size:15px">download</span> Download
+                  </button>
+                  <button class="btn btn-secondary backup-action-btn"
+                    on:click={() => { restoreTarget = bk.filename; showRestoreDialog = true; }} disabled={fullBackupBusy}>
+                    <span class="material-symbols-rounded" style="font-size:15px">restore</span> Restore
+                  </button>
+                  <button class="btn-icon" style="color:var(--danger);padding:0 4px"
+                    on:click={() => { deleteTarget = bk.filename; showDeleteBkDialog = true; }} title="Delete backup">
+                    <span class="material-symbols-rounded" style="font-size:20px">delete</span>
+                  </button>
+                </div>
+              </div>
+            {/each}
+          {:else}
+            <div class="setting-divider"></div>
+            <p style="padding:12px 16px;font-size:13px;color:var(--text-3);margin:0">No backups yet — click Create Backup to get started.</p>
+          {/if}
+        </div>
+        {/if}
+
+        <!-- Portable JSON export/import -->
+        <p class="sub-label">Portable Export</p>
+        <div class="card settings-card">
+          <button class="setting-row setting-action" on:click={exportBackup}>
+            <span class="material-symbols-rounded si" style="color:var(--accent)">download</span>
+            <div>
+              <span class="setting-label">Export JSON</span>
+              <div class="setting-desc">Downloads your foods, meals, recipes, diary, and all settings as a JSON file. In single-user mode this is the recommended way to back up settings (the full ZIP backup only captures settings when user management is enabled). Note: server-hosted images will need to be re-uploaded separately.</div>
+            </div>
+            <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
+          </button>
+          <div class="setting-divider"></div>
+          <button class="setting-row setting-action" on:click={importBackup}>
+            <span class="material-symbols-rounded si" style="color:var(--accent)">upload</span>
+            <div>
+              <span class="setting-label">Import JSON</span>
+              <div class="setting-desc">Restores from a previously exported JSON file. Merges with existing data — does not erase what's already here. Note: server-hosted images will need to be re-uploaded separately.</div>
+            </div>
+            <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
+          </button>
+        </div>
+
+        <!-- Other tools -->
+        <p class="sub-label">Other</p>
+        <div class="card settings-card">
+          <button class="setting-row setting-action" on:click={exportCSV}>
+            <span class="material-symbols-rounded si" style="color:var(--info)">table_chart</span>
+            <div>
+              <span class="setting-label">Export diary as CSV</span>
+              <div class="setting-desc">Downloads your full diary history as a spreadsheet. Useful for analysis in Excel or Google Sheets.</div>
+            </div>
+            <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
+          </button>
+        </div>
+
+        <!-- Danger zone -->
+        <p class="sub-label danger-zone-label">Danger Zone</p>
+        <div class="card settings-card danger-zone-card">
+          <button class="setting-row setting-action danger" on:click={() => showClearDialog = true}>
+            <span class="material-symbols-rounded si" style="color:var(--danger)">delete_forever</span>
+            <div>
+              <span class="setting-label" style="color:var(--danger)">Clear all data</span>
+              <div class="setting-desc">Permanently deletes all diary entries, foods, meals, and body stats. Settings and credentials are kept.</div>
+            </div>
+            <span class="material-symbols-rounded" style="font-size:18px;color:var(--danger);flex-shrink:0">chevron_right</span>
+          </button>
+          <div class="setting-divider"></div>
+          <button class="setting-row setting-action danger" on:click={() => showClearSettingsDialog = true}>
+            <span class="material-symbols-rounded si" style="color:var(--danger)">manage_history</span>
+            <div>
+              <span class="setting-label" style="color:var(--danger)">Clear all settings</span>
+              <div class="setting-desc">Resets all preferences, credentials, and API keys to defaults. Food and diary data are kept.</div>
+            </div>
+            <span class="material-symbols-rounded" style="font-size:18px;color:var(--danger);flex-shrink:0">chevron_right</span>
+          </button>
+        </div>
+
+      </div>
+    {/if}
+
     <!-- About -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'about')} on:click={() => toggleSection('about')}>
       <span class="material-symbols-rounded si">info</span>
@@ -3164,7 +3139,7 @@
             <img src="/icons/logo.png" alt="NutriTrace" class="about-icon" />
             <div>
               <div class="about-name">NutriTrace</div>
-              <div class="about-version text-3 text-sm">v0.11.0-alpha</div>
+              <div class="about-version text-3 text-sm">{APP_VERSION}</div>
             </div>
           </div>
           <div class="setting-divider"></div>

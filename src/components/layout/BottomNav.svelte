@@ -6,7 +6,7 @@
   const BASE_TABS = [
     { path: '/',            icon: 'book',          label: 'Diary'    },
     { path: '/foods',       icon: 'restaurant',    label: 'Foods'    },
-    { path: '/statistics',  icon: 'bar_chart',     label: 'Stats'    },
+    { path: '/statistics',  icon: 'bar_chart',     label: 'Statistics' },
     { path: '/goals',       icon: 'flag',          label: 'Goals'    },
     { path: '/settings',    icon: 'settings',      label: 'Settings' },
   ];
