@@ -280,10 +280,11 @@ export const NtApi = {
     return res.json();
   },
 
-  get(path)        { return this._fetch('GET',    path); },
-  post(path, body) { return this._fetch('POST',   path, body); },
-  put(path, body)  { return this._fetch('PUT',    path, body); },
-  del(path)        { return this._fetch('DELETE', path); },
+  get(path)           { return this._fetch('GET',    path); },
+  post(path, body)    { return this._fetch('POST',   path, body); },
+  put(path, body)     { return this._fetch('PUT',    path, body); },
+  patch(path, body)   { return this._fetch('PATCH',  path, body); },
+  del(path)           { return this._fetch('DELETE', path); },
 
   // Food field mapping: server uses img_url/category, app uses imgUrl/categories
   _foodFromApi(row) {
@@ -297,11 +298,14 @@ export const NtApi = {
   },
 
   // Foods
-  async getFoods()           { const r = await this.get('/api/foods'); return r.map(f => this._foodFromApi(f)); },
-  async getFood(id)          { const r = await this.get(`/api/foods/${id}`); return this._foodFromApi(r); },
-  async createFood(data)     { const r = await this.post('/api/foods', this._foodToApi(data)); return this._foodFromApi(r); },
-  async updateFood(id, data) { const r = await this.put(`/api/foods/${id}`, this._foodToApi(data)); return this._foodFromApi(r); },
-  deleteFood(id)             { return this.del(`/api/foods/${id}`); },
+  async getFoods()                { const r = await this.get('/api/foods'); return r.map(f => this._foodFromApi(f)); },
+  async getGroupFoods()           { const r = await this.get('/api/foods?group=1'); return r.map(f => this._foodFromApi(f)); },
+  async getFood(id)               { const r = await this.get(`/api/foods/${id}`); return this._foodFromApi(r); },
+  async createFood(data)          { const r = await this.post('/api/foods', this._foodToApi(data)); return this._foodFromApi(r); },
+  async updateFood(id, data)      { const r = await this.put(`/api/foods/${id}`, this._foodToApi(data)); return this._foodFromApi(r); },
+  deleteFood(id)                  { return this.del(`/api/foods/${id}`); },
+  shareFood(id, visibility, user_ids) { return this.patch(`/api/foods/${id}/share`, { visibility, user_ids }); },
+  async copyFood(id)              { const r = await this.post(`/api/foods/${id}/copy`, {}); return this._foodFromApi(r); },
 
   // Meal field mapping: server uses img_url, app uses imgUrl
   _mealFromApi(row) {
@@ -315,12 +319,23 @@ export const NtApi = {
   },
 
   // Meals & Recipes
-  async getMeals()           { const r = await this.get('/api/meals'); return r.map(m => this._mealFromApi(m)); },
-  async getMeal(id)          { const r = await this.get(`/api/meals/${id}`); return this._mealFromApi(r); },
-  async getRecipes()         { const r = await this.get('/api/meals?recipes=1'); return r.map(m => this._mealFromApi(m)); },
-  async createMeal(data)     { const r = await this.post('/api/meals', this._mealToApi(data)); return this._mealFromApi(r); },
-  async updateMeal(id, data) { const r = await this.put(`/api/meals/${id}`, this._mealToApi(data)); return this._mealFromApi(r); },
-  deleteMeal(id)             { return this.del(`/api/meals/${id}`); },
+  async getMeals()                { const r = await this.get('/api/meals'); return r.map(m => this._mealFromApi(m)); },
+  async getGroupMeals()           { const r = await this.get('/api/meals?group=1'); return r.map(m => this._mealFromApi(m)); },
+  async getGroupRecipes()         { const r = await this.get('/api/meals?recipes=1&group=1'); return r.map(m => this._mealFromApi(m)); },
+  async getMeal(id)               { const r = await this.get(`/api/meals/${id}`); return this._mealFromApi(r); },
+  async getRecipes()              { const r = await this.get('/api/meals?recipes=1'); return r.map(m => this._mealFromApi(m)); },
+  async createMeal(data)          { const r = await this.post('/api/meals', this._mealToApi(data)); return this._mealFromApi(r); },
+  async updateMeal(id, data)      { const r = await this.put(`/api/meals/${id}`, this._mealToApi(data)); return this._mealFromApi(r); },
+  deleteMeal(id)                  { return this.del(`/api/meals/${id}`); },
+  shareMeal(id, visibility, user_ids) { return this.patch(`/api/meals/${id}/share`, { visibility, user_ids }); },
+  async copyMeal(id)              { const r = await this.post(`/api/meals/${id}/copy`, {}); return this._mealFromApi(r); },
+
+  // Users list for sharing picker (non-admin, returns peers only)
+  getUsersList()                  { return this.get('/api/auth/users/list'); },
+
+  // App config — admin full config, or public sharing status
+  getAppConfig()                  { return this.get('/api/app-config'); },
+  getSharingStatus()              { return this.get('/api/app-config/sharing'); },
 
   // Diary
   getDiaryDate(date)        { return this.get(`/api/diary/${date}`); },

@@ -17,6 +17,7 @@
   import { Nutrition } from '../lib/nutrition.js';
   import { Mealie } from '../lib/mealieApi.js';
   import { foodsShowThumbnails, foodsShowCategories, foodsShowLabels, foodsShowNotes, foodsSort, foodCategories, foodsShowYesterdayMeals, mealNames, usdaEnabled, usdaApiKey, catName as _catName, catDisplay as _catDisplay, pageBanners } from '../stores/settings.js';
+  import { DB as _DB2 } from '../lib/db.js';
   import FoodsBanner from '../components/banners/FoodsBanner.svelte';
 
   // Query string params
@@ -38,7 +39,7 @@
     { label: 'Recipes', value: 'recipes' },
   ];
   let activeTab = 0;
-  $: { activeTab; activeCategoryFilter = ''; if (activeTab !== 0) searchSource = 'local'; }
+  $: { activeTab; activeCategoryFilter = ''; if (activeTab !== 0) searchSource = 'local'; showGroupCatalogue = false; }
   $: _tabIcon = activeTab === 0 ? 'restaurant' : activeTab === 1 ? 'dinner_dining' : 'menu_book';
   $: { if (pickMode) loadYesterdayMeals(); }
 
@@ -52,6 +53,41 @@
     ...(_mealieEnabled ? [{ value: 'mealie', label: 'Mealie' }] : []),
   ];
   $: _sourceLabel = availableSources.find(s => s.value === searchSource)?.label || '';
+
+  // Sharing
+  const sharingEnabled = _DB2.getSetting('sharingEnabled', false); // seeded from app_config on load
+  let showGroupCatalogue = false;  // when true, list shows group items instead of own
+  let groupFoods = [];
+  let groupMeals = [];
+  let groupRecipes = [];
+  let loadingGroup = false;
+
+  async function loadGroupCatalogue() {
+    if (!sharingEnabled) return;
+    loadingGroup = true;
+    try {
+      [groupFoods, groupMeals, groupRecipes] = await Promise.all([
+        NtApi.getGroupFoods(),
+        NtApi.getGroupMeals(),
+        NtApi.getGroupRecipes(),
+      ]);
+    } catch(e) { console.error('[foods] group load error:', e); }
+    finally { loadingGroup = false; }
+  }
+
+  async function copyAndUse(food, action) {
+    // If food belongs to another user, copy to own catalogue first, then proceed
+    try {
+      const isMeal = activeTab === 1 || activeTab === 2;
+      let mine;
+      if (isMeal) mine = await NtApi.copyMeal(food.id);
+      else mine = await NtApi.copyFood(food.id);
+      return mine;
+    } catch(e) {
+      showError('Could not copy item: ' + e.message);
+      return null;
+    }
+  }
 
   let localFoods = [];
   let localMeals = [];
@@ -93,7 +129,9 @@
   }
 
   $: currentStore = TABS[activeTab].value;
-  $: displayList = activeTab === 0 ? localFoods : activeTab === 1 ? localMeals : localRecipes;
+  $: _ownList = activeTab === 0 ? localFoods : activeTab === 1 ? localMeals : localRecipes;
+  $: _groupList = activeTab === 0 ? groupFoods : activeTab === 1 ? groupMeals : groupRecipes;
+  $: displayList = showGroupCatalogue ? _groupList : _ownList;
   $: filteredBySearch = search
     ? displayList.filter(f =>
         (f.name||'').toLowerCase().includes(search.toLowerCase()) ||
@@ -194,6 +232,15 @@
       openEditor(food, 'foodList');
       return;
     }
+
+    // If item is from another user's catalogue, copy it first (silently)
+    if (showGroupCatalogue && food._shared_by != null) {
+      const mine = await copyAndUse(food);
+      if (!mine) return;
+      food = mine;
+      await load(); // refresh own list so the copy appears
+    }
+
     // Meals: always expand ingredients at saved portions — no quantity prompt
     if (activeTab === 1 && food.items && food.items.length > 0) {
       await _expandMealToDiary(food);
@@ -364,6 +411,8 @@
       else openEditor(selectedItem, 'foodList');
     } else if (detail.value === 'clone') {
       cloneItem(selectedItem);
+    } else if (detail.value === 'copy') {
+      copyAndUse(selectedItem).then(() => { showSuccess('Saved to your catalogue'); load(); });
     } else if (detail.value === 'delete') {
       showDeleteDialog = true;
     }
@@ -491,8 +540,26 @@
     </div>
   </div>
 
-  <!-- Source chips (Foods tab only) -->
-  {#if activeTab === 0}
+  <!-- Group catalogue toggle (shown when sharing is enabled, not in pick mode for external sources) -->
+  {#if sharingEnabled && !showGroupCatalogue}
+    <div class="source-chip-row" style="padding-bottom:4px">
+      <button class="source-chip" on:click={() => { showGroupCatalogue = true; loadGroupCatalogue(); }}>
+        <span class="material-symbols-rounded" style="font-size:15px;vertical-align:-3px;margin-right:4px">group</span>Group Catalogue
+      </button>
+    </div>
+  {:else if sharingEnabled && showGroupCatalogue}
+    <div class="source-chip-row" style="padding-bottom:4px">
+      <button class="source-chip active" on:click={() => showGroupCatalogue = false}>
+        <span class="material-symbols-rounded" style="font-size:15px;vertical-align:-3px;margin-right:4px">group</span>Group Catalogue
+      </button>
+      <button class="source-chip" on:click={() => showGroupCatalogue = false}>
+        <span class="material-symbols-rounded" style="font-size:15px;vertical-align:-3px;margin-right:4px">person</span>Mine
+      </button>
+    </div>
+  {/if}
+
+  <!-- Source chips (Foods tab only, own catalogue only) -->
+  {#if activeTab === 0 && !showGroupCatalogue}
     <div class="source-chip-row">
       {#each availableSources as src}
         <button class="source-chip" class:active={searchSource === src.value}
@@ -582,10 +649,10 @@
                   <span class="food-name">{food.name}</span>
                   {#if activeTab === 0}
                     {#if food.brand}<span class="food-brand text-3 text-sm">{food.brand}</span>{/if}
-                    <span class="food-kcal text-sm">{food.portion || 100}{food.unit || 'g'}</span>
+                    <span class="food-kcal text-sm">{food.portion || 100}{food.unit || 'g'}{#if food._shared_by} · <span style="color:var(--accent)">by {food._shared_by}</span>{/if}</span>
                   {:else}
                     {@const _kcal = Math.round(Nutrition.sum((food.items||[]).map(i => Nutrition.calculate(i))).calories || food.nutrition?.calories || 0)}
-                    <span class="food-brand text-3 text-sm">{mealServing(food.items)}</span>
+                    <span class="food-brand text-3 text-sm">{mealServing(food.items)}{#if food._shared_by} · <span style="color:var(--accent)">by {food._shared_by}</span>{/if}</span>
                     <span class="food-kcal text-sm">{_kcal} kcal</span>
                   {/if}
                 </div>
@@ -755,7 +822,9 @@
 <ActionSheet
   bind:open={showItemActions}
   title={selectedItem ? selectedItem.name : ''}
-  actions={[
+  actions={selectedItem?._shared_by != null ? [
+    { label: 'Save to My Catalogue', icon: 'bookmark_add', value: 'copy' },
+  ] : [
     { label: 'Edit',   icon: 'edit',             value: 'edit' },
     ...(activeTab !== 0 ? [{ label: 'Clone', icon: 'content_copy', value: 'clone' }] : []),
     { label: 'Delete', icon: 'delete',            value: 'delete', danger: true },

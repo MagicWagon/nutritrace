@@ -26,6 +26,7 @@ const SERVER_SETTINGS = new Set([
   'wellnessEnabled','fitbitEnabled','wellnessMetrics','wellnessSyncMode','wellnessSyncRange',
   'withingsEnabled','withingsSyncRange','withingsDataPriority',
   'garminEnabled','garminSyncRange',
+  'defaultFoodVisibility',
   // Appearance / UI prefs — included so full backups restore the full look-and-feel
   'appearance','accentColor',
   'navStyle','sidebarPersistent','startPage','disableAnimations','goalCelebrations','pageBanners','loopBannerAnimations',
@@ -238,6 +239,9 @@ export const withingsDataPriority = createSettingStore('withingsDataPriority', {
 
 export const garminEnabled   = createSettingStore('garminEnabled',   false);
 export const garminSyncRange = createSettingStore('garminSyncRange', 7);
+
+// Sharing
+export const defaultFoodVisibility = createSettingStore('defaultFoodVisibility', 'private'); // 'private' | 'group' | 'specific'
 
 // FitBot AI
 export const aiEnabled       = createSettingStore('aiEnabled',       false);

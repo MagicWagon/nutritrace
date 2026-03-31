@@ -13,12 +13,19 @@ const ALLOWED_KEYS = new Set([
   'session_hours',
   'fitbit_client_id', 'fitbit_client_secret', 'fitbit_redirect_uri',
   'withings_client_id', 'withings_client_secret', 'withings_redirect_uri',
+  'sharing_enabled', 'default_food_visibility',
 ]);
 
 // ── GET /api/app-config/env-locks — which sections are locked by env vars ──
 // Any authenticated user can read this (needed to disable UI fields)
 router.get('/env-locks', requireAuth, wrap((req, res) => {
   res.json({ smtp: isSmtpEnvLocked(), ai: isAiEnvLocked() });
+}));
+
+// ── GET /api/app-config/sharing — public sharing status (any auth user) ───
+router.get('/sharing', requireAuth, wrap((req, res) => {
+  const row = db.prepare('SELECT value FROM app_config WHERE key = ?').get('sharing_enabled');
+  res.json({ sharing_enabled: row?.value === 'true' });
 }));
 
 // ── GET /api/app-config — return all config (passwords redacted) ───────────

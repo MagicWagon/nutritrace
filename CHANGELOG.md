@@ -5,6 +5,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.25.0-beta] — 2026-03-30
+
+### Added
+- **Food & meal sharing** — multi-user groups can now share foods, meals, and recipes between members; admin enables sharing via Settings → Sharing; each item can be set to Private / Everyone / Specific People; shared items appear in a "Group Catalogue" tab in Foods; adding a shared item to diary auto-copies it to your own catalogue first (copy-on-use model; originals remain unaffected); `_shared_by` badge shows contributor attribution
+- **FoodEditor/MealEditor sharing section** — new Sharing card at bottom of food and meal/recipe editors; shows visibility selector (Private / Everyone / Specific) and user-picker chips when Specific is selected; only visible when multi-user is active and item is owned by the current user
+- **Settings → Sharing section** — admin toggle to enable/disable food sharing instance-wide; per-user default visibility preference
+- **Tab favicon** — browser tab and bookmark now show the NutriTrace logo (SVG preferred, PNG fallback)
+- **Edit credentials button** — Fitbit, Withings, and Garmin connection cards now show a pencil icon button when configured but not connected, allowing API credentials to be updated without needing to disable the integration entirely
+
+### Fixed
+- **OAuth credential change** — after disconnecting Fitbit/Withings/Garmin, credentials were read-only (only "Connect" button visible); now shows an edit button to modify Client ID, Secret, and Redirect URI before reconnecting
+
+---
+
 ## [0.24.0-beta] — 2026-03-30
 
 ### Added

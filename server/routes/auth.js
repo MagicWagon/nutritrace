@@ -118,6 +118,12 @@ router.put('/password', requireAuth, wrap((req, res) => {
   res.json({ ok: true });
 }));
 
+// ── Any user: list peers (id + display name) for sharing picker ───────────
+router.get('/users/list', requireAuth, wrap((req, res) => {
+  const peers = db.prepare('SELECT id, full_name, username FROM users WHERE id != ? ORDER BY full_name, username').all(req.user.id);
+  res.json(peers.map(u => ({ id: u.id, name: u.full_name || u.username })));
+}));
+
 // ── Admin: list users ──────────────────────────────────────────────────────
 router.get('/users', requireAuth, requireAdmin, wrap((req, res) => {
   const users = db.prepare('SELECT * FROM users ORDER BY created_at').all().map(safeUser);

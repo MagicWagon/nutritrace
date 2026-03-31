@@ -149,6 +149,20 @@ db.exec(`
     data        TEXT NOT NULL DEFAULT '{}',
     expires_at  TEXT NOT NULL
   );
+
+  -- Food sharing: specific user grants (used when visibility = 'specific')
+  CREATE TABLE IF NOT EXISTS food_shares (
+    food_id  INTEGER NOT NULL REFERENCES foods(id) ON DELETE CASCADE,
+    user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    PRIMARY KEY (food_id, user_id)
+  );
+
+  -- Meal/recipe sharing: specific user grants
+  CREATE TABLE IF NOT EXISTS meal_shares (
+    meal_id  INTEGER NOT NULL REFERENCES meals(id) ON DELETE CASCADE,
+    user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    PRIMARY KEY (meal_id, user_id)
+  );
 `);
 
 // ── Migrations ─────────────────────────────────────────────────────────────
@@ -210,6 +224,20 @@ if (!columnExists('diary', 'user_id')) {
     DROP TABLE diary;
     ALTER TABLE diary_new RENAME TO diary;
   `);
+}
+
+// ── Sharing migrations ──────────────────────────────────────────────────────
+if (!columnExists('foods', 'visibility')) {
+  db.exec(`ALTER TABLE foods ADD COLUMN visibility TEXT NOT NULL DEFAULT 'private'`);
+}
+if (!columnExists('foods', 'source_id')) {
+  db.exec(`ALTER TABLE foods ADD COLUMN source_id INTEGER`);
+}
+if (!columnExists('meals', 'visibility')) {
+  db.exec(`ALTER TABLE meals ADD COLUMN visibility TEXT NOT NULL DEFAULT 'private'`);
+}
+if (!columnExists('meals', 'source_id')) {
+  db.exec(`ALTER TABLE meals ADD COLUMN source_id INTEGER`);
 }
 
 export default db;

@@ -27,6 +27,7 @@
     wellnessEnabled, fitbitEnabled, wellnessMetrics, wellnessSyncMode, wellnessSyncRange,
     withingsSyncRange, withingsEnabled,
     garminEnabled, garminSyncRange,
+    defaultFoodVisibility,
   } from '../stores/settings.js';
   import { mealIcon } from '../lib/mealIcon.js';
   import { DB } from '../lib/db.js';
@@ -38,7 +39,7 @@
   $: isDark = $appearance === 'dark' || ($appearance === 'system' && (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches));
   let openSections = { appearance: true, regional: false, diary: false, foods: false, water: false,
                        categories: false, nutrients: false, bodyStats: false, statistics: false,
-                       connectedServices: false, ai: false, wellness: false,
+                       connectedServices: false, ai: false, wellness: false, sharing: false,
                        backup: false, email: false, users: false, about: false };
 
   function toggleSection(key) {
@@ -62,6 +63,7 @@
     connectedServices: ['connected services','usda','open food facts','mealie','recipe','search language','country','api key','credentials','username','password'],
     ai:                ['ai','fitbot','assistant','provider','model','api key','artificial intelligence','chat'],
     wellness:          ['wellness','activity tracking','fitbit','withings','garmin','steps','sleep','heart rate','hrv','spo2','sync mode','sync range','connect','disconnect','connected devices','fitness tracker','body battery','stress'],
+    sharing:           ['sharing','share','group','catalogue','catalog','visibility','private','members','food sharing'],
     backup:            ['backup','export','import','restore','csv','clear data','json','full backup','images','zip'],
     email:             ['email','smtp','mail','password reset','invites','notifications'],
     users:             ['users','user management','accounts','login','password','admin','register','profile'],
@@ -399,6 +401,7 @@
   let fitbitClientSecret = '';
   let fitbitRedirectUri  = '';
   let fitbitShowSecret   = false;
+  let fitbitEditingCreds = false;
   let fitbitRedirectSuggested = '';
   let wellnessConfigLoaded = false;
   let fitbitConnectionStatus  = null; // null = not loaded, { connected, fitbitUserId }
@@ -515,6 +518,7 @@
       // Refresh status so Connect button reflects new config
       fitbitConnectionStatus = null;
       fitbitConnectionStatus = await NtApi.get('/api/wellness/fitbit/status');
+      fitbitEditingCreds = false;
       showSuccess('Fitbit credentials saved');
     } catch (e) { showError('Failed to save: ' + e.message); }
   }
@@ -528,6 +532,7 @@
   let withingsClientSecret = '';
   let withingsRedirectUri  = '';
   let withingsShowSecret   = false;
+  let withingsEditingCreds = false;
   let withingsRedirectSuggested = '';
   let withingsSyncRangeVal = DB.getSetting('withingsSyncRange', 7);
 
@@ -538,6 +543,7 @@
   let garminConsumerSecret = '';
   let garminRedirectUri    = '';
   let garminShowSecret     = false;
+  let garminEditingCreds   = false;
   let garminRedirectSuggested = '';
   let garminConnectionStatus = null;
   let disconnectingGarmin    = false;
@@ -573,6 +579,7 @@
       });
       garminConnectionStatus = null;
       garminConnectionStatus = await NtApi.get('/api/wellness/garmin/status');
+      garminEditingCreds = false;
       showSuccess('Garmin credentials saved');
     } catch(e) { showError('Failed to save: ' + e.message); }
   }
@@ -590,6 +597,7 @@
       });
       withingsConnectionStatus = null;
       withingsConnectionStatus = await NtApi.get('/api/wellness/withings/status');
+      withingsEditingCreds = false;
       showSuccess('Withings credentials saved');
     } catch (e) { showError('Failed to save: ' + e.message); }
   }
@@ -1112,6 +1120,27 @@
 
   // Load backup list when section opens (admin only)
   $: if (openSections.backup && $currentUser?.role === 'admin') loadFullBackups();
+
+  // ── Sharing ────────────────────────────────────────────────────────────────
+  let adminSharingEnabled = false;
+
+  async function loadSharingConfig() {
+    try {
+      const cfg = await NtApi.getSharingStatus().catch(() => ({}));
+      adminSharingEnabled = cfg.sharing_enabled === true;
+    } catch {}
+  }
+
+  async function saveAdminSharingEnabled(val) {
+    adminSharingEnabled = val;
+    await fetch('/api/app-config', {
+      method: 'PUT', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'sharing_enabled', value: val ? 'true' : 'false' }),
+    }).catch(() => {});
+  }
+
+  $: if (openSections.sharing) loadSharingConfig();
 
   // ── Email / SMTP ───────────────────────────────────────────────────────────
   let smtpHost   = '';
@@ -1705,6 +1734,44 @@
       </div>
     {/if}
 
+    <!-- ── Sharing ──────────────────────────────────────────────────────────── -->
+    {#if $userMgmtActive}
+      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'sharing')} on:click={() => toggleSection('sharing')}>
+        <span class="material-symbols-rounded si">group</span>
+        <span>Sharing</span>
+        <span class="material-symbols-rounded chevron" class:rotated={openSections.sharing}>expand_more</span>
+      </button>
+      {#if sectionOpen(openSections, settingsQuery, 'sharing') && sectionVisible(settingsQuery, 'sharing')}
+        <div class="section-body" transition:slide={{ duration: 180 }}>
+          {#if $currentUser?.role === 'admin'}
+            <p class="sub-label">Admin</p>
+            <div class="card settings-card">
+              <div class="setting-row">
+                <div>
+                  <span class="setting-label">Enable food sharing</span>
+                  <span class="setting-desc">Allow group members to share foods, meals, and recipes with each other</span>
+                </div>
+                <Toggle checked={adminSharingEnabled} on:change={e => saveAdminSharingEnabled(e.detail)} />
+              </div>
+            </div>
+          {/if}
+          <p class="sub-label">My Defaults</p>
+          <div class="card settings-card">
+            <div class="setting-row">
+              <span class="setting-label">Default food visibility</span>
+              <div class="select-wrap" style="width:140px">
+                <select class="select sel-sm" value={$defaultFoodVisibility} on:change={e => defaultFoodVisibility.set(e.target.value)}>
+                  <option value="private">Private</option>
+                  <option value="group">Everyone</option>
+                  <option value="specific">Specific people</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      {/if}
+    {/if}
+
     <!-- ── Water ───────────────────────────────────────────────────────────── -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'water')} on:click={() => toggleSection('water')}>
       <span class="material-symbols-rounded si">water_drop</span>
@@ -2276,15 +2343,20 @@
                     {disconnectingFitbit ? 'Disconnecting…' : 'Disconnect'}
                   </button>
                 </div>
-              {:else if fitbitConnectionStatus.configured}
+              {:else if fitbitConnectionStatus.configured && !fitbitEditingCreds}
                 <div class="setting-row">
                   <div>
                     <span class="setting-label">Not connected</span>
                     <div class="setting-desc">Authorize NutriTrace to read your Fitbit data.</div>
                   </div>
-                  <button class="btn btn-primary" style="height:32px;padding:0 12px;font-size:13px" on:click={connectFitbitFromSettings} disabled={connectingFitbit}>
-                    {connectingFitbit ? 'Connecting…' : 'Connect'}
-                  </button>
+                  <div style="display:flex;gap:8px;align-items:center">
+                    <button class="btn btn-ghost" style="height:32px;padding:0 10px;font-size:13px" on:click={() => fitbitEditingCreds = true} title="Change API credentials">
+                      <span class="material-symbols-rounded" style="font-size:16px">edit</span>
+                    </button>
+                    <button class="btn btn-primary" style="height:32px;padding:0 12px;font-size:13px" on:click={connectFitbitFromSettings} disabled={connectingFitbit}>
+                      {connectingFitbit ? 'Connecting…' : 'Connect'}
+                    </button>
+                  </div>
                 </div>
               {:else}
                 <!-- No credentials yet — show inline setup form -->
@@ -2398,15 +2470,20 @@
                     {disconnectingGarmin ? 'Disconnecting…' : 'Disconnect'}
                   </button>
                 </div>
-              {:else if garminConnectionStatus.configured}
+              {:else if garminConnectionStatus.configured && !garminEditingCreds}
                 <div class="setting-row">
                   <div>
                     <span class="setting-label">Not connected</span>
                     <div class="setting-desc">Authorize NutriTrace to read your Garmin data.</div>
                   </div>
-                  <button class="btn btn-primary" style="height:32px;padding:0 12px;font-size:13px" on:click={connectGarminFromSettings} disabled={connectingGarmin}>
-                    {connectingGarmin ? 'Connecting…' : 'Connect'}
-                  </button>
+                  <div style="display:flex;gap:8px;align-items:center">
+                    <button class="btn btn-ghost" style="height:32px;padding:0 10px;font-size:13px" on:click={() => garminEditingCreds = true} title="Change API credentials">
+                      <span class="material-symbols-rounded" style="font-size:16px">edit</span>
+                    </button>
+                    <button class="btn btn-primary" style="height:32px;padding:0 12px;font-size:13px" on:click={connectGarminFromSettings} disabled={connectingGarmin}>
+                      {connectingGarmin ? 'Connecting…' : 'Connect'}
+                    </button>
+                  </div>
                 </div>
               {:else}
                 <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:12px">
@@ -2516,15 +2593,20 @@
                     {disconnectingWithings ? 'Disconnecting…' : 'Disconnect'}
                   </button>
                 </div>
-              {:else if withingsConnectionStatus.configured}
+              {:else if withingsConnectionStatus.configured && !withingsEditingCreds}
                 <div class="setting-row">
                   <div>
                     <span class="setting-label">Not connected</span>
                     <div class="setting-desc">Authorize NutriTrace to read your Withings data.</div>
                   </div>
-                  <button class="btn btn-primary" style="height:32px;padding:0 12px;font-size:13px" on:click={connectWithingsFromSettings} disabled={connectingWithings}>
-                    {connectingWithings ? 'Connecting…' : 'Connect'}
-                  </button>
+                  <div style="display:flex;gap:8px;align-items:center">
+                    <button class="btn btn-ghost" style="height:32px;padding:0 10px;font-size:13px" on:click={() => withingsEditingCreds = true} title="Change API credentials">
+                      <span class="material-symbols-rounded" style="font-size:16px">edit</span>
+                    </button>
+                    <button class="btn btn-primary" style="height:32px;padding:0 12px;font-size:13px" on:click={connectWithingsFromSettings} disabled={connectingWithings}>
+                      {connectingWithings ? 'Connecting…' : 'Connect'}
+                    </button>
+                  </div>
                 </div>
               {:else}
                 <!-- No credentials yet — show inline setup form -->
