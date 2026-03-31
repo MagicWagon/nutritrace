@@ -9,6 +9,8 @@ export default defineConfig({
       '/uploads': 'http://localhost:3001',
     }
   },
+  // Capacitor native build: output to dist/ (default) — capacitor.config.ts points webDir here
+  // The build is identical for web and native; platform branching happens at runtime via platform.js
   plugins: [
     svelte(),
     VitePWA({

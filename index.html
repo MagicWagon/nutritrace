@@ -18,8 +18,21 @@
   <link rel="apple-touch-icon" href="/icons/icon-192.png" />
 
   <!-- Apply theme before first paint to prevent flash of wrong colour -->
+  <!-- Disable service worker in Capacitor native mode (assets served natively, SW causes offline.html redirect) -->
   <script>
     (function() {
+      // Block SW registration in native Capacitor shell
+      if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+        // Unregister any existing SW and prevent new registrations
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function(regs) {
+            regs.forEach(function(r) { r.unregister(); });
+          });
+          // Override register to no-op so vite-plugin-pwa's registerSW.js does nothing
+          navigator.serviceWorker.register = function() { return Promise.resolve(); };
+        }
+      }
+
       var _raw = localStorage.getItem('wl_appearance');
       var appearance = _raw ? JSON.parse(_raw) : 'system';
       var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;

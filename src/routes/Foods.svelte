@@ -38,7 +38,15 @@
     { label: 'Recipes', value: 'recipes' },
   ];
   let activeTab = 0;
-  $: { activeTab; activeCategoryFilter = ''; if (searchSource !== 'local' && searchSource !== 'shared') searchSource = 'local'; if (searchSource === 'shared' && !_tabHasShared) searchSource = 'local'; }
+  // Reset source + category filter when switching tabs (not when searchSource itself changes)
+  let _prevTab = activeTab;
+  $: if (activeTab !== _prevTab) {
+    _prevTab = activeTab;
+    activeCategoryFilter = '';
+    // Non-foods tabs only support local + shared
+    if (activeTab !== 0 && searchSource !== 'local' && searchSource !== 'shared') searchSource = 'local';
+    if (searchSource === 'shared' && !_tabHasShared) searchSource = 'local';
+  }
   $: _tabIcon = activeTab === 0 ? 'restaurant' : activeTab === 1 ? 'dinner_dining' : 'menu_book';
   $: { if (pickMode) loadYesterdayMeals(); }
 

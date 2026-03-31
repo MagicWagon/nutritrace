@@ -1,5 +1,6 @@
 import { writable } from 'svelte/store';
 import { loadServerSettings } from './settings.js';
+import { isNative, getServerUrl } from '../lib/platform.js';
 
 /** Currently logged-in user object, or null */
 export const currentUser = writable(null);
@@ -7,8 +8,29 @@ export const currentUser = writable(null);
 /** Whether user management is enabled on the server */
 export const userMgmtActive = writable(false);
 
-/** Load auth state from the server (called once on app boot) */
+// Synthetic local user for native standalone mode (no server configured)
+const LOCAL_USER = {
+  id:        1,
+  username:  'local',
+  full_name: 'Local User',
+  nickname:  null,
+  role:      'admin',
+  email:     null,
+  avatar_url: null,
+  birthday:  null,
+  gender:    null,
+};
+
+/** Load auth state — handles both server mode and native standalone mode */
 export async function loadAuthState() {
+  // Native standalone: use the synthetic local user, skip all HTTP calls
+  if (isNative && !getServerUrl()) {
+    userMgmtActive.set(false);
+    currentUser.set(LOCAL_USER);
+    localStorage.setItem('wl:userId', String(LOCAL_USER.id));
+    return;
+  }
+
   try {
     const [statusRes, meRes] = await Promise.all([
       fetch('/api/auth/status', { credentials: 'include' }),

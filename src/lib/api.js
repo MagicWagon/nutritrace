@@ -1,12 +1,20 @@
 /**
  * api.js - External API calls (Open Food Facts)
  */
+
+// In native mode, call external APIs directly (no CORS in WebView).
+// In web mode, go through the server proxy to avoid CORS.
+function _extFetch(url) {
+  if (isNative) return fetch(url);
+  return fetch('/api/proxy?url=' + encodeURIComponent(url));
+}
+
 const API = {
   OFF_BASE: 'https://world.openfoodfacts.org',
 
   async lookupBarcode(barcode) {
     try {
-      const res = await fetch('/api/proxy?url=' + encodeURIComponent(`${this.OFF_BASE}/api/v0/product/${barcode}.json`));
+      const res = await _extFetch(`${this.OFF_BASE}/api/v0/product/${barcode}.json`);
       if (!res.ok) return null;
       const data = await res.json();
       if (data.status !== 1) return null;
@@ -21,7 +29,7 @@ const API = {
     page = page || 1;
     try {
       const offUrl = `https://search.openfoodfacts.org/search?q=${encodeURIComponent(query)}&json=1&page_size=20&page=${page}`;
-      const res = await fetch('/api/proxy?url=' + encodeURIComponent(offUrl));
+      const res = await _extFetch(offUrl);
       if (!res.ok) return [];
       const data = await res.json();
       return (data.hits || []).map(p => this._mapOFFProduct(p)).filter(Boolean);
@@ -225,7 +233,7 @@ const USDA = {
       const url = _USDA_BASE + '/foods/search?query=' + encodeURIComponent(query) +
         '&pageSize=20&pageNumber=' + page +
         '&api_key=' + encodeURIComponent(apiKey);
-      const res = await fetch('/api/proxy?url=' + encodeURIComponent(url));
+      const res = await _extFetch(url);
       if (!res.ok) return [];
       const data = await res.json();
       return (data.foods || []).map(f => {
@@ -245,7 +253,7 @@ const USDA = {
       // Branded only (only branded products have GTINs/UPCs)
       const url = _USDA_BASE + '/foods/search?query=' + encodeURIComponent(barcode) +
         '&dataType=Branded&pageSize=10&api_key=' + encodeURIComponent(apiKey);
-      const res = await fetch('/api/proxy?url=' + encodeURIComponent(url));
+      const res = await _extFetch(url);
       if (!res.ok) return null;
       const data = await res.json();
       // Match on exact UPC or UPC without leading zeros
@@ -264,12 +272,24 @@ const USDA = {
 
 // ── NutriTrace Server API ──────────────────────────────────────────────────
 
-export const NtApi = {
-  // Core fetch — uses relative URLs (same origin as frontend)
+// In native standalone mode (Capacitor + no server URL), requests are served
+// from the local SQLite database via NtApiNative. In all other cases (web PWA,
+// or native with a server URL configured) this HTTP implementation is used.
+import { isNative, getServerUrl } from './platform.js';
+
+function _resolveBaseUrl() {
+  if (!isNative) return ''; // relative — same origin as the web app
+  const url = getServerUrl();
+  return url || ''; // native + server configured → absolute URL
+}
+
+const _NtApiHttp = {
+  // Core fetch — uses relative URLs (web) or absolute server URL (native sync mode)
   async _fetch(method, path, body, isUpload = false) {
     const headers = {};
     if (!isUpload) headers['Content-Type'] = 'application/json';
-    const res = await fetch(path, {
+    const base = _resolveBaseUrl();
+    const res = await fetch(base + path, {
       method,
       headers,
       credentials: 'include',
@@ -351,4 +371,13 @@ export const NtApi = {
   },
 };
 
+// ── Platform-aware NtApi export ────────────────────────────────────────────
+// In Capacitor native standalone mode: use SQLite-backed NtApiNative.
+// In all other cases (web, native + server URL): use the HTTP implementation.
+// Both are statically imported so Rollup can bundle them; the unused branch
+// is never called at runtime (isNative is false in the browser).
+
+import { NtApiNative } from './api-native.js';
+
+export const NtApi = (isNative && !getServerUrl()) ? NtApiNative : _NtApiHttp;
 export { API, USDA };

@@ -9,6 +9,11 @@
   import { DB }    from './lib/db.js';
   import { navStyle, applyAccentColor, accentColor, applyAppearance, appearance, disableAnimations, sidebarPersistent } from './stores/settings.js';
   import { currentUser, userMgmtActive, loadAuthState } from './stores/auth.js';
+  import { needsNativeSetup, isNative } from './lib/platform.js';
+  import NativeSetup from './routes/NativeSetup.svelte';
+
+  // Show native setup wizard before anything else on first Android launch
+  let showNativeSetup = needsNativeSetup();
 
   import Diary      from './routes/Diary.svelte';
   import Foods      from './routes/Foods.svelte';
@@ -124,8 +129,13 @@
   $: needsLogin = $userMgmtActive && !$currentUser && !AUTH_BYPASS.includes($location);
 </script>
 
+<!-- Native setup gate — shown on first launch on Android/iOS -->
+{#if showNativeSetup}
+  <NativeSetup />
+  <Toast />
+
 <!-- Login gate (when user management active and not authenticated) -->
-{#if needsLogin}
+{:else if needsLogin}
   <Login />
 {:else}
 

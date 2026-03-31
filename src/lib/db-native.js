@@ -1,0 +1,418 @@
+/**
+ * db-native.js — SQLite database layer for the Capacitor native app.
+ *
+ * Uses @capacitor-community/sqlite to provide a local SQLite database that
+ * mirrors the NutriTrace server schema. All data in standalone mode lives here.
+ *
+ * The local user_id is always 1 (single-user standalone mode).
+ */
+
+import { CapacitorSQLite, SQLiteConnection } from '@capacitor-community/sqlite';
+
+const LOCAL_USER_ID = 1;
+const DB_NAME = 'nutritrace_local';
+const DB_VERSION = 1;
+
+const sqlite = new SQLiteConnection(CapacitorSQLite);
+let _db = null;
+let _initPromise = null;
+
+const SCHEMA = `
+  CREATE TABLE IF NOT EXISTS foods (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER DEFAULT 1,
+    name        TEXT NOT NULL,
+    brand       TEXT,
+    nutrition   TEXT DEFAULT '{}',
+    portion     REAL DEFAULT 100,
+    unit        TEXT DEFAULT 'g',
+    img_url     TEXT,
+    notes       TEXT,
+    category    TEXT,
+    barcode     TEXT,
+    visibility  TEXT NOT NULL DEFAULT 'private',
+    source_id   INTEGER,
+    created_at  TEXT DEFAULT (datetime('now')),
+    updated_at  TEXT DEFAULT (datetime('now')),
+    sync_status TEXT DEFAULT 'synced'
+  );
+
+  CREATE TABLE IF NOT EXISTS meals (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER DEFAULT 1,
+    name        TEXT NOT NULL,
+    nutrition   TEXT DEFAULT '{}',
+    items       TEXT DEFAULT '[]',
+    img_url     TEXT,
+    notes       TEXT,
+    is_recipe   INTEGER DEFAULT 0,
+    portion     REAL DEFAULT 100,
+    unit        TEXT DEFAULT 'g',
+    visibility  TEXT NOT NULL DEFAULT 'private',
+    source_id   INTEGER,
+    created_at  TEXT DEFAULT (datetime('now')),
+    updated_at  TEXT DEFAULT (datetime('now')),
+    sync_status TEXT DEFAULT 'synced'
+  );
+
+  CREATE TABLE IF NOT EXISTS diary (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER DEFAULT 1,
+    date        TEXT NOT NULL,
+    items       TEXT DEFAULT '[]',
+    body_stats  TEXT DEFAULT '{}',
+    water       TEXT DEFAULT '[]',
+    updated_at  TEXT DEFAULT (datetime('now')),
+    sync_status TEXT DEFAULT 'synced',
+    UNIQUE(date, user_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS wellness_data (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER DEFAULT 1,
+    date        TEXT NOT NULL,
+    source      TEXT NOT NULL DEFAULT 'health_connect',
+    metric_type TEXT NOT NULL,
+    value       REAL,
+    metadata    TEXT DEFAULT '{}',
+    synced_at   TEXT DEFAULT (datetime('now')),
+    UNIQUE(user_id, date, source, metric_type)
+  );
+
+  CREATE TABLE IF NOT EXISTS sync_log (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    synced_at   TEXT DEFAULT (datetime('now')),
+    direction   TEXT NOT NULL,
+    table_name  TEXT NOT NULL,
+    record_id   INTEGER,
+    status      TEXT NOT NULL DEFAULT 'ok',
+    error       TEXT
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_foods_user ON foods(user_id);
+  CREATE INDEX IF NOT EXISTS idx_meals_user ON meals(user_id);
+  CREATE INDEX IF NOT EXISTS idx_diary_user_date ON diary(user_id, date);
+  CREATE INDEX IF NOT EXISTS idx_wellness_user_date ON wellness_data(user_id, date);
+  CREATE INDEX IF NOT EXISTS idx_foods_sync ON foods(sync_status);
+  CREATE INDEX IF NOT EXISTS idx_meals_sync ON meals(sync_status);
+  CREATE INDEX IF NOT EXISTS idx_diary_sync ON diary(sync_status);
+`;
+
+async function _open() {
+  console.log('[db-native] Opening SQLite database...');
+  try {
+    // Clean up stale JS-side connection references from previous page loads
+    await sqlite.checkConnectionsConsistency().catch(() => {});
+
+    // Close any lingering connection to this DB (safe to call even if none exists)
+    try { await sqlite.closeConnection(DB_NAME, false); } catch {}
+
+    // Create a fresh connection
+    const db = await sqlite.createConnection(DB_NAME, false, 'no-encryption', DB_VERSION, false);
+    await db.open();
+    // Skip PRAGMAs — WAL is default on Android, foreign keys not needed for local-only schema
+    await db.execute(SCHEMA);
+    console.log('[db-native] SQLite database ready');
+    return db;
+  } catch (e) {
+    console.error('[db-native] Failed to open SQLite database:', e);
+    throw e;
+  }
+}
+
+export async function getDb() {
+  if (_db) return _db;
+  if (!_initPromise) _initPromise = _open().then(db => { _db = db; return db; });
+  return _initPromise;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+
+function _row(result) {
+  return result?.values?.[0] ?? null;
+}
+
+function _rows(result) {
+  return result?.values ?? [];
+}
+
+function _now() {
+  return new Date().toISOString();
+}
+
+// ── Foods ─────────────────────────────────────────────────────────────────
+
+export async function dbGetFoods() {
+  const db = await getDb();
+  const r = await db.query(
+    `SELECT * FROM foods WHERE user_id = ? AND visibility = 'private' ORDER BY created_at DESC`,
+    [LOCAL_USER_ID]
+  );
+  return _rows(r).map(_parseFoodRow);
+}
+
+export async function dbGetFood(id) {
+  const db = await getDb();
+  const r = await db.query(`SELECT * FROM foods WHERE id = ? AND user_id = ?`, [id, LOCAL_USER_ID]);
+  const row = _row(r);
+  return row ? _parseFoodRow(row) : null;
+}
+
+export async function dbCreateFood(data) {
+  const db = await getDb();
+  const r = await db.run(
+    `INSERT INTO foods (user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, updated_at, sync_status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+    [
+      LOCAL_USER_ID,
+      data.name,
+      data.brand || null,
+      JSON.stringify(data.nutrition || {}),
+      data.portion ?? 100,
+      data.unit || 'g',
+      data.img_url || data.imgUrl || null,
+      data.notes || null,
+      data.category || null,
+      data.barcode || null,
+      _now(),
+    ]
+  );
+  return dbGetFood(r.changes?.lastId);
+}
+
+export async function dbUpdateFood(id, data) {
+  const db = await getDb();
+  await db.run(
+    `UPDATE foods SET name=?, brand=?, nutrition=?, portion=?, unit=?, img_url=?, notes=?, category=?, barcode=?, updated_at=?, sync_status='pending'
+     WHERE id=? AND user_id=?`,
+    [
+      data.name,
+      data.brand || null,
+      JSON.stringify(data.nutrition || {}),
+      data.portion ?? 100,
+      data.unit || 'g',
+      data.img_url || data.imgUrl || null,
+      data.notes || null,
+      data.category || null,
+      data.barcode || null,
+      _now(),
+      id,
+      LOCAL_USER_ID,
+    ]
+  );
+  return dbGetFood(id);
+}
+
+export async function dbDeleteFood(id) {
+  const db = await getDb();
+  await db.run(`DELETE FROM foods WHERE id = ? AND user_id = ?`, [id, LOCAL_USER_ID]);
+}
+
+export async function dbCopyFood(id) {
+  const original = await dbGetFood(id);
+  if (!original) throw new Error('Food not found');
+  const { id: _id, created_at: _ca, ...rest } = original;
+  return dbCreateFood({ ...rest, name: original.name + ' (copy)' });
+}
+
+function _parseFoodRow(row) {
+  return {
+    ...row,
+    nutrition: _parseJson(row.nutrition, {}),
+    imgUrl: row.img_url || '',
+    categories: row.category ? [row.category] : [],
+  };
+}
+
+// ── Meals ─────────────────────────────────────────────────────────────────
+
+export async function dbGetMeals(recipesOnly = false) {
+  const db = await getDb();
+  const r = await db.query(
+    `SELECT * FROM meals WHERE user_id = ? AND is_recipe = ? ORDER BY created_at DESC`,
+    [LOCAL_USER_ID, recipesOnly ? 1 : 0]
+  );
+  return _rows(r).map(_parseMealRow);
+}
+
+export async function dbGetMeal(id) {
+  const db = await getDb();
+  const r = await db.query(`SELECT * FROM meals WHERE id = ? AND user_id = ?`, [id, LOCAL_USER_ID]);
+  const row = _row(r);
+  return row ? _parseMealRow(row) : null;
+}
+
+export async function dbCreateMeal(data) {
+  const db = await getDb();
+  const r = await db.run(
+    `INSERT INTO meals (user_id, name, nutrition, items, img_url, notes, is_recipe, portion, unit, updated_at, sync_status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+    [
+      LOCAL_USER_ID,
+      data.name,
+      JSON.stringify(data.nutrition || {}),
+      JSON.stringify(data.items || []),
+      data.img_url || data.imgUrl || null,
+      data.notes || null,
+      data.is_recipe ? 1 : 0,
+      data.portion ?? 100,
+      data.unit || 'g',
+      _now(),
+    ]
+  );
+  return dbGetMeal(r.changes?.lastId);
+}
+
+export async function dbUpdateMeal(id, data) {
+  const db = await getDb();
+  await db.run(
+    `UPDATE meals SET name=?, nutrition=?, items=?, img_url=?, notes=?, is_recipe=?, portion=?, unit=?, updated_at=?, sync_status='pending'
+     WHERE id=? AND user_id=?`,
+    [
+      data.name,
+      JSON.stringify(data.nutrition || {}),
+      JSON.stringify(data.items || []),
+      data.img_url || data.imgUrl || null,
+      data.notes || null,
+      data.is_recipe ? 1 : 0,
+      data.portion ?? 100,
+      data.unit || 'g',
+      _now(),
+      id,
+      LOCAL_USER_ID,
+    ]
+  );
+  return dbGetMeal(id);
+}
+
+export async function dbDeleteMeal(id) {
+  const db = await getDb();
+  await db.run(`DELETE FROM meals WHERE id = ? AND user_id = ?`, [id, LOCAL_USER_ID]);
+}
+
+export async function dbCopyMeal(id) {
+  const original = await dbGetMeal(id);
+  if (!original) throw new Error('Meal not found');
+  const { id: _id, created_at: _ca, ...rest } = original;
+  return dbCreateMeal({ ...rest, name: original.name + ' (copy)' });
+}
+
+function _parseMealRow(row) {
+  return {
+    ...row,
+    nutrition: _parseJson(row.nutrition, {}),
+    items:     _parseJson(row.items, []),
+    imgUrl: row.img_url || '',
+  };
+}
+
+// ── Diary ─────────────────────────────────────────────────────────────────
+
+export async function dbGetDiaryDate(date) {
+  const db = await getDb();
+  const r = await db.query(
+    `SELECT * FROM diary WHERE date = ? AND user_id = ?`,
+    [date, LOCAL_USER_ID]
+  );
+  const row = _row(r);
+  if (!row) return null;
+  return {
+    ...row,
+    items:      _parseJson(row.items, []),
+    body_stats: _parseJson(row.body_stats, {}),
+    water:      _parseJson(row.water, []),
+  };
+}
+
+export async function dbSaveDiaryDate(date, data) {
+  const db = await getDb();
+  const items      = JSON.stringify(data.items || []);
+  const body_stats = JSON.stringify(data.body_stats || {});
+  const water      = JSON.stringify(data.water || []);
+  await db.run(
+    `INSERT INTO diary (user_id, date, items, body_stats, water, updated_at, sync_status)
+     VALUES (?, ?, ?, ?, ?, ?, 'pending')
+     ON CONFLICT(date, user_id) DO UPDATE SET
+       items=excluded.items, body_stats=excluded.body_stats, water=excluded.water,
+       updated_at=excluded.updated_at, sync_status='pending'`,
+    [LOCAL_USER_ID, date, items, body_stats, water, _now()]
+  );
+  return dbGetDiaryDate(date);
+}
+
+export async function dbGetAllDiary() {
+  const db = await getDb();
+  const r = await db.query(
+    `SELECT * FROM diary WHERE user_id = ? ORDER BY date DESC`,
+    [LOCAL_USER_ID]
+  );
+  return _rows(r).map(row => ({
+    ...row,
+    items:      _parseJson(row.items, []),
+    body_stats: _parseJson(row.body_stats, {}),
+    water:      _parseJson(row.water, []),
+  }));
+}
+
+// ── Wellness data ─────────────────────────────────────────────────────────
+
+export async function dbGetWellness(startDate, endDate, source = null) {
+  const db = await getDb();
+  let sql = `SELECT * FROM wellness_data WHERE user_id = ? AND date >= ? AND date <= ?`;
+  const params = [LOCAL_USER_ID, startDate, endDate];
+  if (source) { sql += ` AND source = ?`; params.push(source); }
+  const r = await db.query(sql, params);
+  return _rows(r).map(row => ({ ...row, metadata: _parseJson(row.metadata, {}) }));
+}
+
+export async function dbUpsertWellness(date, source, metric_type, value, metadata = {}) {
+  const db = await getDb();
+  await db.run(
+    `INSERT INTO wellness_data (user_id, date, source, metric_type, value, metadata)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(user_id, date, source, metric_type) DO UPDATE SET
+       value=excluded.value, metadata=excluded.metadata, synced_at=datetime('now')`,
+    [LOCAL_USER_ID, date, source, metric_type, value, JSON.stringify(metadata)]
+  );
+}
+
+// ── Sync helpers ─────────────────────────────────────────────────────────
+
+export async function dbGetPendingChanges() {
+  const db = await getDb();
+  const [foods, meals, diary] = await Promise.all([
+    db.query(`SELECT * FROM foods WHERE sync_status = 'pending' AND user_id = ?`, [LOCAL_USER_ID]),
+    db.query(`SELECT * FROM meals WHERE sync_status = 'pending' AND user_id = ?`, [LOCAL_USER_ID]),
+    db.query(`SELECT * FROM diary WHERE sync_status = 'pending' AND user_id = ?`, [LOCAL_USER_ID]),
+  ]);
+  return {
+    foods: _rows(foods).map(_parseFoodRow),
+    meals: _rows(meals).map(_parseMealRow),
+    diary: _rows(diary).map(row => ({
+      ...row,
+      items:      _parseJson(row.items, []),
+      body_stats: _parseJson(row.body_stats, {}),
+      water:      _parseJson(row.water, []),
+    })),
+  };
+}
+
+export async function dbMarkSynced(table, ids) {
+  if (!ids.length) return;
+  const db = await getDb();
+  const placeholders = ids.map(() => '?').join(',');
+  await db.run(
+    `UPDATE ${table} SET sync_status = 'synced' WHERE id IN (${placeholders})`,
+    ids
+  );
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────────
+
+function _parseJson(val, fallback) {
+  if (val == null) return fallback;
+  if (typeof val === 'object') return val;
+  try { return JSON.parse(val); } catch { return fallback; }
+}
+
+export { LOCAL_USER_ID };

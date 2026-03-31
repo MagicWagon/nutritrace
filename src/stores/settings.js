@@ -32,13 +32,17 @@ const SERVER_SETTINGS = new Set([
   'navStyle','sidebarPersistent','startPage','disableAnimations','goalCelebrations','pageBanners','loopBannerAnimations',
 ]);
 
+import { isNative, getServerUrl } from '../lib/platform.js';
+
 const _saveQueue = {};
 function _isLoggedIn() { return !!localStorage.getItem('wl:userId'); }
+// In native standalone mode, settings only save to localStorage — no server sync
+function _shouldSyncToServer() { return _isLoggedIn() && !(isNative && !getServerUrl()); }
 export function scheduleSave(key, value) {
   if (!SERVER_SETTINGS.has(key)) return;
   clearTimeout(_saveQueue[key]);
   _saveQueue[key] = setTimeout(() => {
-    if (!_isLoggedIn()) return;
+    if (!_shouldSyncToServer()) return;
     fetch('/api/settings', {
       method: 'PUT',
       credentials: 'include',
@@ -53,7 +57,7 @@ export function scheduleSave(key, value) {
  * localStorage + notifies all stores via wl:setting events.
  */
 export async function loadServerSettings() {
-  if (!_isLoggedIn()) return;
+  if (!_shouldSyncToServer()) return;
   try {
     const res = await fetch('/api/settings', { credentials: 'include' });
     if (!res.ok) return;
@@ -220,7 +224,7 @@ export const catLabel   = c => typeof c === 'string' ? '' : (c?.label  || '');
 export const catDisplay = c => { const l = catLabel(c); return l ? `${l} ${catName(c)}` : catName(c); };
 
 // Page banners
-export const pageBanners          = createSettingStore('pageBanners',          false);
+export const pageBanners          = createSettingStore('pageBanners',          true);
 export const loopBannerAnimations = createSettingStore('loopBannerAnimations', true);
 
 // Wellness (Activity Tracking)

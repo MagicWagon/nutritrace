@@ -6,17 +6,31 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "android": "npm run build && npx cap sync android && npx cap open android",
+    "android:build": "npm run build && npx cap sync android",
+    "android:run": "npx cap run android",
+    "cap:sync": "npm run build && npx cap sync",
+    "cap:add:android": "npx cap add android"
   },
   "dependencies": {
+    "@capacitor-community/sqlite": "^8.1.0",
+    "@capacitor/android": "^8.3.0",
+    "@capacitor/core": "^8.3.0",
+    "@capacitor/filesystem": "^8.1.2",
+    "@capacitor/keyboard": "^8.0.2",
+    "@capacitor/splash-screen": "^8.0.1",
+    "@capacitor/status-bar": "^8.0.2",
     "chart.js": "^4.4.0",
     "emoji-picker-element": "^1.29.1",
     "nodemailer": "^8.0.3",
     "svelte-spa-router": "^4.0.1"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.3.0",
     "@sveltejs/vite-plugin-svelte": "^3.0.0",
     "svelte": "^4.2.0",
+    "typescript": "^6.0.2",
     "vite": "^5.0.0",
     "vite-plugin-pwa": "^0.19.0",
     "workbox-window": "^7.0.0"

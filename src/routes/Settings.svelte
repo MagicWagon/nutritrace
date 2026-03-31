@@ -1,7 +1,7 @@
 <script>
   import { onMount, tick } from 'svelte';
   import { get } from 'svelte/store';
-  import { slide } from 'svelte/transition';
+  import { slide, fade } from 'svelte/transition';
   import Toggle from '../components/settings/Toggle.svelte';
   import SettingsWellness from '../components/settings/SettingsWellness.svelte';
   import { APP_VERSION } from '../lib/version.js';
@@ -32,13 +32,165 @@
   import { NtApi } from '../lib/api.js';
   import { NUTRIMENTS, Nutrition } from '../lib/nutrition.js';
   import { currentUser, userMgmtActive, loadAuthState, logout } from '../stores/auth.js';
+  import { isNative, getServerUrl, setServerUrl, setNativeMode, getNativeMode } from '../lib/platform.js';
   import { push } from 'svelte-spa-router';
   // ── Collapsible section state ──────────────────────────────────────────────
   $: isDark = $appearance === 'dark' || ($appearance === 'system' && (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches));
-  let openSections = { appearance: false, regional: false, diary: false, foods: false, water: false,
+  let openSections = { serverConnection: false, appearance: false, regional: false, diary: false, foods: false, water: false,
                        categories: false, nutrients: false, bodyStats: false, statistics: false,
                        connectedServices: false, ai: false, wellness: false, sharing: false,
                        backup: false, email: false, users: false, about: false };
+
+  // ── Server Connection (native only) ─────────────────────────────────────
+  let serverUrlInput = getServerUrl() || '';
+  let serverUsername = '';
+  let serverPassword = '';
+  let serverConnecting = false;
+  let serverMode = getNativeMode(); // 'local' | 'server'
+  // True when running as a standalone phone app (hide multi-user / server features)
+  const isNativeLocal = isNative && !getServerUrl();
+
+  // ── Server connect/merge flow ──────────────────────────────────────────────
+  let mergeStep = null;  // null | 'ask-settings' | 'syncing'
+  let mergeProgress = '';
+  let _pendingServerUrl = '';
+  let _pendingToken = null; // cookie is set by login, but we keep the URL
+
+  async function connectServer() {
+    if (!serverUrlInput.trim()) { showError('Enter a server URL'); return; }
+    if (!serverUsername.trim() || !serverPassword.trim()) { showError('Enter credentials'); return; }
+    const url = serverUrlInput.trim().replace(/\/$/, '');
+    serverConnecting = true;
+    try {
+      const healthRes = await fetch(`${url}/api/health`, { signal: AbortSignal.timeout(8000) });
+      if (!healthRes.ok) throw new Error('Server not reachable');
+      const loginRes = await fetch(`${url}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ username: serverUsername.trim(), password: serverPassword }),
+      });
+      const loginData = await loginRes.json();
+      if (!loginRes.ok) throw new Error(loginData.error || 'Login failed');
+
+      _pendingServerUrl = url;
+
+      // Check if there's local data to merge
+      const { dbGetAllDiary, dbGetFoods, dbGetMeals } = await import('../lib/db-native.js');
+      const [localFoods, localMeals, localDiary] = await Promise.all([
+        dbGetFoods().catch(() => []),
+        dbGetMeals().catch(() => []),
+        dbGetAllDiary().catch(() => []),
+      ]);
+      const hasLocalData = localFoods.length > 0 || localMeals.length > 0 || localDiary.length > 0;
+
+      if (hasLocalData) {
+        // Show merge dialog
+        mergeStep = 'ask-settings';
+      } else {
+        // No local data — just connect directly
+        _finalizeConnect();
+      }
+    } catch (e) {
+      showError(e.message || 'Could not connect');
+    } finally {
+      serverConnecting = false;
+    }
+  }
+
+  async function _mergeAndConnect(settingsWinner) {
+    mergeStep = 'syncing';
+    const url = _pendingServerUrl;
+    try {
+      // 1. Settings: push local to server OR pull server to local
+      const { DB: _DB } = await import('../lib/db.js');
+      if (settingsWinner === 'phone') {
+        mergeProgress = 'Uploading settings…';
+        const allSettings = _DB.getAllSettings();
+        for (const [key, value] of Object.entries(allSettings)) {
+          await fetch(`${url}/api/settings`, {
+            method: 'PUT', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key, value }),
+          }).catch(() => {});
+        }
+      }
+      // (If server wins, settings will be pulled automatically on reload via loadServerSettings)
+
+      // 2. Push local foods to server
+      const { dbGetFoods, dbGetMeals, dbGetAllDiary } = await import('../lib/db-native.js');
+      const localFoods = await dbGetFoods().catch(() => []);
+      if (localFoods.length) {
+        mergeProgress = `Uploading ${localFoods.length} foods…`;
+        for (const food of localFoods) {
+          const { id, user_id, sync_status, created_at, updated_at, imgUrl, categories, ...rest } = food;
+          await fetch(`${url}/api/foods`, {
+            method: 'POST', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...rest, img_url: imgUrl || null, category: categories?.[0] || null }),
+          }).catch(() => {});
+        }
+      }
+
+      // 3. Push local meals to server
+      const localMeals = await dbGetMeals().catch(() => []);
+      if (localMeals.length) {
+        mergeProgress = `Uploading ${localMeals.length} meals…`;
+        for (const meal of localMeals) {
+          const { id, user_id, sync_status, created_at, updated_at, imgUrl, ...rest } = meal;
+          await fetch(`${url}/api/meals`, {
+            method: 'POST', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...rest, img_url: imgUrl || null }),
+          }).catch(() => {});
+        }
+      }
+
+      // 4. Push local diary (local wins for same-date conflicts)
+      const localDiary = await dbGetAllDiary().catch(() => []);
+      if (localDiary.length) {
+        mergeProgress = `Uploading ${localDiary.length} diary entries…`;
+        for (const entry of localDiary) {
+          await fetch(`${url}/api/diary/${entry.date}`, {
+            method: 'PUT', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items: entry.items || [], body_stats: entry.body_stats || {}, water: entry.water || [] }),
+          }).catch(() => {});
+        }
+      }
+
+      mergeProgress = 'Finalizing…';
+      _finalizeConnect();
+    } catch (e) {
+      mergeStep = null;
+      showError('Sync failed: ' + (e.message || 'Unknown error'));
+    }
+  }
+
+  function _finalizeConnect() {
+    setServerUrl(_pendingServerUrl);
+    setNativeMode('server');
+    serverMode = 'server';
+    mergeStep = null;
+    showSuccess('Connected to server');
+    setTimeout(() => window.location.reload(), 600);
+  }
+
+  function cancelMerge() {
+    mergeStep = null;
+    _pendingServerUrl = '';
+  }
+
+  function disconnectServer() {
+    setServerUrl(null);
+    setNativeMode('local');
+    serverMode = 'local';
+    serverUrlInput = '';
+    serverUsername = '';
+    serverPassword = '';
+    showSuccess('Disconnected — using local storage');
+    setTimeout(() => window.location.reload(), 600);
+  }
 
   function toggleSection(key) {
     openSections = { ...openSections, [key]: !openSections[key] };
@@ -49,6 +201,7 @@
   $: settingsQuery = settingsSearch.toLowerCase().trim();
 
   const SECTION_KEYWORDS = {
+    serverConnection:  ['server','connection','sync','cloud','local','remote','connect','disconnect','url'],
     appearance:        ['appearance','theme','dark','light','accent','color','navigation','sidebar','persistent','start page','animations','celebrations','reduce motion','banner','page banner'],
     regional:          ['regional','date format','time format','locale','date','time','12h','24h','units','energy unit','weight unit','height','circumference','distance','temperature','imperial','metric'],
     diary:             ['diary','brands','timestamps','thumbnails','nutrients','nutrition units','macros','macro summary','prompt quantity','portion size','nutrition bar','goals progress','meal names','meals'],
@@ -583,6 +736,30 @@
   }
 
   // ── Backup ─────────────────────────────────────────────────────────────────
+
+  // Native: use Capacitor Filesystem for downloads (WebView <a download> doesn't work)
+  async function _nativeDownload(blob, filename) {
+    const { Filesystem, Directory } = await import('@capacitor/filesystem');
+    const reader = new FileReader();
+    const base64 = await new Promise((res, rej) => {
+      reader.onload = () => res(reader.result.split(',')[1]);
+      reader.onerror = rej;
+      reader.readAsDataURL(blob);
+    });
+    // Write to shared Download folder so users can find it in their file manager
+    await Filesystem.writeFile({ path: `Download/${filename}`, data: base64, directory: Directory.ExternalStorage, recursive: true });
+    showSuccess(`Saved to Download/${filename}`);
+  }
+
+  function _downloadBlob(blob, filename) {
+    if (isNative) { _nativeDownload(blob, filename); return; }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
   async function exportBackup() {
     try {
       const [foodList, meals, recipes, diary] = await Promise.all([
@@ -593,11 +770,7 @@
       ]);
       const data = { foodList, meals, recipes, diary, settings: DB.getAllSettings(), exportedAt: new Date().toISOString() };
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `nutritrace-backup-${new Date().toISOString().slice(0,10)}.json`;
-      a.click();
-      URL.revokeObjectURL(a.href);
+      _downloadBlob(blob, `nutritrace-backup-${new Date().toISOString().slice(0,10)}.json`);
       showSuccess('Backup exported');
     } catch(e) { showError('Export failed: ' + e.message); }
   }
@@ -610,7 +783,7 @@
       try {
         const text = await file.text();
         const data = JSON.parse(text);
-        // Upload any base64 images to the server and replace with server URLs
+        // Upload any base64 images
         async function migrateImg(item) {
           if (!item.imgUrl || !item.imgUrl.startsWith('data:')) return item;
           try {
@@ -626,7 +799,20 @@
           migrateAll(data.meals),
           migrateAll(data.recipes),
         ]);
-        await NtApi.post('/api/data/import', { ...data, foodList, meals, recipes });
+
+        if (isNativeLocal) {
+          // Native local: import directly into SQLite
+          const { dbCreateFood, dbCreateMeal, dbSaveDiaryDate } = await import('../lib/db-native.js');
+          for (const food of (foodList || [])) await dbCreateFood(food).catch(() => {});
+          for (const meal of (meals || [])) await dbCreateMeal(meal).catch(() => {});
+          for (const meal of (recipes || [])) await dbCreateMeal({ ...meal, is_recipe: 1 }).catch(() => {});
+          for (const entry of (data.diary || [])) {
+            if (entry.date) await dbSaveDiaryDate(entry.date, entry).catch(() => {});
+          }
+        } else {
+          await NtApi.post('/api/data/import', { ...data, foodList, meals, recipes });
+        }
+
         if (data.settings && typeof data.settings === 'object') {
           for (const [key, value] of Object.entries(data.settings)) DB.setSetting(key, value);
         }
@@ -658,11 +844,7 @@
         });
       });
       const blob = new Blob([csv], { type: 'text/csv' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `nutritrace-diary-${new Date().toISOString().slice(0,10)}.csv`;
-      a.click();
-      URL.revokeObjectURL(a.href);
+      _downloadBlob(blob, `nutritrace-diary-${new Date().toISOString().slice(0,10)}.csv`);
       showSuccess('CSV exported');
     } catch(e) { showError('Export failed: ' + e.message); }
   }
@@ -676,6 +858,7 @@
   let showDeleteBkDialog = false;
 
   async function loadFullBackups() {
+    if (isNativeLocal) return;
     try {
       const res = await fetch('/api/full-backup', { credentials: 'include' });
       if (res.ok) fullBackups = await res.json();
@@ -1220,7 +1403,7 @@
               </select>
             </div>
           </div>
-          {#if navStyle === 'sidebar' || navStyle === 'both'}
+          {#if (navStyle === 'sidebar' || navStyle === 'both') && !isNative}
             <div class="setting-divider"></div>
             <div class="setting-row">
               <div>
@@ -1953,8 +2136,8 @@
     {/if}
 
     <p class="settings-group-label">App</p>
-    <!-- ── Sharing ──────────────────────────────────────────────────────────── -->
-    {#if $userMgmtActive}
+    <!-- ── Sharing (hidden in native local mode — no one to share with) ──── -->
+    {#if $userMgmtActive && !isNativeLocal}
       <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'sharing')} on:click={() => toggleSection('sharing')}>
         <span class="material-symbols-rounded si">group</span>
         <span>Food Sharing <span class="labs-badge" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">Experimental</span></span>
@@ -2026,7 +2209,8 @@
       {/if}
     {/if}
 
-    <!-- ── User Management ──────────────────────────────────────────────────── -->
+    <!-- ── User Management (hidden in native local mode — single user) ────── -->
+    {#if !isNativeLocal}
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'users')} on:click={() => toggleSection('users')}>
       <span class="material-symbols-rounded si">group</span>
       <span>User Management</span>
@@ -2208,9 +2392,10 @@
         </div>
       </div>
     {/if}
+    {/if}
 
-    <!-- ── Email ────────────────────────────────────────────────────────────── -->
-    {#if $currentUser?.role === 'admin'}
+    <!-- ── Email (hidden in native local mode — no server to send from) ───── -->
+    {#if $currentUser?.role === 'admin' && !isNativeLocal}
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'email')} on:click={() => toggleSection('email')}>
       <span class="material-symbols-rounded si">mail</span>
       <span>Email (SMTP)</span>
@@ -2294,8 +2479,8 @@
     {#if sectionOpen(openSections, settingsQuery, 'backup') && sectionVisible(settingsQuery, 'backup')}
       <div class="section-body" transition:slide={{ duration: 180 }}>
 
-        <!-- Full backup (admin only) -->
-        {#if $currentUser?.role === 'admin'}
+        <!-- Full backup (admin only, server mode only — files stored on server) -->
+        {#if $currentUser?.role === 'admin' && !isNativeLocal}
         <p class="sub-label">Full Backup</p>
         <div class="card settings-card">
           <div style="padding:12px 16px 4px">
@@ -2426,6 +2611,62 @@
       </div>
     {/if}
 
+    <!-- ── Server Connection (native app only, after Backup) ────────────── -->
+    {#if isNative}
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'serverConnection')} on:click={() => toggleSection('serverConnection')}>
+      <span class="material-symbols-rounded si">cloud_sync</span>
+      <span>Server Connection</span>
+      <span class="material-symbols-rounded chevron" class:rotated={openSections.serverConnection}>expand_more</span>
+    </button>
+    {#if sectionOpen(openSections, settingsQuery, 'serverConnection') && sectionVisible(settingsQuery, 'serverConnection')}
+      <div class="section-body" transition:slide={{ duration: 180 }}>
+        <div class="card settings-card">
+          {#if serverMode === 'server' && getServerUrl()}
+            <div class="setting-row">
+              <div>
+                <span class="setting-label">Connected</span>
+                <div class="setting-desc">{getServerUrl()}</div>
+              </div>
+              <span class="material-symbols-rounded" style="color:var(--success, #22c55e);font-size:22px">cloud_done</span>
+            </div>
+            <div class="setting-divider"></div>
+            <div style="padding:12px 16px">
+              <button class="btn btn-ghost w-full" style="color:var(--error,#f87171)" on:click={disconnectServer}>
+                Disconnect &amp; Use Locally
+              </button>
+            </div>
+          {:else}
+            <div class="setting-row">
+              <div>
+                <span class="setting-label">Local Mode</span>
+                <div class="setting-desc">All data stored on this device only</div>
+              </div>
+              <span class="material-symbols-rounded" style="color:var(--text-3);font-size:22px">smartphone</span>
+            </div>
+            <div class="setting-divider"></div>
+            <div style="padding:12px 16px;display:flex;flex-direction:column;gap:10px">
+              <div class="form-group" style="margin:0">
+                <label class="form-label">Server URL</label>
+                <input class="input" type="url" placeholder="https://nutritrace.example.com" bind:value={serverUrlInput} />
+              </div>
+              <div class="form-group" style="margin:0">
+                <label class="form-label">Username</label>
+                <input class="input" type="text" placeholder="Your username" bind:value={serverUsername} autocapitalize="off" />
+              </div>
+              <div class="form-group" style="margin:0">
+                <label class="form-label">Password</label>
+                <input class="input" type="password" placeholder="Your password" bind:value={serverPassword} />
+              </div>
+              <button class="btn btn-primary w-full" on:click={connectServer} disabled={serverConnecting}>
+                {serverConnecting ? 'Connecting…' : 'Connect to Server'}
+              </button>
+            </div>
+          {/if}
+        </div>
+      </div>
+    {/if}
+    {/if}
+
     <!-- About -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'about')} on:click={() => toggleSection('about')}>
       <span class="material-symbols-rounded si">info</span>
@@ -2487,6 +2728,38 @@
   </div>
 
 </div>
+
+<!-- Merge dialog (shown when connecting to server with existing local data) -->
+{#if mergeStep === 'ask-settings'}
+  <div class="merge-overlay" transition:fade={{ duration: 150 }}>
+    <div class="merge-dialog">
+      <h3 style="margin:0 0 8px;font-size:18px;color:var(--text-1)">Sync Local Data</h3>
+      <p style="font-size:14px;color:var(--text-3);margin:0 0 16px;line-height:1.5">
+        You have data on this device. It will be uploaded to the server.
+        Which settings should be used?
+      </p>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button class="btn btn-primary w-full" on:click={() => _mergeAndConnect('phone')}>
+          <span class="material-symbols-rounded" style="font-size:18px">smartphone</span>
+          Use phone settings
+        </button>
+        <button class="btn btn-ghost w-full" on:click={() => _mergeAndConnect('server')}>
+          <span class="material-symbols-rounded" style="font-size:18px">cloud</span>
+          Use server settings
+        </button>
+        <button class="btn btn-ghost w-full" style="color:var(--text-3)" on:click={cancelMerge}>Cancel</button>
+      </div>
+    </div>
+  </div>
+{:else if mergeStep === 'syncing'}
+  <div class="merge-overlay" transition:fade={{ duration: 150 }}>
+    <div class="merge-dialog" style="text-align:center">
+      <span class="material-symbols-rounded" style="font-size:36px;color:var(--accent);animation:spin 1.2s linear infinite">sync</span>
+      <p style="font-size:15px;color:var(--text-1);margin:12px 0 4px;font-weight:600">Syncing…</p>
+      <p style="font-size:13px;color:var(--text-3);margin:0">{mergeProgress}</p>
+    </div>
+  </div>
+{/if}
 
 <Dialog bind:open={showClearDialog}
   title="Clear all data"
@@ -3021,4 +3294,18 @@
     margin-bottom: 4px;
   }
   .env-lock-banner .material-symbols-rounded { font-size: 16px; color: var(--accent); flex-shrink: 0; }
+
+  /* ── Merge dialog ── */
+  .merge-overlay {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(0,0,0,0.6);
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  .merge-dialog {
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: var(--radius-lg, 16px);
+    padding: 24px; width: 100%; max-width: 360px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
 </style>

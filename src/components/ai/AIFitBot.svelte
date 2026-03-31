@@ -59,8 +59,11 @@
       } catch {}
     }
     try {
-      const res = await fetch('/api/app-config/env-locks', { credentials: 'include' });
-      if (res.ok) { const d = await res.json(); aiEnvLocked = !!d.ai; }
+      const { isNative, getServerUrl } = await import('../../lib/platform.js');
+      if (!(isNative && !getServerUrl())) {
+        const res = await fetch('/api/app-config/env-locks', { credentials: 'include' });
+        if (res.ok) { const d = await res.json(); aiEnvLocked = !!d.ai; }
+      }
     } catch {}
   });
 
