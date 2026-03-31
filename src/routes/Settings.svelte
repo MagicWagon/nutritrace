@@ -1787,6 +1787,7 @@
               </div>
             </div>
           {/if}
+          {#if adminSharingEnabled}
           <p class="sub-label">My Defaults</p>
           <div class="card settings-card">
             <div class="setting-row">
@@ -1847,6 +1848,7 @@
               </button>
             </div>
           </div>
+          {/if}
         </div>
       {/if}
     {/if}

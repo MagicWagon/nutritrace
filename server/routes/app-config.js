@@ -70,6 +70,17 @@ router.put('/', requireAuth, requireAdmin, wrap((req, res) => {
   if ((key === 'smtp_pass' || key === 'ai_api_key' || key === 'fitbit_client_secret' || key === 'withings_client_secret') && value === '••••••••') return res.json({ ok: true });
   db.prepare('INSERT INTO app_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
     .run(key, value || null);
+
+  // When disabling sharing, reset ALL items to private and clear share grants
+  if (key === 'sharing_enabled' && value !== 'true') {
+    db.transaction(() => {
+      db.prepare(`UPDATE foods SET visibility = 'private' WHERE visibility != 'private'`).run();
+      db.prepare(`UPDATE meals SET visibility = 'private' WHERE visibility != 'private'`).run();
+      db.prepare(`DELETE FROM food_shares`).run();
+      db.prepare(`DELETE FROM meal_shares`).run();
+    })();
+  }
+
   res.json({ ok: true });
 }));
 
