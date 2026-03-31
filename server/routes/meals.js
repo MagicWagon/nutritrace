@@ -2,26 +2,14 @@ import { Router } from 'express';
 import db from '../db.js';
 import { wrap } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
+import { sharingEnabled, canRead as _canRead } from '../lib/sharing.js';
 
 const router = Router();
 router.use(requireAuth);
 
 const uid = req => userMgmtActive() ? req.user.id : null;
 
-function sharingEnabled() {
-  const row = db.prepare(`SELECT value FROM app_config WHERE key = 'sharing_enabled'`).get();
-  return row?.value === 'true';
-}
-
-function canRead(meal, u) {
-  if (meal.user_id == null || meal.user_id === u) return true;
-  if (meal.visibility === 'group') return true;
-  if (meal.visibility === 'specific') {
-    const row = db.prepare('SELECT 1 FROM meal_shares WHERE meal_id = ? AND user_id = ?').get(meal.id, u);
-    return !!row;
-  }
-  return false;
-}
+const canRead = (meal, u) => _canRead(meal, u, 'meal_shares', 'meal_id');
 
 // ── GET / ─────────────────────────────────────────────────────────────────
 router.get('/', wrap((req, res) => {

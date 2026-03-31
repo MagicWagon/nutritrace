@@ -2,6 +2,7 @@ import { Router } from 'express';
 import db from '../db.js';
 import { wrap } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
+import { sharingEnabled, canRead as _canRead } from '../lib/sharing.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -9,22 +10,7 @@ router.use(requireAuth);
 /** Current user's id, or null in single-user mode */
 const uid = req => userMgmtActive() ? req.user.id : null;
 
-/** Is food sharing enabled on this instance? */
-function sharingEnabled() {
-  const row = db.prepare(`SELECT value FROM app_config WHERE key = 'sharing_enabled'`).get();
-  return row?.value === 'true';
-}
-
-/** Returns true if user u can see food row (owns it, or it's shared with them) */
-function canRead(food, u) {
-  if (food.user_id == null || food.user_id === u) return true; // owns it
-  if (food.visibility === 'group') return true;
-  if (food.visibility === 'specific') {
-    const row = db.prepare('SELECT 1 FROM food_shares WHERE food_id = ? AND user_id = ?').get(food.id, u);
-    return !!row;
-  }
-  return false;
-}
+const canRead = (food, u) => _canRead(food, u, 'food_shares', 'food_id');
 
 // ── GET / — own foods + shared foods from others ──────────────────────────
 router.get('/', wrap((req, res) => {
