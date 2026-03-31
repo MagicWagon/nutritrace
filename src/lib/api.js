@@ -4,8 +4,18 @@
 
 // In native mode, call external APIs directly (no CORS in WebView).
 // In web mode, go through the server proxy to avoid CORS.
-function _extFetch(url) {
-  if (isNative) return fetch(url);
+async function _extFetch(url) {
+  if (isNative) {
+    // Use Capacitor's native HTTP to bypass CORS in the WebView
+    const { CapacitorHttp } = await import('@capacitor/core');
+    const resp = await CapacitorHttp.get({ url, headers: { 'Accept': 'application/json' } });
+    // Wrap in a Response-like object so callers can use .ok / .json()
+    return {
+      ok: resp.status >= 200 && resp.status < 300,
+      status: resp.status,
+      json: async () => typeof resp.data === 'string' ? JSON.parse(resp.data) : resp.data,
+    };
+  }
   return fetch('/api/proxy?url=' + encodeURIComponent(url));
 }
 

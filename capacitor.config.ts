@@ -13,15 +13,10 @@ const config: CapacitorConfig = {
       keystoreAlias: undefined,
     },
   },
-  // Disable Capacitor's native HTTP override — we handle fetch ourselves
-  // (the native HTTP plugin can cause issues with external API responses)
   server: {
     androidScheme: 'https',
   },
   plugins: {
-    CapacitorHttp: {
-      enabled: false,
-    },
     SplashScreen: {
       launchShowDuration: 1200,
       launchAutoHide: true,
