@@ -16,7 +16,7 @@ const SERVER_SETTINGS = new Set([
   'foodsShowYesterdayMeals','foodsSort',
   'barcodeBeep','barcodeFlashlight','cropPhotos',
   'offSearchLanguage','offSearchCountry','offUploadCountry',
-  'weightUnit','heightUnit','lengthUnit','distUnit',
+  'weightUnit','heightUnit','lengthUnit','distUnit','tempUnit',
   'waterGoalMl','waterUnit','waterContainers','waterShowInStats','waterShowInDiary',
   'dateFormat','timeFormat',
   'statsChartType','statsYZero','statsAvgLine','statsGoalLine','statsTrendLine',
@@ -195,6 +195,7 @@ export const weightUnit = createSettingStore('weightUnit', 'lb');
 export const heightUnit = createSettingStore('heightUnit', 'ft');
 export const lengthUnit = createSettingStore('lengthUnit', 'in');
 export const distUnit   = createSettingStore('distUnit',   'km');
+export const tempUnit   = createSettingStore('tempUnit',   'F');  // 'F' | 'C'
 
 // Water
 export const waterGoalMl      = createSettingStore('waterGoalMl',      2000);

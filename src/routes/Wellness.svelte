@@ -1,6 +1,6 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
-  import { wellnessMetrics, wellnessSyncMode, wellnessSyncRange, distUnit, pageBanners, dateFormat, withingsSyncRange as withingsSyncRangeSetting, fitbitEnabled, withingsEnabled, garminEnabled, garminSyncRange as garminSyncRangeSetting, weightUnit, goals, goalCelebrations, disableAnimations } from '../stores/settings.js';
+  import { wellnessMetrics, wellnessSyncMode, wellnessSyncRange, distUnit, tempUnit, pageBanners, dateFormat, withingsSyncRange as withingsSyncRangeSetting, fitbitEnabled, withingsEnabled, garminEnabled, garminSyncRange as garminSyncRangeSetting, weightUnit, goals, goalCelebrations, disableAnimations } from '../stores/settings.js';
   import Chart from 'chart.js/auto';
   import WellnessBanner from '../components/banners/WellnessBanner.svelte';
   import { showSuccess, showError } from '../stores/toast.js';
@@ -42,7 +42,7 @@
     { id: 'respiratory_rate',  label: 'Respiratory Rate',   unit: 'brpm', group: 'heart', icon: 'air',            fmt: v => v.toFixed(1),  sources: ['fitbit','garmin'], desc: 'Average breaths per minute during sleep. Normal adult range is 12–20 breaths/min. Elevated values may signal illness or stress.' },
     { id: 'hrv_daily_rmssd',   label: 'HRV (RMSSD)',        unit: 'ms',   group: 'heart', icon: 'monitor_heart',  fmt: v => v.toFixed(1),  sources: ['fitbit','garmin'], desc: 'Heart rate variability — the variation between heartbeats. Higher values indicate better recovery and autonomic nervous system balance.' },
     // Heart — Fitbit only
-    { id: 'skin_temp_variation', label: 'Skin Temp Var.', unit: '°F',   group: 'heart', icon: 'thermometer',    fmt: v => { const f = v * 9 / 5; return (f >= 0 ? '+' : '') + f.toFixed(2); }, sources: ['fitbit'], desc: 'Nightly skin temperature variation from your personal baseline. Elevated readings can indicate illness or hormonal changes.' },
+    { id: 'skin_temp_variation', label: 'Skin Temp Var.', unit: '°F',   group: 'heart', icon: 'thermometer',    fmt: null, sources: ['fitbit'], desc: 'Nightly skin temperature variation from your personal baseline. Elevated readings can indicate illness or hormonal changes.' },
     { id: 'vo2_max',             label: 'Cardio Fitness',  unit: '',     group: 'heart', icon: 'fitness_center', fmt: v => v.toFixed(1),  sources: ['fitbit'], desc: 'Estimated VO₂ Max — the maximum oxygen your body can use during exercise. Fitbit shows this as a range (e.g. 39–43 mL/kg/min). A key indicator of long-term cardiovascular health.' },
     // Heart — Garmin only
     { id: 'max_hr',           label: 'Max Heart Rate',     unit: 'bpm',       group: 'heart', icon: 'favorite',       fmt: v => Math.round(v), sources: ['garmin'], desc: 'Highest heart rate recorded during the day. Useful for tracking workout intensity and your true max effort.' },
@@ -135,6 +135,12 @@
     }
     if (SLEEP_TIME_IDS.has(m.id)) {
       return fmtSleep(rawValue);
+    }
+    // Skin temp: convert based on tempUnit setting (stored as °C delta)
+    if (m.id === 'skin_temp_variation') {
+      const isFahr = $tempUnit !== 'C';
+      const val = isFahr ? rawValue * 9 / 5 : rawValue;
+      return { value: (val >= 0 ? '+' : '') + val.toFixed(2), unit: isFahr ? '°F' : '°C' };
     }
     // Cardio Fitness: prefer the range string (e.g. "39-43") when available
     if (m.id === 'vo2_max' && displayData.vo2_max_range) {

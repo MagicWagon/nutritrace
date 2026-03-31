@@ -6,7 +6,7 @@
   import { localDateStr } from '../../lib/db.js';
   import { Nutrition } from '../../lib/nutrition.js';
   import { callAI, callAIProxy } from '../../lib/aiChat.js';
-  import { aiEnabled, aiAssistantName, aiApiKey, aiProvider, aiModel, goals, mealNames, energyUnit, dateFormat } from '../../stores/settings.js';
+  import { aiEnabled, aiAssistantName, aiApiKey, aiProvider, aiModel, goals, mealNames, energyUnit, dateFormat, tempUnit } from '../../stores/settings.js';
   import { showError } from '../../stores/toast.js';
 
   // ── State ──────────────────────────────────────────────────────────────────
@@ -194,7 +194,11 @@
         if (fd.spo2_avg != null)              parts.push(`SpO2: ${fd.spo2_avg.toFixed(1)}%`);
         if (fd.respiratory_rate != null)      parts.push(`Respiratory rate: ${fd.respiratory_rate.toFixed(1)} brpm`);
         if (fd.vo2_max != null)               parts.push(`Cardio fitness (VO2 Max): ${fd.vo2_max.toFixed(1)} mL/kg/min`);
-        if (fd.skin_temp_variation != null)   parts.push(`Skin temp variation: ${fd.skin_temp_variation >= 0 ? '+' : ''}${fd.skin_temp_variation.toFixed(2)}°C`);
+        if (fd.skin_temp_variation != null) {
+          const isFahr = $tempUnit !== 'C';
+          const tv = isFahr ? fd.skin_temp_variation * 9 / 5 : fd.skin_temp_variation;
+          parts.push(`Skin temp variation: ${tv >= 0 ? '+' : ''}${tv.toFixed(2)}${isFahr ? '°F' : '°C'}`);
+        }
         if (parts.length) wellnessText += `Fitbit: ${parts.join(', ')}`;
       }
     } catch {}

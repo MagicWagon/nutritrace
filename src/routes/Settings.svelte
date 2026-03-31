@@ -37,7 +37,7 @@
   import { push } from 'svelte-spa-router';
   // ── Collapsible section state ──────────────────────────────────────────────
   $: isDark = $appearance === 'dark' || ($appearance === 'system' && (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches));
-  let openSections = { appearance: true, regional: false, diary: false, foods: false, water: false,
+  let openSections = { appearance: false, regional: false, diary: false, foods: false, water: false,
                        categories: false, nutrients: false, bodyStats: false, statistics: false,
                        connectedServices: false, ai: false, wellness: false, sharing: false,
                        backup: false, email: false, users: false, about: false };
@@ -52,7 +52,7 @@
 
   const SECTION_KEYWORDS = {
     appearance:        ['appearance','theme','dark','light','accent','color','navigation','sidebar','persistent','start page','animations','celebrations','reduce motion','banner','page banner'],
-    regional:          ['regional','date format','time format','locale','date','time','12h','24h','units','energy unit','weight unit','height','circumference','distance','imperial','metric'],
+    regional:          ['regional','date format','time format','locale','date','time','12h','24h','units','energy unit','weight unit','height','circumference','distance','temperature','imperial','metric'],
     diary:             ['diary','brands','timestamps','thumbnails','nutrients','nutrition units','macros','macro summary','prompt quantity','portion size','nutrition bar','goals progress','meal names','meals'],
     foods:             ['foods','thumbnails','category','notes','yesterday meals','sort order','sort','barcode','scan','beep','flashlight','crop photos'],
     water:             ['water','display unit','daily goal','containers','bottle','cup','glass'],
@@ -247,6 +247,7 @@
   let heightUnit  = DB.getSetting('heightUnit',  'ft');
   let lengthUnit  = DB.getSetting('lengthUnit',  'in');
   let distUnitVal = DB.getSetting('distUnit',    'km');
+  let tempUnitVal = DB.getSetting('tempUnit',    'F');
 
   // ── API keys ───────────────────────────────────────────────────────────────
   let usdaApiKey    = DB.getSetting('usdaApiKey',    '');
@@ -1420,6 +1421,7 @@
   $: set('heightUnit',         heightUnit);
   $: set('lengthUnit',         lengthUnit);
   $: set('distUnit',           distUnitVal);
+  $: set('tempUnit',           tempUnitVal);
   $: set('usdaEnabled',        usdaEnabled);
   $: set('offSearchLanguage',  offSearchLanguage);
   $: set('offSearchCountry',   offSearchCountry);
@@ -1643,6 +1645,16 @@
               <select class="select sel-sm" bind:value={distUnitVal}>
                 <option value="km">km</option>
                 <option value="mi">mi</option>
+              </select>
+            </div>
+          </div>
+          <div class="setting-divider"></div>
+          <div class="setting-row">
+            <span class="setting-label">Temperature</span>
+            <div class="select-wrap" style="width:100px">
+              <select class="select sel-sm" bind:value={tempUnitVal}>
+                <option value="F">°F</option>
+                <option value="C">°C</option>
               </select>
             </div>
           </div>
