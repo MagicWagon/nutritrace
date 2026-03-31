@@ -1,6 +1,7 @@
 <script>
   import { onMount, onDestroy, createEventDispatcher } from 'svelte';
   import { fly } from 'svelte/transition';
+  import { isNative } from '../../lib/platform.js';
 
   // Portal to document.body — prevents position:fixed being trapped by
   // ancestor transforms or opacity transitions (common iOS issue)
@@ -324,7 +325,42 @@
       .catch(() => { status = 'Camera access denied.'; });
   }
 
-  $: if (open && !scanning) startScanner();
+  // Native mode: use ML Kit barcode scanner instead of HTML5 camera
+  async function startNativeScanner() {
+    try {
+      const { BarcodeScanner, BarcodeFormat } = await import('@capacitor-mlkit/barcode-scanning');
+
+      // Request camera permission
+      const { camera } = await BarcodeScanner.requestPermissions();
+      if (camera !== 'granted') { status = 'Camera permission denied'; return; }
+
+      // Scan — opens native fullscreen camera overlay
+      const { barcodes } = await BarcodeScanner.scan({
+        formats: [
+          BarcodeFormat.EAN13, BarcodeFormat.EAN8,
+          BarcodeFormat.UPC_A, BarcodeFormat.UPC_E,
+          BarcodeFormat.Code128, BarcodeFormat.Code39,
+        ],
+      });
+
+      if (barcodes.length > 0) {
+        const code = barcodes[0].rawValue;
+        if ($barcodeBeep) playBeep();
+        dispatch('scan', { code });
+      }
+      // Close the scanner UI after scan completes
+      open = false;
+    } catch (e) {
+      console.error('[BarcodeScanner] Native scan failed:', e);
+      status = 'Scan failed: ' + (e?.message || '');
+      open = false;
+    }
+  }
+
+  $: if (open && !scanning) {
+    if (isNative) startNativeScanner();
+    else startScanner();
+  }
   $: if (!open && scanning) close();
 
   onDestroy(() => {

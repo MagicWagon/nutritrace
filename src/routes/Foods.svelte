@@ -419,7 +419,13 @@
     } else if (detail.value === 'clone') {
       cloneItem(selectedItem);
     } else if (detail.value === 'copy') {
-      copyAndUse(selectedItem).then(() => { showSuccess('Saved to your catalogue'); load(); });
+      if (selectedItem.id) {
+        copyAndUse(selectedItem).then(() => { showSuccess('Saved to your catalogue'); load(); });
+      } else {
+        // External item (OFF/USDA) — create a new local food from it
+        NtApi.createFood(selectedItem).then(() => { showSuccess('Saved to My Foods'); load(); })
+          .catch(e => showError('Could not save: ' + e.message));
+      }
     } else if (detail.value === 'delete') {
       showDeleteDialog = true;
     }
@@ -820,6 +826,8 @@
   title={selectedItem ? selectedItem.name : ''}
   actions={selectedItem?._shared_by != null ? [
     { label: 'Save to My Catalogue', icon: 'bookmark_add', value: 'copy' },
+  ] : !selectedItem?.id ? [
+    { label: 'Save to My Foods', icon: 'bookmark_add', value: 'copy' },
   ] : [
     { label: 'Edit',   icon: 'edit',        value: 'edit' },
     ...(activeTab !== 0 ? [{ label: 'Clone', icon: 'content_copy', value: 'clone' }] : []),
