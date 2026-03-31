@@ -62,6 +62,47 @@
   let groupRecipes = [];
   let loadingGroup = false;
 
+  // Share sheet (inline, no editor navigation)
+  let showShareSheet    = false;
+  let shareSheetItem    = null;
+  let shareSheetVis     = 'private';   // 'private' | 'group' | 'specific'
+  let shareSheetUsers   = [];          // all peers
+  let shareSheetSel     = [];          // selected user ids
+  let shareSheetSaving  = false;
+  let shareSheetLoaded  = false;
+
+  async function openShareSheet(item) {
+    shareSheetItem  = item;
+    shareSheetVis   = item.visibility || 'private';
+    shareSheetSel   = (item.shared_with || []).map(u => u.id ?? u);
+    showShareSheet  = true;
+    if (!shareSheetLoaded) {
+      try { shareSheetUsers = await NtApi.getUsersList(); } catch {}
+      shareSheetLoaded = true;
+    }
+  }
+
+  function toggleShareUser(id) {
+    shareSheetSel = shareSheetSel.includes(id)
+      ? shareSheetSel.filter(u => u !== id)
+      : [...shareSheetSel, id];
+  }
+
+  async function saveShare() {
+    if (!shareSheetItem) return;
+    shareSheetSaving = true;
+    try {
+      const isMeal = activeTab === 1 || activeTab === 2;
+      const ids = shareSheetVis === 'specific' ? shareSheetSel : [];
+      if (isMeal) await NtApi.shareMeal(shareSheetItem.id, shareSheetVis, ids);
+      else        await NtApi.shareFood(shareSheetItem.id, shareSheetVis, ids);
+      showShareSheet = false;
+      showSuccess('Sharing updated');
+      await load(); // refresh list so badges update
+    } catch(e) { showError('Could not save: ' + e.message); }
+    shareSheetSaving = false;
+  }
+
   async function loadGroupCatalogue() {
     if (!sharingEnabled) return;
     loadingGroup = true;
@@ -410,10 +451,7 @@
       else if (activeTab === 2) openMealEditor(selectedItem, true);
       else openEditor(selectedItem, 'foodList');
     } else if (detail.value === 'share') {
-      // Open editor scrolled to sharing section
-      if (activeTab === 1) openMealEditor(selectedItem, false);
-      else if (activeTab === 2) openMealEditor(selectedItem, true);
-      else openEditor(selectedItem, 'foodList');
+      openShareSheet(selectedItem);
     } else if (detail.value === 'clone') {
       cloneItem(selectedItem);
     } else if (detail.value === 'copy') {
@@ -662,7 +700,16 @@
                     <span class="food-kcal text-sm">{_kcal} kcal</span>
                   {/if}
                 </div>
-                <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
+                <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+                  {#if sharingEnabled && !food._shared_by}
+                    {#if food.visibility === 'group'}
+                      <span class="material-symbols-rounded share-badge share-badge-group" title="Shared with everyone">group</span>
+                    {:else if food.visibility === 'specific'}
+                      <span class="material-symbols-rounded share-badge share-badge-specific" title="Shared with specific people">person_add</span>
+                    {/if}
+                  {/if}
+                  <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
+                </div>
               </button>
             </li>
           {/each}
@@ -848,12 +895,73 @@
   on:confirm={() => selectedItem && deleteItem(selectedItem)}
 />
 
+<!-- Share Sheet -->
+<Sheet bind:open={showShareSheet} title={shareSheetItem ? shareSheetItem.name : 'Share'}>
+  <div class="share-sheet-body">
+    <p class="share-sheet-label">Who can see this?</p>
+    <div class="share-vis-chips">
+      <button class="chip" class:accent={shareSheetVis === 'private'}
+        on:click={() => shareSheetVis = 'private'}>
+        <span class="material-symbols-rounded" style="font-size:15px">lock</span>
+        Private
+      </button>
+      <button class="chip" class:accent={shareSheetVis === 'group'}
+        on:click={() => shareSheetVis = 'group'}>
+        <span class="material-symbols-rounded" style="font-size:15px">group</span>
+        Everyone
+      </button>
+      <button class="chip" class:accent={shareSheetVis === 'specific'}
+        on:click={() => shareSheetVis = 'specific'}>
+        <span class="material-symbols-rounded" style="font-size:15px">person_add</span>
+        Specific
+      </button>
+    </div>
+
+    {#if shareSheetVis === 'specific'}
+      <p class="share-sheet-label" style="margin-top:16px">Select members:</p>
+      {#if shareSheetUsers.length === 0}
+        <p class="share-sheet-empty">No other members in this group.</p>
+      {:else}
+        <div class="share-user-chips">
+          {#each shareSheetUsers as u}
+            <button class="chip" class:accent={shareSheetSel.includes(u.id)}
+              on:click={() => toggleShareUser(u.id)}>
+              {#if shareSheetSel.includes(u.id)}
+                <span class="material-symbols-rounded" style="font-size:14px">check</span>
+              {/if}
+              {u.name}
+            </button>
+          {/each}
+        </div>
+      {/if}
+    {:else if shareSheetVis === 'group'}
+      <p class="share-sheet-hint">All group members can see and copy this item.</p>
+    {:else}
+      <p class="share-sheet-hint">Only you can see this item.</p>
+    {/if}
+
+    <button class="btn btn-primary w-full share-sheet-save" on:click={saveShare} disabled={shareSheetSaving}>
+      {shareSheetSaving ? 'Saving…' : 'Save'}
+    </button>
+  </div>
+</Sheet>
+
 <style>
   .foods-tabs { padding: 12px var(--page-px) 12px; }
   .foods-search { padding: 0 var(--page-px) 12px; }
   .foods-search .search-input-wrap { gap: 8px; }
   .scan-btn { flex-shrink: 0; }
 
+  .share-badge { font-size: 15px; }
+  .share-badge-group    { color: var(--accent); }
+  .share-badge-specific { color: var(--accent); opacity: 0.75; }
+  .share-sheet-body { display: flex; flex-direction: column; gap: 8px; padding: 4px 0 8px; }
+  .share-sheet-label { font-size: 12px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-3); margin: 0; }
+  .share-sheet-hint  { font-size: 13px; color: var(--text-3); margin: 4px 0 0; }
+  .share-sheet-empty { font-size: 13px; color: var(--text-3); margin: 4px 0 0; }
+  .share-vis-chips   { display: flex; flex-wrap: wrap; gap: 8px; }
+  .share-user-chips  { display: flex; flex-wrap: wrap; gap: 8px; }
+  .share-sheet-save  { margin-top: 16px; }
   .food-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
   .food-item { overflow: hidden; }
   .food-item-btn {

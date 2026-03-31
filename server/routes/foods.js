@@ -161,6 +161,38 @@ router.post('/:id/copy', wrap((req, res) => {
   res.status(201).json(parse(db.prepare('SELECT * FROM foods WHERE id = ?').get(result.lastInsertRowid)));
 }));
 
+// ── POST /bulk-share — set visibility on all owned foods/meals/recipes at once ─
+router.post('/bulk-share', wrap((req, res) => {
+  const u = uid(req);
+  if (!sharingEnabled()) return res.status(403).json({ error: 'Sharing is not enabled.' });
+  const { visibility, target } = req.body;
+  if (!['private','group'].includes(visibility)) return res.status(400).json({ error: 'visibility must be private or group' });
+
+  // Foods
+  if (target === 'all' || target === 'foods') {
+    if (u != null) db.prepare(`UPDATE foods SET visibility = ? WHERE user_id = ?`).run(visibility, u);
+    else           db.prepare(`UPDATE foods SET visibility = ?`).run(visibility);
+    // Clear specific shares if switching away from specific
+    if (visibility !== 'specific') {
+      if (u != null) db.prepare(`DELETE FROM food_shares WHERE food_id IN (SELECT id FROM foods WHERE user_id = ?)`).run(u);
+      else           db.prepare(`DELETE FROM food_shares`).run();
+    }
+  }
+
+  // Meals (includes recipes — is_recipe flag doesn't affect sharing)
+  if (target === 'all' || target === 'meals' || target === 'recipes') {
+    const isRecipeFilter = target === 'meals' ? 'AND is_recipe = 0' : target === 'recipes' ? 'AND is_recipe = 1' : '';
+    if (u != null) db.prepare(`UPDATE meals SET visibility = ? WHERE user_id = ? ${isRecipeFilter}`).run(visibility, u);
+    else           db.prepare(`UPDATE meals SET visibility = ? ${isRecipeFilter}`).run(visibility);
+    if (visibility !== 'specific') {
+      if (u != null) db.prepare(`DELETE FROM meal_shares WHERE meal_id IN (SELECT id FROM meals WHERE user_id = ? ${isRecipeFilter})`).run(u);
+      else           db.prepare(`DELETE FROM meal_shares`).run();
+    }
+  }
+
+  res.json({ ok: true });
+}));
+
 function parse(row) {
   return {
     ...row,

@@ -1140,6 +1140,19 @@
     }).catch(() => {});
   }
 
+  let bulkVisibility = 'group';
+  let bulkApplying = false;
+  let bulkTarget = 'all'; // 'all' | 'foods' | 'meals' | 'recipes'
+
+  async function applyBulkShare() {
+    bulkApplying = true;
+    try {
+      await NtApi.post('/api/foods/bulk-share', { visibility: bulkVisibility, target: bulkTarget });
+      showSuccess('Sharing updated for all items');
+    } catch(e) { showError('Could not apply: ' + e.message); }
+    bulkApplying = false;
+  }
+
   $: if (openSections.sharing) loadSharingConfig();
 
   // ── Email / SMTP ───────────────────────────────────────────────────────────
@@ -1766,6 +1779,37 @@
                   <option value="specific">Specific people</option>
                 </select>
               </div>
+            </div>
+            <div class="setting-desc" style="padding: 0 16px 12px">New items you create will default to this visibility. Existing items are not changed.</div>
+          </div>
+          <p class="sub-label">Bulk Share</p>
+          <div class="card settings-card" style="gap:0">
+            <div class="setting-row">
+              <span class="setting-label">Apply visibility to</span>
+              <div class="select-wrap" style="width:130px">
+                <select class="select sel-sm" bind:value={bulkTarget}>
+                  <option value="all">All items</option>
+                  <option value="foods">Foods only</option>
+                  <option value="meals">Meals only</option>
+                  <option value="recipes">Recipes only</option>
+                </select>
+              </div>
+            </div>
+            <div class="setting-divider"></div>
+            <div class="setting-row">
+              <span class="setting-label">Set visibility to</span>
+              <div class="select-wrap" style="width:130px">
+                <select class="select sel-sm" bind:value={bulkVisibility}>
+                  <option value="private">Private</option>
+                  <option value="group">Everyone</option>
+                </select>
+              </div>
+            </div>
+            <div style="padding:12px 16px">
+              <div class="setting-desc" style="margin-bottom:10px">This will update sharing on all your existing items at once. "Specific people" is not available for bulk — use the share button on individual items instead.</div>
+              <button class="btn btn-secondary w-full" on:click={applyBulkShare} disabled={bulkApplying}>
+                {bulkApplying ? 'Applying…' : 'Apply to existing items'}
+              </button>
             </div>
           </div>
         </div>
