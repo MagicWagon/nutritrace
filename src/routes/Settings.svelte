@@ -353,9 +353,11 @@
   ];
   const WITHINGS_METRICS = [
     { id: 'ecg_afib',            label: 'AFib'               },
+    { id: 'basal_metabolic_rate',     label: 'Basal Metabolic Rate' },
     { id: 'body_fat_pct',        label: 'Body Fat'           },
     { id: 'body_water_pct',      label: 'Body Water'         },
     { id: 'bone_mass_kg',        label: 'Bone Mass'          },
+    { id: 'eda_feet',                 label: 'EDA Score'           },
     { id: 'ecg_heart_rate',           label: 'Heart Rate'          },
     { id: 'extracellular_water_kg',   label: 'Extracell. Water'    },
     { id: 'fat_mass_kg',              label: 'Fat Mass'            },
@@ -363,7 +365,7 @@
     { id: 'lean_mass_kg',             label: 'Lean Mass'           },
     { id: 'metabolic_age',            label: 'Metabolic Age'       },
     { id: 'muscle_mass_kg',           label: 'Muscle Mass'         },
-    { id: 'nerve_health_score',       label: 'Nerve Activity'      },
+    { id: 'nerve_health_score',       label: 'Nerve Health'        },
     { id: 'pulse_wave_velocity', label: 'Pulse Wave'         },
     { id: 'segmental_analysis',  label: 'Segmental Analysis' },
     { id: 'vascular_age',        label: 'Vascular Age'       },
@@ -378,7 +380,7 @@
   }
 
   function toggleWellnessMetric(id) {
-    const allIds = [...FITBIT_METRICS, ...GARMIN_METRICS, ...WITHINGS_METRICS].map(m => m.id);
+    const allIds = [...new Set([...FITBIT_METRICS, ...GARMIN_METRICS, ...WITHINGS_METRICS].map(m => m.id))];
     const cur = $wellnessMetrics ?? allIds;
     if (cur.includes(id)) {
       wellnessMetrics.set(cur.filter(x => x !== id));
@@ -2397,7 +2399,7 @@
                 <span class="setting-label">Visible Metrics</span>
                 <div class="chip-group" style="flex-wrap:wrap;gap:6px">
                   {#each FITBIT_METRICS as m}
-                    <button class="chip" class:chip-active={isWellnessMetricVisible(m.id)}
+                    <button class="chip" class:chip-active={$wellnessMetrics == null || $wellnessMetrics.includes(m.id)}
                       on:click={() => toggleWellnessMetric(m.id)}>{m.label}</button>
                   {/each}
                 </div>
@@ -2523,7 +2525,7 @@
                 <span class="setting-label">Visible Metrics</span>
                 <div class="chip-group" style="flex-wrap:wrap;gap:6px">
                   {#each GARMIN_METRICS as m}
-                    <button class="chip" class:chip-active={isWellnessMetricVisible(m.id)}
+                    <button class="chip" class:chip-active={$wellnessMetrics == null || $wellnessMetrics.includes(m.id)}
                       on:click={() => toggleWellnessMetric(m.id)}>{m.label}</button>
                   {/each}
                 </div>
@@ -2647,7 +2649,7 @@
                 <span class="setting-label">Visible Metrics</span>
                 <div class="chip-group" style="flex-wrap:wrap;gap:6px">
                   {#each WITHINGS_METRICS as m}
-                    <button class="chip" class:chip-active={isWellnessMetricVisible(m.id)}
+                    <button class="chip" class:chip-active={$wellnessMetrics == null || $wellnessMetrics.includes(m.id)}
                       on:click={() => toggleWellnessMetric(m.id)}>{m.label}</button>
                   {/each}
                 </div>
