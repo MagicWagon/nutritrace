@@ -37,6 +37,21 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 app.use(express.json({ limit: '50mb' }));
 app.use(cookieParser());
+
+// CORS — restrict API to same origin in production (allow all in dev for Vite proxy)
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && process.env.NODE_ENV === 'production') {
+    // Only allow requests from the same host (covers reverse proxies like Cloudflare Tunnel)
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') return res.sendStatus(204);
+  }
+  next();
+});
+
 app.use(authenticate); // attach req.user on every request
 
 // ── Request logging ────────────────────────────────────────────────────────

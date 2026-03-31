@@ -3,6 +3,11 @@ import db from '../db.js';
 
 export const JWT_SECRET = process.env.JWT_SECRET || 'nutritrace-dev-secret-change-in-production';
 
+// Warn at startup if using the default dev secret
+if (!process.env.JWT_SECRET) {
+  console.warn('[WARN] JWT_SECRET not set — using insecure dev default. Set JWT_SECRET in your environment for production.');
+}
+
 /** Returns true if user management is active (at least one user exists) */
 export function userMgmtActive() {
   return db.prepare('SELECT 1 FROM users LIMIT 1').get() != null;

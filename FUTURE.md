@@ -1,39 +1,20 @@
 # NutriTrace — Future Implementations
 
 Ideas and planned enhancements. Grouped by area. No commitment to order or timeline.
+Items marked ~~strikethrough~~ have been implemented.
 
 ---
 
-## Wellness — Reporting Phases
+## Wellness — Reporting & Insights
 
-### Phase 1 — Trends tab *(next)*
-Add a **Trends** tab to the Wellness page alongside Movement / Sleep / Heart.
+### ~~Phase 1 — Trends tab~~ *(done — sparklines on each metric card)*
 
-- **Range selector**: 7 / 30 / 90 day chip group
-- **Charts**: line charts using Chart.js (same setup as Statistics)
-  - Steps (Movement)
-  - Sleep duration (Sleep)
-  - Resting heart rate (Heart)
-  - HRV / RMSSD (Heart)
-- Data read from `wellness_data` table, grouped by `metric_type`, sorted by date
-- Reuse Statistics' accent color, grid lines, and tooltip config
-
-### Phase 2 — Derived insights
-Richer analysis derived from raw Fitbit data. Some metrics require storing additional fields.
-
-**Sleep quality:**
-- Sleep debt — actual vs goal, rolling 7-day deficit
-- Chronotype — early bird / night owl / intermediate from average `sleep_start` time
-- Sleep consistency score — % of last 30 days meeting sleep goal
-
-**Activity:**
-- Step consistency score — % of last 30 days meeting steps goal
-- Estimated HR zone from resting HR baseline
-
-**Infrastructure needed:**
-- Store `sleep_start` and `sleep_end` timestamps in `wellness_data`
-  - Fitbit `GET /1/user/-/sleep/date/{date}.json` already returns `mainSleep.startTime` / `mainSleep.endTime`
-  - Add `metric_type = 'sleep_start'` and `'sleep_end'` (ISO string values stored as text)
+### ~~Phase 2 — Derived insights~~ *(done)*
+- ~~Sleep debt — rolling 7/14/30-day deficit~~
+- ~~Chronotype — early bird / night owl from average sleep midpoint~~
+- ~~Daily Readiness score — HRV + RHR + sleep + activity penalty~~
+- ~~Stress Management score — smoothed HRV + RHR + sleep~~
+- ~~Sleep start/end stored as `sleep_start_min` / `sleep_end_min`~~
 
 ### Phase 3 — Dashboard / cross-domain correlation
 A dedicated **Dashboard** page that correlates data across all domains (nutrition + activity + sleep + body stats).
@@ -44,16 +25,19 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
   - Steps vs net calories (burned – eaten)
   - "Best week" pattern summary
   - Today at a glance (streak tracker)
-- May warrant a broader rebrand (e.g. "VitaTrace") since the app scope exceeds nutrition tracking
 
 ---
 
 ## Wellness — Additional Integrations
 
-### Garmin Connect
-- `wellness_data` schema already has `source` column (`'fitbit'` | `'garmin'` | ...)
-- Garmin OAuth 2.0 (similar PKCE flow)
-- Metrics overlap: steps, sleep, HR, HRV, SpO₂
+### ~~Garmin Connect~~ *(done — experimental, OAuth 1.0a)*
+### ~~Withings~~ *(done — body comp, ECG, vascular age, metabolic age, EDA, segmental)*
+
+### Fitbit GPS / Activity Routes
+- Fitbit API provides GPS route data for outdoor activities (runs, walks, bike rides)
+- `GET /1/user/-/activities/{id}.json` returns TCX data with lat/lon/elevation
+- Could display route maps on a per-activity detail view (Leaflet or similar map library)
+- Only unused Fitbit API capability — everything else is already synced
 
 ### Google Health Connect (Android)
 - Android Health Connect API (REST or local SDK bridge via PWA)
@@ -63,33 +47,39 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
 - Requires a native iOS wrapper (WebKit `WKWebView` + Swift bridge)
 - Or: export-based import (Apple Health XML export → parse + ingest)
 
-### Withings
-- Body composition scale data: weight, body fat %, muscle mass, bone mass, water %
-- Would make Goals body stats richer with auto-populated values
-
 ---
 
-## Shared Food Database
-
-- `is_shared` flag (or `user_id = NULL`) on foods visible to all users in multi-user mode
-- Admin can promote/demote shared foods
-- Users can "copy to my library" a shared food for local editing
-- Avoids duplication of common packaged foods across accounts on the same instance
+## ~~Shared Food Database~~ *(done — Food Sharing, experimental)*
+- ~~Visibility: private / group / specific users~~
+- ~~Copy-on-use model for shared items~~
+- ~~Bulk share from Settings~~
+- ~~"From Others" source filter in Foods~~
 
 ---
 
 ## Diary Enhancements
 
-### Calorie budget bar in diary header
-- Visual remaining/over budget strip below the macro summary — color shifts red when over goal
+### ~~Calorie budget bar in diary header~~ *(done — bottom bar with progress strip)*
 
-### Meal-level macro summary
-- Expandable per-meal macro breakdown (tap meal header to expand)
+### ~~Meal-level macro summary~~ *(done — per-meal P/C/F bar + text)*
 
 ### Quick-log (voice / text)
 - Natural language food entry: "2 eggs and a slice of toast"
-- Uses AI Buddy backend (already multi-provider); returns structured nutrition data
+- Uses FitBot AI backend (already multi-provider); returns structured nutrition data
 - Confirmation sheet before adding
+
+### Dynamic Calorie Goal
+- **Fixed** (current, default) vs **Dynamic** (device calories_out × factor)
+- Gate behind connected Fitbit/Garmin — hidden if no device
+- Factor: 0.80 (lose) / 1.00 (maintain) / 1.20 (gain)
+- Uses yesterday's final burn, falls back to fixed goal if no data
+- Touchpoints: diary bar, goals page (read-only override), statistics goal line, FitBot
+- Experimental badge
+
+### Adaptive TDEE
+- Learn actual TDEE by correlating weight trends with calorie intake over 35+ days
+- Requires significant history to be accurate
+- v1.0+ feature
 
 ---
 
@@ -113,7 +103,7 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
 - Useful for intermittent fasting or flexible dieting approaches
 
 ### AI-suggested goal adjustment
-- Based on X weeks of actual diary data, AI Buddy suggests goal refinements
+- Based on X weeks of actual diary data, FitBot suggests goal refinements
 - "You've averaged 1,850 kcal for 4 weeks — your current goal of 2,100 may be too high"
 
 ---
@@ -121,11 +111,26 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
 ## Statistics
 
 ### Body composition chart
-- Weight / body fat % / muscle mass plotted together (requires Withings or manual entry)
+- Weight / body fat % / muscle mass plotted together (Withings data available)
 
 ### Weekly summary email
 - Optional digest: calories in/out, steps, sleep averages, goal hit rate
 - Uses existing SMTP / email template infrastructure
+
+---
+
+## UI / UX Polish
+
+### Accessibility
+- ActionSheet: add `role="dialog"` and focus trap
+- Form inputs: explicit `<label>` associations throughout
+- MealEditor name field: `<div>` → `<label>` element
+
+### Diary loading indicator
+- Subtle spinner or opacity change on date navigation when network is slow
+
+### Water log editing
+- Tap a water log entry to edit volume/time (currently only add/delete)
 
 ---
 
@@ -143,6 +148,12 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
 - Optional Prometheus endpoint (`/api/metrics`): request count, DB query times, sync success/fail
 - Admin-only; opt-in via env var
 
+### Security hardening
+- Rate limiting on auth endpoints
+- CORS middleware with explicit allowed origins
+- CSRF protection
+- Increase minimum password length (4 → 8+)
+
 ---
 
-*Last updated: 2026-03-28*
+*Last updated: 2026-03-31*

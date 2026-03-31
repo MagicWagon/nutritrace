@@ -8,6 +8,36 @@ import { sendPasswordReset, sendInvite, isEmailConfigured } from '../email.js';
 
 const router = Router();
 
+function validatePassword(pw) {
+  if (!pw || pw.length < 8) return 'Password must be at least 8 characters';
+  if (!/[a-z]/.test(pw)) return 'Password must include a lowercase letter';
+  if (!/[A-Z]/.test(pw)) return 'Password must include an uppercase letter';
+  if (!/[0-9]/.test(pw)) return 'Password must include a number';
+  if (!/[^a-zA-Z0-9]/.test(pw)) return 'Password must include a special character';
+  return null;
+}
+
+// Simple in-memory rate limiter for auth endpoints (no external dependency)
+const _loginAttempts = new Map(); // ip → { count, resetAt }
+function rateLimitLogin(req, res, next) {
+  const ip = req.ip || req.connection.remoteAddress;
+  const now = Date.now();
+  const entry = _loginAttempts.get(ip);
+  if (entry && now < entry.resetAt) {
+    entry.count++;
+    if (entry.count > 10) { // 10 attempts per 15-min window
+      return res.status(429).json({ error: 'Too many login attempts. Try again in a few minutes.' });
+    }
+  } else {
+    _loginAttempts.set(ip, { count: 1, resetAt: now + 15 * 60 * 1000 });
+  }
+  // Cleanup stale entries periodically
+  if (_loginAttempts.size > 1000) {
+    for (const [k, v] of _loginAttempts) { if (now > v.resetAt) _loginAttempts.delete(k); }
+  }
+  next();
+}
+
 const COOKIE_OPTS = {
   httpOnly: true,
   sameSite: 'lax',
@@ -33,7 +63,7 @@ router.get('/me', wrap((req, res) => {
 }));
 
 // ── Login ──────────────────────────────────────────────────────────────────
-router.post('/login', wrap((req, res) => {
+router.post('/login', rateLimitLogin, wrap((req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
 
@@ -64,7 +94,7 @@ router.post('/register', wrap((req, res) => {
 
   const { username, password, full_name, nickname, birthday, gender, role, email } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
-  if (password.length < 4) return res.status(400).json({ error: 'Password must be at least 4 characters' });
+  { const pwErr = validatePassword(password); if (pwErr) return res.status(400).json({ error: pwErr }); }
 
   const hash = bcrypt.hashSync(password, 10);
   const assignedRole = isFirst ? 'admin' : (role === 'admin' ? 'admin' : 'user');
@@ -107,7 +137,7 @@ router.put('/profile', requireAuth, wrap((req, res) => {
 router.put('/password', requireAuth, wrap((req, res) => {
   const { current_password, new_password } = req.body;
   if (!current_password || !new_password) return res.status(400).json({ error: 'Both passwords required' });
-  if (new_password.length < 4) return res.status(400).json({ error: 'Password must be at least 4 characters' });
+  { const pwErr = validatePassword(new_password); if (pwErr) return res.status(400).json({ error: pwErr }); }
 
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
   if (!bcrypt.compareSync(current_password, user.password_hash)) {
@@ -142,7 +172,7 @@ router.delete('/users/:id', requireAuth, requireAdmin, wrap((req, res) => {
 router.put('/users/:id/password', requireAuth, requireAdmin, wrap((req, res) => {
   const id = parseInt(req.params.id);
   const { new_password } = req.body;
-  if (!new_password || new_password.length < 4) return res.status(400).json({ error: 'Password must be at least 4 characters' });
+  { const pwErr = validatePassword(new_password); if (pwErr) return res.status(400).json({ error: pwErr }); }
   db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(bcrypt.hashSync(new_password, 10), id);
   res.json({ ok: true });
 }));
@@ -156,7 +186,7 @@ router.delete('/management', requireAuth, requireAdmin, wrap((req, res) => {
 
 // ── Lockout recovery: disable user management without credentials ──────────
 // Requires RECOVERY_TOKEN env var to prevent unauthenticated account wipes.
-router.post('/recover', wrap((req, res) => {
+router.post('/recover', rateLimitLogin, wrap((req, res) => {
   if (req.user) return res.status(400).json({ error: 'You are already signed in. Use Settings to disable user management.' });
   const token = process.env.RECOVERY_TOKEN;
   if (!token) return res.status(503).json({ error: 'Recovery not available. Set RECOVERY_TOKEN environment variable.' });
@@ -167,7 +197,7 @@ router.post('/recover', wrap((req, res) => {
 }));
 
 // ── Forgot password ────────────────────────────────────────────────────────
-router.post('/forgot-password', wrap(async (req, res) => {
+router.post('/forgot-password', rateLimitLogin, wrap(async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'Email required' });
   if (!isEmailConfigured()) return res.status(503).json({ error: 'Email not configured on this server. Contact your administrator.' });
@@ -192,7 +222,7 @@ router.post('/forgot-password', wrap(async (req, res) => {
 router.post('/reset-password', wrap((req, res) => {
   const { token, password } = req.body;
   if (!token || !password) return res.status(400).json({ error: 'Token and password required' });
-  if (password.length < 4) return res.status(400).json({ error: 'Password must be at least 4 characters' });
+  { const pwErr = validatePassword(password); if (pwErr) return res.status(400).json({ error: pwErr }); }
 
   const row = db.prepare('SELECT * FROM password_reset_tokens WHERE token = ?').get(token);
   if (!row || row.used) return res.status(400).json({ error: 'Invalid or expired reset link' });
@@ -232,7 +262,7 @@ router.post('/invite', requireAuth, requireAdmin, wrap(async (req, res) => {
 router.post('/accept-invite', wrap((req, res) => {
   const { token, username, password, full_name } = req.body;
   if (!token || !username || !password) return res.status(400).json({ error: 'Token, username and password required' });
-  if (password.length < 4) return res.status(400).json({ error: 'Password must be at least 4 characters' });
+  { const pwErr = validatePassword(password); if (pwErr) return res.status(400).json({ error: pwErr }); }
 
   const invite = db.prepare('SELECT * FROM invite_tokens WHERE token = ?').get(token);
   if (!invite || invite.used) return res.status(400).json({ error: 'Invalid or already used invite link' });

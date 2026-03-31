@@ -134,7 +134,10 @@
       if (enableUserMgmt) {
         umError = '';
         if (!adminUsername.trim()) { umError = 'Username is required'; return; }
-        if (adminPassword.length < 6) { umError = 'Password must be at least 6 characters'; return; }
+        if (adminPassword.length < 8) { umError = 'Password must be at least 8 characters'; return; }
+        if (!/[a-z]/.test(adminPassword) || !/[A-Z]/.test(adminPassword) || !/[0-9]/.test(adminPassword) || !/[^a-zA-Z0-9]/.test(adminPassword)) {
+          umError = 'Password needs uppercase, lowercase, number, and special character'; return;
+        }
         if (adminPassword !== adminConfirm) { umError = 'Passwords do not match'; return; }
         // Register the admin account
         umLoading = true;

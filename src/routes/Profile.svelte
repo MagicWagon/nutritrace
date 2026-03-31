@@ -72,7 +72,10 @@
 
   async function changePassword() {
     if (new_password !== new_password2) { showError('Passwords do not match'); return; }
-    if (new_password.length < 4) { showError('Password must be at least 4 characters'); return; }
+    if (new_password.length < 8) { showError('Password must be at least 8 characters'); return; }
+    if (!/[a-z]/.test(new_password) || !/[A-Z]/.test(new_password) || !/[0-9]/.test(new_password) || !/[^a-zA-Z0-9]/.test(new_password)) {
+      showError('Password needs uppercase, lowercase, number, and special character'); return;
+    }
     pwSaving = true;
     try {
       const res = await fetch('/api/auth/password', {
