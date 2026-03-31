@@ -19,7 +19,12 @@
     'Avocado Toast',
     'Chicken Stir Fry',
     'Mushroom Risotto',
-    'Berry Smoothie Bowl',
+    'Açaí Bowl',
+    'Salmon Teriyaki',
+    'Greek Yogurt Parfait',
+    'Pad Thai',
+    'Caprese Panini',
+    'Overnight Oats',
   ];
 
   let displayText = '';

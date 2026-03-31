@@ -246,10 +246,11 @@
     return stat && (stat.id in MACRO_DENSITY);
   }
 
-  function getTodayValue(stat, totals, bodyStats) {
+  function getTodayValue(stat, totals, bodyStats, wellness) {
     const t = totals    ?? todayTotals;
     const b = bodyStats ?? todayBodyStats;
-    if (stat.isWellness) return todayWellness[stat.id] ?? null;
+    const w = wellness  ?? todayWellness;
+    if (stat.isWellness) return w[stat.id] ?? null;
     if (stat.isBody) return b[stat.id] ?? null;
     return t[stat.id] ?? null;
   }
@@ -271,8 +272,8 @@
     return Math.round(calGoal * raw / 100 / density);
   }
 
-  function getPct(stat, totals, bodyStats) {
-    const cur = getTodayValue(stat, totals, bodyStats);
+  function getPct(stat, totals, bodyStats, wellness) {
+    const cur = getTodayValue(stat, totals, bodyStats, wellness);
     const tgt = getTarget(stat);
     if (cur == null || tgt == null || tgt === 0) return 0;
     return Math.min(100, Math.round(cur / tgt * 100));
@@ -318,9 +319,9 @@
                 <div class="goal-info">
                   <span class="font-medium">{stat.label}</span>
                   {#if getTarget(stat) != null}
-                    {@const pct = getPct(stat, todayTotals, todayBodyStats)}
+                    {@const pct = getPct(stat, todayTotals, todayBodyStats, todayWellness)}
                     {@const tgt = getTarget(stat)}
-                    {@const cur = getTodayValue(stat, todayTotals, todayBodyStats)}
+                    {@const cur = getTodayValue(stat, todayTotals, todayBodyStats, todayWellness)}
                     {@const isMin = $goals[stat.id]?.isMin}
                     {@const bad = cur != null && tgt != null && (isMin ? cur < tgt : cur > tgt)}
                     <div class="goal-progress-bar">
@@ -349,9 +350,9 @@
                 <div class="goal-info">
                   <span class="font-medium">{stat.label}</span>
                   {#if getTarget(stat) != null}
-                    {@const pct = getPct(stat, todayTotals, todayBodyStats)}
+                    {@const pct = getPct(stat, todayTotals, todayBodyStats, todayWellness)}
                     {@const tgt = getTarget(stat)}
-                    {@const cur = getTodayValue(stat, todayTotals, todayBodyStats)}
+                    {@const cur = getTodayValue(stat, todayTotals, todayBodyStats, todayWellness)}
                     {@const isMin = $goals[stat.id]?.isMin}
                     {@const bad = cur != null && tgt != null && (isMin ? cur < tgt : cur > tgt)}
                     <div class="goal-progress-bar">
@@ -397,9 +398,9 @@
               <div class="goal-info">
                 <span class="font-medium">{stat.label}</span>
                 {#if getTarget(stat) != null}
-                  {@const pct = getPct(stat, todayTotals, todayBodyStats)}
+                  {@const pct = getPct(stat, todayTotals, todayBodyStats, todayWellness)}
                   {@const tgt = getTarget(stat)}
-                  {@const cur = getTodayValue(stat)}
+                  {@const cur = getTodayValue(stat, todayTotals, todayBodyStats, todayWellness)}
                   <div class="goal-progress-bar">
                     <div class="goal-progress-fill" style="width:{pct}%"></div>
                   </div>
@@ -427,9 +428,9 @@
             <div class="goal-info">
               <span class="font-medium">{stat.label}</span>
               {#if $goals[stat.id]}
-                {@const pct = getPct(stat, todayTotals, todayBodyStats)}
+                {@const pct = getPct(stat, todayTotals, todayBodyStats, todayWellness)}
                 {@const tgt = getTarget(stat)}
-                {@const cur = getTodayValue(stat, todayTotals, todayBodyStats)}
+                {@const cur = getTodayValue(stat, todayTotals, todayBodyStats, todayWellness)}
                 <div class="goal-progress-bar">
                   <div class="goal-progress-fill" style="width:{pct}%"></div>
                 </div>
@@ -452,9 +453,9 @@
             <div class="goal-info">
               <span class="font-medium">{stat.label}</span>
               {#if $goals[stat.id]}
-                {@const pct = getPct(stat, todayTotals, todayBodyStats)}
+                {@const pct = getPct(stat, todayTotals, todayBodyStats, todayWellness)}
                 {@const tgt = getTarget(stat)}
-                {@const cur = getTodayValue(stat, todayTotals, todayBodyStats)}
+                {@const cur = getTodayValue(stat, todayTotals, todayBodyStats, todayWellness)}
                 <div class="goal-progress-bar">
                   <div class="goal-progress-fill" style="width:{pct}%"></div>
                 </div>
@@ -493,9 +494,9 @@
               <div class="goal-info">
                 <span class="font-medium">{stat.label}</span>
                 {#if $goals[stat.id]}
-                  {@const pct = getPct(stat, todayTotals, todayBodyStats)}
+                  {@const pct = getPct(stat, todayTotals, todayBodyStats, todayWellness)}
                   {@const tgt = getTarget(stat)}
-                  {@const cur = getTodayValue(stat)}
+                  {@const cur = getTodayValue(stat, todayTotals, todayBodyStats, todayWellness)}
                   <div class="goal-progress-bar">
                     <div class="goal-progress-fill" style="width:{pct}%"></div>
                   </div>
