@@ -1439,6 +1439,12 @@
                       </span>
                     </div>
                   </div>
+                  {#if readiness.data_days < 30}
+                    <div class="si-calibration-note">
+                      <span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">info</span>
+                      Based on {readiness.data_days} of 30 days — accuracy improves as more data is collected.
+                    </div>
+                  {/if}
                 {/if}
               </div>
             {/if}
@@ -1472,6 +1478,12 @@
                     </div>
                   </div>
                   <p class="si-desc" style="margin-top:6px;margin-bottom:0">Higher = nervous system is well balanced. Driven by HRV, sleep quality, and resting HR compared to your personal baselines. Moves gradually — reflects multi-day trends, not just today.</p>
+                  {#if stressScore.data_days < 30}
+                    <div class="si-calibration-note">
+                      <span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">info</span>
+                      Based on {stressScore.data_days} of 30 days — accuracy improves as more data is collected.
+                    </div>
+                  {/if}
                 {/if}
               </div>
             {/if}
@@ -2175,6 +2187,15 @@
     color: var(--text-2);
     line-height: 1.5;
     margin: 0 0 10px;
+  }
+  .si-calibration-note {
+    font-size: 12px;
+    color: var(--text-3);
+    padding: 8px 12px;
+    margin-top: 8px;
+    background: var(--surface-2);
+    border-radius: var(--radius-sm, 6px);
+    line-height: 1.4;
   }
   .si-range-chips {
     display: flex;
