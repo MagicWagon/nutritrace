@@ -2393,7 +2393,7 @@
                       </div>
                       <div class="setting-desc" style="font-size:11px;margin-top:2px">Format: <code style="font-size:11px">https://your-domain.com/api/wellness/fitbit/callback</code></div>
                     </div>
-                    <button class="btn btn-primary" style="align-self:flex-end" on:click={saveFitbitConfig}>Save &amp; Connect</button>
+                    <button class="btn btn-primary" style="align-self:flex-end" on:click={saveFitbitConfig}>{fitbitEditingCreds ? 'Save' : 'Save &amp; Connect'}</button>
                   </div>
                 </div>
               {/if}
@@ -2519,7 +2519,7 @@
                       </div>
                       <div class="setting-desc" style="font-size:11px;margin-top:2px">Format: <code style="font-size:11px">https://your-domain.com/api/wellness/garmin/callback</code></div>
                     </div>
-                    <button class="btn btn-primary" style="align-self:flex-end" on:click={saveGarminConfig}>Save &amp; Connect</button>
+                    <button class="btn btn-primary" style="align-self:flex-end" on:click={saveGarminConfig}>{garminEditingCreds ? 'Save' : 'Save &amp; Connect'}</button>
                   </div>
                 </div>
               {/if}
@@ -2643,7 +2643,7 @@
                       </div>
                       <div class="setting-desc" style="font-size:11px;margin-top:2px">Format: <code style="font-size:11px">https://your-domain.com/api/wellness/withings/callback</code></div>
                     </div>
-                    <button class="btn btn-primary" style="align-self:flex-end" on:click={saveWithingsConfig}>Save &amp; Connect</button>
+                    <button class="btn btn-primary" style="align-self:flex-end" on:click={saveWithingsConfig}>{withingsEditingCreds ? 'Save' : 'Save &amp; Connect'}</button>
                   </div>
                 </div>
               {/if}
