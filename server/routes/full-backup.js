@@ -36,6 +36,8 @@ function restoreFromZip(zip) {
   db.transaction(() => {
     db.prepare('DELETE FROM password_reset_tokens').run();
     db.prepare('DELETE FROM invite_tokens').run();
+    db.prepare('DELETE FROM food_shares').run();
+    db.prepare('DELETE FROM meal_shares').run();
     db.prepare('DELETE FROM user_settings').run();
     db.prepare('DELETE FROM app_config').run();
     db.prepare('DELETE FROM diary').run();
@@ -50,16 +52,22 @@ function restoreFromZip(zip) {
     for (const u of data.users || []) insUser.run(u);
 
     const insFood = db.prepare(`
-      INSERT OR IGNORE INTO foods (id, user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, created_at)
-      VALUES (@id, @user_id, @name, @brand, @nutrition, @portion, @unit, @img_url, @notes, @category, @barcode, @created_at)
+      INSERT OR IGNORE INTO foods (id, user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, visibility, source_id, created_at)
+      VALUES (@id, @user_id, @name, @brand, @nutrition, @portion, @unit, @img_url, @notes, @category, @barcode, @visibility, @source_id, @created_at)
     `);
-    for (const f of data.foods || []) insFood.run(f);
+    for (const f of data.foods || []) insFood.run({ visibility: 'private', source_id: null, ...f });
 
     const insMeal = db.prepare(`
-      INSERT OR IGNORE INTO meals (id, user_id, name, nutrition, items, img_url, notes, is_recipe, portion, unit, created_at)
-      VALUES (@id, @user_id, @name, @nutrition, @items, @img_url, @notes, @is_recipe, @portion, @unit, @created_at)
+      INSERT OR IGNORE INTO meals (id, user_id, name, nutrition, items, img_url, notes, is_recipe, portion, unit, visibility, source_id, created_at)
+      VALUES (@id, @user_id, @name, @nutrition, @items, @img_url, @notes, @is_recipe, @portion, @unit, @visibility, @source_id, @created_at)
     `);
-    for (const m of data.meals || []) insMeal.run(m);
+    for (const m of data.meals || []) insMeal.run({ visibility: 'private', source_id: null, ...m });
+
+    const insFoodShare = db.prepare(`INSERT OR IGNORE INTO food_shares (food_id, user_id) VALUES (@food_id, @user_id)`);
+    for (const fs of data.food_shares || []) insFoodShare.run(fs);
+
+    const insMealShare = db.prepare(`INSERT OR IGNORE INTO meal_shares (meal_id, user_id) VALUES (@meal_id, @user_id)`);
+    for (const ms of data.meal_shares || []) insMealShare.run(ms);
 
     const insDiary = db.prepare(`
       INSERT OR IGNORE INTO diary (id, user_id, date, items, body_stats, water, updated_at)
@@ -113,6 +121,8 @@ function dumpDatabase() {
     users:            db.prepare('SELECT * FROM users').all(),
     foods:            db.prepare('SELECT * FROM foods').all(),
     meals:            db.prepare('SELECT * FROM meals').all(),
+    food_shares:      db.prepare('SELECT * FROM food_shares').all(),
+    meal_shares:      db.prepare('SELECT * FROM meal_shares').all(),
     diary:            db.prepare('SELECT * FROM diary').all(),
     user_settings:    db.prepare('SELECT * FROM user_settings').all(),
     app_config:       db.prepare('SELECT * FROM app_config').all(),
