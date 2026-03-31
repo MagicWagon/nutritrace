@@ -1143,12 +1143,27 @@
   let bulkVisibility = 'group';
   let bulkApplying = false;
   let bulkTarget = 'all'; // 'all' | 'foods' | 'meals' | 'recipes'
+  let bulkUsers = [];
+  let bulkSelectedIds = [];
+  let bulkUsersLoaded = false;
+
+  async function loadBulkUsers() {
+    if (bulkUsersLoaded) return;
+    try { bulkUsers = await NtApi.getUsersList(); bulkUsersLoaded = true; } catch {}
+  }
+
+  function toggleBulkUser(id) {
+    bulkSelectedIds = bulkSelectedIds.includes(id)
+      ? bulkSelectedIds.filter(u => u !== id)
+      : [...bulkSelectedIds, id];
+  }
 
   async function applyBulkShare() {
     bulkApplying = true;
     try {
-      await NtApi.post('/api/foods/bulk-share', { visibility: bulkVisibility, target: bulkTarget });
-      showSuccess('Sharing updated for all items');
+      const user_ids = bulkVisibility === 'specific' ? bulkSelectedIds : [];
+      await NtApi.post('/api/foods/bulk-share', { visibility: bulkVisibility, target: bulkTarget, user_ids });
+      showSuccess('Sharing updated');
     } catch(e) { showError('Could not apply: ' + e.message); }
     bulkApplying = false;
   }
@@ -1799,14 +1814,31 @@
             <div class="setting-row">
               <span class="setting-label">Set visibility to</span>
               <div class="select-wrap" style="width:130px">
-                <select class="select sel-sm" bind:value={bulkVisibility}>
+                <select class="select sel-sm" bind:value={bulkVisibility} on:change={() => { if (bulkVisibility === 'specific') loadBulkUsers(); }}>
                   <option value="private">Private</option>
                   <option value="group">Everyone</option>
+                  <option value="specific">Specific people</option>
                 </select>
               </div>
             </div>
-            <div style="padding:12px 16px">
-              <div class="setting-desc" style="margin-bottom:10px">This will update sharing on all your existing items at once. "Specific people" is not available for bulk — use the share button on individual items instead.</div>
+            {#if bulkVisibility === 'specific'}
+              <div style="padding:0 16px 8px">
+                <div class="setting-desc" style="margin-bottom:8px">Select which members can see your items:</div>
+                <div style="display:flex;flex-wrap:wrap;gap:8px">
+                  {#each bulkUsers as u}
+                    <button class="chip" class:chip-active={bulkSelectedIds.includes(u.id)}
+                      on:click={() => toggleBulkUser(u.id)}>
+                      {#if bulkSelectedIds.includes(u.id)}
+                        <span class="material-symbols-rounded" style="font-size:14px">check</span>
+                      {/if}
+                      {u.name}
+                    </button>
+                  {/each}
+                  {#if !bulkUsersLoaded}<span class="setting-desc">Loading…</span>{/if}
+                </div>
+              </div>
+            {/if}
+            <div style="padding:8px 16px 12px">
               <button class="btn btn-secondary w-full" on:click={applyBulkShare} disabled={bulkApplying}>
                 {bulkApplying ? 'Applying…' : 'Apply to existing items'}
               </button>

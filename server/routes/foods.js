@@ -165,28 +165,43 @@ router.post('/:id/copy', wrap((req, res) => {
 router.post('/bulk-share', wrap((req, res) => {
   const u = uid(req);
   if (!sharingEnabled()) return res.status(403).json({ error: 'Sharing is not enabled.' });
-  const { visibility, target } = req.body;
-  if (!['private','group'].includes(visibility)) return res.status(400).json({ error: 'visibility must be private or group' });
+  const { visibility, target, user_ids = [] } = req.body;
+  if (!['private','group','specific'].includes(visibility)) return res.status(400).json({ error: 'Invalid visibility' });
+
+  const doFoods = target === 'all' || target === 'foods';
+  const doMeals = target === 'all' || target === 'meals';
+  const doRecipes = target === 'all' || target === 'recipes';
 
   // Foods
-  if (target === 'all' || target === 'foods') {
+  if (doFoods) {
     if (u != null) db.prepare(`UPDATE foods SET visibility = ? WHERE user_id = ?`).run(visibility, u);
     else           db.prepare(`UPDATE foods SET visibility = ?`).run(visibility);
-    // Clear specific shares if switching away from specific
-    if (visibility !== 'specific') {
-      if (u != null) db.prepare(`DELETE FROM food_shares WHERE food_id IN (SELECT id FROM foods WHERE user_id = ?)`).run(u);
-      else           db.prepare(`DELETE FROM food_shares`).run();
+    if (u != null) db.prepare(`DELETE FROM food_shares WHERE food_id IN (SELECT id FROM foods WHERE user_id = ?)`).run(u);
+    else           db.prepare(`DELETE FROM food_shares`).run();
+    if (visibility === 'specific' && user_ids.length) {
+      const foodIds = u != null
+        ? db.prepare(`SELECT id FROM foods WHERE user_id = ?`).all(u).map(r => r.id)
+        : db.prepare(`SELECT id FROM foods`).all().map(r => r.id);
+      const ins = db.prepare(`INSERT OR IGNORE INTO food_shares (food_id, user_id) VALUES (?, ?)`);
+      const tx = db.transaction(() => { for (const fid of foodIds) for (const uid2 of user_ids) ins.run(fid, uid2); });
+      tx();
     }
   }
 
-  // Meals (includes recipes — is_recipe flag doesn't affect sharing)
-  if (target === 'all' || target === 'meals' || target === 'recipes') {
-    const isRecipeFilter = target === 'meals' ? 'AND is_recipe = 0' : target === 'recipes' ? 'AND is_recipe = 1' : '';
-    if (u != null) db.prepare(`UPDATE meals SET visibility = ? WHERE user_id = ? ${isRecipeFilter}`).run(visibility, u);
-    else           db.prepare(`UPDATE meals SET visibility = ? ${isRecipeFilter}`).run(visibility);
-    if (visibility !== 'specific') {
-      if (u != null) db.prepare(`DELETE FROM meal_shares WHERE meal_id IN (SELECT id FROM meals WHERE user_id = ? ${isRecipeFilter})`).run(u);
-      else           db.prepare(`DELETE FROM meal_shares`).run();
+  // Meals
+  const mealFilter = doMeals && !doRecipes ? 'AND is_recipe = 0' : !doMeals && doRecipes ? 'AND is_recipe = 1' : '';
+  if (doMeals || doRecipes) {
+    if (u != null) db.prepare(`UPDATE meals SET visibility = ? WHERE user_id = ? ${mealFilter}`).run(visibility, u);
+    else           db.prepare(`UPDATE meals SET visibility = ? ${mealFilter}`).run(visibility);
+    if (u != null) db.prepare(`DELETE FROM meal_shares WHERE meal_id IN (SELECT id FROM meals WHERE user_id = ? ${mealFilter})`).run(u);
+    else           db.prepare(`DELETE FROM meal_shares`).run();
+    if (visibility === 'specific' && user_ids.length) {
+      const mealIds = u != null
+        ? db.prepare(`SELECT id FROM meals WHERE user_id = ? ${mealFilter}`).all(u).map(r => r.id)
+        : db.prepare(`SELECT id FROM meals ${mealFilter ? 'WHERE ' + mealFilter.slice(4) : ''}`).all().map(r => r.id);
+      const ins = db.prepare(`INSERT OR IGNORE INTO meal_shares (meal_id, user_id) VALUES (?, ?)`);
+      const tx = db.transaction(() => { for (const mid of mealIds) for (const uid2 of user_ids) ins.run(mid, uid2); });
+      tx();
     }
   }
 

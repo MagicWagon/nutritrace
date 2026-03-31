@@ -39,7 +39,7 @@
     { label: 'Recipes', value: 'recipes' },
   ];
   let activeTab = 0;
-  $: { activeTab; activeCategoryFilter = ''; if (activeTab !== 0) searchSource = 'local'; showGroupCatalogue = false; }
+  $: { activeTab; activeCategoryFilter = ''; if (activeTab !== 0 && searchSource !== 'local') searchSource = 'local'; }
   $: _tabIcon = activeTab === 0 ? 'restaurant' : activeTab === 1 ? 'dinner_dining' : 'menu_book';
   $: { if (pickMode) loadYesterdayMeals(); }
 
@@ -51,61 +51,16 @@
     { value: 'off',    label: 'OFF'    },
     ...($usdaEnabled   ? [{ value: 'usda',   label: 'USDA'   }] : []),
     ...(_mealieEnabled ? [{ value: 'mealie', label: 'Mealie' }] : []),
+    ...(sharingEnabled ? [{ value: 'shared', label: 'Shared' }] : []),
   ];
   $: _sourceLabel = availableSources.find(s => s.value === searchSource)?.label || '';
 
-  // Sharing
+  // Sharing — "Shared" source filter
   let sharingEnabled = false;
-  let showGroupCatalogue = false;  // when true, list shows group items instead of own
   let groupFoods = [];
   let groupMeals = [];
   let groupRecipes = [];
   let loadingGroup = false;
-
-  // Share sheet (inline, no editor navigation)
-  let showShareSheet    = false;
-  let shareSheetItem    = null;
-  let shareSheetVis     = 'private';   // 'private' | 'group' | 'specific'
-  let shareSheetUsers   = [];          // all peers
-  let shareSheetSel     = [];          // selected user ids
-  let shareSheetSaving  = false;
-  let shareSheetLoaded  = false;
-
-  async function openShareSheet(item) {
-    shareSheetItem  = item;
-    shareSheetVis   = item.visibility || 'private';
-    shareSheetSel   = [];
-    showShareSheet  = true;
-    // Load peers and existing specific shares in parallel
-    const [, full] = await Promise.all([
-      shareSheetLoaded ? null : NtApi.getUsersList().then(u => { shareSheetUsers = u; shareSheetLoaded = true; }).catch(() => {}),
-      item.visibility === 'specific'
-        ? (activeTab === 0 ? NtApi.getFood(item.id) : NtApi.getMeal(item.id)).catch(() => null)
-        : Promise.resolve(null),
-    ]);
-    if (full?._specific_users) shareSheetSel = full._specific_users;
-  }
-
-  function toggleShareUser(id) {
-    shareSheetSel = shareSheetSel.includes(id)
-      ? shareSheetSel.filter(u => u !== id)
-      : [...shareSheetSel, id];
-  }
-
-  async function saveShare() {
-    if (!shareSheetItem) return;
-    shareSheetSaving = true;
-    try {
-      const isMeal = activeTab === 1 || activeTab === 2;
-      const ids = shareSheetVis === 'specific' ? shareSheetSel : [];
-      if (isMeal) await NtApi.shareMeal(shareSheetItem.id, shareSheetVis, ids);
-      else        await NtApi.shareFood(shareSheetItem.id, shareSheetVis, ids);
-      showShareSheet = false;
-      showSuccess('Sharing updated');
-      await load(); // refresh list so badges update
-    } catch(e) { showError('Could not save: ' + e.message); }
-    shareSheetSaving = false;
-  }
 
   async function loadGroupCatalogue() {
     if (!sharingEnabled) return;
@@ -120,14 +75,10 @@
     finally { loadingGroup = false; }
   }
 
-  async function copyAndUse(food, action) {
-    // If food belongs to another user, copy to own catalogue first, then proceed
+  async function copyAndUse(food) {
     try {
       const isMeal = activeTab === 1 || activeTab === 2;
-      let mine;
-      if (isMeal) mine = await NtApi.copyMeal(food.id);
-      else mine = await NtApi.copyFood(food.id);
-      return mine;
+      return isMeal ? await NtApi.copyMeal(food.id) : await NtApi.copyFood(food.id);
     } catch(e) {
       showError('Could not copy item: ' + e.message);
       return null;
@@ -176,7 +127,8 @@
   $: currentStore = TABS[activeTab].value;
   $: _ownList = activeTab === 0 ? localFoods : activeTab === 1 ? localMeals : localRecipes;
   $: _groupList = activeTab === 0 ? groupFoods : activeTab === 1 ? groupMeals : groupRecipes;
-  $: displayList = showGroupCatalogue ? _groupList : _ownList;
+  $: displayList = searchSource === 'shared' ? _groupList : _ownList;
+  $: { if (searchSource === 'shared' && sharingEnabled && !groupFoods.length && !groupMeals.length && !groupRecipes.length) loadGroupCatalogue(); }
   $: filteredBySearch = search
     ? displayList.filter(f =>
         (f.name||'').toLowerCase().includes(search.toLowerCase()) ||
@@ -279,11 +231,11 @@
     }
 
     // If item is from another user's catalogue, copy it first (silently)
-    if (showGroupCatalogue && food._shared_by != null) {
+    if (searchSource === 'shared' && food._shared_by != null) {
       const mine = await copyAndUse(food);
       if (!mine) return;
       food = mine;
-      await load(); // refresh own list so the copy appears
+      await load();
     }
 
     // Meals: always expand ingredients at saved portions — no quantity prompt
@@ -454,8 +406,6 @@
       if (activeTab === 1) openMealEditor(selectedItem, false);
       else if (activeTab === 2) openMealEditor(selectedItem, true);
       else openEditor(selectedItem, 'foodList');
-    } else if (detail.value === 'share') {
-      openShareSheet(selectedItem);
     } else if (detail.value === 'clone') {
       cloneItem(selectedItem);
     } else if (detail.value === 'copy') {
@@ -588,30 +538,14 @@
     </div>
   </div>
 
-  <!-- Group catalogue toggle (shown when sharing is enabled, not in pick mode for external sources) -->
-  {#if sharingEnabled && !showGroupCatalogue}
-    <div class="source-chip-row" style="padding-bottom:4px">
-      <button class="source-chip" on:click={() => { showGroupCatalogue = true; loadGroupCatalogue(); }}>
-        <span class="material-symbols-rounded" style="font-size:15px;vertical-align:-3px;margin-right:4px">group</span>Group Catalogue
-      </button>
-    </div>
-  {:else if sharingEnabled && showGroupCatalogue}
-    <div class="source-chip-row" style="padding-bottom:4px">
-      <button class="source-chip active" on:click={() => showGroupCatalogue = false}>
-        <span class="material-symbols-rounded" style="font-size:15px;vertical-align:-3px;margin-right:4px">group</span>Group Catalogue
-      </button>
-      <button class="source-chip" on:click={() => showGroupCatalogue = false}>
-        <span class="material-symbols-rounded" style="font-size:15px;vertical-align:-3px;margin-right:4px">person</span>Mine
-      </button>
-    </div>
-  {/if}
-
-  <!-- Source chips (Foods tab only, own catalogue only) -->
-  {#if activeTab === 0 && !showGroupCatalogue}
+  <!-- Source chips (Foods tab only) -->
+  {#if activeTab === 0}
     <div class="source-chip-row">
       {#each availableSources as src}
         <button class="source-chip" class:active={searchSource === src.value}
-          on:click={() => searchSource = src.value}>{src.label}</button>
+          on:click={() => { searchSource = src.value; }}>
+          {src.label}
+        </button>
       {/each}
     </div>
   {/if}
@@ -656,7 +590,7 @@
   {/if}
 
   <div class="page-content">
-    {#if searchSource === 'local' || activeTab !== 0}
+    {#if searchSource === 'local' || searchSource === 'shared' || activeTab !== 0}
       <!-- ── Local list ─────────────────────────────────────────────────────── -->
       {#if filteredList.length === 0 && !search && !loadError}
         <div class="empty-state">
@@ -704,16 +638,7 @@
                     <span class="food-kcal text-sm">{_kcal} kcal</span>
                   {/if}
                 </div>
-                <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
-                  {#if sharingEnabled && !food._shared_by}
-                    {#if food.visibility === 'group'}
-                      <span class="material-symbols-rounded share-badge share-badge-group" title="Shared with everyone">group</span>
-                    {:else if food.visibility === 'specific'}
-                      <span class="material-symbols-rounded share-badge share-badge-specific" title="Shared with specific people">person_add</span>
-                    {/if}
-                  {/if}
-                  <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
-                </div>
+                <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
               </button>
             </li>
           {/each}
@@ -882,10 +807,9 @@
   actions={selectedItem?._shared_by != null ? [
     { label: 'Save to My Catalogue', icon: 'bookmark_add', value: 'copy' },
   ] : [
-    { label: 'Edit',   icon: 'edit',             value: 'edit' },
-    ...(sharingEnabled ? [{ label: 'Share', icon: 'share', value: 'share' }] : []),
+    { label: 'Edit',   icon: 'edit',        value: 'edit' },
     ...(activeTab !== 0 ? [{ label: 'Clone', icon: 'content_copy', value: 'clone' }] : []),
-    { label: 'Delete', icon: 'delete',            value: 'delete', danger: true },
+    { label: 'Delete', icon: 'delete',      value: 'delete', danger: true },
   ]}
   on:select={handleItemAction}
 />
@@ -899,73 +823,12 @@
   on:confirm={() => selectedItem && deleteItem(selectedItem)}
 />
 
-<!-- Share Sheet -->
-<Sheet bind:open={showShareSheet} title={shareSheetItem ? shareSheetItem.name : 'Share'}>
-  <div class="share-sheet-body">
-    <p class="share-sheet-label">Who can see this?</p>
-    <div class="share-vis-chips">
-      <button class="chip" class:accent={shareSheetVis === 'private'}
-        on:click={() => shareSheetVis = 'private'}>
-        <span class="material-symbols-rounded" style="font-size:15px">lock</span>
-        Private
-      </button>
-      <button class="chip" class:accent={shareSheetVis === 'group'}
-        on:click={() => shareSheetVis = 'group'}>
-        <span class="material-symbols-rounded" style="font-size:15px">group</span>
-        Everyone
-      </button>
-      <button class="chip" class:accent={shareSheetVis === 'specific'}
-        on:click={() => shareSheetVis = 'specific'}>
-        <span class="material-symbols-rounded" style="font-size:15px">person_add</span>
-        Specific
-      </button>
-    </div>
-
-    {#if shareSheetVis === 'specific'}
-      <p class="share-sheet-label" style="margin-top:16px">Select members:</p>
-      {#if shareSheetUsers.length === 0}
-        <p class="share-sheet-empty">No other members in this group.</p>
-      {:else}
-        <div class="share-user-chips">
-          {#each shareSheetUsers as u}
-            <button class="chip" class:accent={shareSheetSel.includes(u.id)}
-              on:click={() => toggleShareUser(u.id)}>
-              {#if shareSheetSel.includes(u.id)}
-                <span class="material-symbols-rounded" style="font-size:14px">check</span>
-              {/if}
-              {u.name}
-            </button>
-          {/each}
-        </div>
-      {/if}
-    {:else if shareSheetVis === 'group'}
-      <p class="share-sheet-hint">All group members can see and copy this item.</p>
-    {:else}
-      <p class="share-sheet-hint">Only you can see this item.</p>
-    {/if}
-
-    <button class="btn btn-primary w-full share-sheet-save" on:click={saveShare} disabled={shareSheetSaving}>
-      {shareSheetSaving ? 'Saving…' : 'Save'}
-    </button>
-  </div>
-</Sheet>
-
 <style>
   .foods-tabs { padding: 12px var(--page-px) 12px; }
   .foods-search { padding: 0 var(--page-px) 12px; }
   .foods-search .search-input-wrap { gap: 8px; }
   .scan-btn { flex-shrink: 0; }
 
-  .share-badge { font-size: 15px; }
-  .share-badge-group    { color: var(--accent); }
-  .share-badge-specific { color: var(--accent); opacity: 0.75; }
-  .share-sheet-body { display: flex; flex-direction: column; gap: 8px; padding: 4px 0 8px; }
-  .share-sheet-label { font-size: 12px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-3); margin: 0; }
-  .share-sheet-hint  { font-size: 13px; color: var(--text-3); margin: 4px 0 0; }
-  .share-sheet-empty { font-size: 13px; color: var(--text-3); margin: 4px 0 0; }
-  .share-vis-chips   { display: flex; flex-wrap: wrap; gap: 8px; }
-  .share-user-chips  { display: flex; flex-wrap: wrap; gap: 8px; }
-  .share-sheet-save  { margin-top: 16px; }
   .food-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
   .food-item { overflow: hidden; }
   .food-item-btn {

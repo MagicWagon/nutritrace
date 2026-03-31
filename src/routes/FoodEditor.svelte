@@ -9,7 +9,7 @@
   import { editorState, clearFoodEditorState } from '../stores/editorState.js';
   import Toggle from '../components/settings/Toggle.svelte';
   import Dialog from '../components/ui/Dialog.svelte';
-  import { foodsShowCategories, foodsShowLabels, foodsShowNotes, foodCategories, visibleNutriments, nutrimentsOrder, customNutriments, cropPhotos, offUsername, offPassword, offUploadCountry, catName as _catName, catDisplay as _catDisplay, defaultFoodVisibility } from '../stores/settings.js';
+  import { foodsShowCategories, foodsShowLabels, foodsShowNotes, foodCategories, visibleNutriments, nutrimentsOrder, customNutriments, cropPhotos, offUsername, offPassword, offUploadCountry, catName as _catName, catDisplay as _catDisplay } from '../stores/settings.js';
 
   // ── Photo capture / upload ─────────────────────────────────
   let fileInput;
@@ -152,28 +152,6 @@
   $: isNewFood = !(params && params.id);
   $: hasBarcode = !!(food.barcode && food.barcode.trim());
 
-  // ── Sharing ────────────────────────────────────────────────────
-  let sharingEnabled = false;
-  let shareVisibility = 'private';   // 'private' | 'group' | 'specific'
-  let allUsers = [];                  // { id, name }[]
-  let selectedUserIds = [];           // number[]
-  let loadingUsers = false;
-  $: isOwnedFood = !food.source_id;  // copies can't be re-shared
-
-  async function loadUsers() {
-    if (allUsers.length || loadingUsers) return;
-    loadingUsers = true;
-    try { allUsers = await NtApi.getUsersList(); } catch {}
-    loadingUsers = false;
-  }
-
-  function toggleUser(id) {
-    if (selectedUserIds.includes(id)) {
-      selectedUserIds = selectedUserIds.filter(u => u !== id);
-    } else {
-      selectedUserIds = [...selectedUserIds, id];
-    }
-  }
 
   let offVerified    = null;  // null = unchecked, true = confirmed, false = not found yet
   let offAlreadyExists = false;
@@ -312,17 +290,6 @@
     }
     takeSnapshot();
 
-    // Load sharing config
-    try {
-      const cfg = await NtApi.getSharingStatus().catch(() => ({}));
-      sharingEnabled = cfg.sharing_enabled === true;
-    } catch {}
-    // Set initial visibility from food or user default
-    shareVisibility = food.visibility || $defaultFoodVisibility || 'private';
-    if (shareVisibility === 'specific') {
-      await loadUsers();
-      selectedUserIds = (food.shared_with || []).map(u => u.id ?? u);
-    }
   });
 
   async function save() {
@@ -340,14 +307,10 @@
           _nutrition[_n.id] = parseFloat(_v) || 0;
         }
       }
-      const item = { ...food, nutrition: _nutrition, visibility: sharingEnabled ? shareVisibility : 'private' };
+      const item = { ...food, nutrition: _nutrition };
       const saved = food.id
         ? await NtApi.updateFood(food.id, item)
         : await NtApi.createFood(item);
-      // Sync shares after save
-      if (sharingEnabled && isOwnedFood) {
-        await NtApi.shareFood(saved.id, shareVisibility, shareVisibility === 'specific' ? selectedUserIds : []).catch(() => {});
-      }
       item.id = saved.id;
       // If called from diary pick mode, also add to diary
       const ctx = editorState.foodDiaryCtx;
@@ -617,54 +580,6 @@
       </button>
     </div>
 
-    <!-- Sharing (multi-user only) -->
-    {#if sharingEnabled && isOwnedFood}
-      <div class="card editor-card">
-        <div class="editor-card-title">Sharing</div>
-        <div class="share-vis-row">
-          <button class="chip" class:accent={shareVisibility === 'private'}
-            on:click={() => shareVisibility = 'private'}>
-            <span class="material-symbols-rounded" style="font-size:15px">lock</span>
-            Private
-          </button>
-          <button class="chip" class:accent={shareVisibility === 'group'}
-            on:click={() => shareVisibility = 'group'}>
-            <span class="material-symbols-rounded" style="font-size:15px">group</span>
-            Everyone
-          </button>
-          <button class="chip" class:accent={shareVisibility === 'specific'}
-            on:click={() => { shareVisibility = 'specific'; loadUsers(); }}>
-            <span class="material-symbols-rounded" style="font-size:15px">person_add</span>
-            Specific
-          </button>
-        </div>
-        {#if shareVisibility === 'specific'}
-          <div class="share-users-label">Who can see this food:</div>
-          {#if loadingUsers}
-            <div class="share-users-loading">Loading members…</div>
-          {:else if allUsers.length === 0}
-            <div class="share-users-empty">No other members in this group.</div>
-          {:else}
-            <div class="cat-chips">
-              {#each allUsers as u}
-                <button class="chip" class:accent={selectedUserIds.includes(u.id)}
-                  on:click={() => toggleUser(u.id)}>
-                  {#if selectedUserIds.includes(u.id)}
-                    <span class="material-symbols-rounded" style="font-size:14px">check</span>
-                  {/if}
-                  {u.name}
-                </button>
-              {/each}
-            </div>
-          {/if}
-        {:else if shareVisibility === 'group'}
-          <p class="share-hint">All group members can see and copy this food.</p>
-        {:else}
-          <p class="share-hint">Only you can see this food.</p>
-        {/if}
-      </div>
-    {/if}
-
     <div style="height:16px"></div>
   </div>
 </div>
@@ -710,10 +625,6 @@
   }
   .off-verify-link:hover { text-decoration: underline; }
   .cat-chips { display: flex; flex-wrap: wrap; gap: 8px; }
-  .share-vis-row { display: flex; flex-wrap: wrap; gap: 8px; }
-  .share-users-label { font-size: 12px; font-weight: 600; color: var(--text-3); margin-top: 4px; }
-  .share-users-loading, .share-users-empty { font-size: 13px; color: var(--text-3); }
-  .share-hint { font-size: 13px; color: var(--text-3); margin: 0; }
   /* Photo section */
   .photo-card { gap: 10px; }
   .photo-preview-wrap {

@@ -6,7 +6,7 @@
   import { showSuccess, showError } from '../stores/toast.js';
   import { editorState, clearMealEditorState } from '../stores/editorState.js';
   import { Nutrition, NUTRIMENTS } from '../lib/nutrition.js';
-  import { foodsShowCategories, foodsShowLabels, foodsShowNotes, foodCategories, catName as _catName, catDisplay as _catDisplay, defaultFoodVisibility } from '../stores/settings.js';
+  import { foodsShowCategories, foodsShowLabels, foodsShowNotes, foodCategories, catName as _catName, catDisplay as _catDisplay } from '../stores/settings.js';
 
   export let params = {};
 
@@ -62,28 +62,6 @@
   let showMultiPortionSheet = false;
   let multiPortionItems = [];
 
-  // ── Sharing ────────────────────────────────────────────────────
-  let sharingEnabled = false;
-  let shareVisibility = 'private';
-  let allUsers = [];
-  let selectedUserIds = [];
-  let loadingUsers = false;
-  $: isOwnedMeal = !meal.source_id;
-
-  async function loadUsers() {
-    if (allUsers.length || loadingUsers) return;
-    loadingUsers = true;
-    try { allUsers = await NtApi.getUsersList(); } catch {}
-    loadingUsers = false;
-  }
-
-  function toggleUser(id) {
-    if (selectedUserIds.includes(id)) {
-      selectedUserIds = selectedUserIds.filter(u => u !== id);
-    } else {
-      selectedUserIds = [...selectedUserIds, id];
-    }
-  }
 
   onMount(async () => {
     isRecipe = editorState.mealIsRecipe || false;
@@ -98,15 +76,6 @@
     if (isRecipe && meal.portion) recipeAmount = meal.portion;
     if (isRecipe && meal.unit) recipeUnit = meal.unit;
 
-    try {
-      const cfg = await NtApi.getSharingStatus().catch(() => ({}));
-      sharingEnabled = cfg.sharing_enabled === true;
-    } catch {}
-    shareVisibility = meal.visibility || $defaultFoodVisibility || 'private';
-    if (shareVisibility === 'specific') {
-      await loadUsers();
-      selectedUserIds = (meal.shared_with || []).map(u => u.id ?? u);
-    }
   });
 
   // ── Photo ──────────────────────────────────────────────────────────────────
@@ -400,18 +369,13 @@
         imgUrl: photoPreviewUrl || '',
         nutrition: totals,
         is_recipe: isRecipe,
-        visibility: sharingEnabled ? shareVisibility : 'private',
       };
       if (isRecipe) {
         item.portion = parseFloat(recipeAmount) || Math.round(meal.items.reduce((s,it)=>s+toGrams(it.portion,it.unit),0)) || 100;
         item.unit = recipeUnit;
       }
-      const saved = meal.id
-        ? await NtApi.updateMeal(meal.id, item)
-        : await NtApi.createMeal(item);
-      if (sharingEnabled && isOwnedMeal) {
-        await NtApi.shareMeal(saved.id, shareVisibility, shareVisibility === 'specific' ? selectedUserIds : []).catch(() => {});
-      }
+      if (meal.id) await NtApi.updateMeal(meal.id, item);
+      else await NtApi.createMeal(item);
       clearMealEditorState();
       showSuccess('Saved');
       pop();
@@ -601,54 +565,6 @@
           on:click={() => showAllNutrients = !showAllNutrients}>
           {showAllNutrients ? 'Show less' : 'Show all nutrients'}
         </button>
-      </div>
-    {/if}
-
-    <!-- Sharing (multi-user only) -->
-    {#if sharingEnabled && isOwnedMeal}
-      <div class="card editor-card">
-        <div class="editor-card-title">Sharing</div>
-        <div class="share-vis-row">
-          <button class="chip" class:accent={shareVisibility === 'private'}
-            on:click={() => shareVisibility = 'private'}>
-            <span class="material-symbols-rounded" style="font-size:15px">lock</span>
-            Private
-          </button>
-          <button class="chip" class:accent={shareVisibility === 'group'}
-            on:click={() => shareVisibility = 'group'}>
-            <span class="material-symbols-rounded" style="font-size:15px">group</span>
-            Everyone
-          </button>
-          <button class="chip" class:accent={shareVisibility === 'specific'}
-            on:click={() => { shareVisibility = 'specific'; loadUsers(); }}>
-            <span class="material-symbols-rounded" style="font-size:15px">person_add</span>
-            Specific
-          </button>
-        </div>
-        {#if shareVisibility === 'specific'}
-          <div class="share-users-label">Who can see this {isRecipe ? 'recipe' : 'meal'}:</div>
-          {#if loadingUsers}
-            <div class="share-users-loading">Loading members…</div>
-          {:else if allUsers.length === 0}
-            <div class="share-users-empty">No other members in this group.</div>
-          {:else}
-            <div class="share-chips">
-              {#each allUsers as u}
-                <button class="chip" class:accent={selectedUserIds.includes(u.id)}
-                  on:click={() => toggleUser(u.id)}>
-                  {#if selectedUserIds.includes(u.id)}
-                    <span class="material-symbols-rounded" style="font-size:14px">check</span>
-                  {/if}
-                  {u.name}
-                </button>
-              {/each}
-            </div>
-          {/if}
-        {:else if shareVisibility === 'group'}
-          <p class="share-hint">All group members can see and copy this {isRecipe ? 'recipe' : 'meal'}.</p>
-        {:else}
-          <p class="share-hint">Only you can see this {isRecipe ? 'recipe' : 'meal'}.</p>
-        {/if}
       </div>
     {/if}
 
@@ -859,11 +775,6 @@
   .editor-content { display: flex; flex-direction: column; gap: 12px; padding-top: 16px; padding-bottom: 32px; }
   .editor-card { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
   .editor-card-title { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); }
-  .share-vis-row { display: flex; flex-wrap: wrap; gap: 8px; }
-  .share-chips { display: flex; flex-wrap: wrap; gap: 8px; }
-  .share-users-label { font-size: 12px; font-weight: 600; color: var(--text-3); margin-top: 4px; }
-  .share-users-loading, .share-users-empty { font-size: 13px; color: var(--text-3); }
-  .share-hint { font-size: 13px; color: var(--text-3); margin: 0; }
 
   /* Photo */
   .photo-preview-wrap {
