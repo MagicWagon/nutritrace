@@ -2669,7 +2669,7 @@
     {#if $userMgmtActive}
       <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'sharing')} on:click={() => toggleSection('sharing')}>
         <span class="material-symbols-rounded si">group</span>
-        <span>Food Sharing</span>
+        <span>Food Sharing <span class="labs-badge" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">Experimental</span></span>
         <span class="material-symbols-rounded chevron" class:rotated={openSections.sharing}>expand_more</span>
       </button>
       {#if sectionOpen(openSections, settingsQuery, 'sharing') && sectionVisible(settingsQuery, 'sharing')}

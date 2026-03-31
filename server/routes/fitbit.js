@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { createHash, randomBytes } from 'crypto';
 import db from '../db.js';
-import { wrap } from '../logger.js';
+import { wrap, logger } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
 
 const router = Router();
@@ -348,7 +348,7 @@ async function _syncDate(u, dateStr) {
     }
   })();
 
-  if (errors.length) console.log(`[fitbit] sync errors for ${dateStr}:`, errors);
+  if (errors.length) logger.warn(`[fitbit] sync errors for ${dateStr}:`, errors);
   return { metrics, errors };
 }
 

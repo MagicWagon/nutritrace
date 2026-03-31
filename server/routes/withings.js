@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { randomBytes } from 'crypto';
 import db from '../db.js';
-import { wrap } from '../logger.js';
+import { wrap, logger } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
 
 const router = Router();
@@ -90,7 +90,7 @@ async function _wPost(userId, endpoint, params) {
   if (!res.ok) throw new Error(`Withings HTTP ${res.status}`);
   const json = await res.json();
   if (json.status !== 0) {
-    console.error('[withings] API error response:', JSON.stringify(json));
+    logger.error('[withings] API error response:', JSON.stringify(json));
     throw new Error(`Withings API error ${json.status}: ${json.error || ''}`);
   }
   return json.body;
@@ -278,12 +278,12 @@ async function _syncRange(userId, fromDate, toDate) {
     });
   } catch (err) {
     // Log full error for debugging; re-throw so the caller surfaces it
-    console.error('[withings] /measure failed:', err.message);
+    logger.error('[withings] /measure failed:', err.message);
     throw err;
   }
 
   const grps = body.measuregrps || [];
-  console.log(`[withings] /measure returned ${grps.length} groups for ${fromDate}→${toDate} (ts ${startTs}→${endTs})`);
+  logger.debug(`[withings] /measure returned ${grps.length} groups for ${fromDate}→${toDate} (ts ${startTs}→${endTs})`);
 
   // Get device model names (GET endpoint, not POST)
   let deviceModels = {};
@@ -351,7 +351,7 @@ async function _syncRange(userId, fromDate, toDate) {
               latestByMetric[metricKey] = { value, deviceModel, ts: grp.date };
             }
           } else {
-            console.log(`[withings] unmapped type ${type} = ${value} (date: ${date})`);
+            logger.debug(`[withings] unmapped type ${type} = ${value} (date: ${date})`);
           }
         }
 
@@ -374,7 +374,7 @@ async function _syncRange(userId, fromDate, toDate) {
   }
 
   const dates = Object.keys(byDate).length;
-  console.log(`[withings] stored data for ${dates} date(s)`);
+  logger.debug(`[withings] stored data for ${dates} date(s)`);
 
   // ── ECG recordings (requires user.cardiovascular scope) ──────────────────────
   try {
