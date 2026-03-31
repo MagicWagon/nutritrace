@@ -28,6 +28,7 @@
     hasUnread     = false;
     assistantName = $aiAssistantName;
     apiKey        = $aiApiKey;
+    tick().then(() => _scrollBottom());
   }
 
   onMount(async () => {
