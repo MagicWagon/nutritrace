@@ -74,12 +74,16 @@
   async function openShareSheet(item) {
     shareSheetItem  = item;
     shareSheetVis   = item.visibility || 'private';
-    shareSheetSel   = (item.shared_with || []).map(u => u.id ?? u);
+    shareSheetSel   = [];
     showShareSheet  = true;
-    if (!shareSheetLoaded) {
-      try { shareSheetUsers = await NtApi.getUsersList(); } catch {}
-      shareSheetLoaded = true;
-    }
+    // Load peers and existing specific shares in parallel
+    const [, full] = await Promise.all([
+      shareSheetLoaded ? null : NtApi.getUsersList().then(u => { shareSheetUsers = u; shareSheetLoaded = true; }).catch(() => {}),
+      item.visibility === 'specific'
+        ? (activeTab === 0 ? NtApi.getFood(item.id) : NtApi.getMeal(item.id)).catch(() => null)
+        : Promise.resolve(null),
+    ]);
+    if (full?._specific_users) shareSheetSel = full._specific_users;
   }
 
   function toggleShareUser(id) {
