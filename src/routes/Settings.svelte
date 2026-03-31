@@ -1142,7 +1142,11 @@
 
   let bulkVisibility = 'group';
   let bulkApplying = false;
-  let bulkTarget = 'all'; // 'all' | 'foods' | 'meals' | 'recipes'
+  let bulkTargets = new Set(['foods', 'meals', 'recipes']);
+  function toggleBulkTarget(t) {
+    if (bulkTargets.has(t)) bulkTargets.delete(t); else bulkTargets.add(t);
+    bulkTargets = bulkTargets;
+  }
   let bulkUsers = [];
   let bulkSelectedIds = [];
   let bulkUsersLoaded = false;
@@ -1162,7 +1166,7 @@
     bulkApplying = true;
     try {
       const user_ids = bulkVisibility === 'specific' ? bulkSelectedIds : [];
-      await NtApi.post('/api/foods/bulk-share', { visibility: bulkVisibility, target: bulkTarget, user_ids });
+      await NtApi.post('/api/foods/bulk-share', { visibility: bulkVisibility, targets: [...bulkTargets], user_ids });
       showSuccess('Sharing updated');
     } catch(e) { showError('Could not apply: ' + e.message); }
     bulkApplying = false;
@@ -1799,15 +1803,14 @@
           </div>
           <p class="sub-label">Bulk Share</p>
           <div class="card settings-card" style="gap:0">
-            <div class="setting-row">
+            <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px;padding:12px 16px">
               <span class="setting-label">Apply visibility to</span>
-              <div class="select-wrap" style="width:130px">
-                <select class="select sel-sm" bind:value={bulkTarget}>
-                  <option value="all">All items</option>
-                  <option value="foods">Foods only</option>
-                  <option value="meals">Meals only</option>
-                  <option value="recipes">Recipes only</option>
-                </select>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                {#each ['foods','meals','recipes'] as t}
+                  <button class="chip" class:accent={bulkTargets.has(t)} on:click={() => toggleBulkTarget(t)}>
+                    {#if bulkTargets.has(t)}<span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle;margin-right:2px">check</span>{/if}{t.charAt(0).toUpperCase() + t.slice(1)}
+                  </button>
+                {/each}
               </div>
             </div>
             <div class="setting-divider"></div>

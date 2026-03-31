@@ -165,12 +165,13 @@ router.post('/:id/copy', wrap((req, res) => {
 router.post('/bulk-share', wrap((req, res) => {
   const u = uid(req);
   if (!sharingEnabled()) return res.status(403).json({ error: 'Sharing is not enabled.' });
-  const { visibility, target, user_ids = [] } = req.body;
+  const { visibility, targets, user_ids = [] } = req.body;
   if (!['private','group','specific'].includes(visibility)) return res.status(400).json({ error: 'Invalid visibility' });
 
-  const doFoods = target === 'all' || target === 'foods';
-  const doMeals = target === 'all' || target === 'meals';
-  const doRecipes = target === 'all' || target === 'recipes';
+  const t = Array.isArray(targets) ? targets : ['foods','meals','recipes'];
+  const doFoods = t.includes('foods');
+  const doMeals = t.includes('meals');
+  const doRecipes = t.includes('recipes');
 
   // Foods
   if (doFoods) {
