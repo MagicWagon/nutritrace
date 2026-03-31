@@ -233,14 +233,22 @@ const WELLNESS_TYPES = {
   8:   'fat_mass_kg',
   11:  'heart_pulse_bpm',
   91:  'pulse_wave_velocity',
+  130: 'afib_result',             // Atrial fibrillation result (status code)
+  155: 'vascular_age',            // Vascular Age (years)
+  158: 'nerve_health_left_foot',  // Nerve Health Score Left Foot
+  159: 'nerve_health_right_foot', // Nerve Health Score Right Foot
   168: 'extracellular_water_kg',
   169: 'intracellular_water_kg',
   170: 'visceral_fat_index',
   174: 'visceral_fat',
-  226: 'nerve_health_score',
-  227: 'metabolic_age',
-  238: 'vascular_age',
-  239: 'nerve_activity',
+  196: 'eda_feet',                // Electrodermal Activity Feet
+  197: 'eda_left_foot',           // Electrodermal Activity Left Foot
+  198: 'eda_right_foot',          // Electrodermal Activity Right Foot
+  226: 'basal_metabolic_rate',    // Basal Metabolic Rate (kcal/day)
+  227: 'metabolic_age',           // Metabolic Age (years) — undocumented but confirmed from device
+  229: 'electrochemical_skin_conductance', // Electrochemical Skin Conductance
+  238: 'nerve_activity',          // legacy mapping kept
+  239: 'nerve_health_score',      // Nerve Health Score (general)
 };
 
 // Segmental types: same type code appears 5× per measuregrp, one per body segment.

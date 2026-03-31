@@ -67,7 +67,7 @@
     const all = [
       ...ALL_METRICS.map(m => m.id),
       'weight_kg','body_fat_pct','muscle_mass_kg','bone_mass_kg','body_water_pct','lean_mass_kg','fat_mass_kg','visceral_fat','visceral_fat_index','extracellular_water_kg','intracellular_water_kg',
-      'vascular_age','nerve_health_score','pulse_wave_velocity','ecg_heart_rate','ecg_afib','metabolic_age',
+      'vascular_age','metabolic_age','basal_metabolic_rate','nerve_health_score','eda_feet','pulse_wave_velocity','ecg_heart_rate','ecg_afib',
       'body_battery_high','body_battery_low','stress_avg',
       'segmental_analysis',
     ];
@@ -168,7 +168,9 @@
   const BODY_SCORE_METRICS = [
     { id: 'vascular_age',       label: 'Vascular Age',     unit: 'yrs',  icon: 'cardiology',   fmt: v => Math.round(v) },
     { id: 'metabolic_age',      label: 'Metabolic Age',    unit: 'yrs',  icon: 'trending_up',  fmt: v => Math.round(v) },
-    { id: 'nerve_health_score', label: 'Nerve Activity',   unit: ' µS',  icon: 'neurology',     fmt: v => Math.round(v) },
+    { id: 'basal_metabolic_rate', label: 'Basal Metabolic Rate', unit: 'kcal/day', icon: 'local_fire_department', fmt: v => Math.round(v) },
+    { id: 'nerve_health_score', label: 'Nerve Health',     unit: '',     icon: 'neurology',     fmt: v => Math.round(v) },
+    { id: 'eda_feet',           label: 'EDA Score',        unit: 'µS',   icon: 'neurology',     fmt: v => v.toFixed(1) },
     { id: 'pulse_wave_velocity',label: 'Pulse Wave Vel.',  unit: 'm/s',  icon: 'show_chart',    fmt: v => v.toFixed(1) },
     { id: 'ecg_heart_rate',     label: 'Heart Rate',       unit: 'bpm',  icon: 'ecg_heart',     fmt: v => Math.round(v) },
     { id: 'ecg_afib',           label: 'AFib Detection',   unit: '',     icon: 'ecg',           fmt: v => v === 1 ? 'Detected' : 'Normal' },
@@ -231,7 +233,14 @@
       withingsLastSync = new Date();
       if (!silent) showSuccess(`Synced ${result.dates} day${result.dates === 1 ? '' : 's'} from Withings`);
     } catch(e) {
-      if (!silent) showError('Withings sync failed: ' + e.message);
+      if (!silent) {
+        if (e.message?.includes('revoked') || e.message?.includes('Not connected') || e.status === 401) {
+          showError('Withings disconnected — reconnect in Settings → Wellness');
+          withingsStatus = { ...withingsStatus, connected: false };
+        } else {
+          showError('Withings sync failed: ' + e.message);
+        }
+      }
     }
     withingsSyncing = false;
   }
@@ -294,7 +303,14 @@
       await loadGarminData();
       if (!silent) showSuccess(`Synced ${result.synced ?? 0} day${result.synced === 1 ? '' : 's'} from Garmin`);
     } catch(e) {
-      if (!silent) showError('Garmin sync failed: ' + e.message);
+      if (!silent) {
+        if (e.message?.includes('revoked') || e.message?.includes('Not connected') || e.status === 401) {
+          showError('Garmin disconnected — reconnect in Settings → Wellness');
+          garminStatus = { ...garminStatus, connected: false };
+        } else {
+          showError('Garmin sync failed: ' + e.message);
+        }
+      }
     }
     garminSyncing    = false;
     _insightsLoaded  = false;
@@ -887,7 +903,14 @@
         if (!silent) showSuccess('Synced');
       }
     } catch (e) {
-      if (!silent) showError('Sync failed: ' + e.message);
+      if (!silent) {
+        if (e.message?.includes('revoked') || e.message?.includes('Not connected') || e.status === 401) {
+          showError('Fitbit disconnected — reconnect in Settings → Wellness');
+          status = { ...status, connected: false };
+        } else {
+          showError('Fitbit sync failed: ' + e.message);
+        }
+      }
     }
     syncing = false;
     _insightsLoaded  = false;
