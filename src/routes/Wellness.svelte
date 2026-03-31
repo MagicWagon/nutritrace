@@ -152,28 +152,28 @@
 
   // ── Withings metric definitions ───────────────────────────────────────────
   const BODY_METRICS = [
-    { id: 'weight_kg',     label: 'Weight',       unit: '', icon: 'monitor_weight',   fmt: null },
-    { id: 'body_fat_pct',  label: 'Body Fat',     unit: '%', icon: 'percent',          fmt: v => v.toFixed(1) },
-    { id: 'muscle_mass_kg',label: 'Muscle Mass',  unit: '', icon: 'fitness_center',   fmt: null },
-    { id: 'bone_mass_kg',  label: 'Bone Mass',    unit: '', icon: 'emergency',         fmt: v => v.toFixed(2) },
-    { id: 'body_water_pct',label: 'Body Water',   unit: '', icon: 'water_drop',       fmt: null },
-    { id: 'lean_mass_kg',            label: 'Lean Mass',            unit: '', icon: 'person',           fmt: null },
-    { id: 'fat_mass_kg',             label: 'Fat Mass',             unit: '', icon: 'scale',            fmt: null },
-    { id: 'visceral_fat',            label: 'Visceral Fat',         unit: '', icon: 'favorite_border',  fmt: v => v.toFixed(1) },
-    { id: 'visceral_fat_index',      label: 'Visceral Fat Index',   unit: '', icon: 'favorite_border',  fmt: v => v.toFixed(1) },
-    { id: 'extracellular_water_kg',  label: 'Extracellular Water',  unit: '', icon: 'water_drop',       fmt: null },
-    { id: 'intracellular_water_kg',  label: 'Intracellular Water',  unit: '', icon: 'water_drop',       fmt: null },
+    { id: 'weight_kg',     label: 'Weight',       unit: '', icon: 'monitor_weight',   fmt: null, desc: 'Current body weight from your scale.' },
+    { id: 'body_fat_pct',  label: 'Body Fat',     unit: '%', icon: 'percent',          fmt: v => v.toFixed(1), desc: 'Percentage of total body weight that is fat tissue. Healthy ranges vary by age and sex.' },
+    { id: 'muscle_mass_kg',label: 'Muscle Mass',  unit: '', icon: 'fitness_center',   fmt: null, desc: 'Total skeletal muscle mass. Higher values indicate better strength and metabolic health.' },
+    { id: 'bone_mass_kg',  label: 'Bone Mass',    unit: '', icon: 'emergency',         fmt: v => v.toFixed(2), desc: 'Estimated bone mineral content. Stable values are normal; significant drops may warrant discussion with your doctor.' },
+    { id: 'body_water_pct',label: 'Body Water',   unit: '', icon: 'water_drop',       fmt: null, desc: 'Total body water as a percentage of weight. Normal range is 45–65% depending on age and sex.' },
+    { id: 'lean_mass_kg',            label: 'Lean Mass',            unit: '', icon: 'person',           fmt: null, desc: 'Everything except fat — includes muscle, bone, organs, and water.' },
+    { id: 'fat_mass_kg',             label: 'Fat Mass',             unit: '', icon: 'scale',            fmt: null, desc: 'Total fat tissue weight. Tracking trends is more useful than individual readings.' },
+    { id: 'visceral_fat',            label: 'Visceral Fat',         unit: '', icon: 'favorite_border',  fmt: v => v.toFixed(1), desc: 'Fat stored around internal organs. Higher levels are linked to increased metabolic and cardiovascular risk.' },
+    { id: 'visceral_fat_index',      label: 'Visceral Fat Index',   unit: '', icon: 'favorite_border',  fmt: v => v.toFixed(1), desc: 'Indexed rating of visceral fat. Lower is better — a score under 13 is generally considered healthy.' },
+    { id: 'extracellular_water_kg',  label: 'Extracellular Water',  unit: '', icon: 'water_drop',       fmt: null, desc: 'Water outside cells (blood, lymph, interstitial fluid). Elevated levels may indicate inflammation or fluid retention.' },
+    { id: 'intracellular_water_kg',  label: 'Intracellular Water',  unit: '', icon: 'water_drop',       fmt: null, desc: 'Water inside cells. Reflects hydration at the cellular level — higher relative to extracellular is generally healthier.' },
   ];
 
   const BODY_SCORE_METRICS = [
-    { id: 'vascular_age',       label: 'Vascular Age',     unit: 'yrs',  icon: 'cardiology',   fmt: v => Math.round(v) },
-    { id: 'metabolic_age',      label: 'Metabolic Age',    unit: 'yrs',  icon: 'trending_up',  fmt: v => Math.round(v) },
-    { id: 'basal_metabolic_rate', label: 'Basal Metabolic Rate', unit: 'kcal/day', icon: 'local_fire_department', fmt: v => Math.round(v) },
-    { id: 'nerve_health_score', label: 'Nerve Health',     unit: '',     icon: 'neurology',     fmt: v => Math.round(v) },
-    { id: 'eda_feet',           label: 'EDA Score',        unit: 'µS',   icon: 'neurology',     fmt: v => v.toFixed(1) },
-    { id: 'pulse_wave_velocity',label: 'Pulse Wave Vel.',  unit: 'm/s',  icon: 'show_chart',    fmt: v => v.toFixed(1) },
-    { id: 'ecg_heart_rate',     label: 'Heart Rate',       unit: 'bpm',  icon: 'ecg_heart',     fmt: v => Math.round(v) },
-    { id: 'ecg_afib',           label: 'AFib Detection',   unit: '',     icon: 'ecg',           fmt: v => v === 1 ? 'Detected' : 'Normal' },
+    { id: 'vascular_age',       label: 'Vascular Age',     unit: 'yrs',  icon: 'cardiology',   fmt: v => Math.round(v), desc: 'Estimated age of your arteries based on pulse wave velocity. Lower than your actual age indicates healthier blood vessels.' },
+    { id: 'metabolic_age',      label: 'Metabolic Age',    unit: 'yrs',  icon: 'trending_up',  fmt: v => Math.round(v), desc: 'Your body\'s metabolic efficiency compared to age norms. Lower than your actual age means your metabolism is performing well.' },
+    { id: 'basal_metabolic_rate', label: 'Basal Metabolic Rate', unit: 'kcal/day', icon: 'local_fire_department', fmt: v => Math.round(v), desc: 'Calories your body burns at complete rest over 24 hours. Influenced by muscle mass, age, and body composition.' },
+    { id: 'nerve_health_score', label: 'Nerve Health',     unit: '',     icon: 'neurology',     fmt: v => Math.round(v), desc: 'Measures small nerve fiber activity in your feet via electrodermal response. Early indicator of peripheral neuropathy.' },
+    { id: 'eda_feet',           label: 'EDA Score',        unit: 'µS',   icon: 'neurology',     fmt: v => v.toFixed(1), desc: 'Electrodermal activity — measures sweat gland conductance in your feet. Reflects autonomic nervous system health.' },
+    { id: 'pulse_wave_velocity',label: 'Pulse Wave Vel.',  unit: 'm/s',  icon: 'show_chart',    fmt: v => v.toFixed(1), desc: 'Speed of blood pressure pulse along arteries. Lower values indicate more elastic, healthier blood vessels.' },
+    { id: 'ecg_heart_rate',     label: 'Heart Rate',       unit: 'bpm',  icon: 'ecg_heart',     fmt: v => Math.round(v), desc: 'Heart rate measured during ECG recording on your scale. More accurate than optical wrist sensors.' },
+    { id: 'ecg_afib',           label: 'AFib Detection',   unit: '',     icon: 'ecg',           fmt: v => v === 1 ? 'Detected' : 'Normal', desc: 'Atrial fibrillation screening from ECG recording. "Normal" means no irregular rhythm detected during this reading.' },
   ];
 
   function fmtWeight(kg) {
@@ -268,9 +268,9 @@
   // ── Garmin ─────────────────────────────────────────────────────────────────
   // Garmin-specific metrics (supplements the shared ALL_METRICS)
   const GARMIN_METRICS = [
-    { id: 'body_battery_high', label: 'Body Battery (Peak)', unit: '',    icon: 'battery_full',    fmt: v => Math.round(v) },
-    { id: 'body_battery_low',  label: 'Body Battery (Low)',  unit: '',    icon: 'battery_alert',   fmt: v => Math.round(v) },
-    { id: 'stress_avg',        label: 'Avg Stress',          unit: '/100',icon: 'sentiment_stressed', fmt: v => Math.round(v) },
+    { id: 'body_battery_high', label: 'Body Battery (Peak)', unit: '',    icon: 'battery_full',    fmt: v => Math.round(v), desc: 'Highest Body Battery level today (0–100). Charges during rest and sleep, drains during activity and stress.' },
+    { id: 'body_battery_low',  label: 'Body Battery (Low)',  unit: '',    icon: 'battery_alert',   fmt: v => Math.round(v), desc: 'Lowest Body Battery level today. If it drops below 20, your body may need rest or recovery.' },
+    { id: 'stress_avg',        label: 'Avg Stress',          unit: '/100',icon: 'sentiment_stressed', fmt: v => Math.round(v), desc: 'Average stress level from Garmin (0–100). Measured via heart rate variability throughout the day. Lower is calmer.' },
   ];
 
   async function initGarmin() {
@@ -1376,7 +1376,7 @@
                   {#each GARMIN_METRICS.filter(m => isVisible(m.id)) as m}
                     {@const raw = garminData[m.id]}
                     {#if raw != null}
-                      <div class="metric-card">
+                      <div class="metric-card" title={m.desc}>
                         <div class="metric-icon-wrap">
                           <span class="material-symbols-rounded metric-icon">{m.icon}</span>
                         </div>
@@ -1494,7 +1494,7 @@
             {#each BODY_METRICS.filter(m => isVisible(m.id)) as m}
               {@const raw = withingsData[m.id]}
               {@const formatted = fmtBodyMetric(m, raw)}
-              <div class="metric-card" class:no-data={formatted == null && !loadingData} class:celebrating={_celebratingMetrics.has(m.id)}>
+              <div class="metric-card" class:no-data={formatted == null && !loadingData} class:celebrating={_celebratingMetrics.has(m.id)} title={m.desc}>
                 <div class="metric-icon-wrap">
                   <span class="material-symbols-rounded metric-icon">{m.icon}</span>
                 </div>
@@ -1522,7 +1522,7 @@
                 {#each BODY_SCORE_METRICS.filter(m => isVisible(m.id)) as m}
                   {@const raw = withingsData[m.id]}
                   {#if raw != null}
-                    <div class="metric-card">
+                    <div class="metric-card" title={m.desc}>
                       <div class="metric-icon-wrap">
                         <span class="material-symbols-rounded metric-icon">{m.icon}</span>
                       </div>
