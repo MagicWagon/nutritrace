@@ -349,6 +349,7 @@ async function _syncDate(u, dateStr) {
     }
   })();
 
+  logger.debug(`[fitbit] ${dateStr} readiness inputs: hrv=${metrics.hrv_daily_rmssd} rhr=${metrics.resting_hr} sleep=${metrics.sleep_score} cal=${metrics.calories_out} sleep_eff=${metrics.sleep_efficiency}`);
   if (errors.length) logger.warn(`[fitbit] sync errors for ${dateStr}:`, errors);
   return { metrics, errors };
 }

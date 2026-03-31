@@ -495,6 +495,13 @@
     const label = score >= 80 ? 'Optimal' : score >= 65 ? 'Good' : score >= 50 ? 'Fair' : score >= 35 ? 'Low' : 'Poor';
     const color = score >= 65 ? 'var(--accent)' : score >= 50 ? '#f59e0b' : '#ef4444';
 
+    console.debug('[readiness]', JSON.stringify({
+      inputs: { todayHrv, todayRhr, todaySleepScore, todayCalories, historyDays: history30d.length },
+      baselines: { hrvBaseline: Math.round(hrvBaseline * 100) / 100, rhrBaseline: rhrBaseline != null ? Math.round(rhrBaseline * 10) / 10 : null },
+      components: { hrvRatio: Math.round(hrvRatio * 1000) / 1000, hrv_score: Math.round(hrv_score * 10) / 10, rhr_score: Math.round(rhr_score * 10) / 10, sleepBase, activity_penalty: Math.round(activity_penalty * 10) / 10, interaction_penalty: Math.round(interaction_penalty * 10) / 10 },
+      formula: `(0.60×${Math.round(hrv_score*10)/10}) + (0.20×${Math.round(rhr_score*10)/10}) + (0.15×${sleepBase}) - ${Math.round(activity_penalty*10)/10} - ${Math.round(interaction_penalty*10)/10} = ${score}`,
+    }, null, 2));
+
     return {
       score, label, color,
       hrv_score:        Math.round(hrv_score),
@@ -613,6 +620,14 @@
     // Fitbit: higher = better managed (less stressed)
     const label = score >= 80 ? 'Well managed' : score >= 65 ? 'Balanced' : score >= 50 ? 'Moderate' : score >= 35 ? 'Elevated' : 'High';
     const color = score >= 65 ? 'var(--accent)' : score >= 50 ? '#f59e0b' : '#ef4444';
+
+    console.debug('[stress]', JSON.stringify({
+      inputs: { todayHrv, todayRhr, todaySleepScore, historyDays: history30d.length },
+      baselines: { hrvBaseline: Math.round(hrvBaseline * 100) / 100, rhrBaseline: rhrBaseline != null ? Math.round(rhrBaseline * 10) / 10 : null },
+      todayRaw: Math.round(todayRaw * 10) / 10,
+      smoothedHistory: smoothed != null ? Math.round(smoothed * 10) / 10 : null,
+      formula: smoothed != null ? `0.65×${Math.round(smoothed*10)/10} + 0.35×${Math.round(todayRaw*10)/10} = ${score}` : `raw=${Math.round(todayRaw*10)/10} → ${score}`,
+    }, null, 2));
 
     return {
       score, label, color,
