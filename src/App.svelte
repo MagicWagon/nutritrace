@@ -9,7 +9,7 @@
   import { DB }    from './lib/db.js';
   import { navStyle, applyAccentColor, accentColor, applyAppearance, appearance, disableAnimations, sidebarPersistent } from './stores/settings.js';
   import { currentUser, userMgmtActive, loadAuthState } from './stores/auth.js';
-  import { needsNativeSetup, isNative } from './lib/platform.js';
+  import { needsNativeSetup, isNative, getNativeMode } from './lib/platform.js';
   import NativeSetup from './routes/NativeSetup.svelte';
 
   // Show native setup wizard before anything else on first Android launch
@@ -102,8 +102,10 @@
     // Load auth state first (sets $currentUser and $userMgmtActive)
     await loadAuthState();
 
-    // Skip wizard if user is logged in, or if user management is already active
-    if (!DB.getSetting('setupComplete', false) && !$currentUser && !$userMgmtActive) {
+    // Show wizard on first launch — skip if user is logged in on server, or if user management is active
+    // In native local mode, always show wizard (currentUser is synthetic LOCAL_USER)
+    const _isNativeLocal = isNative && !getNativeMode()?.startsWith('server');
+    if (!DB.getSetting('setupComplete', false) && (!$currentUser || _isNativeLocal) && !$userMgmtActive) {
       window.location.hash = '#/wizard';
     }
 

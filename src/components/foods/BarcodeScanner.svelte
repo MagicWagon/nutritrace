@@ -327,12 +327,25 @@
 
   // Native mode: use ML Kit barcode scanner instead of HTML5 camera
   async function startNativeScanner() {
+    scanning = true;
     try {
       const { BarcodeScanner, BarcodeFormat } = await import('@capacitor-mlkit/barcode-scanning');
 
+      // Check if Google Barcode Scanner module is available
+      const { available } = await BarcodeScanner.isGoogleBarcodeScannerModuleAvailable();
+      if (!available) {
+        // Install the module (downloads on first use, ~2MB)
+        await BarcodeScanner.installGoogleBarcodeScannerModule();
+      }
+
       // Request camera permission
       const { camera } = await BarcodeScanner.requestPermissions();
-      if (camera !== 'granted') { status = 'Camera permission denied'; return; }
+      if (camera !== 'granted') {
+        const { showError } = await import('../../stores/toast.js');
+        showError('Camera permission denied');
+        open = false; scanning = false;
+        return;
+      }
 
       // Scan — opens native fullscreen camera overlay
       const { barcodes } = await BarcodeScanner.scan({
@@ -348,12 +361,12 @@
         if ($barcodeBeep) playBeep();
         dispatch('scan', { code });
       }
-      // Close the scanner UI after scan completes
-      open = false;
+      open = false; scanning = false;
     } catch (e) {
       console.error('[BarcodeScanner] Native scan failed:', e);
-      status = 'Scan failed: ' + (e?.message || '');
-      open = false;
+      const { showError } = await import('../../stores/toast.js');
+      showError('Barcode scan failed: ' + (e?.message || 'Unknown error'));
+      open = false; scanning = false;
     }
   }
 
@@ -371,7 +384,7 @@
   });
 </script>
 
-{#if open}
+{#if open && !isNative}
   <div class="scanner-backdrop" use:modalPortal on:click={close} transition:fly={{ y: 20, duration: 220 }}>
     <div class="scanner-panel" on:click|stopPropagation>
       <!-- Header -->

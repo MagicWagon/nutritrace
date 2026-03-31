@@ -7,10 +7,14 @@
   import { mealNames, energyUnit, goals, weightUnit, heightUnit, scheduleSave } from '../stores/settings.js';
   import { currentUser, userMgmtActive, loadAuthState } from '../stores/auth.js';
   import { showError } from '../stores/toast.js';
+  import { isNative, getServerUrl } from '../lib/platform.js';
+
+  // In native local mode, skip user management step (single user, no server)
+  const _isNativeLocal = isNative && !getServerUrl();
 
   // Steps: usermgmt (optional), welcome, gender, dob, height, weight, target, activity, integrations, summary
   const BASE_STEPS = ['welcome','gender','dob','height','weight','target','activity','integrations','summary'];
-  const ALL_STEPS  = ['usermgmt', ...BASE_STEPS];
+  const ALL_STEPS  = _isNativeLocal ? BASE_STEPS : ['usermgmt', ...BASE_STEPS];
 
   let step = 0;
   let dir  = 1;
@@ -54,13 +58,15 @@
 
   $: if (currentStepName === 'integrations' && !intStatusLoaded) {
     intStatusLoaded = true;
-    fetch('/api/app-config/env-locks', { credentials: 'include' })
-      .then(r => r.ok ? r.json() : {})
-      .then(d => {
-        intAILocked = d.ai === true;
-        if (intAILocked) intSkipped = { ...intSkipped, ai: true };
-      })
-      .catch(() => {});
+    if (!_isNativeLocal) {
+      fetch('/api/app-config/env-locks', { credentials: 'include' })
+        .then(r => r.ok ? r.json() : {})
+        .then(d => {
+          intAILocked = d.ai === true;
+          if (intAILocked) intSkipped = { ...intSkipped, ai: true };
+        })
+        .catch(() => {});
+    }
   }
 
   // Computed TDEE / goal / water for summary step
