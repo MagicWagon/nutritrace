@@ -225,7 +225,7 @@
         const end = new Date(dateStr + 'T12:00:00');
         const start = new Date(end);
         start.setDate(start.getDate() - (range - 1));
-        from = start.toISOString().slice(0, 10);
+        from = start.toLocaleDateString('sv-SE');
       }
       const result = await NtApi.post('/api/wellness/withings/sync', { from, to });
       await loadWithingsData();
@@ -297,7 +297,7 @@
         const end = new Date(dateStr + 'T12:00:00');
         const start = new Date(end);
         start.setDate(start.getDate() - (range - 1));
-        from = start.toISOString().slice(0, 10);
+        from = start.toLocaleDateString('sv-SE');
       }
       const result = await NtApi.post('/api/wellness/garmin/sync', { from, to });
       await loadGarminData();
@@ -375,8 +375,8 @@
     const lookback = Math.max(sleepInsightsRange, 45); // 45d window: covers 30d debt + extra for chronotype
     const from    = new Date(today);
     from.setDate(from.getDate() - lookback + 1);
-    const fromStr = from.toISOString().slice(0, 10);
-    const toStr   = today.toISOString().slice(0, 10);
+    const fromStr = from.toLocaleDateString('sv-SE');
+    const toStr   = today.toLocaleDateString('sv-SE');
 
     let fitbitRows = {}, garminRows = {};
     try { if ($fitbitEnabled)  fitbitRows  = await NtApi.get(`/api/wellness/fitbit/data?from=${fromStr}&to=${toStr}`); } catch {}
@@ -386,7 +386,7 @@
     const dates = [];
     const cur = new Date(fromStr + 'T12:00:00');
     while (cur <= today) {
-      dates.push(cur.toISOString().slice(0, 10));
+      dates.push(cur.toLocaleDateString('sv-SE'));
       cur.setDate(cur.getDate() + 1);
     }
     const merged = dates.map(d => {
@@ -520,12 +520,12 @@
     const today   = new Date();
     const from    = new Date(today);
     from.setDate(from.getDate() - 30);
-    const fromStr = from.toISOString().slice(0, 10);
-    const toStr   = today.toISOString().slice(0, 10);
+    const fromStr = from.toLocaleDateString('sv-SE');
+    const toStr   = today.toLocaleDateString('sv-SE');
 
     const dates = [];
     const cur   = new Date(fromStr + 'T12:00:00');
-    while (cur <= today) { dates.push(cur.toISOString().slice(0, 10)); cur.setDate(cur.getDate() + 1); }
+    while (cur <= today) { dates.push(cur.toLocaleDateString('sv-SE')); cur.setDate(cur.getDate() + 1); }
 
     let fitbitRows = {}, garminRows = {};
     try { if ($fitbitEnabled) fitbitRows = await NtApi.get(`/api/wellness/fitbit/data?from=${fromStr}&to=${toStr}`); } catch {}
@@ -660,12 +660,12 @@
     const today = new Date();
     const from  = new Date(today);
     from.setDate(from.getDate() - 30);
-    const fromStr = from.toISOString().slice(0, 10);
-    const toStr   = today.toISOString().slice(0, 10);
+    const fromStr = from.toLocaleDateString('sv-SE');
+    const toStr   = today.toLocaleDateString('sv-SE');
 
     const dates = [];
     const cur   = new Date(fromStr + 'T12:00:00');
-    while (cur <= today) { dates.push(cur.toISOString().slice(0, 10)); cur.setDate(cur.getDate() + 1); }
+    while (cur <= today) { dates.push(cur.toLocaleDateString('sv-SE')); cur.setDate(cur.getDate() + 1); }
 
     let fitbitRows = {}, garminRows = {};
     try { if ($fitbitEnabled) fitbitRows = await NtApi.get(`/api/wellness/fitbit/data?from=${fromStr}&to=${toStr}`); } catch {}
@@ -712,11 +712,11 @@
     const today   = new Date();
     const from    = new Date(today);
     from.setDate(from.getDate() - 6);
-    const fromStr = from.toISOString().slice(0, 10);
-    const toStr   = today.toISOString().slice(0, 10);
+    const fromStr = from.toLocaleDateString('sv-SE');
+    const toStr   = today.toLocaleDateString('sv-SE');
     const dates   = [];
     const cur     = new Date(fromStr + 'T12:00:00');
-    while (cur <= today) { dates.push(cur.toISOString().slice(0, 10)); cur.setDate(cur.getDate() + 1); }
+    while (cur <= today) { dates.push(cur.toLocaleDateString('sv-SE')); cur.setDate(cur.getDate() + 1); }
 
     let fitbitRange = {}, garminRange = {};
     try { if ($fitbitEnabled)  fitbitRange  = await NtApi.get(`/api/wellness/fitbit/data?from=${fromStr}&to=${toStr}`); } catch {}
@@ -788,13 +788,13 @@
   function prevDay() {
     const d = new Date(dateStr + 'T12:00:00');
     d.setDate(d.getDate() - 1);
-    dateStr = d.toISOString().slice(0, 10);
+    dateStr = d.toLocaleDateString('sv-SE');
     loadData();
   }
   function nextDay() {
     const d = new Date(dateStr + 'T12:00:00');
     d.setDate(d.getDate() + 1);
-    dateStr = d.toISOString().slice(0, 10);
+    dateStr = d.toLocaleDateString('sv-SE');
     loadData();
   }
   $: isToday = dateStr === localDateStr();
@@ -944,7 +944,7 @@
         const end   = new Date(dateStr + 'T12:00:00');
         const start = new Date(end);
         start.setDate(start.getDate() - (range - 1));
-        const from = start.toISOString().slice(0, 10);
+        const from = start.toLocaleDateString('sv-SE');
         result = await NtApi.post('/api/wellness/fitbit/sync', { from, to: dateStr });
         await loadData(); // reload displayed date from DB after range sync
         lastSync = new Date();
