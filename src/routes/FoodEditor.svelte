@@ -32,22 +32,7 @@
   let cropBox     = null;
   let cropDragging = false, cropStartX, cropStartY, cropOrigL, cropOrigT;
 
-  async function openGallery() {
-    if (isNative) {
-      try {
-        const file = await takePhoto();
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = ev => {
-          if ($cropPhotos) { cropSrc = ev.target.result; showCrop = true; }
-          else { food.imgUrl = ev.target.result; }
-        };
-        reader.readAsDataURL(file);
-      } catch { /* user cancelled */ }
-      return;
-    }
-    fileInput && fileInput.click();
-  }
+  function openGallery() { fileInput && fileInput.click(); }
 
   function onFileChange(e) {
     const file = e.target.files[0];
@@ -66,6 +51,19 @@
   }
 
   async function openCamera() {
+    if (isNative) {
+      try {
+        const file = await takePhoto();
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = ev => {
+          if ($cropPhotos) { cropSrc = ev.target.result; showCrop = true; }
+          else { food.imgUrl = ev.target.result; }
+        };
+        reader.readAsDataURL(file);
+      } catch { /* user cancelled */ }
+      return;
+    }
     showCamera = true;
     await new Promise(r => setTimeout(r, 80));
     try {

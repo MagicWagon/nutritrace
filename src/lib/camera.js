@@ -16,7 +16,7 @@ export async function takePhoto() {
 
   const photo = await Camera.getPhoto({
     resultType: CameraResultType.Uri,
-    source: CameraSource.Prompt,  // Prompt: camera or gallery choice
+    source: CameraSource.Camera,  // Open camera directly — Upload button handles gallery
     quality: 85,
     allowEditing: false,
   });
