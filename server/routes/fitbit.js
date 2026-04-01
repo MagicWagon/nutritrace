@@ -416,35 +416,56 @@ router.post('/sync', wrap(async (req, res) => {
   res.json({ ok: true, from, to, ...results });
 }));
 
-// ── POST /recalculate — force recalculate readiness/stress scores ────────────
+// Recalculate sleep score from stored raw components for a given date
+function _recalcSleep(userId, dateStr) {
+  const rows = db.prepare(
+    `SELECT metric_type, value FROM wellness_data WHERE user_id = ? AND date = ? AND source = 'fitbit'`
+  ).all(userId, dateStr);
+  const m = {};
+  for (const r of rows) m[r.metric_type] = r.value;
+
+  if (m.sleep_duration_min == null) return null;
+  const dur  = m.sleep_duration_min;
+  const deep = m.sleep_deep_min ?? 0;
+  const rem  = m.sleep_rem_min  ?? 0;
+  const spo2 = m.spo2_avg ?? null;
+  const hrv  = m.hrv_daily_rmssd ?? null;
+  const eff  = m.sleep_efficiency ?? null;
+  const durPts     = Math.min(30, (dur / 470) * 30);
+  const deepRemPct = dur > 0 ? (deep + rem) / dur : 0;
+  const qualPts    = Math.min(40, deepRemPct / 0.25 * 40);
+  const qualBonus  = Math.min(8, Math.max(0, (deepRemPct - 0.35) / 0.15 * 8));
+  const spo2Pts    = spo2 != null ? Math.min(15, Math.max(0, (spo2 - 90) / 5 * 15)) : 11;
+  const hrvPts     = hrv  != null ? Math.min(15, Math.max(0, (hrv  -  5) / 45 * 15)) : 10;
+  const effPts     = eff  != null ? Math.min(1.5, Math.max(0, (eff - 85) * 0.15)) : 0;
+  const score = Math.min(100, Math.round(durPts + qualPts + qualBonus + spo2Pts + hrvPts + effPts));
+
+  const upsert = db.prepare(`
+    INSERT INTO wellness_data (user_id, date, source, metric_type, value, synced_at)
+    VALUES (?, ?, 'fitbit', 'sleep_score', ?, datetime('now'))
+    ON CONFLICT(user_id, date, source, metric_type) DO UPDATE SET value = excluded.value, synced_at = excluded.synced_at
+  `);
+  upsert.run(userId, dateStr, score);
+  return score;
+}
+
+// ── POST /recalculate — force recalculate today's sleep, readiness, stress ───
 // Used during formula tuning — overwrites stored scores with new constants.
-// Body: { all: true } to wipe and recalculate all dates, or just today by default.
 router.post('/recalculate', wrap(async (req, res) => {
   const u = uid(req);
+  const today = new Date().toISOString().slice(0, 10);
   const { snapshotScores } = await import('../lib/wellness-scores.js');
 
-  if (req.body.all) {
-    // Wipe all stored readiness/stress scores and recalculate each date
-    db.prepare(`DELETE FROM wellness_data WHERE user_id = ? AND source = 'fitbit' AND metric_type IN ('readiness_score', 'stress_score')`).run(u);
-    const dates = db.prepare(
-      `SELECT DISTINCT date FROM wellness_data WHERE user_id = ? AND source = 'fitbit' AND metric_type = 'hrv_daily_rmssd' ORDER BY date`
-    ).all(u).map(r => r.date);
-    let count = 0;
-    for (const d of dates) {
-      snapshotScores(u, d, { force: true });
-      count++;
-    }
-    res.json({ ok: true, recalculated: count });
-  } else {
-    const today = new Date().toISOString().slice(0, 10);
-    snapshotScores(u, today, { force: true });
-    const scores = db.prepare(
-      `SELECT metric_type, value FROM wellness_data WHERE user_id = ? AND date = ? AND source = 'fitbit' AND metric_type IN ('readiness_score', 'stress_score')`
-    ).all(u, today);
-    const result = {};
-    for (const s of scores) result[s.metric_type] = s.value;
-    res.json({ ok: true, date: today, ...result });
-  }
+  // Recalculate all three scores for today
+  const sleep = _recalcSleep(u, today);
+  snapshotScores(u, today, { force: true });
+
+  const scores = db.prepare(
+    `SELECT metric_type, value FROM wellness_data WHERE user_id = ? AND date = ? AND source = 'fitbit' AND metric_type IN ('sleep_score', 'readiness_score', 'stress_score')`
+  ).all(u, today);
+  const result = {};
+  for (const s of scores) result[s.metric_type] = s.value;
+  res.json({ ok: true, date: today, ...result });
 }));
 
 // ── GET /data — return stored wellness data ───────────────────────────────────
