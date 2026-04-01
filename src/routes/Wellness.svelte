@@ -1159,7 +1159,7 @@
       <!-- ── At least one integration configured — main UI ── -->
 
       <!-- Tab bar — only tabs for configured integrations -->
-      <div class="tab-bar">
+      <div class="tab-bar" class:has-banner={$pageBanners}>
         <div class="tab-pill" style="left:{_wlPillLeft};width:{_wlPillWidth}"></div>
         {#if fitbitAvailable}
           <button class="tab-btn" class:active={activeTab === 'movement'} on:click={() => activeTab = 'movement'}>
@@ -1949,7 +1949,7 @@
   /* Tabs */
   .tab-bar {
     position: sticky;
-    top: calc(var(--page-top, var(--safe-top)) + 92px);
+    top: calc(var(--page-top, var(--safe-top)) + 46px + 50px);
     z-index: 8;
     display: flex;
     padding: 4px;
@@ -1960,9 +1960,8 @@
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
   }
-  :global(.wl-date-bar.has-banner) ~ * > .tab-bar,
-  :global(.wl-date-bar.has-banner) ~ .tab-bar {
-    top: calc(var(--page-top, var(--safe-top)) + 132px);
+  .tab-bar.has-banner {
+    top: calc(var(--page-top, var(--safe-top)) + 86px + 50px);
   }
   .tab-bar::-webkit-scrollbar { display: none; }
   .tab-pill {
