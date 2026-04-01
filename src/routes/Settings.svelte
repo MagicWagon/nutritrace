@@ -887,7 +887,7 @@
   async function loadFullBackups() {
     if (isNativeLocal) return;
     try {
-      const res = await fetch(apiUrl('/api/full-backup'), { credentials: 'include' });
+      const res = await fetch(apiUrl('/api/full-backup'), _fetchOpts());
       if (res.ok) fullBackups = await res.json();
     } catch {}
   }
@@ -895,7 +895,7 @@
   async function createFullBackup() {
     fullBackupBusy = true;
     try {
-      const res  = await fetch(apiUrl('/api/full-backup'), { method: 'POST', credentials: 'include' });
+      const res  = await fetch(apiUrl('/api/full-backup'), { method: 'POST', ..._fetchOpts() });
       const data = await res.json();
       if (!res.ok) { showError(data.error || 'Backup failed'); return; }
       showSuccess('Full backup created');
@@ -928,7 +928,7 @@
     restoreStatus = { phase: 'restoring', percent: 40, label: 'Restoring backup…' };
     _scrollToProgress();
     try {
-      const res  = await fetch(apiUrl(`/api/full-backup/${encodeURIComponent(filename)}/restore`), { method: 'POST', credentials: 'include' });
+      const res  = await fetch(apiUrl(`/api/full-backup/${encodeURIComponent(filename)}/restore`), { method: 'POST', ..._fetchOpts() });
       const data = await res.json();
       if (!res.ok) { showError(data.error || 'Restore failed'); restoreStatus = null; return; }
       restoreStatus = { phase: 'restoring', percent: 100, label: 'Restore complete — reloading…' };
@@ -943,7 +943,7 @@
     const filename = deleteTarget;
     deleteTarget = null;
     try {
-      const res = await fetch(apiUrl(`/api/full-backup/${encodeURIComponent(filename)}`), { method: 'DELETE', credentials: 'include' });
+      const res = await fetch(apiUrl(`/api/full-backup/${encodeURIComponent(filename)}`), { method: 'DELETE', ..._fetchOpts() });
       if (res.ok) { showSuccess('Backup deleted'); await loadFullBackups(); }
       else showError('Delete failed');
     } catch { showError('Delete failed'); }
@@ -1092,7 +1092,7 @@
 
   async function loadSmtpConfig() {
     try {
-      const res  = await fetch(apiUrl('/api/app-config'), { credentials: 'include' });
+      const res  = await fetch(apiUrl('/api/app-config'), _fetchOpts());
       if (!res.ok) return;
       const cfg  = await res.json();
       smtpHost   = cfg.smtp_host   || '';
@@ -1133,7 +1133,7 @@
   async function testSmtp() {
     smtpTestStatus = 'testing';
     try {
-      const res = await fetch(apiUrl('/api/app-config/test-email'), { method: 'POST', credentials: 'include' });
+      const res = await fetch(apiUrl('/api/app-config/test-email'), { method: 'POST', ..._fetchOpts() });
       smtpTestStatus = res.ok ? 'ok' : 'fail';
     } catch { smtpTestStatus = 'fail'; }
   }
@@ -1294,7 +1294,7 @@
   let showClearSettingsDialog = false;
   async function clearAllSettings() {
     try {
-      await fetch(apiUrl('/api/settings'), { method: 'DELETE', credentials: 'include' });
+      await fetch(apiUrl('/api/settings'), { method: 'DELETE', ..._fetchOpts() });
       // Clear user-scoped localStorage settings
       const userId = localStorage.getItem('wl:userId');
       const prefix = userId ? `wl_u${userId}_` : 'wl_';
@@ -1352,7 +1352,7 @@
   let envLocks = { smtp: false, ai: false };
   onMount(async () => {
     try {
-      const res = await fetch(apiUrl('/api/app-config/env-locks'), { credentials: 'include' });
+      const res = await fetch(apiUrl('/api/app-config/env-locks'), _fetchOpts());
       if (res.ok) envLocks = await res.json();
     } catch {}
   });
