@@ -32,7 +32,7 @@
   import { NtApi } from '../lib/api.js';
   import { NUTRIMENTS, Nutrition } from '../lib/nutrition.js';
   import { currentUser, userMgmtActive, loadAuthState, logout } from '../stores/auth.js';
-  import { isNative, getServerUrl, setServerUrl, setNativeMode, getNativeMode, setAuthToken, apiUrl, getAuthToken } from '../lib/platform.js';
+  import { isNative, getServerUrl, setServerUrl, setNativeMode, getNativeMode, setAuthToken, apiUrl, getAuthToken, resolveAssetUrl } from '../lib/platform.js';
 
   function _fetchOpts(extra = {}) {
     const h = { ...extra };
@@ -2296,7 +2296,7 @@
                     <div class="um-user-row">
                       <div class="um-user-avatar">
                         {#if u.avatar_url}
-                          <img src={u.avatar_url} alt={u.username} />
+                          <img src={resolveAssetUrl(u.avatar_url)} alt={u.username} />
                         {:else}
                           <span class="material-symbols-rounded">person</span>
                         {/if}

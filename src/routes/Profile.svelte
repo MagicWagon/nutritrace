@@ -241,4 +241,6 @@
   }
   .avatar-btn:hover .avatar-overlay { opacity: 1; }
   .avatar-meta { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .profile-body .settings-card { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .profile-body .editor-card-title { font-size: 16px; font-weight: 600; margin: 0; }
 </style>
