@@ -102,10 +102,13 @@
     // Load auth state first (sets $currentUser and $userMgmtActive)
     await loadAuthState();
 
-    // Show wizard on first launch — skip if user is logged in on server, or if user management is active
-    // In native local mode, always show wizard (currentUser is synthetic LOCAL_USER)
-    const _isNativeLocal = isNative && !getNativeMode()?.startsWith('server');
-    if (!DB.getSetting('setupComplete', false) && (!$currentUser || _isNativeLocal) && !$userMgmtActive) {
+    // Show wizard on first launch:
+    // - Native server mode: NEVER show wizard (server is already configured)
+    // - Native local mode: show wizard for goals/units/profile setup
+    // - Web: show wizard if no user logged in and no user management
+    const _isNativeServer = isNative && getNativeMode() === 'server';
+    const _isNativeLocal = isNative && getNativeMode() === 'local';
+    if (!_isNativeServer && !DB.getSetting('setupComplete', false) && (!$currentUser || _isNativeLocal) && !$userMgmtActive) {
       window.location.hash = '#/wizard';
     }
 

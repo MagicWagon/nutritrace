@@ -41,16 +41,31 @@ export async function loadAuthState() {
   }
 
   try {
-    const [statusRes, meRes] = await Promise.all([
-      fetch(_apiUrl('/api/auth/status'), { credentials: 'include' }),
-      fetch(_apiUrl('/api/auth/me'),     { credentials: 'include' }),
-    ]);
-    const { active } = await statusRes.json();
-    const meData     = await meRes.json();
-    const user       = meData.user || null;
+    let active, user;
+    if (isNative && getServerUrl()) {
+      // Native server mode: use CapacitorHttp (shares cookies with native HTTP layer)
+      const { CapacitorHttp } = await import('@capacitor/core');
+      const serverUrl = getServerUrl();
+      const [statusRes, meRes] = await Promise.all([
+        CapacitorHttp.get({ url: `${serverUrl}/api/auth/status` }),
+        CapacitorHttp.get({ url: `${serverUrl}/api/auth/me` }),
+      ]);
+      const statusData = typeof statusRes.data === 'string' ? JSON.parse(statusRes.data) : statusRes.data;
+      const meData     = typeof meRes.data === 'string' ? JSON.parse(meRes.data) : meRes.data;
+      active = statusData.active;
+      user   = meData.user || null;
+    } else {
+      const [statusRes, meRes] = await Promise.all([
+        fetch(_apiUrl('/api/auth/status'), { credentials: 'include' }),
+        fetch(_apiUrl('/api/auth/me'),     { credentials: 'include' }),
+      ]);
+      const statusData = await statusRes.json();
+      const meData     = await meRes.json();
+      active = statusData.active;
+      user   = meData.user || null;
+    }
     userMgmtActive.set(!!active);
     currentUser.set(user);
-    // Update user-scoped localStorage key prefix
     if (user) localStorage.setItem('wl:userId', String(user.id));
     else       localStorage.removeItem('wl:userId');
     if (user) await loadServerSettings();
