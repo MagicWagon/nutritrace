@@ -2953,9 +2953,8 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 8px 16px 12px;
-    margin: 0 calc(-1 * var(--page-px, 16px));
-    background: var(--bg);
+    padding: 8px 0 0;
+    width: 100%;
   }
   .settings-search-icon { font-size: 20px; color: var(--text-3); flex-shrink: 0; }
   .settings-search-input {
