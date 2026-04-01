@@ -134,6 +134,17 @@
       window.location.hash = '#/wizard';
     }
 
+    // Start sync engine in native server-connected mode
+    if (isNative && getNativeMode() === 'server') {
+      import('./lib/sync.js').then(({ fullSync }) => {
+        fullSync(); // Initial sync on app startup
+        // Sync on app resume (coming back from background)
+        import('@capacitor/app').then(({ App }) => {
+          App.addListener('resume', () => fullSync());
+        });
+      });
+    }
+
     // Migrate assistant name: 'Buddy' → 'FitBot'
     if (DB.getSetting('aiAssistantName', null) === 'Buddy') {
       DB.setSetting('aiAssistantName', 'FitBot');

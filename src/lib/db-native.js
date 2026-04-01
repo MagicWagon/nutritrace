@@ -20,6 +20,7 @@ let _initPromise = null;
 const SCHEMA = `
   CREATE TABLE IF NOT EXISTS foods (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    server_id   INTEGER,
     user_id     INTEGER DEFAULT 1,
     name        TEXT NOT NULL,
     brand       TEXT,
@@ -34,11 +35,13 @@ const SCHEMA = `
     source_id   INTEGER,
     created_at  TEXT DEFAULT (datetime('now')),
     updated_at  TEXT DEFAULT (datetime('now')),
+    deleted_at  TEXT DEFAULT NULL,
     sync_status TEXT DEFAULT 'synced'
   );
 
   CREATE TABLE IF NOT EXISTS meals (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    server_id   INTEGER,
     user_id     INTEGER DEFAULT 1,
     name        TEXT NOT NULL,
     nutrition   TEXT DEFAULT '{}',
@@ -52,17 +55,20 @@ const SCHEMA = `
     source_id   INTEGER,
     created_at  TEXT DEFAULT (datetime('now')),
     updated_at  TEXT DEFAULT (datetime('now')),
+    deleted_at  TEXT DEFAULT NULL,
     sync_status TEXT DEFAULT 'synced'
   );
 
   CREATE TABLE IF NOT EXISTS diary (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    server_id   INTEGER,
     user_id     INTEGER DEFAULT 1,
     date        TEXT NOT NULL,
     items       TEXT DEFAULT '[]',
     body_stats  TEXT DEFAULT '{}',
     water       TEXT DEFAULT '[]',
     updated_at  TEXT DEFAULT (datetime('now')),
+    deleted_at  TEXT DEFAULT NULL,
     sync_status TEXT DEFAULT 'synced',
     UNIQUE(date, user_id)
   );
@@ -79,6 +85,11 @@ const SCHEMA = `
     UNIQUE(user_id, date, source, metric_type)
   );
 
+  CREATE TABLE IF NOT EXISTS sync_meta (
+    key   TEXT PRIMARY KEY,
+    value TEXT
+  );
+
   CREATE TABLE IF NOT EXISTS sync_log (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     synced_at   TEXT DEFAULT (datetime('now')),
@@ -90,8 +101,11 @@ const SCHEMA = `
   );
 
   CREATE INDEX IF NOT EXISTS idx_foods_user ON foods(user_id);
+  CREATE INDEX IF NOT EXISTS idx_foods_server ON foods(server_id);
   CREATE INDEX IF NOT EXISTS idx_meals_user ON meals(user_id);
+  CREATE INDEX IF NOT EXISTS idx_meals_server ON meals(server_id);
   CREATE INDEX IF NOT EXISTS idx_diary_user_date ON diary(user_id, date);
+  CREATE INDEX IF NOT EXISTS idx_diary_server ON diary(server_id);
   CREATE INDEX IF NOT EXISTS idx_wellness_user_date ON wellness_data(user_id, date);
   CREATE INDEX IF NOT EXISTS idx_foods_sync ON foods(sync_status);
   CREATE INDEX IF NOT EXISTS idx_meals_sync ON meals(sync_status);
@@ -145,7 +159,7 @@ function _now() {
 export async function dbGetFoods() {
   const db = await getDb();
   const r = await db.query(
-    `SELECT * FROM foods WHERE user_id = ? AND visibility = 'private' ORDER BY created_at DESC`,
+    `SELECT * FROM foods WHERE user_id = ? AND visibility = 'private' AND deleted_at IS NULL ORDER BY created_at DESC`,
     [LOCAL_USER_ID]
   );
   return _rows(r).map(_parseFoodRow);
@@ -205,7 +219,7 @@ export async function dbUpdateFood(id, data) {
 
 export async function dbDeleteFood(id) {
   const db = await getDb();
-  await db.run(`DELETE FROM foods WHERE id = ? AND user_id = ?`, [id, LOCAL_USER_ID]);
+  await db.run(`UPDATE foods SET deleted_at = datetime('now'), updated_at = datetime('now'), sync_status = 'pending' WHERE id = ? AND user_id = ?`, [id, LOCAL_USER_ID]);
 }
 
 export async function dbCopyFood(id) {
@@ -229,7 +243,7 @@ function _parseFoodRow(row) {
 export async function dbGetMeals(recipesOnly = false) {
   const db = await getDb();
   const r = await db.query(
-    `SELECT * FROM meals WHERE user_id = ? AND is_recipe = ? ORDER BY created_at DESC`,
+    `SELECT * FROM meals WHERE user_id = ? AND is_recipe = ? AND deleted_at IS NULL ORDER BY created_at DESC`,
     [LOCAL_USER_ID, recipesOnly ? 1 : 0]
   );
   return _rows(r).map(_parseMealRow);
@@ -287,7 +301,7 @@ export async function dbUpdateMeal(id, data) {
 
 export async function dbDeleteMeal(id) {
   const db = await getDb();
-  await db.run(`DELETE FROM meals WHERE id = ? AND user_id = ?`, [id, LOCAL_USER_ID]);
+  await db.run(`UPDATE meals SET deleted_at = datetime('now'), updated_at = datetime('now'), sync_status = 'pending' WHERE id = ? AND user_id = ?`, [id, LOCAL_USER_ID]);
 }
 
 export async function dbCopyMeal(id) {
@@ -404,6 +418,132 @@ export async function dbMarkSynced(table, ids) {
   await db.run(
     `UPDATE ${table} SET sync_status = 'synced' WHERE id IN (${placeholders})`,
     ids
+  );
+}
+
+// ── Sync meta ─────────────────────────────────────────────────────────────
+
+export async function dbGetSyncMeta(key) {
+  const db = await getDb();
+  const r = await db.query(`SELECT value FROM sync_meta WHERE key = ?`, [key]);
+  const row = _row(r);
+  return row?.value || null;
+}
+
+export async function dbSetSyncMeta(key, value) {
+  const db = await getDb();
+  await db.run(
+    `INSERT INTO sync_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    [key, value]
+  );
+}
+
+// Update server_id after push
+export async function dbSetServerId(table, localId, serverId) {
+  const db = await getDb();
+  await db.run(`UPDATE ${table} SET server_id = ? WHERE id = ?`, [serverId, localId]);
+}
+
+// Hard-delete soft-deleted records that have been confirmed pushed to server
+export async function dbPurgeSoftDeleted(table) {
+  const db = await getDb();
+  await db.run(`DELETE FROM ${table} WHERE deleted_at IS NOT NULL AND sync_status = 'synced'`);
+}
+
+// Upsert a record from server pull (by server_id)
+export async function dbUpsertFromServer(table, serverRecord) {
+  const db = await getDb();
+  const { id: serverId, deleted_at, ...data } = serverRecord;
+
+  if (deleted_at) {
+    // Server soft-deleted — hard delete locally
+    await db.run(`DELETE FROM ${table} WHERE server_id = ?`, [serverId]);
+    return;
+  }
+
+  // Check if we have this server record locally
+  const existing = await db.query(`SELECT id, sync_status FROM ${table} WHERE server_id = ?`, [serverId]);
+  const local = _row(existing);
+
+  if (local) {
+    // Don't overwrite local pending changes (client wins during active editing)
+    if (local.sync_status === 'pending') return;
+
+    if (table === 'foods') {
+      await db.run(
+        `UPDATE foods SET name=?, brand=?, nutrition=?, portion=?, unit=?, img_url=?, notes=?, category=?, barcode=?, updated_at=?, sync_status='synced' WHERE server_id=?`,
+        [data.name, data.brand, typeof data.nutrition === 'string' ? data.nutrition : JSON.stringify(data.nutrition || {}),
+         data.portion ?? 100, data.unit || 'g', data.img_url, data.notes, data.category, data.barcode, data.updated_at, serverId]
+      );
+    } else if (table === 'meals') {
+      await db.run(
+        `UPDATE meals SET name=?, nutrition=?, items=?, img_url=?, notes=?, is_recipe=?, portion=?, unit=?, updated_at=?, sync_status='synced' WHERE server_id=?`,
+        [data.name, typeof data.nutrition === 'string' ? data.nutrition : JSON.stringify(data.nutrition || {}),
+         typeof data.items === 'string' ? data.items : JSON.stringify(data.items || []),
+         data.img_url, data.notes, data.is_recipe ? 1 : 0, data.portion ?? 100, data.unit || 'g', data.updated_at, serverId]
+      );
+    }
+  } else {
+    // New from server — insert locally
+    if (table === 'foods') {
+      await db.run(
+        `INSERT INTO foods (server_id, user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, updated_at, sync_status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced')`,
+        [serverId, LOCAL_USER_ID, data.name, data.brand, typeof data.nutrition === 'string' ? data.nutrition : JSON.stringify(data.nutrition || {}),
+         data.portion ?? 100, data.unit || 'g', data.img_url, data.notes, data.category, data.barcode, data.updated_at]
+      );
+    } else if (table === 'meals') {
+      await db.run(
+        `INSERT INTO meals (server_id, user_id, name, nutrition, items, img_url, notes, is_recipe, portion, unit, updated_at, sync_status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced')`,
+        [serverId, LOCAL_USER_ID, data.name, typeof data.nutrition === 'string' ? data.nutrition : JSON.stringify(data.nutrition || {}),
+         typeof data.items === 'string' ? data.items : JSON.stringify(data.items || []),
+         data.img_url, data.notes, data.is_recipe ? 1 : 0, data.portion ?? 100, data.unit || 'g', data.updated_at]
+      );
+    }
+  }
+}
+
+// Upsert diary from server pull (keyed by date)
+export async function dbUpsertDiaryFromServer(serverRecord) {
+  const db = await getDb();
+  const { id: serverId, deleted_at, date, items, body_stats, water, updated_at } = serverRecord;
+
+  if (deleted_at) {
+    await db.run(`DELETE FROM diary WHERE server_id = ? OR date = ?`, [serverId, date]);
+    return;
+  }
+
+  const existing = await db.query(`SELECT id, sync_status FROM diary WHERE date = ? AND user_id = ?`, [date, LOCAL_USER_ID]);
+  const local = _row(existing);
+
+  if (local && local.sync_status === 'pending') return; // don't overwrite active edits
+
+  await db.run(
+    `INSERT INTO diary (server_id, user_id, date, items, body_stats, water, updated_at, sync_status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'synced')
+     ON CONFLICT(date, user_id) DO UPDATE SET
+       server_id=excluded.server_id, items=excluded.items, body_stats=excluded.body_stats,
+       water=excluded.water, updated_at=excluded.updated_at, sync_status='synced'`,
+    [serverId, LOCAL_USER_ID, date,
+     typeof items === 'string' ? items : JSON.stringify(items || []),
+     typeof body_stats === 'string' ? body_stats : JSON.stringify(body_stats || {}),
+     typeof water === 'string' ? water : JSON.stringify(water || []),
+     updated_at]
+  );
+}
+
+// Upsert wellness data from server pull
+export async function dbUpsertWellnessFromServer(record) {
+  const db = await getDb();
+  await db.run(
+    `INSERT INTO wellness_data (user_id, date, source, metric_type, value, metadata, synced_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(user_id, date, source, metric_type) DO UPDATE SET
+       value=excluded.value, metadata=excluded.metadata, synced_at=excluded.synced_at`,
+    [LOCAL_USER_ID, record.date, record.source, record.metric_type, record.value,
+     typeof record.metadata === 'string' ? record.metadata : JSON.stringify(record.metadata || {}),
+     record.synced_at]
   );
 }
 

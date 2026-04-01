@@ -397,11 +397,19 @@ const _NtApiHttp = {
 import { NtApiNative } from './api-native.js';
 
 // Dynamic proxy — resolves which implementation to use on EVERY call.
-// This handles the case where the user switches from local → server mode
-// (or vice versa) without a full module re-evaluation.
+// Three modes: web (HTTP), native standalone (local SQLite), native server (cached).
+import { NtApiCached } from './api-cached.js';
+
 export const NtApi = new Proxy({}, {
   get(_, prop) {
-    const impl = (isNative && !getServerUrl()) ? NtApiNative : _NtApiHttp;
+    let impl;
+    if (!isNative) {
+      impl = _NtApiHttp;                    // Web PWA — always server
+    } else if (!getServerUrl()) {
+      impl = NtApiNative;                   // Native standalone — always local
+    } else {
+      impl = NtApiCached;                   // Native + server — cached/offline
+    }
     return typeof impl[prop] === 'function' ? impl[prop].bind(impl) : impl[prop];
   }
 });

@@ -17,12 +17,12 @@ router.get('/', wrap((req, res) => {
   const u = uid(req);
 
   if (u == null) {
-    return res.json(db.prepare('SELECT * FROM meals WHERE is_recipe = ? ORDER BY name ASC').all(isRecipe).map(parse));
+    return res.json(db.prepare('SELECT * FROM meals WHERE is_recipe = ? AND deleted_at IS NULL ORDER BY name ASC').all(isRecipe).map(parse));
   }
 
   if (req.query.group === '1' && sharingEnabled()) {
     // Group catalogue: other users' meals/recipes visible to this user
-    const others = db.prepare('SELECT * FROM meals WHERE is_recipe = ? AND user_id != ? ORDER BY name ASC').all(isRecipe, u);
+    const others = db.prepare('SELECT * FROM meals WHERE is_recipe = ? AND user_id != ? AND deleted_at IS NULL ORDER BY name ASC').all(isRecipe, u);
     const shared = others.filter(m => canRead(m, u));
     const userCache = {};
     for (const m of shared) {
@@ -35,7 +35,7 @@ router.get('/', wrap((req, res) => {
     return res.json(shared.map(parse));
   }
 
-  const rows = db.prepare('SELECT * FROM meals WHERE is_recipe = ? AND user_id = ? ORDER BY name ASC').all(isRecipe, u);
+  const rows = db.prepare('SELECT * FROM meals WHERE is_recipe = ? AND user_id = ? AND deleted_at IS NULL ORDER BY name ASC').all(isRecipe, u);
   res.json(rows.map(parse));
 }));
 
@@ -58,8 +58,8 @@ router.post('/', wrap((req, res) => {
   const u = uid(req);
   const vis = visibility || 'private';
   const result = db.prepare(
-    `INSERT INTO meals (user_id, name, nutrition, items, img_url, notes, is_recipe, portion, unit, visibility, source_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO meals (user_id, name, nutrition, items, img_url, notes, is_recipe, portion, unit, visibility, source_id, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
   ).run(u, name, JSON.stringify(nutrition || {}), JSON.stringify(items || []),
     img_url || null, notes || null, is_recipe ? 1 : 0, portion ?? 100, unit || 'g', vis, source_id || null);
   res.status(201).json(parse(db.prepare('SELECT * FROM meals WHERE id = ?').get(result.lastInsertRowid)));
@@ -73,7 +73,7 @@ router.put('/:id', wrap((req, res) => {
   if (u != null && existing.user_id !== u) return res.status(403).json({ error: 'Forbidden' });
   const { name, nutrition, items, img_url, notes, is_recipe, portion, unit, visibility } = req.body;
   db.prepare(
-    `UPDATE meals SET name=?, nutrition=?, items=?, img_url=?, notes=?, is_recipe=?, portion=?, unit=?, visibility=? WHERE id=?`
+    `UPDATE meals SET name=?, nutrition=?, items=?, img_url=?, notes=?, is_recipe=?, portion=?, unit=?, visibility=?, updated_at=datetime('now') WHERE id=?`
   ).run(name ?? existing.name, JSON.stringify(nutrition ?? JSON.parse(existing.nutrition || '{}')),
     JSON.stringify(items ?? JSON.parse(existing.items || '[]')), img_url ?? existing.img_url,
     notes ?? existing.notes, is_recipe != null ? (is_recipe ? 1 : 0) : existing.is_recipe,
@@ -88,7 +88,7 @@ router.delete('/:id', wrap((req, res) => {
   const existing = db.prepare('SELECT * FROM meals WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Not found' });
   if (u != null && existing.user_id !== u) return res.status(403).json({ error: 'Forbidden' });
-  db.prepare('DELETE FROM meals WHERE id = ?').run(req.params.id);
+  db.prepare(`UPDATE meals SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`).run(req.params.id);
   res.json({ ok: true });
 }));
 
@@ -134,8 +134,8 @@ router.post('/:id/copy', wrap((req, res) => {
   }
 
   const result = db.prepare(
-    `INSERT INTO meals (user_id, name, nutrition, items, img_url, notes, is_recipe, portion, unit, visibility, source_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'private', ?)`
+    `INSERT INTO meals (user_id, name, nutrition, items, img_url, notes, is_recipe, portion, unit, visibility, source_id, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'private', ?, datetime('now'))`
   ).run(u, meal.name, meal.nutrition, meal.items, meal.img_url, meal.notes,
     meal.is_recipe, meal.portion, meal.unit, meal.id);
   res.status(201).json(parse(db.prepare('SELECT * FROM meals WHERE id = ?').get(result.lastInsertRowid)));

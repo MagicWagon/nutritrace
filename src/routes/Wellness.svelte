@@ -1488,7 +1488,7 @@
                   {#if readiness.data_days < 30}
                     <div class="si-calibration-note">
                       <span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">info</span>
-                      Based on {readiness.data_days} of 30 days — accuracy improves as more data is collected.
+                      Based on {readiness.data_days} days — accuracy improves as more data is collected.
                     </div>
                   {/if}
                   {#if readiness.stored}
@@ -1536,7 +1536,7 @@
                   {#if stressScore.data_days < 30}
                     <div class="si-calibration-note">
                       <span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">info</span>
-                      Based on {stressScore.data_days} of 30 days — accuracy improves as more data is collected.
+                      Based on {stressScore.data_days} days — accuracy improves as more data is collected.
                     </div>
                   {/if}
                 {/if}

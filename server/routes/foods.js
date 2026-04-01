@@ -17,16 +17,16 @@ router.get('/', wrap((req, res) => {
   const u = uid(req);
   if (u == null) {
     // Single-user mode — no sharing concept
-    return res.json(db.prepare('SELECT * FROM foods ORDER BY name ASC').all().map(parse));
+    return res.json(db.prepare('SELECT * FROM foods WHERE deleted_at IS NULL ORDER BY name ASC').all().map(parse));
   }
 
   const sharing = sharingEnabled();
   // Always return own foods
-  let rows = db.prepare('SELECT * FROM foods WHERE user_id = ? ORDER BY name ASC').all(u);
+  let rows = db.prepare('SELECT * FROM foods WHERE user_id = ? AND deleted_at IS NULL ORDER BY name ASC').all(u);
 
   if (sharing && req.query.group === '1') {
     // Group catalogue: other users' foods visible to this user
-    const others = db.prepare('SELECT * FROM foods WHERE user_id != ? ORDER BY name ASC').all(u);
+    const others = db.prepare('SELECT * FROM foods WHERE user_id != ? AND deleted_at IS NULL ORDER BY name ASC').all(u);
     const shared = others.filter(f => canRead(f, u));
     // Attach owner display name
     const userCache = {};
@@ -63,8 +63,8 @@ router.post('/', wrap((req, res) => {
   const u = uid(req);
   const vis = visibility || 'private';
   const result = db.prepare(
-    `INSERT INTO foods (user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, visibility, source_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO foods (user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, visibility, source_id, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
   ).run(u, name, brand || null, JSON.stringify(nutrition || {}), portion ?? 100, unit || 'g',
     img_url || null, notes || null, category || null, barcode || null, vis, source_id || null);
   res.status(201).json(parse(db.prepare('SELECT * FROM foods WHERE id = ?').get(result.lastInsertRowid)));
@@ -78,7 +78,7 @@ router.put('/:id', wrap((req, res) => {
   if (u != null && existing.user_id !== u) return res.status(403).json({ error: 'Forbidden' });
   const { name, brand, nutrition, portion, unit, img_url, notes, category, barcode, visibility } = req.body;
   db.prepare(
-    `UPDATE foods SET name=?, brand=?, nutrition=?, portion=?, unit=?, img_url=?, notes=?, category=?, barcode=?, visibility=? WHERE id=?`
+    `UPDATE foods SET name=?, brand=?, nutrition=?, portion=?, unit=?, img_url=?, notes=?, category=?, barcode=?, visibility=?, updated_at=datetime('now') WHERE id=?`
   ).run(name ?? existing.name, brand ?? existing.brand,
     JSON.stringify(nutrition ?? JSON.parse(existing.nutrition || '{}')),
     portion ?? existing.portion, unit ?? existing.unit, img_url ?? existing.img_url,
@@ -93,7 +93,7 @@ router.delete('/:id', wrap((req, res) => {
   const existing = db.prepare('SELECT * FROM foods WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Not found' });
   if (u != null && existing.user_id !== u) return res.status(403).json({ error: 'Forbidden' });
-  db.prepare('DELETE FROM foods WHERE id = ?').run(req.params.id);
+  db.prepare(`UPDATE foods SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`).run(req.params.id);
   res.json({ ok: true });
 }));
 

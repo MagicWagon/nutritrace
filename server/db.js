@@ -245,4 +245,42 @@ if (!columnExists('meals', 'source_id')) {
   db.exec(`ALTER TABLE meals ADD COLUMN source_id INTEGER`);
 }
 
+// ── Sync migrations (Phase 2) ──────────────────────────────────────────────
+// Add updated_at to tables that lack it (needed for differential sync)
+if (!columnExists('foods', 'updated_at')) {
+  db.exec(`ALTER TABLE foods ADD COLUMN updated_at TEXT DEFAULT (datetime('now'))`);
+  db.exec(`UPDATE foods SET updated_at = created_at WHERE updated_at IS NULL`);
+}
+if (!columnExists('meals', 'updated_at')) {
+  db.exec(`ALTER TABLE meals ADD COLUMN updated_at TEXT DEFAULT (datetime('now'))`);
+  db.exec(`UPDATE meals SET updated_at = created_at WHERE updated_at IS NULL`);
+}
+if (!columnExists('user_settings', 'updated_at')) {
+  db.exec(`ALTER TABLE user_settings ADD COLUMN updated_at TEXT DEFAULT (datetime('now'))`);
+}
+
+// Soft deletes — deleted_at column on all syncable tables
+if (!columnExists('foods', 'deleted_at')) {
+  db.exec(`ALTER TABLE foods ADD COLUMN deleted_at TEXT DEFAULT NULL`);
+}
+if (!columnExists('meals', 'deleted_at')) {
+  db.exec(`ALTER TABLE meals ADD COLUMN deleted_at TEXT DEFAULT NULL`);
+}
+if (!columnExists('diary', 'deleted_at')) {
+  db.exec(`ALTER TABLE diary ADD COLUMN deleted_at TEXT DEFAULT NULL`);
+}
+if (!columnExists('user_settings', 'deleted_at')) {
+  db.exec(`ALTER TABLE user_settings ADD COLUMN deleted_at TEXT DEFAULT NULL`);
+}
+
+// Indexes for sync queries
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_foods_updated ON foods(updated_at);
+  CREATE INDEX IF NOT EXISTS idx_meals_updated ON meals(updated_at);
+  CREATE INDEX IF NOT EXISTS idx_diary_updated ON diary(updated_at);
+  CREATE INDEX IF NOT EXISTS idx_foods_deleted ON foods(deleted_at);
+  CREATE INDEX IF NOT EXISTS idx_meals_deleted ON meals(deleted_at);
+  CREATE INDEX IF NOT EXISTS idx_diary_deleted ON diary(deleted_at);
+`);
+
 export default db;

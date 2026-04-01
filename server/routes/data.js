@@ -12,13 +12,13 @@ const uid = req => userMgmtActive() ? req.user.id : null;
 router.delete('/', wrap((req, res) => {
   const u = uid(req);
   if (u == null) {
-    db.prepare('DELETE FROM foods').run();
-    db.prepare('DELETE FROM meals').run();
-    db.prepare('DELETE FROM diary').run();
+    db.prepare(`UPDATE foods SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE deleted_at IS NULL`).run();
+    db.prepare(`UPDATE meals SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE deleted_at IS NULL`).run();
+    db.prepare(`UPDATE diary SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE deleted_at IS NULL`).run();
   } else {
-    db.prepare('DELETE FROM foods WHERE user_id = ?').run(u);
-    db.prepare('DELETE FROM meals WHERE user_id = ?').run(u);
-    db.prepare('DELETE FROM diary WHERE user_id = ?').run(u);
+    db.prepare(`UPDATE foods SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE user_id = ? AND deleted_at IS NULL`).run(u);
+    db.prepare(`UPDATE meals SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE user_id = ? AND deleted_at IS NULL`).run(u);
+    db.prepare(`UPDATE diary SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE user_id = ? AND deleted_at IS NULL`).run(u);
   }
   res.json({ ok: true });
 }));

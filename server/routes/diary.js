@@ -12,8 +12,8 @@ const uid = req => userMgmtActive() ? req.user.id : null;
 router.get('/', wrap((req, res) => {
   const u = uid(req);
   const rows = u == null
-    ? db.prepare('SELECT * FROM diary ORDER BY date ASC').all()
-    : db.prepare('SELECT * FROM diary WHERE user_id = ? ORDER BY date ASC').all(u);
+    ? db.prepare('SELECT * FROM diary WHERE deleted_at IS NULL ORDER BY date ASC').all()
+    : db.prepare('SELECT * FROM diary WHERE user_id = ? AND deleted_at IS NULL ORDER BY date ASC').all(u);
   res.json(rows.map(parse));
 }));
 
@@ -21,8 +21,8 @@ router.get('/', wrap((req, res) => {
 router.get('/:date', wrap((req, res) => {
   const u = uid(req);
   const row = u == null
-    ? db.prepare('SELECT * FROM diary WHERE date = ?').get(req.params.date)
-    : db.prepare('SELECT * FROM diary WHERE date = ? AND user_id = ?').get(req.params.date, u);
+    ? db.prepare('SELECT * FROM diary WHERE date = ? AND deleted_at IS NULL').get(req.params.date)
+    : db.prepare('SELECT * FROM diary WHERE date = ? AND user_id = ? AND deleted_at IS NULL').get(req.params.date, u);
   if (!row) return res.json({ date: req.params.date, items: [], body_stats: {}, water: [] });
   res.json(parse(row));
 }));
@@ -37,7 +37,8 @@ router.put('/:date', wrap((req, res) => {
        VALUES (?, ?, ?, ?, datetime('now'))
        ON CONFLICT(date, user_id) DO UPDATE SET
          items=excluded.items, body_stats=excluded.body_stats,
-         water=excluded.water, updated_at=excluded.updated_at`
+         water=excluded.water, updated_at=excluded.updated_at,
+         deleted_at=NULL`
     ).run(req.params.date, JSON.stringify(items || []), JSON.stringify(body_stats || {}), JSON.stringify(water || []));
   } else {
     db.prepare(
@@ -45,19 +46,23 @@ router.put('/:date', wrap((req, res) => {
        VALUES (?, ?, ?, ?, ?, datetime('now'))
        ON CONFLICT(date, user_id) DO UPDATE SET
          items=excluded.items, body_stats=excluded.body_stats,
-         water=excluded.water, updated_at=excluded.updated_at`
+         water=excluded.water, updated_at=excluded.updated_at,
+         deleted_at=NULL`
     ).run(u, req.params.date, JSON.stringify(items || []), JSON.stringify(body_stats || {}), JSON.stringify(water || []));
   }
   const row = u == null
-    ? db.prepare('SELECT * FROM diary WHERE date = ? AND user_id IS NULL').get(req.params.date)
-    : db.prepare('SELECT * FROM diary WHERE date = ? AND user_id = ?').get(req.params.date, u);
+    ? db.prepare('SELECT * FROM diary WHERE date = ? AND user_id IS NULL AND deleted_at IS NULL').get(req.params.date)
+    : db.prepare('SELECT * FROM diary WHERE date = ? AND user_id = ? AND deleted_at IS NULL').get(req.params.date, u);
   res.json(parse(row));
 }));
 
 router.delete('/:date', wrap((req, res) => {
   const u = uid(req);
-  if (u == null) db.prepare('DELETE FROM diary WHERE date = ?').run(req.params.date);
-  else db.prepare('DELETE FROM diary WHERE date = ? AND user_id = ?').run(req.params.date, u);
+  if (u == null) {
+    db.prepare("UPDATE diary SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE date = ? AND deleted_at IS NULL").run(req.params.date);
+  } else {
+    db.prepare("UPDATE diary SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE date = ? AND user_id = ? AND deleted_at IS NULL").run(req.params.date, u);
+  }
   res.json({ ok: true });
 }));
 
