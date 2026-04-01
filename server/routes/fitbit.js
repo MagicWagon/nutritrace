@@ -362,18 +362,20 @@ async function _syncDate(u, dateStr) {
 }
 
 // ── Server-side readiness & stress score snapshot ─────────────────────────────
-// Mirrors the client-side formulas in Wellness.svelte so stored scores don't
-// change retroactively as the 30-day baseline shifts.
+// Uses a FIXED baseline (30 days from today) for all snapshots, matching the
+// client-side behavior. This prevents past-day scores from diverging due to
+// per-day sliding baselines.
 function _snapshotScores(userId, dateStr) {
   const _clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const _mean = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
+  const today = new Date().toISOString().slice(0, 10);
 
-  // Load 30-day history (excluding today)
+  // Load 30-day history from today (not from dateStr) — matches client baseline
   const history = db.prepare(
     `SELECT date, metric_type, value FROM wellness_data
      WHERE user_id = ? AND source = 'fitbit' AND date >= date(?, '-30 days') AND date < ?
      ORDER BY date`
-  ).all(userId, dateStr, dateStr);
+  ).all(userId, today, today);
 
   // Group by date
   const byDate = {};
@@ -480,7 +482,7 @@ function _snapshotScores(userId, dateStr) {
   `);
   upsert.run(userId, dateStr, 'readiness_score', readiness);
   upsert.run(userId, dateStr, 'stress_score', stress);
-  logger.debug(`[fitbit] ${dateStr} snapshot: readiness=${readiness} stress=${stress}`);
+  logger.debug(`[fitbit] ${dateStr} snapshot: readiness=${readiness} stress=${stress} (hrvBase=${hrvBaseline.toFixed(2)} rhrBase=${rhrBaseline?.toFixed(1) ?? 'null'} histDays=${days.length})`);
 }
 
 // ── POST /sync — fetch Fitbit metrics for a date or date range ────────────────
