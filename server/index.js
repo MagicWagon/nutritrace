@@ -51,6 +51,13 @@ app.use((req, res, next) => {
   next();
 });
 
+// Serve uploaded images BEFORE auth — images are public (needed for Android WebView
+// which can't send Authorization headers on <img src> requests)
+const uploadsPath = process.env.UPLOADS_PATH || './uploads';
+app.use('/uploads', express.static(uploadsPath, {
+  setHeaders(res) { res.set('Cache-Control', 'public, max-age=3600'); }
+}));
+
 app.use(authenticate); // attach req.user on every request
 
 // ── Request logging ────────────────────────────────────────────────────────
@@ -63,12 +70,6 @@ app.use((req, res, next) => {
   });
   next();
 });
-
-// Serve uploaded images (short cache — user images can change)
-const uploadsPath = process.env.UPLOADS_PATH || './uploads';
-app.use('/uploads', express.static(uploadsPath, {
-  setHeaders(res) { res.set('Cache-Control', 'public, max-age=3600'); }
-}));
 
 // Prevent browser/proxy caching of all API responses
 app.use('/api', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });

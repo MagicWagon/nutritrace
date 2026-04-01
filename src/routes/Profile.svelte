@@ -3,8 +3,17 @@
   import { pop } from 'svelte-spa-router';
   import { currentUser } from '../stores/auth.js';
   import { NtApi } from '../lib/api.js';
-  import { apiUrl, isNative } from '../lib/platform.js';
+  import { apiUrl, isNative, getServerUrl, getAuthToken } from '../lib/platform.js';
   import { takePhoto } from '../lib/camera.js';
+
+  function _headers(extra = {}) {
+    const h = { 'Content-Type': 'application/json', ...extra };
+    if (isNative && getServerUrl()) {
+      const t = getAuthToken();
+      if (t) h['Authorization'] = `Bearer ${t}`;
+    }
+    return h;
+  }
   import { showSuccess, showError } from '../stores/toast.js';
 
   const GENDERS = ['Male', 'Female', 'Non-binary', 'Prefer not to say'];
@@ -36,7 +45,7 @@
       const res = await fetch(apiUrl('/api/auth/profile'), {
         method: 'PUT',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: _headers(),
         body: JSON.stringify({ full_name, nickname, birthday, gender, avatar_url, email }),
       });
       const data = await res.json();
@@ -96,7 +105,7 @@
       const res = await fetch(apiUrl('/api/auth/password'), {
         method: 'PUT',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: _headers(),
         body: JSON.stringify({ current_password: cur_password, new_password }),
       });
       const data = await res.json();
