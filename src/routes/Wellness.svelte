@@ -1,5 +1,5 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy, tick } from 'svelte';
   import { wellnessMetrics, wellnessSyncMode, wellnessSyncRange, distUnit, tempUnit, pageBanners, dateFormat, withingsSyncRange as withingsSyncRangeSetting, fitbitEnabled, withingsEnabled, garminEnabled, garminSyncRange as garminSyncRangeSetting, weightUnit, goals, goalCelebrations, disableAnimations } from '../stores/settings.js';
   import Chart from 'chart.js/auto';
   import WellnessBanner from '../components/banners/WellnessBanner.svelte';
@@ -760,8 +760,22 @@
     ...(withingsAvailable ? ['body'] : []),
   ];
   $: _wlActiveIdx  = Math.max(0, _wlTabList.indexOf(activeTab));
-  $: _wlPillWidth  = `calc((100% - 8px) / ${_wlTabList.length})`;
-  $: _wlPillLeft   = `calc(4px + ${_wlActiveIdx} * (100% - 8px) / ${_wlTabList.length})`;
+  // Pill position: measure actual tab button positions for pixel-perfect alignment
+  let _tabBarEl = null;
+  let _wlPillWidth = '25%';
+  let _wlPillLeft = '0px';
+  function _updatePill() {
+    if (!_tabBarEl) return;
+    const buttons = _tabBarEl.querySelectorAll('.tab-btn');
+    if (!buttons.length || _wlActiveIdx >= buttons.length) return;
+    const btn = buttons[_wlActiveIdx];
+    const barRect = _tabBarEl.getBoundingClientRect();
+    _wlPillLeft = `${btn.offsetLeft}px`;
+    _wlPillWidth = `${btn.offsetWidth}px`;
+  }
+  $: if (_wlActiveIdx >= 0 && _tabBarEl) { tick().then(_updatePill); }
+  onMount(() => { tick().then(_updatePill); window.addEventListener('resize', _updatePill); });
+  onDestroy(() => { window.removeEventListener('resize', _updatePill); });
 
   // Auto-correct activeTab when an integration's availability changes
   $: if (status !== null && withingsStatus !== null && garminStatus !== null) {
@@ -1159,7 +1173,8 @@
       <!-- ── At least one integration configured — main UI ── -->
 
       <!-- Tab bar — only tabs for configured integrations -->
-      <div class="tab-bar" class:has-banner={$pageBanners}>
+      <div class="tab-bar-wrap" class:has-banner={$pageBanners}>
+      <div class="tab-bar" bind:this={_tabBarEl}>
         <div class="tab-pill" style="left:{_wlPillLeft};width:{_wlPillWidth}"></div>
         {#if fitbitAvailable}
           <button class="tab-btn" class:active={activeTab === 'movement'} on:click={() => activeTab = 'movement'}>
@@ -1178,6 +1193,8 @@
           </button>
         {/if}
       </div>
+      </div>
+      <div style="height:12px"></div>
 
       <!-- ── Fitbit tabs (Movement / Sleep / Heart) ── -->
       {#if activeTab === 'movement' || activeTab === 'sleep' || activeTab === 'heart'}
@@ -1947,21 +1964,29 @@
     animation: wl-spin 0.8s linear infinite;
   }
   /* Tabs */
-  .tab-bar {
+  .tab-bar-wrap {
     position: sticky;
-    top: calc(var(--page-top, var(--safe-top)) + 46px + 50px);
+    top: calc(var(--page-top, var(--safe-top)) + 46px + 86px);
     z-index: 8;
+    background: var(--glass-surface);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border-bottom: 1px solid var(--border);
+    margin: -12px calc(-1 * var(--page-px, 16px)) 0;
+    padding: 12px var(--page-px, 16px) 12px;
+  }
+  .tab-bar-wrap.has-banner {
+    top: calc(var(--page-top, var(--safe-top)) + 86px + 86px);
+  }
+  .tab-bar {
     display: flex;
     padding: 4px;
     background: var(--surface-2);
     border-radius: var(--radius-md);
-    margin-bottom: 12px;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
-  }
-  .tab-bar.has-banner {
-    top: calc(var(--page-top, var(--safe-top)) + 86px + 50px);
+    position: relative;
   }
   .tab-bar::-webkit-scrollbar { display: none; }
   .tab-pill {
