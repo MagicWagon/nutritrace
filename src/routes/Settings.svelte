@@ -3346,20 +3346,21 @@
   .merge-overlay {
     position: fixed; inset: 0; z-index: 200;
     background: rgba(0,0,0,0.6);
-    display: flex; align-items: center; justify-content: center;
-    padding: 24px;
+    display: flex; align-items: flex-start; justify-content: center;
+    padding: 40px 16px;
+    overflow-y: auto;
   }
   .merge-dialog {
     background: var(--surface-1); border: 1px solid var(--border);
     border-radius: var(--radius-lg, 16px);
-    padding: 24px; width: 100%; max-width: 400px;
-    max-height: 90vh; overflow-y: auto;
+    padding: 20px; width: 100%; max-width: 360px;
+    margin: auto;
   }
   .merge-option {
     display: flex;
     align-items: flex-start;
-    gap: 12px;
-    padding: 14px;
+    gap: 10px;
+    padding: 12px;
     background: var(--surface-2);
     border: 1px solid var(--border);
     border-radius: var(--radius-md, 12px);
