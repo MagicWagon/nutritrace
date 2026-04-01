@@ -545,15 +545,17 @@
 
   <div class="foods-search">
     <span class="material-symbols-rounded foods-search-icon">search</span>
-    <input
-      class="foods-search-input"
-      type="search"
-      placeholder="Search foods..."
-      bind:value={search}
-    />
-    <button class="btn-icon scan-btn" on:click={() => scannerOpen = true} aria-label="Scan barcode" title="Scan barcode">
-      <span class="material-symbols-rounded">barcode_scanner</span>
-    </button>
+    <div class="foods-search-input-wrap">
+      <input
+        class="foods-search-input"
+        type="search"
+        placeholder="Search foods or scan barcode..."
+        bind:value={search}
+      />
+      <button class="scan-btn-inline" on:click={() => scannerOpen = true} aria-label="Scan barcode" title="Scan barcode">
+        <span class="material-symbols-rounded">barcode_scanner</span>
+      </button>
+    </div>
   </div>
   </div>
 
@@ -865,18 +867,35 @@
     padding: 0 var(--page-px) 12px;
   }
   .foods-search-icon { font-size: 20px; color: var(--text-3); flex-shrink: 0; }
-  .foods-search-input {
+  .foods-search-input-wrap {
     flex: 1;
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+  .foods-search-input {
+    width: 100%;
     background: var(--surface-2);
     border: 1px solid var(--border);
     border-radius: var(--radius-full);
-    padding: 7px 14px;
+    padding: 7px 40px 7px 14px;
     font-size: 15px;
     color: var(--text-1);
     outline: none;
   }
   .foods-search-input:focus { border-color: var(--accent); }
-  .scan-btn { flex-shrink: 0; color: var(--text-3); }
+  .scan-btn-inline {
+    position: absolute;
+    right: 6px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-3);
+    padding: 4px;
+    display: flex;
+    align-items: center;
+  }
+  .scan-btn-inline .material-symbols-rounded { font-size: 20px; }
 
   .food-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
   .food-item { overflow: hidden; }
