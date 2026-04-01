@@ -3,6 +3,7 @@
   import { cubicOut } from 'svelte/easing';
   import { location, push } from 'svelte-spa-router';
   import { createEventDispatcher } from 'svelte';
+  import { resolveAssetUrl } from '../../lib/platform.js';
   import { currentUser, userMgmtActive, logout } from '../../stores/auth.js';
   import { wellnessEnabled, fitbitEnabled, withingsEnabled, garminEnabled } from '../../stores/settings.js';
   import WellnessIcon from '../icons/WellnessIcon.svelte';
@@ -112,7 +113,7 @@
         <div class="sidebar-user">
           <div class="user-avatar">
             {#if $currentUser.avatar_url}
-              <img src={$currentUser.avatar_url} alt="" class="user-avatar-img" />
+              <img src={resolveAssetUrl($currentUser.avatar_url)} alt="" class="user-avatar-img" />
             {:else}
               {getInitial($currentUser)}
             {/if}

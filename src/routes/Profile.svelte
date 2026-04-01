@@ -128,7 +128,7 @@
     <div class="avatar-section">
       <button class="avatar-btn" on:click={pickAvatar} disabled={uploading} title="Change photo">
         {#if avatar_url}
-          <img class="avatar-img" src={avatar_url} alt="avatar" />
+          <img class="avatar-img" src={resolveAssetUrl(avatar_url)} alt="avatar" />
         {:else}
           <span class="material-symbols-rounded avatar-placeholder">person</span>
         {/if}
