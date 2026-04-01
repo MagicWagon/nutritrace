@@ -385,17 +385,17 @@ function _snapshotScores(userId, dateStr) {
   }
   const days = Object.values(byDate);
 
-  // Today's values
-  const todayRows = db.prepare(
+  // Current date's values
+  const dateRows = db.prepare(
     `SELECT metric_type, value FROM wellness_data WHERE user_id = ? AND source = 'fitbit' AND date = ?`
   ).all(userId, dateStr);
-  const today = {};
-  for (const r of todayRows) today[r.metric_type] = r.value;
+  const dayData = {};
+  for (const r of dateRows) dayData[r.metric_type] = r.value;
 
-  const todayHrv = today.hrv_daily_rmssd;
-  const todayRhr = today.resting_hr;
-  const todaySleep = today.sleep_score;
-  const todayCal = today.calories_out;
+  const todayHrv = dayData.hrv_daily_rmssd;
+  const todayRhr = dayData.resting_hr;
+  const todaySleep = dayData.sleep_score;
+  const todayCal = dayData.calories_out;
 
   if (todayHrv == null) return; // can't calculate without HRV
 
