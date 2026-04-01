@@ -1205,22 +1205,14 @@
                 <span class="material-symbols-rounded connect-icon">monitor_heart</span>
               </div>
               {#if isNative && !getServerUrl()}
-                <h2 class="connect-title">Connect a Fitness Tracker</h2>
+                <h2 class="connect-title">No Device Connected</h2>
                 <p class="connect-desc">
-                  Wellness tracking requires a server connection. Connect to your NutriTrace server in
-                  <strong>Settings → Server Connection</strong>, then link your Fitbit, Garmin, or Withings device.
-                </p>
-              {:else if isNative}
-                <h2 class="connect-title">Connect a Fitness Tracker</h2>
-                <p class="connect-desc">
-                  Link your Fitbit, Garmin, or Withings device in
-                  <strong>Settings → Wellness</strong> on the web app to see your data here.
+                  Connect to your NutriTrace server in <strong>Settings → Server Connection</strong> and link a wellness device to see your data here.
                 </p>
               {:else}
-                <h2 class="connect-title">Fitbit Setup Required</h2>
+                <h2 class="connect-title">No Device Connected</h2>
                 <p class="connect-desc">
-                  An administrator needs to configure Fitbit API credentials in
-                  <strong>Settings → Wellness</strong> before you can connect.
+                  Connect a wellness device in <strong>Settings → Wellness</strong> to start tracking your health data.
                 </p>
               {/if}
             </div>
