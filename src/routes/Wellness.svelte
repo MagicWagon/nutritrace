@@ -6,6 +6,7 @@
   import { showSuccess, showError } from '../stores/toast.js';
   import { localDateStr } from '../lib/db.js';
   import { NtApi } from '../lib/api.js';
+  import { isNative, getServerUrl } from '../lib/platform.js';
   import { portal } from '../lib/portal.js';
   import FitbitIcon from '../components/icons/FitbitIcon.svelte';
   import WithingsIcon from '../components/icons/WithingsIcon.svelte';
@@ -1203,11 +1204,25 @@
               <div class="connect-icon-wrap">
                 <span class="material-symbols-rounded connect-icon">monitor_heart</span>
               </div>
-              <h2 class="connect-title">Fitbit Setup Required</h2>
-              <p class="connect-desc">
-                An administrator needs to configure Fitbit API credentials in
-                <strong>Settings → Wellness</strong> before you can connect.
-              </p>
+              {#if isNative && !getServerUrl()}
+                <h2 class="connect-title">Connect a Fitness Tracker</h2>
+                <p class="connect-desc">
+                  Wellness tracking requires a server connection. Connect to your NutriTrace server in
+                  <strong>Settings → Server Connection</strong>, then link your Fitbit, Garmin, or Withings device.
+                </p>
+              {:else if isNative}
+                <h2 class="connect-title">Connect a Fitness Tracker</h2>
+                <p class="connect-desc">
+                  Link your Fitbit, Garmin, or Withings device in
+                  <strong>Settings → Wellness</strong> on the web app to see your data here.
+                </p>
+              {:else}
+                <h2 class="connect-title">Fitbit Setup Required</h2>
+                <p class="connect-desc">
+                  An administrator needs to configure Fitbit API credentials in
+                  <strong>Settings → Wellness</strong> before you can connect.
+                </p>
+              {/if}
             </div>
           {:else}
             <div class="connect-card">
