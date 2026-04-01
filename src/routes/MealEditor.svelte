@@ -3,7 +3,7 @@
   import { pop } from 'svelte-spa-router';
   import { NtApi } from '../lib/api.js';
   import { takePhoto } from '../lib/camera.js';
-  import { isNative } from '../lib/platform.js';
+  import { isNative, resolveAssetUrl } from '../lib/platform.js';
   import { portal } from '../lib/portal.js';
   import { showSuccess, showError } from '../stores/toast.js';
   import { editorState, clearMealEditorState } from '../stores/editorState.js';
@@ -540,7 +540,7 @@
                 drag_indicator
               </span>
               {#if item.imgUrl && !failedImgs.has(item.imgUrl)}
-                <img src={item.imgUrl} alt={item.name} class="ing-thumb"
+                <img src={resolveAssetUrl(item.imgUrl)} alt={item.name} class="ing-thumb"
                      on:error={() => onImgError(item.imgUrl)} />
               {:else}
                 <div class="ing-thumb ing-thumb-placeholder">
@@ -627,7 +627,7 @@
             </button>
             <button class="picker-item-btn" on:click={() => { showPicker = false; pickerSearch = ''; selectedIngredients = new Set(); pickIngredient(food); }}>
               {#if food.imgUrl && !failedImgs.has(food.imgUrl)}
-                <img src={food.imgUrl} alt={food.name} class="picker-thumb"
+                <img src={resolveAssetUrl(food.imgUrl)} alt={food.name} class="picker-thumb"
                      on:error={() => onImgError(food.imgUrl)} />
               {:else}
                 <div class="picker-thumb picker-thumb-ph">

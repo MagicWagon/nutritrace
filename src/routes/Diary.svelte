@@ -1,6 +1,7 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import { push } from 'svelte-spa-router';
+  import { resolveAssetUrl } from '../lib/platform.js';
   import { fade, slide, fly } from 'svelte/transition';
   import { tweened } from 'svelte/motion';
   import { cubicOut } from 'svelte/easing';
@@ -662,7 +663,7 @@
                 {/if}
                 <button class="diary-item-btn" on:click={() => selectMode ? toggleItemSelect(item) : openEditItem(item)}>
                   {#if $diaryShowThumbnails && item.imgUrl}
-                    <img class="item-thumb" src={item.imgUrl} alt="" loading="lazy" />
+                    <img class="item-thumb" src={resolveAssetUrl(item.imgUrl)} alt="" loading="lazy" />
                   {:else if $diaryShowThumbnails}
                     <div class="item-thumb-placeholder">
                       <span class="material-symbols-rounded" style="font-size:18px;color:var(--accent)">restaurant</span>

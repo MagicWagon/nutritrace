@@ -32,7 +32,16 @@
   import { NtApi } from '../lib/api.js';
   import { NUTRIMENTS, Nutrition } from '../lib/nutrition.js';
   import { currentUser, userMgmtActive, loadAuthState, logout } from '../stores/auth.js';
-  import { isNative, getServerUrl, setServerUrl, setNativeMode, getNativeMode, setAuthToken } from '../lib/platform.js';
+  import { isNative, getServerUrl, setServerUrl, setNativeMode, getNativeMode, setAuthToken, apiUrl, getAuthToken } from '../lib/platform.js';
+
+  function _fetchOpts(extra = {}) {
+    const h = { ...extra };
+    if (isNative && getServerUrl()) {
+      const t = getAuthToken();
+      if (t) h['Authorization'] = `Bearer ${t}`;
+    }
+    return { credentials: 'include', headers: h };
+  }
   import { push } from 'svelte-spa-router';
   // ── Collapsible section state ──────────────────────────────────────────────
   $: isDark = $appearance === 'dark' || ($appearance === 'system' && (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches));
@@ -445,7 +454,7 @@
     if (!mealieBaseUrl || !mealieApiToken) { mealieTestStatus = 'fail'; return; }
     mealieTestStatus = 'testing';
     try {
-      const res = await fetch('/api/mealie/proxy', {
+      const res = await fetch(apiUrl('/api/mealie/proxy'), {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -878,7 +887,7 @@
   async function loadFullBackups() {
     if (isNativeLocal) return;
     try {
-      const res = await fetch('/api/full-backup', { credentials: 'include' });
+      const res = await fetch(apiUrl('/api/full-backup'), { credentials: 'include' });
       if (res.ok) fullBackups = await res.json();
     } catch {}
   }
@@ -886,7 +895,7 @@
   async function createFullBackup() {
     fullBackupBusy = true;
     try {
-      const res  = await fetch('/api/full-backup', { method: 'POST', credentials: 'include' });
+      const res  = await fetch(apiUrl('/api/full-backup'), { method: 'POST', credentials: 'include' });
       const data = await res.json();
       if (!res.ok) { showError(data.error || 'Backup failed'); return; }
       showSuccess('Full backup created');
@@ -897,7 +906,7 @@
 
   function downloadFullBackup(filename) {
     const a = document.createElement('a');
-    a.href = `/api/full-backup/${encodeURIComponent(filename)}/download`;
+    a.href = apiUrl(`/api/full-backup/${encodeURIComponent(filename)}/download`);
     a.download = filename;
     a.click();
   }
@@ -919,7 +928,7 @@
     restoreStatus = { phase: 'restoring', percent: 40, label: 'Restoring backup…' };
     _scrollToProgress();
     try {
-      const res  = await fetch(`/api/full-backup/${encodeURIComponent(filename)}/restore`, { method: 'POST', credentials: 'include' });
+      const res  = await fetch(apiUrl(`/api/full-backup/${encodeURIComponent(filename)}/restore`), { method: 'POST', credentials: 'include' });
       const data = await res.json();
       if (!res.ok) { showError(data.error || 'Restore failed'); restoreStatus = null; return; }
       restoreStatus = { phase: 'restoring', percent: 100, label: 'Restore complete — reloading…' };
@@ -934,7 +943,7 @@
     const filename = deleteTarget;
     deleteTarget = null;
     try {
-      const res = await fetch(`/api/full-backup/${encodeURIComponent(filename)}`, { method: 'DELETE', credentials: 'include' });
+      const res = await fetch(apiUrl(`/api/full-backup/${encodeURIComponent(filename)}`), { method: 'DELETE', credentials: 'include' });
       if (res.ok) { showSuccess('Backup deleted'); await loadFullBackups(); }
       else showError('Delete failed');
     } catch { showError('Delete failed'); }
@@ -974,7 +983,7 @@
     const form = new FormData();
     form.append('backup', file);
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', '/api/full-backup/upload-restore');
+    xhr.open('POST', apiUrl('/api/full-backup/upload-restore'));
     xhr.withCredentials = true;
 
     // onprogress at top level — Svelte can track these assignments directly
@@ -1031,7 +1040,7 @@
 
   async function saveAdminSharingEnabled(val) {
     adminSharingEnabled = val;
-    await fetch('/api/app-config', {
+    await fetch(apiUrl('/api/app-config'), {
       method: 'PUT', credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key: 'sharing_enabled', value: val ? 'true' : 'false' }),
@@ -1083,7 +1092,7 @@
 
   async function loadSmtpConfig() {
     try {
-      const res  = await fetch('/api/app-config', { credentials: 'include' });
+      const res  = await fetch(apiUrl('/api/app-config'), { credentials: 'include' });
       if (!res.ok) return;
       const cfg  = await res.json();
       smtpHost   = cfg.smtp_host   || '';
@@ -1096,7 +1105,7 @@
   }
 
   async function saveSmtpField(key, value) {
-    await fetch('/api/app-config', {
+    await fetch(apiUrl('/api/app-config'), {
       method: 'PUT', credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key, value: String(value) }),
@@ -1124,7 +1133,7 @@
   async function testSmtp() {
     smtpTestStatus = 'testing';
     try {
-      const res = await fetch('/api/app-config/test-email', { method: 'POST', credentials: 'include' });
+      const res = await fetch(apiUrl('/api/app-config/test-email'), { method: 'POST', credentials: 'include' });
       smtpTestStatus = res.ok ? 'ok' : 'fail';
     } catch { smtpTestStatus = 'fail'; }
   }
@@ -1134,14 +1143,14 @@
   let sessionSaved = false;
   async function loadSessionConfig() {
     try {
-      const res = await fetch('/api/app-config', { credentials: 'include' });
+      const res = await fetch(apiUrl('/api/app-config'), { credentials: 'include' });
       if (!res.ok) return;
       const cfg = await res.json();
       sessionHours = cfg.session_hours ?? '720';
     } catch {}
   }
   async function saveSessionHours() {
-    await fetch('/api/app-config', {
+    await fetch(apiUrl('/api/app-config'), {
       method: 'PUT', credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key: 'session_hours', value: sessionHours }),
@@ -1162,7 +1171,7 @@
     inviteLoading = true;
     inviteResult  = null;
     try {
-      const res  = await fetch('/api/auth/invite', {
+      const res  = await fetch(apiUrl('/api/auth/invite'), {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: inviteEmail.trim() || undefined, role: inviteRole }),
@@ -1202,7 +1211,7 @@
     if (enableAdminPass !== enableAdminConf) { enableUmError = 'Passwords do not match'; return; }
     enableUmLoading = true;
     try {
-      const res = await fetch('/api/auth/register', {
+      const res = await fetch(apiUrl('/api/auth/register'), {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1234,7 +1243,7 @@
     if (!newUsername.trim() || !newPassword.trim()) { umError = 'Username and password required'; return; }
     umLoading = true;
     try {
-      const res = await fetch('/api/auth/register', {
+      const res = await fetch(apiUrl('/api/auth/register'), {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: newUsername.trim(), password: newPassword, full_name: newFullName.trim() || undefined, role: newRole }),
@@ -1285,7 +1294,7 @@
   let showClearSettingsDialog = false;
   async function clearAllSettings() {
     try {
-      await fetch('/api/settings', { method: 'DELETE', credentials: 'include' });
+      await fetch(apiUrl('/api/settings'), { method: 'DELETE', credentials: 'include' });
       // Clear user-scoped localStorage settings
       const userId = localStorage.getItem('wl:userId');
       const prefix = userId ? `wl_u${userId}_` : 'wl_';
@@ -1343,7 +1352,7 @@
   let envLocks = { smtp: false, ai: false };
   onMount(async () => {
     try {
-      const res = await fetch('/api/app-config/env-locks', { credentials: 'include' });
+      const res = await fetch(apiUrl('/api/app-config/env-locks'), { credentials: 'include' });
       if (res.ok) envLocks = await res.json();
     } catch {}
   });
