@@ -59,7 +59,7 @@ export function snapshotScores(userId, dateStr) {
 
   // ── Readiness ─────────────────────────────────────────────────
   const hrvRatio = todayHrv / hrvBaseline;
-  let hrv_score = hrvRatio >= 1.0 ? 65 + (hrvRatio - 1.0) * 80 : 65 - (1.0 - hrvRatio) * 350;
+  let hrv_score = hrvRatio >= 1.0 ? 62 + (hrvRatio - 1.0) * 80 : 62 - (1.0 - hrvRatio) * 400;
   hrv_score = _clamp(hrv_score, 0, 100);
 
   let rhr_score = 55;

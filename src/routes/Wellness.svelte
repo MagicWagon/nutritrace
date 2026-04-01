@@ -452,8 +452,8 @@
     // especially for low-HRV users where the ratio swings are small in absolute terms.
     const hrvRatio = todayHrv / hrvBaseline;
     let hrv_score  = hrvRatio >= 1.0
-      ? 65 + (hrvRatio - 1.0) * 80
-      : 65 - (1.0 - hrvRatio) * 350;
+      ? 62 + (hrvRatio - 1.0) * 80
+      : 62 - (1.0 - hrvRatio) * 400;
     hrv_score = _clamp(hrv_score, 0, 100);
 
     // RHR score (20% weight) — inverse: lower today is better. Neutral at 55 (not 65).
