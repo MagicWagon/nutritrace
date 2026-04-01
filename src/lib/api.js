@@ -420,5 +420,13 @@ const _NtApiHttp = {
 
 import { NtApiNative } from './api-native.js';
 
-export const NtApi = (isNative && !getServerUrl()) ? NtApiNative : _NtApiHttp;
+// Dynamic proxy — resolves which implementation to use on EVERY call.
+// This handles the case where the user switches from local → server mode
+// (or vice versa) without a full module re-evaluation.
+export const NtApi = new Proxy({}, {
+  get(_, prop) {
+    const impl = (isNative && !getServerUrl()) ? NtApiNative : _NtApiHttp;
+    return typeof impl[prop] === 'function' ? impl[prop].bind(impl) : impl[prop];
+  }
+});
 export { API, USDA };
