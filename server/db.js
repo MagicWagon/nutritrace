@@ -248,15 +248,16 @@ if (!columnExists('meals', 'source_id')) {
 // ── Sync migrations (Phase 2) ──────────────────────────────────────────────
 // Add updated_at to tables that lack it (needed for differential sync)
 if (!columnExists('foods', 'updated_at')) {
-  db.exec(`ALTER TABLE foods ADD COLUMN updated_at TEXT DEFAULT (datetime('now'))`);
-  db.exec(`UPDATE foods SET updated_at = created_at WHERE updated_at IS NULL`);
+  db.exec(`ALTER TABLE foods ADD COLUMN updated_at TEXT`);
+  db.exec(`UPDATE foods SET updated_at = COALESCE(created_at, datetime('now'))`);
 }
 if (!columnExists('meals', 'updated_at')) {
-  db.exec(`ALTER TABLE meals ADD COLUMN updated_at TEXT DEFAULT (datetime('now'))`);
-  db.exec(`UPDATE meals SET updated_at = created_at WHERE updated_at IS NULL`);
+  db.exec(`ALTER TABLE meals ADD COLUMN updated_at TEXT`);
+  db.exec(`UPDATE meals SET updated_at = COALESCE(created_at, datetime('now'))`);
 }
 if (!columnExists('user_settings', 'updated_at')) {
-  db.exec(`ALTER TABLE user_settings ADD COLUMN updated_at TEXT DEFAULT (datetime('now'))`);
+  db.exec(`ALTER TABLE user_settings ADD COLUMN updated_at TEXT`);
+  db.exec(`UPDATE user_settings SET updated_at = datetime('now')`);
 }
 
 // Soft deletes — deleted_at column on all syncable tables

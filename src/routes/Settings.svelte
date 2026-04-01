@@ -210,6 +210,7 @@
 
   function disconnectServer() {
     setServerUrl(null);
+    setAuthToken(null);
     setNativeMode('local');
     serverMode = 'local';
     serverUrlInput = '';
