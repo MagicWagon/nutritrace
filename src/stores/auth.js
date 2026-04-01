@@ -1,6 +1,6 @@
 import { writable } from 'svelte/store';
 import { loadServerSettings } from './settings.js';
-import { isNative, getServerUrl } from '../lib/platform.js';
+import { isNative, getServerUrl, getAuthToken } from '../lib/platform.js';
 
 // In native server-connected mode, prefix API calls with the server URL
 function _apiUrl(path) {
@@ -46,9 +46,11 @@ export async function loadAuthState() {
       // Native server mode: use CapacitorHttp (shares cookies with native HTTP layer)
       const { CapacitorHttp } = await import('@capacitor/core');
       const serverUrl = getServerUrl();
+      const token = getAuthToken();
+      const authHeaders = token ? { 'Authorization': `Bearer ${token}` } : {};
       const [statusRes, meRes] = await Promise.all([
-        CapacitorHttp.get({ url: `${serverUrl}/api/auth/status` }),
-        CapacitorHttp.get({ url: `${serverUrl}/api/auth/me` }),
+        CapacitorHttp.get({ url: `${serverUrl}/api/auth/status`, headers: authHeaders }),
+        CapacitorHttp.get({ url: `${serverUrl}/api/auth/me`, headers: authHeaders }),
       ]);
       const statusData = typeof statusRes.data === 'string' ? JSON.parse(statusRes.data) : statusRes.data;
       const meData     = typeof meRes.data === 'string' ? JSON.parse(meRes.data) : meRes.data;

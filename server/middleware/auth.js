@@ -34,7 +34,12 @@ export function sessionMaxAge() {
 
 /** Attach req.user if a valid JWT cookie is present (non-blocking) */
 export function authenticate(req, res, next) {
-  const token = req.cookies?.nt_token;
+  // Accept token from cookie OR Authorization: Bearer header (mobile apps use the header)
+  let token = req.cookies?.nt_token;
+  if (!token) {
+    const auth = req.headers.authorization;
+    if (auth?.startsWith('Bearer ')) token = auth.slice(7);
+  }
   if (!token) { req.user = null; return next(); }
   try {
     req.user = jwt.verify(token, JWT_SECRET);

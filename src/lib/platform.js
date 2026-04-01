@@ -77,6 +77,16 @@ export function needsNativeSetup() {
   return isNative && !getNativeMode();
 }
 
+/** Store the JWT token for native server mode (used in Authorization header) */
+export function setAuthToken(token) {
+  if (token) localStorage.setItem('nt:authToken', token);
+  else localStorage.removeItem('nt:authToken');
+}
+
+export function getAuthToken() {
+  return localStorage.getItem('nt:authToken') || null;
+}
+
 /**
  * Prefix an API path with the server URL when in native server-connected mode.
  * In web mode or native local mode, returns the path unchanged (relative URL).

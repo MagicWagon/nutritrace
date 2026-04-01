@@ -1,5 +1,5 @@
 <script>
-  import { setNativeMode, setServerUrl } from '../lib/platform.js';
+  import { setNativeMode, setServerUrl, setAuthToken } from '../lib/platform.js';
   import { showError, showSuccess } from '../stores/toast.js';
   import { DB } from '../lib/db.js';
 
@@ -42,8 +42,9 @@
       const loginData = typeof loginRes.data === 'string' ? JSON.parse(loginRes.data) : loginRes.data;
       if (loginRes.status < 200 || loginRes.status >= 300) throw new Error(loginData.error || 'Login failed');
 
-      // Success — save the server URL and mode, skip wizard (server is already configured)
+      // Success — save server URL, auth token, and mode
       setServerUrl(url);
+      setAuthToken(loginData.token);
       setNativeMode('server');
       DB.setSetting('setupComplete', true);
       showSuccess('Connected to server');

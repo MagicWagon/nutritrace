@@ -32,7 +32,7 @@
   import { NtApi } from '../lib/api.js';
   import { NUTRIMENTS, Nutrition } from '../lib/nutrition.js';
   import { currentUser, userMgmtActive, loadAuthState, logout } from '../stores/auth.js';
-  import { isNative, getServerUrl, setServerUrl, setNativeMode, getNativeMode } from '../lib/platform.js';
+  import { isNative, getServerUrl, setServerUrl, setNativeMode, getNativeMode, setAuthToken } from '../lib/platform.js';
   import { push } from 'svelte-spa-router';
   // ── Collapsible section state ──────────────────────────────────────────────
   $: isDark = $appearance === 'dark' || ($appearance === 'system' && (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches));
@@ -90,6 +90,7 @@
       }
 
       _pendingServerUrl = url;
+      if (loginData.token) setAuthToken(loginData.token);
 
       // Check if there's local data to merge
       const { dbGetAllDiary, dbGetFoods, dbGetMeals } = await import('../lib/db-native.js');

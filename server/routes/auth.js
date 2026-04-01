@@ -72,9 +72,10 @@ router.post('/login', rateLimitLogin, wrap((req, res) => {
     return res.status(401).json({ error: 'Invalid username or password' });
   }
 
+  const token = signToken(user);
   const cookieOpts = { ...COOKIE_OPTS, maxAge: sessionMaxAge() };
-  res.cookie('nt_token', signToken(user), cookieOpts);
-  res.json({ user: safeUser(user) });
+  res.cookie('nt_token', token, cookieOpts);
+  res.json({ user: safeUser(user), token });
 }));
 
 // ── Logout ─────────────────────────────────────────────────────────────────

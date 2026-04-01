@@ -285,7 +285,7 @@ const USDA = {
 // In native standalone mode (Capacitor + no server URL), requests are served
 // from the local SQLite database via NtApiNative. In all other cases (web PWA,
 // or native with a server URL configured) this HTTP implementation is used.
-import { isNative, getServerUrl } from './platform.js';
+import { isNative, getServerUrl, getAuthToken } from './platform.js';
 
 function _resolveBaseUrl() {
   if (!isNative) return ''; // relative — same origin as the web app
@@ -305,12 +305,14 @@ const _NtApiHttp = {
   async _fetch(method, path, body, isUpload = false) {
     const base = _resolveBaseUrl();
 
-    // Native server mode: use CapacitorHttp (shares cookies with native HTTP layer)
+    // Native server mode: use CapacitorHttp with Bearer token auth
     if (isNative && base) {
       const CH = await _getCapHttp();
       const url = base + path;
       const headers = {};
       if (!isUpload) headers['Content-Type'] = 'application/json';
+      const token = getAuthToken();
+      if (token) headers['Authorization'] = `Bearer ${token}`;
 
       let resp;
       if (method === 'GET')         resp = await CH.get({ url, headers });

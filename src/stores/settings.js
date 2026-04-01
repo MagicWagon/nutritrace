@@ -32,7 +32,7 @@ const SERVER_SETTINGS = new Set([
   'navStyle','sidebarPersistent','startPage','disableAnimations','goalCelebrations','pageBanners','loopBannerAnimations',
 ]);
 
-import { isNative, getServerUrl } from '../lib/platform.js';
+import { isNative, getServerUrl, getAuthToken } from '../lib/platform.js';
 
 let _capHttp = null;
 async function _getCapHttp() {
@@ -53,10 +53,13 @@ export function scheduleSave(key, value) {
     try {
       if (_nativeServerMode()) {
         const CH = await _getCapHttp();
+        const headers = { 'Content-Type': 'application/json' };
+        const token = getAuthToken();
+        if (token) headers['Authorization'] = `Bearer ${token}`;
         await CH.request({
           method: 'PUT',
           url: getServerUrl() + '/api/settings',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           data: { key, value },
         });
       } else {
@@ -81,7 +84,10 @@ export async function loadServerSettings() {
     let serverSettings;
     if (_nativeServerMode()) {
       const CH = await _getCapHttp();
-      const resp = await CH.get({ url: getServerUrl() + '/api/settings' });
+      const headers = {};
+      const token = getAuthToken();
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const resp = await CH.get({ url: getServerUrl() + '/api/settings', headers });
       serverSettings = typeof resp.data === 'string' ? JSON.parse(resp.data) : resp.data;
       if (resp.status < 200 || resp.status >= 300) return;
     } else {
