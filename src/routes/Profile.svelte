@@ -3,7 +3,7 @@
   import { pop } from 'svelte-spa-router';
   import { currentUser } from '../stores/auth.js';
   import { NtApi } from '../lib/api.js';
-  import { apiUrl, isNative, getServerUrl, getAuthToken } from '../lib/platform.js';
+  import { apiUrl, isNative, getServerUrl, getAuthToken, resolveAssetUrl } from '../lib/platform.js';
   import { takePhoto } from '../lib/camera.js';
 
   function _headers(extra = {}) {
