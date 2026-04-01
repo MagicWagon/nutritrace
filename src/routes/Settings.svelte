@@ -1364,18 +1364,17 @@
     <h1>Settings</h1>
   </header>
 
-  <div class="settings-search-bar">
-    <span class="material-symbols-rounded settings-search-icon">search</span>
-    <input class="settings-search-input" type="search" placeholder="Search settings…"
-      bind:value={settingsSearch} />
-    {#if settingsSearch}
-      <button class="settings-search-clear btn-icon" on:click={() => settingsSearch = ''} title="Clear search">
-        <span class="material-symbols-rounded" style="font-size:18px">close</span>
-      </button>
-    {/if}
-  </div>
-
   <div class="page-content settings-content">
+    <div class="settings-search-bar">
+      <span class="material-symbols-rounded settings-search-icon">search</span>
+      <input class="settings-search-input" type="search" placeholder="Search settings…"
+        bind:value={settingsSearch} />
+      {#if settingsSearch}
+        <button class="settings-search-clear btn-icon" on:click={() => settingsSearch = ''} title="Clear search">
+          <span class="material-symbols-rounded" style="font-size:18px">close</span>
+        </button>
+      {/if}
+    </div>
 
     <p class="settings-group-label">Display</p>
     <!-- ── Appearance ──────────────────────────────────────────────────────── -->
@@ -2952,13 +2951,12 @@
   /* Settings search bar */
   .settings-search-bar {
     position: sticky;
-    top: var(--page-top, 0px);
+    top: 0;
     z-index: 20;
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 8px var(--page-px, 16px) 12px;
-    margin-top: -1px;
+    padding: 8px 0 12px;
     background: var(--bg);
   }
   .settings-search-icon { font-size: 20px; color: var(--text-3); flex-shrink: 0; }
