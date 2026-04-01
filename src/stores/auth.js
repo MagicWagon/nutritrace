@@ -2,6 +2,15 @@ import { writable } from 'svelte/store';
 import { loadServerSettings } from './settings.js';
 import { isNative, getServerUrl } from '../lib/platform.js';
 
+// In native server-connected mode, prefix API calls with the server URL
+function _apiUrl(path) {
+  if (isNative) {
+    const url = getServerUrl();
+    if (url) return url + path;
+  }
+  return path; // relative — same origin (web or native local)
+}
+
 /** Currently logged-in user object, or null */
 export const currentUser = writable(null);
 
@@ -33,8 +42,8 @@ export async function loadAuthState() {
 
   try {
     const [statusRes, meRes] = await Promise.all([
-      fetch('/api/auth/status', { credentials: 'include' }),
-      fetch('/api/auth/me',     { credentials: 'include' }),
+      fetch(_apiUrl('/api/auth/status'), { credentials: 'include' }),
+      fetch(_apiUrl('/api/auth/me'),     { credentials: 'include' }),
     ]);
     const { active } = await statusRes.json();
     const meData     = await meRes.json();
@@ -52,7 +61,7 @@ export async function loadAuthState() {
 }
 
 export async function logout() {
-  await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+  await fetch(_apiUrl('/api/auth/logout'), { method: 'POST', credentials: 'include' });
   // Clear all user-scoped settings from localStorage (wl_u{id}_* keys)
   const userId = localStorage.getItem('wl:userId');
   if (userId) {

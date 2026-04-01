@@ -19,7 +19,8 @@ export async function callAI({ provider, apiKey, model, messages, systemPrompt }
  * The API key stays on the server; only messages + systemPrompt are sent.
  */
 export async function callAIProxy({ messages, systemPrompt }) {
-  const res = await fetch('/api/ai/chat', {
+  const { apiUrl } = await import('./platform.js');
+  const res = await fetch(apiUrl('/api/ai/chat'), {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },

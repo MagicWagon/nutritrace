@@ -34,6 +34,11 @@ const SERVER_SETTINGS = new Set([
 
 import { isNative, getServerUrl } from '../lib/platform.js';
 
+function _apiUrl(path) {
+  if (isNative) { const url = getServerUrl(); if (url) return url + path; }
+  return path;
+}
+
 const _saveQueue = {};
 function _isLoggedIn() { return !!localStorage.getItem('wl:userId'); }
 // In native standalone mode, settings only save to localStorage — no server sync
@@ -43,7 +48,7 @@ export function scheduleSave(key, value) {
   clearTimeout(_saveQueue[key]);
   _saveQueue[key] = setTimeout(() => {
     if (!_shouldSyncToServer()) return;
-    fetch('/api/settings', {
+    fetch(_apiUrl('/api/settings'), {
       method: 'PUT',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
@@ -59,7 +64,7 @@ export function scheduleSave(key, value) {
 export async function loadServerSettings() {
   if (!_shouldSyncToServer()) return;
   try {
-    const res = await fetch('/api/settings', { credentials: 'include' });
+    const res = await fetch(_apiUrl('/api/settings'), { credentials: 'include' });
     if (!res.ok) return;
     const serverSettings = await res.json();
     for (const [key, value] of Object.entries(serverSettings)) {

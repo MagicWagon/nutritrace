@@ -8,6 +8,8 @@
   import { showSuccess, showError } from '../stores/toast.js';
   import { editorState, clearFoodEditorState } from '../stores/editorState.js';
   import Toggle from '../components/settings/Toggle.svelte';
+  import { takePhoto } from '../lib/camera.js';
+  import { isNative } from '../lib/platform.js';
   import Dialog from '../components/ui/Dialog.svelte';
   import { foodsShowCategories, foodsShowLabels, foodsShowNotes, foodCategories, visibleNutriments, nutrimentsOrder, customNutriments, cropPhotos, offUsername, offPassword, offUploadCountry, catName as _catName, catDisplay as _catDisplay } from '../stores/settings.js';
 
@@ -30,7 +32,22 @@
   let cropBox     = null;
   let cropDragging = false, cropStartX, cropStartY, cropOrigL, cropOrigT;
 
-  function openGallery() { fileInput && fileInput.click(); }
+  async function openGallery() {
+    if (isNative) {
+      try {
+        const file = await takePhoto();
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = ev => {
+          if ($cropPhotos) { cropSrc = ev.target.result; showCrop = true; }
+          else { food.imgUrl = ev.target.result; }
+        };
+        reader.readAsDataURL(file);
+      } catch { /* user cancelled */ }
+      return;
+    }
+    fileInput && fileInput.click();
+  }
 
   function onFileChange(e) {
     const file = e.target.files[0];

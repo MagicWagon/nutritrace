@@ -59,9 +59,9 @@
       } catch {}
     }
     try {
-      const { isNative, getServerUrl } = await import('../../lib/platform.js');
+      const { isNative, getServerUrl, apiUrl } = await import('../../lib/platform.js');
       if (!(isNative && !getServerUrl())) {
-        const res = await fetch('/api/app-config/env-locks', { credentials: 'include' });
+        const res = await fetch(apiUrl('/api/app-config/env-locks'), { credentials: 'include' });
         if (res.ok) { const d = await res.json(); aiEnvLocked = !!d.ai; }
       }
     } catch {}

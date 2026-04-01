@@ -2,6 +2,8 @@
   import { onMount } from 'svelte';
   import { pop } from 'svelte-spa-router';
   import { NtApi } from '../lib/api.js';
+  import { takePhoto } from '../lib/camera.js';
+  import { isNative } from '../lib/platform.js';
   import { portal } from '../lib/portal.js';
   import { showSuccess, showError } from '../stores/toast.js';
   import { editorState, clearMealEditorState } from '../stores/editorState.js';
@@ -89,6 +91,16 @@
   }
 
   async function openCamera() {
+    if (isNative) {
+      try {
+        const file = await takePhoto();
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = ev => { cropSrc = ev.target.result; cropOpen = true; initCropBox(); };
+        reader.readAsDataURL(file);
+      } catch { /* user cancelled */ }
+      return;
+    }
     cameraOpen = true;
     await new Promise(r => setTimeout(r, 100));
     try {

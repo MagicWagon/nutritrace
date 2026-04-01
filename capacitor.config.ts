@@ -25,8 +25,7 @@ const config: CapacitorConfig = {
       showSpinner: false,
     },
     Keyboard: {
-      resize: 'body',
-      resizeOnFullScreen: true,
+      resize: 'native',
     },
     StatusBar: {
       style: 'dark',

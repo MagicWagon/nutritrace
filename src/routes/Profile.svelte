@@ -3,6 +3,8 @@
   import { pop } from 'svelte-spa-router';
   import { currentUser } from '../stores/auth.js';
   import { NtApi } from '../lib/api.js';
+  import { apiUrl, isNative } from '../lib/platform.js';
+  import { takePhoto } from '../lib/camera.js';
   import { showSuccess, showError } from '../stores/toast.js';
 
   const GENDERS = ['Male', 'Female', 'Non-binary', 'Prefer not to say'];
@@ -31,7 +33,7 @@
   async function save() {
     saving = true;
     try {
-      const res = await fetch('/api/auth/profile', {
+      const res = await fetch(apiUrl('/api/auth/profile'), {
         method: 'PUT',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -48,7 +50,20 @@
     }
   }
 
-  async function pickAvatar() { fileInput?.click(); }
+  async function pickAvatar() {
+    if (isNative) {
+      try {
+        const file = await takePhoto();
+        if (!file) return;
+        uploading = true;
+        const url = await NtApi.uploadImage(file);
+        avatar_url = url;
+      } catch { showError('Upload failed'); }
+      finally { uploading = false; }
+      return;
+    }
+    fileInput?.click();
+  }
 
   async function onFileChange(e) {
     const file = e.target.files?.[0];
@@ -78,7 +93,7 @@
     }
     pwSaving = true;
     try {
-      const res = await fetch('/api/auth/password', {
+      const res = await fetch(apiUrl('/api/auth/password'), {
         method: 'PUT',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },

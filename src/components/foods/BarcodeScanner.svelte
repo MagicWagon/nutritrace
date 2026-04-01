@@ -329,32 +329,25 @@
   async function startNativeScanner() {
     scanning = true;
     try {
-      const { BarcodeScanner, BarcodeFormat } = await import('@capacitor-mlkit/barcode-scanning');
-
-      // Check if Google Barcode Scanner module is available
-      const { available } = await BarcodeScanner.isGoogleBarcodeScannerModuleAvailable();
-      if (!available) {
-        // Install the module (downloads on first use, ~2MB)
-        await BarcodeScanner.installGoogleBarcodeScannerModule();
-      }
+      const { BarcodeScanner } = await import('@capacitor-mlkit/barcode-scanning');
 
       // Request camera permission
-      const { camera } = await BarcodeScanner.requestPermissions();
-      if (camera !== 'granted') {
+      const perms = await BarcodeScanner.requestPermissions();
+      if (perms.camera !== 'granted') {
         const { showError } = await import('../../stores/toast.js');
         showError('Camera permission denied');
         open = false; scanning = false;
         return;
       }
 
-      // Scan — opens native fullscreen camera overlay
-      const { barcodes } = await BarcodeScanner.scan({
-        formats: [
-          BarcodeFormat.EAN13, BarcodeFormat.EAN8,
-          BarcodeFormat.UPC_A, BarcodeFormat.UPC_E,
-          BarcodeFormat.Code128, BarcodeFormat.Code39,
-        ],
-      });
+      // Check/install the Google Barcode Scanner module (required for scan())
+      try {
+        const { available } = await BarcodeScanner.isGoogleBarcodeScannerModuleAvailable();
+        if (!available) await BarcodeScanner.installGoogleBarcodeScannerModule();
+      } catch {}
+
+      // Scan — opens native Google Code Scanner (no format filter = scan all)
+      const { barcodes } = await BarcodeScanner.scan();
 
       if (barcodes.length > 0) {
         const code = barcodes[0].rawValue;

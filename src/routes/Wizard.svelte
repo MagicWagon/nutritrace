@@ -12,8 +12,8 @@
   // In native local mode, skip user management step (single user, no server)
   const _isNativeLocal = isNative && !getServerUrl();
 
-  // Steps: usermgmt (optional), welcome, gender, dob, height, weight, target, activity, integrations, summary
-  const BASE_STEPS = ['welcome','gender','dob','height','weight','target','activity','integrations','summary'];
+  // Steps: usermgmt (optional), welcome, units, gender, dob, height, weight, target, activity, integrations, summary
+  const BASE_STEPS = ['welcome','units','gender','dob','height','weight','target','activity','integrations','summary'];
   const ALL_STEPS  = _isNativeLocal ? BASE_STEPS : ['usermgmt', ...BASE_STEPS];
 
   let step = 0;
@@ -31,6 +31,26 @@
   let adminGender     = '';
   let umError         = '';
   let umLoading       = false;
+
+  // ── Unit system ───────────────────────────────────────────────────────────
+  let unitSystem = ''; // 'metric' | 'imperial'
+
+  function applyUnitSystem(sys) {
+    unitSystem = sys;
+    if (sys === 'imperial') {
+      weightUnit.set('lb');
+      heightUnit.set('ft');
+      energyUnit.set('kcal');
+      weight = 155; targetW = 145;
+      heightFt = 5; heightIn = 9;
+    } else {
+      weightUnit.set('kg');
+      heightUnit.set('cm');
+      energyUnit.set('kcal');
+      weight = 70; targetW = 65;
+      heightCm = 170;
+    }
+  }
 
   // ── Profile data ─────────────────────────────────────────────────────────
   let gender   = '';
@@ -129,6 +149,7 @@
 
   // Validation per step
   $: canProceed = !(currentStepName === 'usermgmt' && enableUserMgmt && (!adminUsername.trim() || !adminPassword.trim() || adminPassword !== adminConfirm))
+               && !(currentStepName === 'units'    && !unitSystem)
                && !(currentStepName === 'gender'   && !gender)
                && !(currentStepName === 'activity' && !activity);
 
@@ -367,6 +388,31 @@
           <div class="logo-icon">🥗</div>
           <h1 class="step-title">Welcome to NutriTrace</h1>
           <p class="step-desc">Your personal nutrition tracker. Let's get you set up in about a minute.</p>
+        </div>
+
+      <!-- ── Units ── -->
+      {:else if currentStepName === 'units'}
+        <h2 class="step-title">Measurement System</h2>
+        <p class="step-desc">How do you measure things?</p>
+        <div class="gender-cards">
+          <button class="option-card" class:selected={unitSystem === 'metric'}
+            on:click={() => applyUnitSystem('metric')}>
+            <span class="material-symbols-rounded" style="font-size:48px">straighten</span>
+            <span class="option-label">Metric</span>
+            <span class="option-sublabel">kg, cm, °C</span>
+            {#if unitSystem === 'metric'}
+              <span class="material-symbols-rounded check">check_circle</span>
+            {/if}
+          </button>
+          <button class="option-card" class:selected={unitSystem === 'imperial'}
+            on:click={() => applyUnitSystem('imperial')}>
+            <span class="material-symbols-rounded" style="font-size:48px">scale</span>
+            <span class="option-label">Imperial</span>
+            <span class="option-sublabel">lb, ft/in, °F</span>
+            {#if unitSystem === 'imperial'}
+              <span class="material-symbols-rounded check">check_circle</span>
+            {/if}
+          </button>
         </div>
 
       <!-- ── Gender ── -->
@@ -708,6 +754,7 @@
   }
   .option-card.selected { border-color: var(--accent); background: var(--accent-dim); }
   .option-label { font-size: 16px; font-weight: 600; }
+  .option-sublabel { font-size: 13px; color: var(--text-3); }
   .check { position: absolute; right: 10px; top: 10px; color: var(--accent); font-size: 20px; }
 
   /* Activity list */

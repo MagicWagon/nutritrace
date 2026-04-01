@@ -6,6 +6,7 @@
  * All requests are proxied through /api/mealie/proxy to avoid CORS.
  */
 import { DB } from './db.js';
+import { apiUrl } from './platform.js';
 
 function _cfg() {
   const baseUrl = (DB.getSetting('mealieBaseUrl', '') || '').replace(/\/$/, '');
@@ -16,7 +17,7 @@ function _cfg() {
 async function _proxy(path) {
   const { baseUrl, token } = _cfg();
   if (!baseUrl || !token) return null;
-  const res = await fetch('/api/mealie/proxy', {
+  const res = await fetch(apiUrl('/api/mealie/proxy'), {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },

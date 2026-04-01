@@ -1716,8 +1716,10 @@
         <p class="sub-label">Camera &amp; Scanning</p>
         <div class="card settings-card">
           <div class="setting-row"><span class="setting-label">Beep on successful scan</span><Toggle checked={$barcodeBeep} on:change={e => barcodeBeep.set(e.detail)} /></div>
-          <div class="setting-divider"></div>
-          <div class="setting-row"><span class="setting-label">Use flashlight while scanning</span><Toggle checked={$barcodeFlashlight} on:change={e => barcodeFlashlight.set(e.detail)} /></div>
+          {#if !isNative}
+            <div class="setting-divider"></div>
+            <div class="setting-row"><span class="setting-label">Use flashlight while scanning</span><Toggle checked={$barcodeFlashlight} on:change={e => barcodeFlashlight.set(e.detail)} /></div>
+          {/if}
           <div class="setting-divider"></div>
           <div class="setting-row"><span class="setting-label">Crop photos on upload</span><Toggle checked={$cropPhotos} on:change={e => cropPhotos.set(e.detail)} /></div>
         </div>
