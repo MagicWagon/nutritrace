@@ -1362,17 +1362,18 @@
   <header class="page-header" class:has-banner={$pageBanners}>
     {#if $pageBanners}<SettingsBanner />{/if}
     <h1>Settings</h1>
-    <div class="settings-search-bar">
-      <span class="material-symbols-rounded settings-search-icon">search</span>
-      <input class="settings-search-input" type="search" placeholder="Search settings…"
-        bind:value={settingsSearch} />
-      {#if settingsSearch}
-        <button class="settings-search-clear btn-icon" on:click={() => settingsSearch = ''} title="Clear search">
-          <span class="material-symbols-rounded" style="font-size:18px">close</span>
-        </button>
-      {/if}
-    </div>
   </header>
+
+  <div class="settings-search-bar">
+    <span class="material-symbols-rounded settings-search-icon">search</span>
+    <input class="settings-search-input" type="search" placeholder="Search settings…"
+      bind:value={settingsSearch} />
+    {#if settingsSearch}
+      <button class="settings-search-clear btn-icon" on:click={() => settingsSearch = ''} title="Clear search">
+        <span class="material-symbols-rounded" style="font-size:18px">close</span>
+      </button>
+    {/if}
+  </div>
 
   <div class="page-content settings-content">
 
@@ -2953,8 +2954,9 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 8px 0 0;
-    width: 100%;
+    padding: 8px var(--page-px, 16px) 12px;
+    margin-top: -1px;
+    background: var(--bg);
   }
   .settings-search-icon { font-size: 20px; color: var(--text-3); flex-shrink: 0; }
   .settings-search-input {
