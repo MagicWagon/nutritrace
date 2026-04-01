@@ -99,6 +99,28 @@
   }
 
   onMount(async () => {
+    // Android back button: navigate back or confirm exit
+    if (isNative) {
+      import('@capacitor/app').then(({ App }) => {
+        let lastBack = 0;
+        App.addListener('backButton', ({ canGoBack }) => {
+          if (canGoBack) {
+            window.history.back();
+          } else {
+            const now = Date.now();
+            if (now - lastBack < 2000) {
+              App.exitApp();
+            } else {
+              lastBack = now;
+              import('./stores/toast.js').then(({ showSuccess }) => {
+                showSuccess('Press back again to exit');
+              });
+            }
+          }
+        });
+      });
+    }
+
     // Load auth state first (sets $currentUser and $userMgmtActive)
     await loadAuthState();
 
