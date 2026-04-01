@@ -113,7 +113,7 @@
             } else {
               lastBack = now;
               import('./stores/toast.js').then(({ showSuccess }) => {
-                showSuccess('Press back again to exit');
+                showSuccess('Tap again to exit');
               });
             }
           }
