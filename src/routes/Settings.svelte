@@ -62,16 +62,31 @@
     const url = serverUrlInput.trim().replace(/\/$/, '');
     serverConnecting = true;
     try {
-      const healthRes = await fetch(`${url}/api/health`, { signal: AbortSignal.timeout(8000) });
-      if (!healthRes.ok) throw new Error('Server not reachable');
-      const loginRes = await fetch(`${url}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ username: serverUsername.trim(), password: serverPassword }),
-      });
-      const loginData = await loginRes.json();
-      if (!loginRes.ok) throw new Error(loginData.error || 'Login failed');
+      // Use CapacitorHttp on native to bypass CORS (WebView fetch can't reach external origins)
+      let loginData;
+      if (isNative) {
+        const { CapacitorHttp } = await import('@capacitor/core');
+        const healthRes = await CapacitorHttp.get({ url: `${url}/api/health` });
+        if (healthRes.status < 200 || healthRes.status >= 300) throw new Error('Server not reachable');
+        const loginRes = await CapacitorHttp.post({
+          url: `${url}/api/auth/login`,
+          headers: { 'Content-Type': 'application/json' },
+          data: { username: serverUsername.trim(), password: serverPassword },
+        });
+        loginData = typeof loginRes.data === 'string' ? JSON.parse(loginRes.data) : loginRes.data;
+        if (loginRes.status < 200 || loginRes.status >= 300) throw new Error(loginData.error || 'Login failed');
+      } else {
+        const healthRes = await fetch(`${url}/api/health`, { signal: AbortSignal.timeout(8000) });
+        if (!healthRes.ok) throw new Error('Server not reachable');
+        const loginRes = await fetch(`${url}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ username: serverUsername.trim(), password: serverPassword }),
+        });
+        loginData = await loginRes.json();
+        if (!loginRes.ok) throw new Error(loginData.error || 'Login failed');
+      }
 
       _pendingServerUrl = url;
 

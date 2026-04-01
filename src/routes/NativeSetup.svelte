@@ -27,21 +27,18 @@
     connecting = true;
 
     try {
-      // Test the connection by hitting the health endpoint
-      const healthRes = await fetch(`${url}/api/health`, { signal: AbortSignal.timeout(8000) });
-      if (!healthRes.ok) throw new Error('Server not reachable');
-      const health = await healthRes.json();
-      if (!health.ok) throw new Error('Invalid server response');
+      // Use CapacitorHttp to bypass CORS
+      const { CapacitorHttp } = await import('@capacitor/core');
+      const healthRes = await CapacitorHttp.get({ url: `${url}/api/health` });
+      if (healthRes.status < 200 || healthRes.status >= 300) throw new Error('Server not reachable');
 
-      // Try to log in
-      const loginRes = await fetch(`${url}/api/auth/login`, {
-        method: 'POST',
+      const loginRes = await CapacitorHttp.post({
+        url: `${url}/api/auth/login`,
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ username: username.trim(), password }),
+        data: { username: username.trim(), password },
       });
-      const loginData = await loginRes.json();
-      if (!loginRes.ok) throw new Error(loginData.error || 'Login failed');
+      const loginData = typeof loginRes.data === 'string' ? JSON.parse(loginRes.data) : loginRes.data;
+      if (loginRes.status < 200 || loginRes.status >= 300) throw new Error(loginData.error || 'Login failed');
 
       // Success — save the server URL and mode
       setServerUrl(url);
