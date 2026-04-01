@@ -285,7 +285,7 @@ const USDA = {
 // In native standalone mode (Capacitor + no server URL), requests are served
 // from the local SQLite database via NtApiNative. In all other cases (web PWA,
 // or native with a server URL configured) this HTTP implementation is used.
-import { isNative, getServerUrl, getAuthToken } from './platform.js';
+import { isNative, getServerUrl, getAuthToken, resolveAssetUrl } from './platform.js';
 
 function _resolveBaseUrl() {
   if (!isNative) return ''; // relative — same origin as the web app
@@ -293,43 +293,19 @@ function _resolveBaseUrl() {
   return url || ''; // native + server configured → absolute URL
 }
 
-// Cache CapacitorHttp import for native server mode (avoids repeated dynamic imports)
-let _capHttp = null;
-async function _getCapHttp() {
-  if (!_capHttp) { const { CapacitorHttp } = await import('@capacitor/core'); _capHttp = CapacitorHttp; }
-  return _capHttp;
-}
-
 const _NtApiHttp = {
-  // Core fetch — uses relative URLs (web) or CapacitorHttp (native server mode)
+  // Core fetch — uses absolute URL + Bearer token (native server) or relative URL + cookies (web)
   async _fetch(method, path, body, isUpload = false) {
     const base = _resolveBaseUrl();
-
-    // Native server mode: use CapacitorHttp with Bearer token auth
-    if (isNative && base) {
-      const CH = await _getCapHttp();
-      const url = base + path;
-      const headers = {};
-      if (!isUpload) headers['Content-Type'] = 'application/json';
-      const token = getAuthToken();
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
-      let resp;
-      if (method === 'GET')         resp = await CH.get({ url, headers });
-      else if (method === 'DELETE') resp = await CH.delete({ url, headers });
-      else {
-        const data = isUpload ? undefined : (body != null ? body : undefined);
-        resp = await CH.request({ method, url, headers, data });
-      }
-
-      const parsed = typeof resp.data === 'string' ? JSON.parse(resp.data) : resp.data;
-      if (resp.status < 200 || resp.status >= 300) throw new Error(parsed?.error || `API error ${resp.status}`);
-      return parsed;
-    }
-
-    // Web mode: standard fetch with relative URLs
     const headers = {};
     if (!isUpload) headers['Content-Type'] = 'application/json';
+
+    // Native server mode: add Bearer token (cookies don't persist across WebView reloads)
+    if (isNative && base) {
+      const token = getAuthToken();
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+    }
+
     const res = await fetch(base + path, {
       method,
       headers,
@@ -351,7 +327,7 @@ const _NtApiHttp = {
   _foodFromApi(row) {
     if (!row) return null;
     const { img_url, category, ...rest } = row;
-    return { ...rest, imgUrl: img_url || '', categories: category ? [category] : [] };
+    return { ...rest, imgUrl: resolveAssetUrl(img_url) || '', categories: category ? [category] : [] };
   },
   _foodToApi(food) {
     const { imgUrl, img_url, categories, category, ...rest } = food;
@@ -372,7 +348,7 @@ const _NtApiHttp = {
   _mealFromApi(row) {
     if (!row) return null;
     const { img_url, ...rest } = row;
-    return { ...rest, imgUrl: img_url || '' };
+    return { ...rest, imgUrl: resolveAssetUrl(img_url) || '' };
   },
   _mealToApi(meal) {
     const { imgUrl, img_url, ...rest } = meal;

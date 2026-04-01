@@ -2,6 +2,7 @@ import { writable, derived } from 'svelte/store';
 import { NtApi } from '../lib/api.js';
 import { Nutrition } from '../lib/nutrition.js';
 import { localDateStr } from '../lib/db.js';
+import { resolveAssetUrl } from '../lib/platform.js';
 
 function todayStr() {
   return localDateStr();
@@ -24,10 +25,11 @@ export const macroPercents = derived(diaryTotals, $t => {
   return Nutrition.macroPercents($t);
 });
 
-// Map API snake_case → app camelCase
+// Map API snake_case → app camelCase, resolve image URLs for native server mode
 function _fromApi(entry) {
   if (!entry) return null;
-  return { ...entry, bodyStats: entry.body_stats || {}, body_stats: undefined };
+  const items = (entry.items || []).map(i => i.imgUrl ? { ...i, imgUrl: resolveAssetUrl(i.imgUrl) } : i);
+  return { ...entry, items, bodyStats: entry.body_stats || {}, body_stats: undefined };
 }
 
 // Map app camelCase → API snake_case

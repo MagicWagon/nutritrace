@@ -616,7 +616,7 @@
   </div>
 
   <div class="page-content diary-content" style="padding-bottom:{contentPad}">
-    {#if $diaryLoadError}
+{#if $diaryLoadError}
       <div class="server-error-banner">
         <span class="material-symbols-rounded">cloud_off</span>
         <span>Could not reach server — <button class="server-error-retry" on:click={() => loadEntry($currentDate)}>retry</button></span>

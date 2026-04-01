@@ -2,13 +2,18 @@ import { writable } from 'svelte/store';
 import { loadServerSettings } from './settings.js';
 import { isNative, getServerUrl, getAuthToken } from '../lib/platform.js';
 
-// In native server-connected mode, prefix API calls with the server URL
 function _apiUrl(path) {
-  if (isNative) {
-    const url = getServerUrl();
-    if (url) return url + path;
+  if (isNative) { const url = getServerUrl(); if (url) return url + path; }
+  return path;
+}
+
+function _authHeaders() {
+  const h = {};
+  if (isNative && getServerUrl()) {
+    const token = getAuthToken();
+    if (token) h['Authorization'] = `Bearer ${token}`;
   }
-  return path; // relative — same origin (web or native local)
+  return h;
 }
 
 /** Currently logged-in user object, or null */
@@ -41,31 +46,13 @@ export async function loadAuthState() {
   }
 
   try {
-    let active, user;
-    if (isNative && getServerUrl()) {
-      // Native server mode: use CapacitorHttp (shares cookies with native HTTP layer)
-      const { CapacitorHttp } = await import('@capacitor/core');
-      const serverUrl = getServerUrl();
-      const token = getAuthToken();
-      const authHeaders = token ? { 'Authorization': `Bearer ${token}` } : {};
-      const [statusRes, meRes] = await Promise.all([
-        CapacitorHttp.get({ url: `${serverUrl}/api/auth/status`, headers: authHeaders }),
-        CapacitorHttp.get({ url: `${serverUrl}/api/auth/me`, headers: authHeaders }),
-      ]);
-      const statusData = typeof statusRes.data === 'string' ? JSON.parse(statusRes.data) : statusRes.data;
-      const meData     = typeof meRes.data === 'string' ? JSON.parse(meRes.data) : meRes.data;
-      active = statusData.active;
-      user   = meData.user || null;
-    } else {
-      const [statusRes, meRes] = await Promise.all([
-        fetch(_apiUrl('/api/auth/status'), { credentials: 'include' }),
-        fetch(_apiUrl('/api/auth/me'),     { credentials: 'include' }),
-      ]);
-      const statusData = await statusRes.json();
-      const meData     = await meRes.json();
-      active = statusData.active;
-      user   = meData.user || null;
-    }
+    const [statusRes, meRes] = await Promise.all([
+      fetch(_apiUrl('/api/auth/status'), { credentials: 'include', headers: _authHeaders() }),
+      fetch(_apiUrl('/api/auth/me'),     { credentials: 'include', headers: _authHeaders() }),
+    ]);
+    const { active } = await statusRes.json();
+    const meData     = await meRes.json();
+    const user       = meData.user || null;
     userMgmtActive.set(!!active);
     currentUser.set(user);
     if (user) localStorage.setItem('wl:userId', String(user.id));

@@ -34,13 +34,19 @@ const SERVER_SETTINGS = new Set([
 
 import { isNative, getServerUrl, getAuthToken } from '../lib/platform.js';
 
-let _capHttp = null;
-async function _getCapHttp() {
-  if (!_capHttp) { const { CapacitorHttp } = await import('@capacitor/core'); _capHttp = CapacitorHttp; }
-  return _capHttp;
+function _settingsUrl() {
+  if (isNative) { const url = getServerUrl(); if (url) return url + '/api/settings'; }
+  return '/api/settings';
 }
 
-function _nativeServerMode() { return isNative && !!getServerUrl(); }
+function _authHeaders() {
+  const h = { 'Content-Type': 'application/json' };
+  if (isNative && getServerUrl()) {
+    const token = getAuthToken();
+    if (token) h['Authorization'] = `Bearer ${token}`;
+  }
+  return h;
+}
 
 const _saveQueue = {};
 function _isLoggedIn() { return !!localStorage.getItem('wl:userId'); }
@@ -51,25 +57,12 @@ export function scheduleSave(key, value) {
   _saveQueue[key] = setTimeout(async () => {
     if (!_shouldSyncToServer()) return;
     try {
-      if (_nativeServerMode()) {
-        const CH = await _getCapHttp();
-        const headers = { 'Content-Type': 'application/json' };
-        const token = getAuthToken();
-        if (token) headers['Authorization'] = `Bearer ${token}`;
-        await CH.request({
-          method: 'PUT',
-          url: getServerUrl() + '/api/settings',
-          headers,
-          data: { key, value },
-        });
-      } else {
-        await fetch('/api/settings', {
-          method: 'PUT',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key, value }),
-        });
-      }
+      await fetch(_settingsUrl(), {
+        method: 'PUT',
+        credentials: 'include',
+        headers: _authHeaders(),
+        body: JSON.stringify({ key, value }),
+      });
     } catch {}
   }, 600);
 }
@@ -81,20 +74,9 @@ export function scheduleSave(key, value) {
 export async function loadServerSettings() {
   if (!_shouldSyncToServer()) return;
   try {
-    let serverSettings;
-    if (_nativeServerMode()) {
-      const CH = await _getCapHttp();
-      const headers = {};
-      const token = getAuthToken();
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const resp = await CH.get({ url: getServerUrl() + '/api/settings', headers });
-      serverSettings = typeof resp.data === 'string' ? JSON.parse(resp.data) : resp.data;
-      if (resp.status < 200 || resp.status >= 300) return;
-    } else {
-      const res = await fetch('/api/settings', { credentials: 'include' });
-      if (!res.ok) return;
-      serverSettings = await res.json();
-    }
+    const res = await fetch(_settingsUrl(), { credentials: 'include', headers: _authHeaders() });
+    if (!res.ok) return;
+    const serverSettings = await res.json();
     for (const [key, value] of Object.entries(serverSettings)) {
       // Use raw key for localStorage (DB.setSetting prefixes with wl_)
       DB.setSetting(key, value);

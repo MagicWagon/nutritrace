@@ -88,6 +88,20 @@ export function getAuthToken() {
 }
 
 /**
+ * Resolve a relative URL (e.g. /uploads/photo.jpg) to an absolute URL
+ * when in native server mode. On web, returns the path unchanged.
+ */
+export function resolveAssetUrl(path) {
+  if (!path) return path;
+  if (path.startsWith('http') || path.startsWith('data:') || path.startsWith('file:')) return path;
+  if (isNative) {
+    const url = getServerUrl();
+    if (url) return url + path;
+  }
+  return path;
+}
+
+/**
  * Prefix an API path with the server URL when in native server-connected mode.
  * In web mode or native local mode, returns the path unchanged (relative URL).
  */
