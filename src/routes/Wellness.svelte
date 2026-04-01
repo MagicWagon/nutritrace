@@ -1949,7 +1949,7 @@
   /* Tabs */
   .tab-bar {
     position: sticky;
-    top: calc(var(--page-top, var(--safe-top)) + 108px);
+    top: calc(var(--page-top, var(--safe-top)) + 92px);
     z-index: 8;
     display: flex;
     padding: 4px;
@@ -1962,7 +1962,7 @@
   }
   :global(.wl-date-bar.has-banner) ~ * > .tab-bar,
   :global(.wl-date-bar.has-banner) ~ .tab-bar {
-    top: calc(var(--page-top, var(--safe-top)) + 148px);
+    top: calc(var(--page-top, var(--safe-top)) + 132px);
   }
   .tab-bar::-webkit-scrollbar { display: none; }
   .tab-pill {
