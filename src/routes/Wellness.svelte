@@ -1948,6 +1948,9 @@
   }
   /* Tabs */
   .tab-bar {
+    position: sticky;
+    top: calc(var(--page-top, var(--safe-top)) + 108px);
+    z-index: 8;
     display: flex;
     padding: 4px;
     background: var(--surface-2);
@@ -1956,7 +1959,10 @@
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
-    position: relative;
+  }
+  :global(.wl-date-bar.has-banner) ~ * > .tab-bar,
+  :global(.wl-date-bar.has-banner) ~ .tab-bar {
+    top: calc(var(--page-top, var(--safe-top)) + 148px);
   }
   .tab-bar::-webkit-scrollbar { display: none; }
   .tab-pill {
