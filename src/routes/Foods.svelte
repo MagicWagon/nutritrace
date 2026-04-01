@@ -557,7 +557,6 @@
       </button>
     </div>
   </div>
-  </div>
 
   <!-- Source chips (Foods tab only) -->
   {#if activeTab === 0}
@@ -570,6 +569,7 @@
       {/each}
     </div>
   {/if}
+  </div>
 
   <!-- Category filter chips (Local + Foods tab only) -->
   {#if activeTab === 0 && searchSource === 'local' && $foodsShowCategories && $foodCategories && $foodCategories.length > 0}
@@ -864,7 +864,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 0 var(--page-px) 12px;
+    padding: 0 var(--page-px) 6px;
   }
   .foods-search-icon { font-size: 20px; color: var(--text-3); flex-shrink: 0; }
   .foods-search-input-wrap {
