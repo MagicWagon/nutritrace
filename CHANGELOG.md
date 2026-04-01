@@ -5,6 +5,36 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.28.0-beta] — 2026-03-31
+
+### Added
+- **Android app via Capacitor 8 (Phase 1 complete)** — full native Android build wrapping the Svelte PWA
+  - Offline-first with local SQLite database (`@capacitor-community/sqlite`)
+  - NativeSetup wizard: "Use Locally" (pure offline) or "Connect to Server" (enter URL + authenticate)
+  - Server connection with Bearer token auth and data merge dialog (push local data, choose settings winner)
+  - Native barcode scanner via Google ML Kit (`@capacitor-mlkit/barcode-scanning`)
+  - Native camera for food, meal, and avatar photos (`@capacitor/camera`)
+  - OFF/USDA food search via `CapacitorHttp` (CORS bypass in WebView)
+  - All images resolve to server URL in connected mode
+  - All API calls include auth token in native server mode
+  - Service worker disabled inside Capacitor (prevents offline.html redirect)
+  - App icon at all Android `mipmap` densities
+  - Wizard: measurement system step (metric/imperial) with appropriate defaults
+  - Password visibility toggle on connect forms
+  - Settings hidden in local mode: User Management, Email, Food Sharing, persistent sidebar
+  - Full backup works in server-connected mode
+- **Server CORS** — allows `Authorization` header and all origins for native app support
+- **Server auth** — `authenticate` middleware accepts Bearer token in `Authorization` header (in addition to cookie)
+- **Login response** — JWT token now included in response body (for native app token storage)
+
+### Fixed
+- **OFF/USDA source chip clicks** — reactive loop was breaking chip navigation for both PWA and Android; fixed reactive dependency chain
+- **`_extFetch` recursive call** — infinite loop on PWA caused by self-referencing fetch wrapper; corrected call target
+- **Page banners default to on** — banners now enabled by default on fresh installs
+- **Long-press menu for external results** — OFF/USDA search results now show "Save to My Foods" instead of Edit/Delete in the long-press action sheet
+
+---
+
 ## [0.25.0-beta] — 2026-03-30
 
 ### Added
