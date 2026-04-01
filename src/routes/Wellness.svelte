@@ -548,13 +548,31 @@
       ? (history[history.length - 1].calories_out ?? null)
       : null;
 
-    readiness = _calcReadiness(
-      displayData.hrv_daily_rmssd,
-      displayData.resting_hr,
-      displayData.sleep_score,
-      yesterdayCalories,
-      history
-    );
+    // Past days: use server-stored snapshot (locked in at sync time).
+    // Today: always calculate live so score updates as data arrives.
+    const isToday = dateStr === localDateStr();
+    if (!isToday && displayData.readiness_score != null) {
+      const s = Math.round(displayData.readiness_score);
+      readiness = _calcReadiness(
+        displayData.hrv_daily_rmssd,
+        displayData.resting_hr,
+        displayData.sleep_score,
+        yesterdayCalories,
+        history
+      );
+      // Override the score with the stored value but keep the detail breakdown
+      readiness = { ...readiness, score: s };
+      readiness.label = s >= 80 ? 'Optimal' : s >= 65 ? 'Good' : s >= 50 ? 'Fair' : s >= 35 ? 'Low' : 'Poor';
+      readiness.color = s >= 65 ? 'var(--accent)' : s >= 50 ? '#f59e0b' : '#ef4444';
+    } else {
+      readiness = _calcReadiness(
+        displayData.hrv_daily_rmssd,
+        displayData.resting_hr,
+        displayData.sleep_score,
+        yesterdayCalories,
+        history
+      );
+    }
   }
 
   $: { activeTab; if (activeTab === 'heart') _readinessLoaded = false; }
@@ -662,12 +680,26 @@
       };
     });
 
-    stressScore = _calcStressScore(
-      displayData.hrv_daily_rmssd,
-      displayData.resting_hr,
-      displayData.sleep_score,
-      history
-    );
+    const isStressToday = dateStr === localDateStr();
+    if (!isStressToday && displayData.stress_score != null) {
+      const s = Math.round(displayData.stress_score);
+      stressScore = _calcStressScore(
+        displayData.hrv_daily_rmssd,
+        displayData.resting_hr,
+        displayData.sleep_score,
+        history
+      );
+      stressScore = { ...stressScore, score: s };
+      stressScore.label = s >= 80 ? 'Excellent' : s >= 60 ? 'Good' : s >= 40 ? 'Fair' : 'Low';
+      stressScore.color = s >= 60 ? 'var(--accent)' : s >= 40 ? '#f59e0b' : '#ef4444';
+    } else {
+      stressScore = _calcStressScore(
+        displayData.hrv_daily_rmssd,
+        displayData.resting_hr,
+        displayData.sleep_score,
+        history
+      );
+    }
   }
 
   $: { activeTab; if (activeTab === 'heart') _stressLoaded = false; }
