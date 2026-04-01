@@ -124,66 +124,57 @@
     }
   }
 
-  async function _mergeAndConnect(settingsWinner) {
+  async function _mergeAndConnect(mode) {
     mergeStep = 'syncing';
     const url = _pendingServerUrl;
+    const token = getAuthToken();
+    const _authH = { 'Content-Type': 'application/json' };
+    if (token) _authH['Authorization'] = `Bearer ${token}`;
+
     try {
-      // 1. Settings: push local to server OR pull server to local
       const { DB: _DB } = await import('../lib/db.js');
-      if (settingsWinner === 'phone') {
+      const { dbGetFoods, dbGetMeals, dbGetAllDiary } = await import('../lib/db-native.js');
+
+      if (mode === 'upload' || mode === 'merge') {
+        // Push local settings to server
         mergeProgress = 'Uploading settings…';
         const allSettings = _DB.getAllSettings();
         for (const [key, value] of Object.entries(allSettings)) {
-          await fetch(`${url}/api/settings`, {
-            method: 'PUT', credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ key, value }),
-          }).catch(() => {});
+          await fetch(`${url}/api/settings`, { method: 'PUT', headers: _authH, body: JSON.stringify({ key, value }) }).catch(() => {});
         }
-      }
-      // (If server wins, settings will be pulled automatically on reload via loadServerSettings)
 
-      // 2. Push local foods to server
-      const { dbGetFoods, dbGetMeals, dbGetAllDiary } = await import('../lib/db-native.js');
-      const localFoods = await dbGetFoods().catch(() => []);
-      if (localFoods.length) {
-        mergeProgress = `Uploading ${localFoods.length} foods…`;
-        for (const food of localFoods) {
-          const { id, user_id, sync_status, created_at, updated_at, imgUrl, categories, ...rest } = food;
-          await fetch(`${url}/api/foods`, {
-            method: 'POST', credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...rest, img_url: imgUrl || null, category: categories?.[0] || null }),
-          }).catch(() => {});
+        // Push local foods
+        const localFoods = await dbGetFoods().catch(() => []);
+        if (localFoods.length) {
+          mergeProgress = `Uploading ${localFoods.length} foods…`;
+          for (const food of localFoods) {
+            const { id, user_id, sync_status, server_id, created_at, updated_at, deleted_at, imgUrl, categories, ...rest } = food;
+            await fetch(`${url}/api/foods`, { method: 'POST', headers: _authH, body: JSON.stringify({ ...rest, img_url: imgUrl || null, category: categories?.[0] || null }) }).catch(() => {});
+          }
         }
-      }
 
-      // 3. Push local meals to server
-      const localMeals = await dbGetMeals().catch(() => []);
-      if (localMeals.length) {
-        mergeProgress = `Uploading ${localMeals.length} meals…`;
-        for (const meal of localMeals) {
-          const { id, user_id, sync_status, created_at, updated_at, imgUrl, ...rest } = meal;
-          await fetch(`${url}/api/meals`, {
-            method: 'POST', credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...rest, img_url: imgUrl || null }),
-          }).catch(() => {});
+        // Push local meals
+        const localMeals = await dbGetMeals().catch(() => []);
+        if (localMeals.length) {
+          mergeProgress = `Uploading ${localMeals.length} meals…`;
+          for (const meal of localMeals) {
+            const { id, user_id, sync_status, server_id, created_at, updated_at, deleted_at, imgUrl, ...rest } = meal;
+            await fetch(`${url}/api/meals`, { method: 'POST', headers: _authH, body: JSON.stringify({ ...rest, img_url: imgUrl || null }) }).catch(() => {});
+          }
+        }
+
+        // Push local diary
+        const localDiary = await dbGetAllDiary().catch(() => []);
+        if (localDiary.length) {
+          mergeProgress = `Uploading ${localDiary.length} diary entries…`;
+          for (const entry of localDiary) {
+            await fetch(`${url}/api/diary/${entry.date}`, { method: 'PUT', headers: _authH, body: JSON.stringify({ items: entry.items || [], body_stats: entry.body_stats || {}, water: entry.water || [] }) }).catch(() => {});
+          }
         }
       }
 
-      // 4. Push local diary (local wins for same-date conflicts)
-      const localDiary = await dbGetAllDiary().catch(() => []);
-      if (localDiary.length) {
-        mergeProgress = `Uploading ${localDiary.length} diary entries…`;
-        for (const entry of localDiary) {
-          await fetch(`${url}/api/diary/${entry.date}`, {
-            method: 'PUT', credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ items: entry.items || [], body_stats: entry.body_stats || {}, water: entry.water || [] }),
-          }).catch(() => {});
-        }
-      }
+      // mode === 'download' or 'merge': server data will be pulled automatically on reload via loadServerSettings + NtApiCached
+      // mode === 'upload': server settings stay, local data pushed up
 
       mergeProgress = 'Finalizing…';
       _finalizeConnect();
@@ -2772,21 +2763,33 @@
 {#if mergeStep === 'ask-settings'}
   <div class="merge-overlay" transition:fade={{ duration: 150 }}>
     <div class="merge-dialog">
-      <h3 style="margin:0 0 8px;font-size:18px;color:var(--text-1)">Sync Local Data</h3>
-      <p style="font-size:14px;color:var(--text-3);margin:0 0 16px;line-height:1.5">
-        You have data on this device. It will be uploaded to the server.
-        Which settings should be used?
+      <h3 style="margin:0 0 6px;font-size:18px;color:var(--text-1)">Sync Options</h3>
+      <p style="font-size:13px;color:var(--text-3);margin:0 0 16px;line-height:1.5">
+        You have data on this phone. How should it be handled when connecting?
       </p>
-      <div style="display:flex;flex-direction:column;gap:10px">
-        <button class="btn btn-primary w-full" on:click={() => _mergeAndConnect('phone')}>
-          <span class="material-symbols-rounded" style="font-size:18px">smartphone</span>
-          Use phone settings
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button class="merge-option" on:click={() => _mergeAndConnect('upload')}>
+          <span class="material-symbols-rounded" style="font-size:22px;color:var(--accent)">cloud_upload</span>
+          <div>
+            <div class="merge-option-title">Upload phone to server</div>
+            <div class="merge-option-desc">Send this phone's foods, diary, and settings to the server. Existing server data stays.</div>
+          </div>
         </button>
-        <button class="btn btn-ghost w-full" on:click={() => _mergeAndConnect('server')}>
-          <span class="material-symbols-rounded" style="font-size:18px">cloud</span>
-          Use server settings
+        <button class="merge-option" on:click={() => _mergeAndConnect('download')}>
+          <span class="material-symbols-rounded" style="font-size:22px;color:var(--accent)">cloud_download</span>
+          <div>
+            <div class="merge-option-title">Download server to phone</div>
+            <div class="merge-option-desc">Replace this phone's data with everything from the server. Local data is discarded.</div>
+          </div>
         </button>
-        <button class="btn btn-ghost w-full" style="color:var(--text-3)" on:click={cancelMerge}>Cancel</button>
+        <button class="merge-option" on:click={() => _mergeAndConnect('merge')}>
+          <span class="material-symbols-rounded" style="font-size:22px;color:var(--accent)">sync</span>
+          <div>
+            <div class="merge-option-title">Merge both</div>
+            <div class="merge-option-desc">Upload phone data to the server AND download server data. Nothing is lost, but duplicates are possible.</div>
+          </div>
+        </button>
+        <button class="btn btn-ghost w-full" style="color:var(--text-3);margin-top:4px" on:click={cancelMerge}>Cancel</button>
       </div>
     </div>
   </div>
@@ -3349,7 +3352,23 @@
   .merge-dialog {
     background: var(--surface-1); border: 1px solid var(--border);
     border-radius: var(--radius-lg, 16px);
-    padding: 24px; width: 100%; max-width: 360px;
+    padding: 24px; width: 100%; max-width: 400px;
+    max-height: 90vh; overflow-y: auto;
   }
+  .merge-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md, 12px);
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.15s;
+  }
+  .merge-option:hover { border-color: var(--accent); }
+  .merge-option-title { font-size: 14px; font-weight: 600; color: var(--text-1); margin-bottom: 2px; }
+  .merge-option-desc { font-size: 12px; color: var(--text-3); line-height: 1.4; }
   @keyframes spin { to { transform: rotate(360deg); } }
 </style>
