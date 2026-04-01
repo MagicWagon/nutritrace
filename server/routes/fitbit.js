@@ -317,23 +317,26 @@ async function _syncDate(u, dateStr) {
 
   // Sleep Score — not in public Fitbit API; estimated from sleep components.
   // Formula: Duration (0-30) + Quality/deep+REM% (0-40) + QualBonus for >35% (0-8)
-  //        + SpO2 restoration (0-15) + HRV (0-15)
-  // Calibrated to 3 days of actual Fitbit scores — within ±1 pt on all 3.
-  // Note: Fitbit also uses overnight sleeping HR (not in API), so this is an approximation.
+  //        + SpO2 restoration (0-15) + HRV (0-15) + Efficiency bonus (0-3)
+  // Duration target: 455min (~7.5h) — Fitbit is generous with 7+ hours.
+  // SpO2 null default: 11 (Fitbit doesn't penalize missing SpO2 heavily).
+  // Efficiency bonus: rewards high sleep efficiency (>85%) up to 3 pts.
   if (metrics.sleep_duration_min != null) {
     const dur  = metrics.sleep_duration_min;
     const deep = metrics.sleep_deep_min ?? 0;
     const rem  = metrics.sleep_rem_min  ?? 0;
     const spo2 = metrics.spo2_avg;
     const hrv  = metrics.hrv_daily_rmssd;
-    const durPts     = Math.min(30, (dur / 480) * 30);
+    const eff  = metrics.sleep_efficiency ?? null;
+    const durPts     = Math.min(30, (dur / 455) * 30);
     const deepRemPct = dur > 0 ? (deep + rem) / dur : 0;
     const qualPts    = Math.min(40, deepRemPct / 0.25 * 40);
     const qualBonus  = Math.min(8, Math.max(0, (deepRemPct - 0.35) / 0.15 * 8));
-    const spo2Pts    = spo2 != null ? Math.min(15, Math.max(0, (spo2 - 90) / 5 * 15)) : 10;
+    const spo2Pts    = spo2 != null ? Math.min(15, Math.max(0, (spo2 - 90) / 5 * 15)) : 11;
     const hrvPts     = hrv  != null ? Math.min(15, Math.max(0, (hrv  -  5) / 45 * 15)) : 10;
-    metrics.sleep_score = Math.round(durPts + qualPts + qualBonus + spo2Pts + hrvPts);
-    logger.debug(`[fitbit] sleep_score ${dateStr}: dur=${dur}m deep=${deep}m rem=${rem}m spo2=${spo2} hrv=${hrv} → ${durPts.toFixed(1)}+${qualPts.toFixed(1)}+${qualBonus.toFixed(1)}+${spo2Pts.toFixed(1)}+${hrvPts.toFixed(1)}=${metrics.sleep_score}`);
+    const effPts     = eff  != null ? Math.min(3, Math.max(0, (eff - 85) * 0.25)) : 0;
+    metrics.sleep_score = Math.min(100, Math.round(durPts + qualPts + qualBonus + spo2Pts + hrvPts + effPts));
+    logger.debug(`[fitbit] sleep_score ${dateStr}: dur=${dur}m deep=${deep}m rem=${rem}m spo2=${spo2} hrv=${hrv} eff=${eff} → ${durPts.toFixed(1)}+${qualPts.toFixed(1)}+${qualBonus.toFixed(1)}+${spo2Pts.toFixed(1)}+${hrvPts.toFixed(1)}+${effPts.toFixed(1)}=${metrics.sleep_score}`);
   }
 
   // Upsert all metrics
