@@ -2952,7 +2952,7 @@
   /* Settings search bar */
   .settings-search-bar {
     position: sticky;
-    top: calc(var(--page-top, var(--safe-top)) + 62px);
+    top: calc(var(--page-top, var(--safe-top)) + 46px);
     z-index: 20;
     display: flex;
     align-items: center;
@@ -2964,7 +2964,7 @@
     border-bottom: 1px solid var(--border);
   }
   :global(.page-header.has-banner) + .settings-search-bar {
-    top: calc(var(--page-top, var(--safe-top)) + 102px);
+    top: calc(var(--page-top, var(--safe-top)) + 86px);
   }
   .settings-search-icon { font-size: 20px; color: var(--text-3); flex-shrink: 0; }
   .settings-search-input {
