@@ -11,8 +11,19 @@ import { logger } from '../logger.js';
 const _clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const _mean = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
 
-export function snapshotScores(userId, dateStr) {
+export function snapshotScores(userId, dateStr, { force = false } = {}) {
   const today = new Date().toISOString().slice(0, 10);
+
+  // Skip if scores already exist for this date (unless force recalculating)
+  if (!force) {
+    const existing = db.prepare(
+      `SELECT value FROM wellness_data WHERE user_id = ? AND date = ? AND source = 'fitbit' AND metric_type = 'readiness_score'`
+    ).get(userId, dateStr);
+    if (existing) {
+      logger.debug(`[wellness] ${dateStr} snapshot skipped — already stored (readiness=${existing.value})`);
+      return;
+    }
+  }
 
   // Load 30-day history from today — ALL sources (fitbit + garmin merged)
   const history = db.prepare(

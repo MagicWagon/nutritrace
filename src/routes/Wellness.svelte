@@ -515,6 +515,19 @@
     };
   }
 
+  async function recalculateScores() {
+    try {
+      const result = await NtApi.post('/api/wellness/fitbit/recalculate', {});
+      showSuccess(`Recalculated: readiness=${result.readiness_score}, stress=${result.stress_score}`);
+      // Reload data to pick up new scores
+      _readinessLoaded = false;
+      _stressLoaded = false;
+      loadData();
+    } catch (e) {
+      showError('Recalculate failed: ' + (e.message || ''));
+    }
+  }
+
   async function loadReadiness() {
     _readinessLoaded = true;
     const today   = new Date();
@@ -550,28 +563,20 @@
 
     // Past days: use server-stored snapshot (locked in at sync time).
     // Today: always calculate live so score updates as data arrives.
-    const isToday = dateStr === localDateStr();
-    if (!isToday && displayData.readiness_score != null) {
+    // Always compute the breakdown for display
+    readiness = _calcReadiness(
+      displayData.hrv_daily_rmssd,
+      displayData.resting_hr,
+      displayData.sleep_score,
+      yesterdayCalories,
+      history
+    );
+    // If a stored (locked-in) score exists, use it as the displayed score
+    if (displayData.readiness_score != null) {
       const s = Math.round(displayData.readiness_score);
-      readiness = _calcReadiness(
-        displayData.hrv_daily_rmssd,
-        displayData.resting_hr,
-        displayData.sleep_score,
-        yesterdayCalories,
-        history
-      );
-      // Override the score with the stored value but keep the detail breakdown
-      readiness = { ...readiness, score: s };
+      readiness = { ...readiness, score: s, stored: true };
       readiness.label = s >= 80 ? 'Optimal' : s >= 65 ? 'Good' : s >= 50 ? 'Fair' : s >= 35 ? 'Low' : 'Poor';
       readiness.color = s >= 65 ? 'var(--accent)' : s >= 50 ? '#f59e0b' : '#ef4444';
-    } else {
-      readiness = _calcReadiness(
-        displayData.hrv_daily_rmssd,
-        displayData.resting_hr,
-        displayData.sleep_score,
-        yesterdayCalories,
-        history
-      );
     }
   }
 
@@ -680,25 +685,17 @@
       };
     });
 
-    const isStressToday = dateStr === localDateStr();
-    if (!isStressToday && displayData.stress_score != null) {
+    stressScore = _calcStressScore(
+      displayData.hrv_daily_rmssd,
+      displayData.resting_hr,
+      displayData.sleep_score,
+      history
+    );
+    if (displayData.stress_score != null) {
       const s = Math.round(displayData.stress_score);
-      stressScore = _calcStressScore(
-        displayData.hrv_daily_rmssd,
-        displayData.resting_hr,
-        displayData.sleep_score,
-        history
-      );
-      stressScore = { ...stressScore, score: s };
+      stressScore = { ...stressScore, score: s, stored: true };
       stressScore.label = s >= 80 ? 'Excellent' : s >= 60 ? 'Good' : s >= 40 ? 'Fair' : 'Low';
       stressScore.color = s >= 60 ? 'var(--accent)' : s >= 40 ? '#f59e0b' : '#ef4444';
-    } else {
-      stressScore = _calcStressScore(
-        displayData.hrv_daily_rmssd,
-        displayData.resting_hr,
-        displayData.sleep_score,
-        history
-      );
     }
   }
 
@@ -1494,6 +1491,15 @@
                       Based on {readiness.data_days} of 30 days — accuracy improves as more data is collected.
                     </div>
                   {/if}
+                  {#if readiness.stored}
+                    <div class="score-debug-info">
+                      <span class="material-symbols-rounded" style="font-size:14px;color:var(--text-3)">lock</span>
+                      <span>Locked at sync · Calculated: {readiness.hrv_score != null ? Math.round((0.65 * readiness.hrv_score) + (0.20 * readiness.rhr_score) + (0.10 * (readiness.sleep_score_used || 75))) : '—'}</span>
+                      <button class="btn-recalc" on:click={recalculateScores} title="Force recalculate">
+                        <span class="material-symbols-rounded" style="font-size:16px">refresh</span>
+                      </button>
+                    </div>
+                  {/if}
                 {/if}
               </div>
             {/if}
@@ -2259,6 +2265,29 @@
     border-radius: var(--radius-sm, 6px);
     line-height: 1.4;
   }
+  .score-debug-info {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-3);
+    margin-top: 8px;
+    padding: 6px 10px;
+    background: var(--surface-2);
+    border-radius: var(--radius-sm, 6px);
+  }
+  .btn-recalc {
+    margin-left: auto;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm, 6px);
+    cursor: pointer;
+    color: var(--text-3);
+    padding: 2px 6px;
+    display: flex;
+    align-items: center;
+  }
+  .btn-recalc:hover { color: var(--accent); border-color: var(--accent); }
   .si-range-chips {
     display: flex;
     gap: 6px;

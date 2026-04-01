@@ -416,6 +416,37 @@ router.post('/sync', wrap(async (req, res) => {
   res.json({ ok: true, from, to, ...results });
 }));
 
+// ── POST /recalculate — force recalculate readiness/stress scores ────────────
+// Used during formula tuning — overwrites stored scores with new constants.
+// Body: { all: true } to wipe and recalculate all dates, or just today by default.
+router.post('/recalculate', wrap(async (req, res) => {
+  const u = uid(req);
+  const { snapshotScores } = await import('../lib/wellness-scores.js');
+
+  if (req.body.all) {
+    // Wipe all stored readiness/stress scores and recalculate each date
+    db.prepare(`DELETE FROM wellness_data WHERE user_id = ? AND source = 'fitbit' AND metric_type IN ('readiness_score', 'stress_score')`).run(u);
+    const dates = db.prepare(
+      `SELECT DISTINCT date FROM wellness_data WHERE user_id = ? AND source = 'fitbit' AND metric_type = 'hrv_daily_rmssd' ORDER BY date`
+    ).all(u).map(r => r.date);
+    let count = 0;
+    for (const d of dates) {
+      snapshotScores(u, d, { force: true });
+      count++;
+    }
+    res.json({ ok: true, recalculated: count });
+  } else {
+    const today = new Date().toISOString().slice(0, 10);
+    snapshotScores(u, today, { force: true });
+    const scores = db.prepare(
+      `SELECT metric_type, value FROM wellness_data WHERE user_id = ? AND date = ? AND source = 'fitbit' AND metric_type IN ('readiness_score', 'stress_score')`
+    ).all(u, today);
+    const result = {};
+    for (const s of scores) result[s.metric_type] = s.value;
+    res.json({ ok: true, date: today, ...result });
+  }
+}));
+
 // ── GET /data — return stored wellness data ───────────────────────────────────
 router.get('/data', wrap((req, res) => {
   const u = uid(req);
