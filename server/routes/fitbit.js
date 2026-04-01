@@ -328,13 +328,13 @@ async function _syncDate(u, dateStr) {
     const spo2 = metrics.spo2_avg;
     const hrv  = metrics.hrv_daily_rmssd;
     const eff  = metrics.sleep_efficiency ?? null;
-    const durPts     = Math.min(30, (dur / 455) * 30);
+    const durPts     = Math.min(30, (dur / 470) * 30);
     const deepRemPct = dur > 0 ? (deep + rem) / dur : 0;
     const qualPts    = Math.min(40, deepRemPct / 0.25 * 40);
     const qualBonus  = Math.min(8, Math.max(0, (deepRemPct - 0.35) / 0.15 * 8));
     const spo2Pts    = spo2 != null ? Math.min(15, Math.max(0, (spo2 - 90) / 5 * 15)) : 11;
     const hrvPts     = hrv  != null ? Math.min(15, Math.max(0, (hrv  -  5) / 45 * 15)) : 10;
-    const effPts     = eff  != null ? Math.min(3, Math.max(0, (eff - 85) * 0.25)) : 0;
+    const effPts     = eff  != null ? Math.min(1.5, Math.max(0, (eff - 85) * 0.15)) : 0;
     metrics.sleep_score = Math.min(100, Math.round(durPts + qualPts + qualBonus + spo2Pts + hrvPts + effPts));
     logger.debug(`[fitbit] sleep_score ${dateStr}: dur=${dur}m deep=${deep}m rem=${rem}m spo2=${spo2} hrv=${hrv} eff=${eff} → ${durPts.toFixed(1)}+${qualPts.toFixed(1)}+${qualBonus.toFixed(1)}+${spo2Pts.toFixed(1)}+${hrvPts.toFixed(1)}+${effPts.toFixed(1)}=${metrics.sleep_score}`);
   }
