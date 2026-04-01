@@ -2951,6 +2951,9 @@
 
   /* Settings search bar */
   .settings-search-bar {
+    position: sticky;
+    top: var(--page-top, 0px);
+    z-index: 20;
     display: flex;
     align-items: center;
     gap: 8px;
