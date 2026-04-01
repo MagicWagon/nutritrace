@@ -48,3 +48,38 @@ See `.env.example` for full list. Key ones:
 ## Password Requirements
 
 8+ characters with uppercase, lowercase, number, and special character. Validated server-side in `server/routes/auth.js` and client-side in Wizard + Profile.
+
+## Android App (Capacitor 8)
+
+### Architecture
+The Android app is a Capacitor 8 shell wrapping the same Svelte PWA. It runs offline-first with a local SQLite database, and can optionally connect to a NutriTrace server for sync.
+
+- **Platform layer** (`src/lib/platform.js`): `isNative` detects Capacitor environment; `apiUrl()` returns empty string (local mode) or server URL (connected mode); `getServerUrl()` and `getNativeMode()` read from Capacitor Preferences.
+- **Native API** (`src/lib/api-native.js`): `NtApiNative` class provides the same CRUD interface as the server API but backed by local SQLite. Used when `isNative && mode === 'local'`.
+- **Native DB** (`src/lib/db-native.js`): SQLite schema and queries via `@capacitor-community/sqlite`. Mirrors server tables (foods, meals, diary, user_settings).
+- **NativeSetup wizard**: shown on first launch. Offers "Use Locally" (pure offline) or "Connect to Server" (enter URL, authenticate, merge dialog for existing local data).
+- **Merge on connect**: when connecting to a server with existing local data, a dialog lets the user push local foods/meals/diary to the server and choose which settings win (local or server).
+- **Barcode scanning**: `@capacitor-mlkit/barcode-scanning` with Google Code Scanner fallback. Replaces the web QuaggaJS scanner on native.
+- **Camera**: `@capacitor/camera` for food photos, meal photos, and avatar. Falls back to file input on web.
+- **HTTP**: `CapacitorHttp.get()` for OFF/USDA API calls — bypasses CORS restrictions that block `fetch()` inside the WebView.
+- **API routing**: every `fetch('/api/...')` call in the codebase uses `apiUrl()` to prefix the server URL when in connected mode. In local mode, these calls go to `NtApiNative` instead.
+- **Service worker**: disabled when running inside Capacitor (`src/registerSW.js` checks `isNative`) to prevent the offline.html redirect from intercepting WebView navigation.
+- **Hidden settings**: features that require a server (User Management, Email/SMTP, Food Sharing, persistent sidebar, flashlight toggle, Full Backup) are hidden when running in native local mode.
+
+### Build & Run
+```bash
+# Prerequisites (env vars in ~/.bashrc):
+#   JAVA_HOME, ANDROID_HOME, CAPACITOR_ANDROID_STUDIO_PATH
+
+# Build the Svelte app for production
+npm run android          # or: npm run build
+
+# Sync web assets + plugins to the Android project
+npx cap sync android
+
+# Run on a connected device or emulator
+npx cap run android --target <device-id>
+
+# Open in Android Studio (for signing, debugging, etc.)
+npx cap open android
+```

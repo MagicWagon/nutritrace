@@ -49,6 +49,27 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
 
 ---
 
+## Android App (Capacitor)
+
+### ~~Phase 1 — Native shell + offline mode~~ *(done)*
+- ~~Capacitor 8 wrapping Svelte PWA~~
+- ~~Local SQLite via @capacitor-community/sqlite~~
+- ~~NativeSetup wizard (Use Locally / Connect to Server)~~
+- ~~Native barcode scanner (@capacitor-mlkit/barcode-scanning)~~
+- ~~Native camera for food/meal/avatar photos~~
+- ~~CapacitorHttp for OFF/USDA search (CORS bypass)~~
+- ~~Platform detection (isNative, apiUrl, getServerUrl, getNativeMode)~~
+- ~~Server connection with merge dialog~~
+- ~~Service worker disabled in Capacitor~~
+- ~~App icon at all mipmap densities~~
+
+### Phase 2 — Sync & platform integrations
+- **Differential sync** — only push/pull changed records since last sync (timestamp-based), instead of full merge on every connect
+- **Health Connect integration** — read steps, sleep, HR, body comp directly from Android Health Connect API via Capacitor plugin; unifies all Android wearable data
+- **Background sync** — periodic background task (via @capacitor/background-runner or WorkManager bridge) to sync diary/foods/wellness with server when connected
+
+---
+
 ## ~~Shared Food Database~~ *(done — Food Sharing, experimental)*
 - ~~Visibility: private / group / specific users~~
 - ~~Copy-on-use model for shared items~~
