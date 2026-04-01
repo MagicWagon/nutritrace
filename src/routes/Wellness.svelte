@@ -1767,7 +1767,7 @@
   /* Date sub-bar — same pattern as Diary */
   .wl-date-bar {
     position: sticky;
-    top: calc(var(--page-top, var(--safe-top)) + 62px);
+    top: calc(var(--page-top, var(--safe-top)) + 46px);
     z-index: 9;
     background: var(--glass-surface);
     backdrop-filter: blur(20px) saturate(180%);
@@ -1779,7 +1779,7 @@
     padding: 8px var(--page-px);
   }
   .wl-date-bar.has-banner {
-    top: calc(var(--page-top, var(--safe-top)) + 102px);
+    top: calc(var(--page-top, var(--safe-top)) + 86px);
   }
   .date-btn {
     flex: 1;
