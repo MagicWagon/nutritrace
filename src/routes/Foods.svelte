@@ -537,12 +537,12 @@
     {/if}
   </header>
 
-  <!-- Tabs -->
+  <!-- Tabs + Search (sticky below header) -->
+  <div class="foods-sticky-bar">
   <div class="foods-tabs">
     <Tabs tabs={TABS} bind:active={activeTab} />
   </div>
 
-  <!-- Search -->
   <div class="foods-search">
     <div class="search-input-wrap">
       <span class="material-symbols-rounded icon-search">search</span>
@@ -556,6 +556,7 @@
         <span class="material-symbols-rounded">barcode_scanner</span>
       </button>
     </div>
+  </div>
   </div>
 
   <!-- Source chips (Foods tab only) -->
@@ -846,6 +847,18 @@
 />
 
 <style>
+  .foods-sticky-bar {
+    position: sticky;
+    top: calc(var(--page-top, var(--safe-top)) + 46px);
+    z-index: 20;
+    background: var(--glass-surface);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border-bottom: 1px solid var(--border);
+  }
+  :global(.page-header.has-banner) ~ .foods-sticky-bar {
+    top: calc(var(--page-top, var(--safe-top)) + 86px);
+  }
   .foods-tabs { padding: 12px var(--page-px) 12px; }
   .foods-search { padding: 0 var(--page-px) 12px; }
   .foods-search .search-input-wrap { gap: 8px; }
