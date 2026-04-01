@@ -1,11 +1,13 @@
 <script>
   import { setNativeMode, setServerUrl } from '../lib/platform.js';
   import { showError, showSuccess } from '../stores/toast.js';
+  import { DB } from '../lib/db.js';
 
   let step = 'choose'; // 'choose' | 'server-form' | 'connecting'
   let serverUrl = '';
   let username = '';
   let password = '';
+  let showPw = false;
   let connecting = false;
 
   async function chooseLocal() {
@@ -40,11 +42,11 @@
       const loginData = typeof loginRes.data === 'string' ? JSON.parse(loginRes.data) : loginRes.data;
       if (loginRes.status < 200 || loginRes.status >= 300) throw new Error(loginData.error || 'Login failed');
 
-      // Success — save the server URL and mode
+      // Success — save the server URL and mode, skip wizard (server is already configured)
       setServerUrl(url);
       setNativeMode('server');
+      DB.setSetting('setupComplete', true);
       showSuccess('Connected to server');
-      // Reload to re-initialize with server mode
       window.location.reload();
     } catch (e) {
       showError(e.message || 'Could not connect to server');
@@ -117,12 +119,16 @@
         </div>
         <div class="form-group">
           <label class="form-label">Password</label>
-          <input
-            class="input"
-            type="password"
-            placeholder="Your password"
-            bind:value={password}
-          />
+          <div style="position:relative">
+            {#if showPw}
+              <input class="input" type="text" placeholder="Your password" bind:value={password} style="padding-right:40px" />
+            {:else}
+              <input class="input" type="password" placeholder="Your password" bind:value={password} style="padding-right:40px" />
+            {/if}
+            <button type="button" class="pw-toggle" on:click={() => showPw = !showPw}>
+              <span class="material-symbols-rounded" style="font-size:20px">{showPw ? 'visibility_off' : 'visibility'}</span>
+            </button>
+          </div>
         </div>
 
         <div class="setup-form-actions">
@@ -229,5 +235,9 @@
   }
   .setup-form-actions .btn {
     flex: 1;
+  }
+  .pw-toggle {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; cursor: pointer; color: var(--text-3); padding: 4px;
   }
 </style>

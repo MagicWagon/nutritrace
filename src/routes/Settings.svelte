@@ -45,6 +45,7 @@
   let serverUrlInput = getServerUrl() || '';
   let serverUsername = '';
   let serverPassword = '';
+  let serverShowPw = false;
   let serverConnecting = false;
   let serverMode = getNativeMode(); // 'local' | 'server'
   // True when running as a standalone phone app (hide multi-user / server features)
@@ -185,6 +186,7 @@
   function _finalizeConnect() {
     setServerUrl(_pendingServerUrl);
     setNativeMode('server');
+    DB.setSetting('setupComplete', true);
     serverMode = 'server';
     mergeStep = null;
     showSuccess('Connected to server');
@@ -2672,7 +2674,16 @@
               </div>
               <div class="form-group" style="margin:0">
                 <label class="form-label">Password</label>
-                <input class="input" type="password" placeholder="Your password" bind:value={serverPassword} />
+                <div style="position:relative">
+                  {#if serverShowPw}
+                    <input class="input" type="text" placeholder="Your password" bind:value={serverPassword} style="padding-right:40px" />
+                  {:else}
+                    <input class="input" type="password" placeholder="Your password" bind:value={serverPassword} style="padding-right:40px" />
+                  {/if}
+                  <button type="button" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-3);padding:4px" on:click={() => serverShowPw = !serverShowPw}>
+                    <span class="material-symbols-rounded" style="font-size:20px">{serverShowPw ? 'visibility_off' : 'visibility'}</span>
+                  </button>
+                </div>
               </div>
               <button class="btn btn-primary w-full" on:click={connectServer} disabled={serverConnecting}>
                 {serverConnecting ? 'Connecting…' : 'Connect to Server'}
