@@ -34,26 +34,40 @@ const SERVER_SETTINGS = new Set([
 
 import { isNative, getServerUrl } from '../lib/platform.js';
 
-function _apiUrl(path) {
-  if (isNative) { const url = getServerUrl(); if (url) return url + path; }
-  return path;
+let _capHttp = null;
+async function _getCapHttp() {
+  if (!_capHttp) { const { CapacitorHttp } = await import('@capacitor/core'); _capHttp = CapacitorHttp; }
+  return _capHttp;
 }
+
+function _nativeServerMode() { return isNative && !!getServerUrl(); }
 
 const _saveQueue = {};
 function _isLoggedIn() { return !!localStorage.getItem('wl:userId'); }
-// In native standalone mode, settings only save to localStorage — no server sync
 function _shouldSyncToServer() { return _isLoggedIn() && !(isNative && !getServerUrl()); }
 export function scheduleSave(key, value) {
   if (!SERVER_SETTINGS.has(key)) return;
   clearTimeout(_saveQueue[key]);
-  _saveQueue[key] = setTimeout(() => {
+  _saveQueue[key] = setTimeout(async () => {
     if (!_shouldSyncToServer()) return;
-    fetch(_apiUrl('/api/settings'), {
-      method: 'PUT',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key, value }),
-    }).catch(() => {});
+    try {
+      if (_nativeServerMode()) {
+        const CH = await _getCapHttp();
+        await CH.request({
+          method: 'PUT',
+          url: getServerUrl() + '/api/settings',
+          headers: { 'Content-Type': 'application/json' },
+          data: { key, value },
+        });
+      } else {
+        await fetch('/api/settings', {
+          method: 'PUT',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key, value }),
+        });
+      }
+    } catch {}
   }, 600);
 }
 
@@ -64,9 +78,17 @@ export function scheduleSave(key, value) {
 export async function loadServerSettings() {
   if (!_shouldSyncToServer()) return;
   try {
-    const res = await fetch(_apiUrl('/api/settings'), { credentials: 'include' });
-    if (!res.ok) return;
-    const serverSettings = await res.json();
+    let serverSettings;
+    if (_nativeServerMode()) {
+      const CH = await _getCapHttp();
+      const resp = await CH.get({ url: getServerUrl() + '/api/settings' });
+      serverSettings = typeof resp.data === 'string' ? JSON.parse(resp.data) : resp.data;
+      if (resp.status < 200 || resp.status >= 300) return;
+    } else {
+      const res = await fetch('/api/settings', { credentials: 'include' });
+      if (!res.ok) return;
+      serverSettings = await res.json();
+    }
     for (const [key, value] of Object.entries(serverSettings)) {
       // Use raw key for localStorage (DB.setSetting prefixes with wl_)
       DB.setSetting(key, value);
