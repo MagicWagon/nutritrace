@@ -9,7 +9,7 @@
 import { Router } from 'express';
 import { createHmac, randomBytes } from 'crypto';
 import db from '../db.js';
-import { wrap } from '../logger.js';
+import { wrap, logger } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
 
 const router = Router();
@@ -390,6 +390,15 @@ async function _syncRange(u, fromDate, toDate) {
       }
     })();
   } catch (e) { errors.push('pulseox: ' + e.message); }
+
+  // Snapshot readiness + stress for today only (past days keep locked-in scores)
+  const todayDate = new Date().toISOString().slice(0, 10);
+  if (todayDate >= fromDate && todayDate <= toDate) {
+    try {
+      const { snapshotScores } = await import('../lib/wellness-scores.js');
+      snapshotScores(u, todayDate);
+    } catch (e) { logger.warn('[garmin] snapshot failed:', e.message); }
+  }
 
   return { synced, errors };
 }
