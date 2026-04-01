@@ -416,36 +416,6 @@ router.post('/sync', wrap(async (req, res) => {
   res.json({ ok: true, from, to, ...results });
 }));
 
-// ── POST /seed-scores — ONE-TIME: seed exact Fitbit scores for historical days ─
-// Call once, then remove this endpoint.
-router.post('/seed-scores', wrap((req, res) => {
-  const u = uid(req);
-  const scores = [
-    { date: '2026-03-25', sleep: 87, readiness: 65, stress: 82 },
-    { date: '2026-03-26', sleep: 88, readiness: 65, stress: 79 },
-    { date: '2026-03-27', sleep: 88, readiness: 53, stress: 81 },
-    { date: '2026-03-28', sleep: 75, readiness: 66, stress: 74 },
-    { date: '2026-03-29', sleep: 74, readiness: 66, stress: 73 },
-    { date: '2026-03-30', sleep: 82, readiness: 55, stress: 77 },
-    { date: '2026-03-31', sleep: 83, readiness: 56, stress: 76 },
-    { date: '2026-04-01', sleep: 89, readiness: 56, stress: 80 },
-  ];
-  const upsert = db.prepare(`
-    INSERT INTO wellness_data (user_id, date, source, metric_type, value, synced_at)
-    VALUES (?, ?, 'fitbit', ?, ?, datetime('now'))
-    ON CONFLICT(user_id, date, source, metric_type) DO UPDATE SET
-      value = excluded.value, synced_at = excluded.synced_at
-  `);
-  db.transaction(() => {
-    for (const s of scores) {
-      upsert.run(u, s.date, 'sleep_score', s.sleep);
-      upsert.run(u, s.date, 'readiness_score', s.readiness);
-      upsert.run(u, s.date, 'stress_score', s.stress);
-    }
-  })();
-  res.json({ ok: true, seeded: scores.length });
-}));
-
 // ── POST /recalculate — force recalculate readiness/stress scores ────────────
 // Used during formula tuning — overwrites stored scores with new constants.
 // Body: { all: true } to wipe and recalculate all dates, or just today by default.
