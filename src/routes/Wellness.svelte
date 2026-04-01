@@ -548,26 +548,13 @@
       ? (history[history.length - 1].calories_out ?? null)
       : null;
 
-    // For past days, prefer server-stored snapshot (won't drift with baseline changes).
-    // Today always calculates live so the score updates as new data arrives.
-    const isToday = dateStr === localDateStr();
-    if (!isToday && displayData.readiness_score != null) {
-      const s = Math.round(displayData.readiness_score);
-      readiness = {
-        score: s,
-        label: s >= 80 ? 'Optimal' : s >= 65 ? 'Good' : s >= 50 ? 'Fair' : s >= 35 ? 'Low' : 'Poor',
-        color: s >= 65 ? 'var(--accent)' : s >= 50 ? '#f59e0b' : '#ef4444',
-        stored: true,
-      };
-    } else {
-      readiness = _calcReadiness(
-        displayData.hrv_daily_rmssd,
-        displayData.resting_hr,
-        displayData.sleep_score,
-        yesterdayCalories,
-        history
-      );
-    }
+    readiness = _calcReadiness(
+      displayData.hrv_daily_rmssd,
+      displayData.resting_hr,
+      displayData.sleep_score,
+      yesterdayCalories,
+      history
+    );
   }
 
   $: { activeTab; if (activeTab === 'heart') _readinessLoaded = false; }
@@ -675,24 +662,12 @@
       };
     });
 
-    // For past days, prefer server-stored snapshot. Today calculates live.
-    const isStressToday = dateStr === localDateStr();
-    if (!isStressToday && displayData.stress_score != null) {
-      const s = Math.round(displayData.stress_score);
-      stressScore = {
-        score: s,
-        label: s >= 80 ? 'Excellent' : s >= 60 ? 'Good' : s >= 40 ? 'Fair' : 'Low',
-        color: s >= 60 ? 'var(--accent)' : s >= 40 ? '#f59e0b' : '#ef4444',
-        stored: true,
-      };
-    } else {
-      stressScore = _calcStressScore(
-        displayData.hrv_daily_rmssd,
-        displayData.resting_hr,
-        displayData.sleep_score,
-        history
-      );
-    }
+    stressScore = _calcStressScore(
+      displayData.hrv_daily_rmssd,
+      displayData.resting_hr,
+      displayData.sleep_score,
+      history
+    );
   }
 
   $: { activeTab; if (activeTab === 'heart') _stressLoaded = false; }
@@ -1434,11 +1409,9 @@
                       <span class="material-symbols-rounded si-icon">battery_charging_full</span>
                       <div class="si-title-wrap">
                         <span class="si-title">Daily Readiness</span>
-                        {#if !readiness.stored}
-                          <span class="si-sub">
-                            HRV baseline {readiness.hrv_baseline} ms{readiness.rhr_baseline != null ? ` · RHR baseline ${readiness.rhr_baseline} bpm` : ''} · {readiness.data_days} days
-                          </span>
-                        {/if}
+                        <span class="si-sub">
+                          HRV baseline {readiness.hrv_baseline} ms{readiness.rhr_baseline != null ? ` · RHR baseline ${readiness.rhr_baseline} bpm` : ''} · {readiness.data_days} days
+                        </span>
                       </div>
                     </div>
                     <div class="readiness-score-wrap">
@@ -1446,7 +1419,6 @@
                       <span class="readiness-label" style="color:{readiness.color}">{readiness.label}</span>
                     </div>
                   </div>
-                  {#if !readiness.stored}
                   <div class="readiness-drivers">
                     <div class="readiness-driver">
                       <span class="rd-label">HRV</span>
@@ -1467,8 +1439,7 @@
                       </span>
                     </div>
                   </div>
-                  {/if}
-                  {#if !readiness.stored && readiness.data_days < 30}
+                  {#if readiness.data_days < 30}
                     <div class="si-calibration-note">
                       <span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">info</span>
                       Based on {readiness.data_days} of 30 days — accuracy improves as more data is collected.
@@ -1496,11 +1467,9 @@
                       <span class="material-symbols-rounded si-icon">self_improvement</span>
                       <div class="si-title-wrap">
                         <span class="si-title">Stress Management</span>
-                        {#if !stressScore.stored}
-                          <span class="si-sub">
-                            HRV baseline {stressScore.hrv_baseline} ms{stressScore.rhr_baseline != null ? ` · RHR baseline ${stressScore.rhr_baseline} bpm` : ''} · {stressScore.data_days} days
-                          </span>
-                        {/if}
+                        <span class="si-sub">
+                          HRV baseline {stressScore.hrv_baseline} ms{stressScore.rhr_baseline != null ? ` · RHR baseline ${stressScore.rhr_baseline} bpm` : ''} · {stressScore.data_days} days
+                        </span>
                       </div>
                     </div>
                     <div class="readiness-score-wrap">
@@ -1509,7 +1478,7 @@
                     </div>
                   </div>
                   <p class="si-desc" style="margin-top:6px;margin-bottom:0">Higher = nervous system is well balanced. Driven by HRV, sleep quality, and resting HR compared to your personal baselines. Moves gradually — reflects multi-day trends, not just today.</p>
-                  {#if !stressScore.stored && stressScore.data_days < 30}
+                  {#if stressScore.data_days < 30}
                     <div class="si-calibration-note">
                       <span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">info</span>
                       Based on {stressScore.data_days} of 30 days — accuracy improves as more data is collected.

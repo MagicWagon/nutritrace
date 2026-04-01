@@ -354,9 +354,6 @@ async function _syncDate(u, dateStr) {
 
   logger.debug(`[fitbit] ${dateStr} readiness inputs: hrv=${metrics.hrv_daily_rmssd} rhr=${metrics.resting_hr} sleep=${metrics.sleep_score} cal=${metrics.calories_out} sleep_eff=${metrics.sleep_efficiency}`);
 
-  // Snapshot readiness + stress scores at sync time so they don't drift
-  _snapshotScores(u, dateStr);
-
   if (errors.length) logger.warn(`[fitbit] sync errors for ${dateStr}:`, errors);
   return { metrics, errors };
 }
