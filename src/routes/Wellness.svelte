@@ -548,13 +548,24 @@
       ? (history[history.length - 1].calories_out ?? null)
       : null;
 
-    readiness = _calcReadiness(
-      displayData.hrv_daily_rmssd,
-      displayData.resting_hr,
-      displayData.sleep_score,
-      yesterdayCalories,
-      history
-    );
+    // Prefer server-stored snapshot score (won't drift with baseline changes)
+    if (displayData.readiness_score != null) {
+      const s = Math.round(displayData.readiness_score);
+      readiness = {
+        score: s,
+        label: s >= 80 ? 'Optimal' : s >= 65 ? 'Good' : s >= 50 ? 'Fair' : s >= 35 ? 'Low' : 'Poor',
+        color: s >= 65 ? 'var(--accent)' : s >= 50 ? '#f59e0b' : '#ef4444',
+        stored: true,
+      };
+    } else {
+      readiness = _calcReadiness(
+        displayData.hrv_daily_rmssd,
+        displayData.resting_hr,
+        displayData.sleep_score,
+        yesterdayCalories,
+        history
+      );
+    }
   }
 
   $: { activeTab; if (activeTab === 'heart') _readinessLoaded = false; }
@@ -662,12 +673,23 @@
       };
     });
 
-    stressScore = _calcStressScore(
-      displayData.hrv_daily_rmssd,
-      displayData.resting_hr,
-      displayData.sleep_score,
-      history
-    );
+    // Prefer server-stored snapshot score
+    if (displayData.stress_score != null) {
+      const s = Math.round(displayData.stress_score);
+      stressScore = {
+        score: s,
+        label: s >= 80 ? 'Excellent' : s >= 60 ? 'Good' : s >= 40 ? 'Fair' : 'Low',
+        color: s >= 60 ? 'var(--accent)' : s >= 40 ? '#f59e0b' : '#ef4444',
+        stored: true,
+      };
+    } else {
+      stressScore = _calcStressScore(
+        displayData.hrv_daily_rmssd,
+        displayData.resting_hr,
+        displayData.sleep_score,
+        history
+      );
+    }
   }
 
   $: { activeTab; if (activeTab === 'heart') _stressLoaded = false; }
