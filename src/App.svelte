@@ -1,6 +1,6 @@
 <script>
   import { onMount }   from 'svelte';
-  import { fade } from 'svelte/transition';
+  import { fade, slide } from 'svelte/transition';
   import Router, { location } from 'svelte-spa-router';
 
   import BottomNav from './components/layout/BottomNav.svelte';
@@ -9,7 +9,20 @@
   import { DB }    from './lib/db.js';
   import { navStyle, applyAccentColor, accentColor, applyAppearance, appearance, disableAnimations, sidebarPersistent } from './stores/settings.js';
   import { currentUser, userMgmtActive, loadAuthState } from './stores/auth.js';
-  import { needsNativeSetup, isNative, getNativeMode } from './lib/platform.js';
+  import { needsNativeSetup, isNative, getNativeMode, getServerUrl } from './lib/platform.js';
+  import { writable } from 'svelte/store';
+
+  // Sync state — imported dynamically only in native server mode
+  let syncState = writable({ syncing: false, lastSync: null, error: null, online: true });
+  $: _showSyncBar = isNative && getNativeMode() === 'server';
+  let _syncJustFinished = false;
+  let _syncHideTimer = null;
+  // Auto-show "Synced" for 3 seconds after sync completes, then hide
+  $: if (!$syncState.syncing && $syncState.lastSync && _showSyncBar) {
+    _syncJustFinished = true;
+    clearTimeout(_syncHideTimer);
+    _syncHideTimer = setTimeout(() => { _syncJustFinished = false; }, 3000);
+  }
   import NativeSetup from './routes/NativeSetup.svelte';
 
   // Show native setup wizard before anything else on first Android launch
@@ -136,11 +149,12 @@
 
     // Start sync engine in native server-connected mode
     if (isNative && getNativeMode() === 'server') {
-      import('./lib/sync.js').then(({ fullSync }) => {
-        fullSync(); // Initial sync on app startup
+      import('./lib/sync.js').then((mod) => {
+        syncState = mod.syncState; // Bind the real reactive store
+        mod.fullSync(); // Initial sync on app startup
         // Sync on app resume (coming back from background)
         import('@capacitor/app').then(({ App }) => {
-          App.addListener('resume', () => fullSync());
+          App.addListener('resume', () => mod.fullSync());
         });
       });
     }
@@ -191,6 +205,26 @@
     </button>
     <div class="topbar-spacer"></div>
   </header>
+{/if}
+
+<!-- Sync status bar (native server mode only) -->
+{#if _showSyncBar && ($syncState.syncing || !$syncState.online || $syncState.error || _syncJustFinished)}
+  <div class="sync-bar" class:sync-bar-error={$syncState.error} class:sync-bar-offline={!$syncState.online} class:sync-bar-done={_syncJustFinished && !$syncState.syncing}
+    transition:slide={{ duration: 200 }}>
+    {#if $syncState.syncing}
+      <span class="material-symbols-rounded sync-bar-icon sync-spin">sync</span>
+      <span>Syncing…</span>
+    {:else if !$syncState.online}
+      <span class="material-symbols-rounded sync-bar-icon">cloud_off</span>
+      <span>Offline — changes saved locally</span>
+    {:else if $syncState.error}
+      <span class="material-symbols-rounded sync-bar-icon">error</span>
+      <span>Sync error</span>
+    {:else if _syncJustFinished}
+      <span class="material-symbols-rounded sync-bar-icon">cloud_done</span>
+      <span>Synced</span>
+    {/if}
+  </div>
 {/if}
 
 <!-- Page content -->
@@ -270,4 +304,33 @@
     left: var(--sidebar-w, 0px) !important;
     transition: left 0.25s ease !important;
   }
+
+  /* ── Sync status bar ── */
+  .sync-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 16px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--accent) 15%, transparent);
+    transition: background 0.3s, color 0.3s;
+    margin-left: var(--sidebar-w, 0px);
+  }
+  .sync-bar-offline {
+    color: var(--text-3);
+    background: color-mix(in srgb, var(--text-3) 8%, transparent);
+    border-color: color-mix(in srgb, var(--text-3) 15%, transparent);
+  }
+  .sync-bar-error {
+    color: var(--error, #f87171);
+    background: color-mix(in srgb, var(--error, #f87171) 8%, transparent);
+    border-color: color-mix(in srgb, var(--error, #f87171) 15%, transparent);
+  }
+  .sync-bar-icon { font-size: 16px; }
+  @keyframes sync-spin { to { transform: rotate(360deg); } }
+  .sync-spin { animation: sync-spin 1.2s linear infinite; }
 </style>
