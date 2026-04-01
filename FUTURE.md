@@ -65,8 +65,11 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
 
 ### Phase 2 — Sync & platform integrations
 - **Differential sync** — only push/pull changed records since last sync (timestamp-based), instead of full merge on every connect
+- **Offline cache in server mode** — mirror server data in local SQLite so the app works when server is down; sync diff when back online
 - **Health Connect integration** — read steps, sleep, HR, body comp directly from Android Health Connect API via Capacitor plugin; unifies all Android wearable data
 - **Background sync** — periodic background task (via @capacitor/background-runner or WorkManager bridge) to sync diary/foods/wellness with server when connected
+- **Local full backup (ZIP)** — create full backup on device (JSZip) including images, for phone-to-phone transfer without a server
+- **iOS app** — Capacitor already supports iOS; need HealthKit integration + App Store setup
 
 ---
 
@@ -169,12 +172,13 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
 - Optional Prometheus endpoint (`/api/metrics`): request count, DB query times, sync success/fail
 - Admin-only; opt-in via env var
 
-### Security hardening
-- Rate limiting on auth endpoints
-- CORS middleware with explicit allowed origins
+### ~~Security hardening~~ *(done — v0.27.0)*
+- ~~Rate limiting on auth endpoints (10/15min)~~
+- ~~CORS middleware with allowed origins + Authorization header~~
+- ~~Password complexity (8+ chars, uppercase/lowercase/number/special)~~
+- ~~JWT_SECRET startup warning~~
 - CSRF protection
-- Increase minimum password length (4 → 8+)
 
 ---
 
-*Last updated: 2026-03-31*
+*Last updated: 2026-04-01*
