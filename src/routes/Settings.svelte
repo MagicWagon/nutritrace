@@ -2,6 +2,7 @@
   import { onMount, tick } from 'svelte';
   import { get } from 'svelte/store';
   import { slide, fade } from 'svelte/transition';
+  import { portal } from '../lib/portal.js';
   import Toggle from '../components/settings/Toggle.svelte';
   import SettingsWellness from '../components/settings/SettingsWellness.svelte';
   import { APP_VERSION } from '../lib/version.js';
@@ -2761,7 +2762,7 @@
 
 <!-- Merge dialog (shown when connecting to server with existing local data) -->
 {#if mergeStep === 'ask-settings'}
-  <div class="merge-overlay" transition:fade={{ duration: 150 }}>
+  <div class="merge-overlay" use:portal transition:fade={{ duration: 150 }}>
     <div class="merge-dialog">
       <h3 style="margin:0 0 6px;font-size:18px;color:var(--text-1)">Sync Options</h3>
       <p style="font-size:13px;color:var(--text-3);margin:0 0 16px;line-height:1.5">
@@ -2794,7 +2795,7 @@
     </div>
   </div>
 {:else if mergeStep === 'syncing'}
-  <div class="merge-overlay" transition:fade={{ duration: 150 }}>
+  <div class="merge-overlay" use:portal transition:fade={{ duration: 150 }}>
     <div class="merge-dialog" style="text-align:center">
       <span class="material-symbols-rounded" style="font-size:36px;color:var(--accent);animation:spin 1.2s linear infinite">sync</span>
       <p style="font-size:15px;color:var(--text-1);margin:12px 0 4px;font-weight:600">Syncing…</p>
