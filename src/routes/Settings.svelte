@@ -212,12 +212,11 @@
     setTimeout(() => window.location.reload(), 600);
   }
 
-  async function logoutServer() {
-    const { logout } = await import('../stores/auth.js');
+  function logoutServer() {
     document.body.style.transition = 'opacity 0.3s';
     document.body.style.opacity = '0';
-    await logout();
-    setTimeout(() => window.location.reload(), 300);
+    import('../stores/auth.js').then(({ logout }) => logout());
+    setTimeout(() => window.location.reload(), 350);
   }
 
   function toggleSection(key) {
