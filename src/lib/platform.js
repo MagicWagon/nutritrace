@@ -119,10 +119,11 @@ export function resolveAssetUrl(path) {
   if (!path) return path;
   if (path.startsWith('data:') || path.startsWith('file:')) return path;
   if (isNative) {
+    // Check image cache by relative path first (works even when server URL is null/offline)
+    if (_imageMap[path]) return _imageMap[path];
     const url = getServerUrl();
-    // Build the full server URL for cache lookup
+    // Check by full URL
     const fullUrl = path.startsWith('http') ? path : (url ? url + path : path);
-    // Check local image cache first
     if (_imageMap[fullUrl]) return _imageMap[fullUrl];
     // Fall back to server URL
     if (url && !path.startsWith('http')) return url + path;

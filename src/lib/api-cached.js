@@ -71,10 +71,10 @@ export const NtApiCached = {
   async getFoods() {
     try {
       const serverFoods = await _serverFetch('GET', '/api/foods');
-      // Cache each food locally
-      for (const f of serverFoods) {
-        await dbUpsertFromServer('foods', f).catch(() => {});
-      }
+      // Return immediately, cache in background (don't block UI)
+      Promise.resolve().then(async () => {
+        for (const f of serverFoods) await dbUpsertFromServer('foods', f).catch(() => {});
+      });
       return serverFoods.map(_foodFromApi);
     } catch {
       // Offline — serve from cache
@@ -164,7 +164,7 @@ export const NtApiCached = {
   async getMeals() {
     try {
       const r = await _serverFetch('GET', '/api/meals');
-      for (const m of r) await dbUpsertFromServer('meals', m).catch(() => {});
+      Promise.resolve().then(async () => { for (const m of r) await dbUpsertFromServer('meals', m).catch(() => {}); });
       return r.map(_mealFromApi);
     } catch {
       return (await dbGetMeals(false)).map(_mealFromApi);
@@ -179,7 +179,7 @@ export const NtApiCached = {
   async getRecipes() {
     try {
       const r = await _serverFetch('GET', '/api/meals?recipes=1');
-      for (const m of r) await dbUpsertFromServer('meals', m).catch(() => {});
+      Promise.resolve().then(async () => { for (const m of r) await dbUpsertFromServer('meals', m).catch(() => {}); });
       return r.map(_mealFromApi);
     } catch {
       return (await dbGetMeals(true)).map(_mealFromApi);

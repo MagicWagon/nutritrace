@@ -101,44 +101,61 @@ export async function cacheAllImages(onProgress) {
   const db = await getDb();
   const imageMap = await _loadImageMap();
 
-  // Collect all unique image URLs from foods, meals, and diary items
-  const urls = new Set();
+  // Collect all unique image paths (relative like /uploads/photo.jpg)
+  // Store both the relative path AND the full URL as keys so lookups work in all modes
+  const urlPairs = []; // [{ relative, full }]
 
   const foods = await db.query(`SELECT img_url FROM foods WHERE img_url IS NOT NULL AND img_url != '' AND deleted_at IS NULL`, []);
   for (const row of (foods?.values || [])) {
-    if (row.img_url) urls.add(row.img_url.startsWith('http') ? row.img_url : serverUrl + row.img_url);
+    if (row.img_url) {
+      const rel = row.img_url.startsWith('http') ? new URL(row.img_url).pathname : row.img_url;
+      const full = row.img_url.startsWith('http') ? row.img_url : serverUrl + row.img_url;
+      urlPairs.push({ relative: rel, full });
+    }
   }
 
   const meals = await db.query(`SELECT img_url FROM meals WHERE img_url IS NOT NULL AND img_url != '' AND deleted_at IS NULL`, []);
   for (const row of (meals?.values || [])) {
-    if (row.img_url) urls.add(row.img_url.startsWith('http') ? row.img_url : serverUrl + row.img_url);
+    if (row.img_url) {
+      const rel = row.img_url.startsWith('http') ? new URL(row.img_url).pathname : row.img_url;
+      const full = row.img_url.startsWith('http') ? row.img_url : serverUrl + row.img_url;
+      urlPairs.push({ relative: rel, full });
+    }
   }
 
-  // Diary items have imgUrl embedded in JSON
   const diary = await db.query(`SELECT items FROM diary WHERE deleted_at IS NULL`, []);
   for (const row of (diary?.values || [])) {
     try {
       const items = typeof row.items === 'string' ? JSON.parse(row.items) : (row.items || []);
       for (const item of items) {
         if (item.imgUrl) {
-          urls.add(item.imgUrl.startsWith('http') ? item.imgUrl : serverUrl + item.imgUrl);
+          const rel = item.imgUrl.startsWith('http') ? new URL(item.imgUrl).pathname : item.imgUrl;
+          const full = item.imgUrl.startsWith('http') ? item.imgUrl : serverUrl + item.imgUrl;
+          urlPairs.push({ relative: rel, full });
         }
       }
     } catch {}
   }
 
-  // Filter out already-cached URLs
-  const toDownload = [...urls].filter(u => !imageMap[u]);
+  // Deduplicate and filter out already-cached
+  const seen = new Set();
+  const toDownload = urlPairs.filter(p => {
+    if (seen.has(p.full)) return false;
+    seen.add(p.full);
+    return !imageMap[p.relative] && !imageMap[p.full];
+  });
   const total = toDownload.length;
   let downloaded = 0;
   let failed = 0;
 
   if (onProgress) onProgress(0, total);
 
-  for (const url of toDownload) {
-    const localUri = await _downloadImage(url);
+  for (const pair of toDownload) {
+    const localUri = await _downloadImage(pair.full);
     if (localUri) {
-      imageMap[url] = localUri;
+      // Store both relative and full URL as keys so lookup works in any mode
+      imageMap[pair.relative] = localUri;
+      imageMap[pair.full] = localUri;
       downloaded++;
     } else {
       failed++;
