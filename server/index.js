@@ -39,15 +39,21 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 app.use(express.json({ limit: '50mb' }));
 app.use(cookieParser());
 
-// CORS — allow cross-origin requests (needed for Android app + reverse proxies)
+// CORS — allow cross-origin requests from Android app (https://localhost) and same-origin
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (origin) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    if (req.method === 'OPTIONS') return res.sendStatus(204);
+    // Allow Capacitor WebView (https://localhost) and same-host origins
+    const host = req.headers.host;
+    const isCapacitor = origin === 'https://localhost' || origin === 'http://localhost';
+    const isSameHost = host && origin.includes(host);
+    if (isCapacitor || isSameHost) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      if (req.method === 'OPTIONS') return res.sendStatus(204);
+    }
   }
   next();
 });
