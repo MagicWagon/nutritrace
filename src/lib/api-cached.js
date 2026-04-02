@@ -1,18 +1,18 @@
 /**
- * api-cached.js — Cached API layer for native server-connected mode.
+ * api-cached.js — LOCAL-FIRST API layer for native server-connected mode.
  *
- * Wraps _NtApiHttp: on success caches to local SQLite, on failure serves from cache.
- * Writes go to local SQLite immediately (with sync_status='pending') AND to server.
- * If server write fails (offline), the sync engine pushes later.
+ * ALL reads come from local SQLite (instant, works offline).
+ * ALL writes go to local SQLite first (with sync_status='pending'),
+ * then attempt server write. If server fails, sync engine pushes later.
  *
- * Provides the same interface as NtApi / NtApiNative.
+ * The sync engine (sync.js) handles background data synchronization.
+ * This module never blocks on server calls for reads.
  */
 
 import {
   dbGetFoods, dbGetFood, dbCreateFood, dbUpdateFood, dbDeleteFood, dbCopyFood,
   dbGetMeals, dbGetMeal, dbCreateMeal, dbUpdateMeal, dbDeleteMeal, dbCopyMeal,
   dbGetDiaryDate, dbSaveDiaryDate, dbGetAllDiary,
-  dbUpsertFromServer, dbUpsertDiaryFromServer,
 } from './db-native.js';
 import { getServerUrl, getAuthToken, resolveAssetUrl } from './platform.js';
 import { schedulePush } from './sync.js';
@@ -40,7 +40,7 @@ async function _serverFetch(method, path, body) {
   return res.json();
 }
 
-// Field mapping helpers (same as NtApiHttp)
+// Field mapping helpers
 function _foodFromApi(row) {
   if (!row) return null;
   const { img_url, category, ...rest } = row;
@@ -65,77 +65,52 @@ function _mealToApi(meal) {
 
 export const NtApiCached = {
 
-  // ── Foods ─────────────────────────────────────────────────────────────
+  // ── Foods — always local-first ────────────────────────────────────────
 
   async getFoods() {
-    try {
-      const r = await _serverFetch('GET', '/api/foods');
-      Promise.resolve().then(async () => { for (const f of r) await dbUpsertFromServer('foods', f).catch(() => {}); });
-      return r.map(_foodFromApi);
-    } catch {
-      return (await dbGetFoods().catch(() => [])).map(_foodFromApi);
-    }
+    return (await dbGetFoods().catch(() => [])).map(_foodFromApi);
   },
 
   async getGroupFoods() {
+    // Group foods (shared by other users) — must come from server
     try {
-      const r = await _serverFetch('GET', '/api/foods?group=1');
-      return r.map(_foodFromApi);
+      return (await _serverFetch('GET', '/api/foods?group=1')).map(_foodFromApi);
     } catch {
-      return this.getFoods();
+      return [];
     }
   },
 
   async getFood(id) {
-    try {
-      const r = await _serverFetch('GET', `/api/foods/${id}`);
-      return _foodFromApi(r);
-    } catch {
-      const local = await dbGetFood(id);
-      return _foodFromApi(local);
-    }
+    const local = await dbGetFood(id).catch(() => null);
+    return _foodFromApi(local);
   },
 
   async createFood(data) {
-    // Write locally first
     const local = await dbCreateFood(_foodToApi(data));
-    // Try server
-    try {
-      const server = await _serverFetch('POST', '/api/foods', _foodToApi(data));
+    // Try server in background
+    _serverFetch('POST', '/api/foods', _foodToApi(data)).then(async server => {
       if (server?.id && local?.id) {
         const { dbSetServerId, dbMarkSynced } = await import('./db-native.js');
         await dbSetServerId('foods', local.id, server.id);
         await dbMarkSynced('foods', [local.id]);
       }
-      return _foodFromApi(server);
-    } catch {
-      schedulePush();
-      return _foodFromApi(local);
-    }
+    }).catch(() => schedulePush());
+    return _foodFromApi(local);
   },
 
   async updateFood(id, data) {
     const local = await dbUpdateFood(id, _foodToApi(data));
-    try {
-      // Use server_id if available
-      const serverId = local?.server_id || id;
-      const server = await _serverFetch('PUT', `/api/foods/${serverId}`, _foodToApi(data));
-      return _foodFromApi(server);
-    } catch {
-      schedulePush();
-      return _foodFromApi(local);
-    }
+    // Try server in background
+    const serverId = local?.server_id || id;
+    _serverFetch('PUT', `/api/foods/${serverId}`, _foodToApi(data)).catch(() => schedulePush());
+    return _foodFromApi(local);
   },
 
   async deleteFood(id) {
     await dbDeleteFood(id);
-    try {
-      const local = await dbGetFood(id);
-      const serverId = local?.server_id || id;
-      await _serverFetch('DELETE', `/api/foods/${serverId}`);
-    } catch {
-      schedulePush();
-    }
+    const food = await dbGetFood(id).catch(() => null);
+    const serverId = food?.server_id || id;
+    _serverFetch('DELETE', `/api/foods/${serverId}`).catch(() => schedulePush());
     return { ok: true };
   },
 
@@ -153,76 +128,54 @@ export const NtApiCached = {
     }
   },
 
-  // ── Meals & Recipes ───────────────────────────────────────────────────
+  // ── Meals & Recipes — always local-first ──────────────────────────────
 
   async getMeals() {
-    try {
-      const r = await _serverFetch('GET', '/api/meals');
-      Promise.resolve().then(async () => { for (const m of r) await dbUpsertFromServer('meals', m).catch(() => {}); });
-      return r.map(_mealFromApi);
-    } catch {
-      return (await dbGetMeals(false).catch(() => [])).map(_mealFromApi);
-    }
+    return (await dbGetMeals(false).catch(() => [])).map(_mealFromApi);
   },
 
   async getGroupMeals() {
     try { return (await _serverFetch('GET', '/api/meals?group=1')).map(_mealFromApi); }
-    catch { return this.getMeals(); }
+    catch { return []; }
   },
 
   async getRecipes() {
-    try {
-      const r = await _serverFetch('GET', '/api/meals?recipes=1');
-      Promise.resolve().then(async () => { for (const m of r) await dbUpsertFromServer('meals', m).catch(() => {}); });
-      return r.map(_mealFromApi);
-    } catch {
-      return (await dbGetMeals(true).catch(() => [])).map(_mealFromApi);
-    }
+    return (await dbGetMeals(true).catch(() => [])).map(_mealFromApi);
   },
 
   async getGroupRecipes() {
     try { return (await _serverFetch('GET', '/api/meals?recipes=1&group=1')).map(_mealFromApi); }
-    catch { return this.getRecipes(); }
+    catch { return []; }
   },
 
   async getMeal(id) {
-    try { return _mealFromApi(await _serverFetch('GET', `/api/meals/${id}`)); }
-    catch { return _mealFromApi(await dbGetMeal(id)); }
+    return _mealFromApi(await dbGetMeal(id).catch(() => null));
   },
 
   async createMeal(data) {
     const local = await dbCreateMeal(_mealToApi(data));
-    try {
-      const server = await _serverFetch('POST', '/api/meals', _mealToApi(data));
+    _serverFetch('POST', '/api/meals', _mealToApi(data)).then(async server => {
       if (server?.id && local?.id) {
         const { dbSetServerId, dbMarkSynced } = await import('./db-native.js');
         await dbSetServerId('meals', local.id, server.id);
         await dbMarkSynced('meals', [local.id]);
       }
-      return _mealFromApi(server);
-    } catch {
-      schedulePush();
-      return _mealFromApi(local);
-    }
+    }).catch(() => schedulePush());
+    return _mealFromApi(local);
   },
 
   async updateMeal(id, data) {
     const local = await dbUpdateMeal(id, _mealToApi(data));
-    try {
-      const serverId = local?.server_id || id;
-      return _mealFromApi(await _serverFetch('PUT', `/api/meals/${serverId}`, _mealToApi(data)));
-    } catch {
-      schedulePush();
-      return _mealFromApi(local);
-    }
+    const serverId = local?.server_id || id;
+    _serverFetch('PUT', `/api/meals/${serverId}`, _mealToApi(data)).catch(() => schedulePush());
+    return _mealFromApi(local);
   },
 
   async deleteMeal(id) {
+    const meal = await dbGetMeal(id).catch(() => null);
     await dbDeleteMeal(id);
-    try {
-      const local = await dbGetMeal(id);
-      await _serverFetch('DELETE', `/api/meals/${local?.server_id || id}`);
-    } catch { schedulePush(); }
+    const serverId = meal?.server_id || id;
+    _serverFetch('DELETE', `/api/meals/${serverId}`).catch(() => schedulePush());
     return { ok: true };
   },
 
@@ -236,32 +189,21 @@ export const NtApiCached = {
     catch { return _mealFromApi(await dbCopyMeal(id)); }
   },
 
-  // ── Diary ─────────────────────────────────────────────────────────────
+  // ── Diary — always local-first ────────────────────────────────────────
 
   async getDiaryDate(date) {
-    try {
-      const r = await _serverFetch('GET', `/api/diary/${date}`);
-      if (r) await dbUpsertDiaryFromServer(r).catch(() => {});
-      return r || { date, items: [], body_stats: {}, water: [] };
-    } catch {
-      const local = await dbGetDiaryDate(date);
-      return local || { date, items: [], body_stats: {}, water: [] };
-    }
+    const local = await dbGetDiaryDate(date).catch(() => null);
+    return local || { date, items: [], body_stats: {}, water: [] };
   },
 
   async saveDiaryDate(date, data) {
-    await dbSaveDiaryDate(date, data);
-    try {
-      return await _serverFetch('PUT', `/api/diary/${date}`, data);
-    } catch {
-      schedulePush();
-      return await dbGetDiaryDate(date);
-    }
+    const local = await dbSaveDiaryDate(date, data);
+    _serverFetch('PUT', `/api/diary/${date}`, data).catch(() => schedulePush());
+    return local || await dbGetDiaryDate(date);
   },
 
   async getAllDiary() {
-    try { return await _serverFetch('GET', '/api/diary'); }
-    catch { return await dbGetAllDiary(); }
+    return await dbGetAllDiary().catch(() => []);
   },
 
   // ── Users (server-only) ───────────────────────────────────────────────

@@ -113,10 +113,25 @@ export async function cacheAllImages(onProgress) {
 
   function addUrl(imgUrl) {
     if (!imgUrl) return;
-    const rel = imgUrl.startsWith('http') ? new URL(imgUrl).pathname : imgUrl;
-    const full = imgUrl.startsWith('http') ? imgUrl : serverUrl + imgUrl;
-    urlPairs.push({ relative: rel, full });
+    // Skip Capacitor cached paths and data URIs
+    if (imgUrl.includes('_capacitor_file_') || imgUrl.startsWith('data:') || imgUrl.startsWith('file:')) return;
+    try {
+      const rel = imgUrl.startsWith('http') ? new URL(imgUrl).pathname : imgUrl;
+      const full = imgUrl.startsWith('http') ? imgUrl : serverUrl + imgUrl;
+      urlPairs.push({ relative: rel, full });
+    } catch {
+      // Invalid URL — skip
+    }
   }
+
+  // User avatar
+  try {
+    const cachedUser = localStorage.getItem('nt:cachedUser');
+    if (cachedUser) {
+      const user = JSON.parse(cachedUser);
+      if (user.avatar_url) addUrl(user.avatar_url);
+    }
+  } catch {}
 
   try {
     const foods = await fetch(`${serverUrl}/api/foods`, { headers }).then(r => r.json());
