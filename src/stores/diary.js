@@ -33,9 +33,23 @@ function _fromApi(entry) {
 }
 
 // Map app camelCase → API snake_case
+// Strip Capacitor file paths from imgUrl before sending to server
+function _stripCachedPaths(items) {
+  if (!items || !Array.isArray(items)) return items;
+  return items.map(i => {
+    if (!i.imgUrl) return i;
+    // Capacitor cached path → strip back to original /uploads/ path
+    if (i.imgUrl.includes('_capacitor_file_') || i.imgUrl.includes('/image_cache/')) {
+      const filename = i.imgUrl.split('/').pop();
+      return { ...i, imgUrl: '/uploads/' + filename };
+    }
+    return i;
+  });
+}
+
 function _toApi(entry) {
   return {
-    items:      entry.items      || [],
+    items:      _stripCachedPaths(entry.items || []),
     body_stats: entry.bodyStats  || entry.body_stats || {},
     water:      entry.water      || [],
   };

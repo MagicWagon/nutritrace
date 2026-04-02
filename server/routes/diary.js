@@ -66,13 +66,44 @@ router.delete('/:date', wrap((req, res) => {
   res.json({ ok: true });
 }));
 
+// Fix any Capacitor cached paths that leaked into diary items
+function fixCachedPaths(items) {
+  if (!Array.isArray(items)) return items;
+  let changed = false;
+  const fixed = items.map(i => {
+    if (i.imgUrl && (i.imgUrl.includes('_capacitor_file_') || i.imgUrl.includes('/image_cache/'))) {
+      const filename = i.imgUrl.split('/').pop();
+      changed = true;
+      return { ...i, imgUrl: '/uploads/' + filename };
+    }
+    return i;
+  });
+  return changed ? fixed : items;
+}
+
 function parse(row) {
+  const items = JSON.parse(row.items || '[]');
   return {
     ...row,
-    items:      JSON.parse(row.items      || '[]'),
+    items:      fixCachedPaths(items),
     body_stats: JSON.parse(row.body_stats || '{}'),
     water:      JSON.parse(row.water      || '[]'),
   };
 }
+
+// One-time migration: fix any Capacitor cached paths in existing diary items
+try {
+  const rows = db.prepare(`SELECT id, items FROM diary WHERE items LIKE '%_capacitor_file_%' OR items LIKE '%/image_cache/%'`).all();
+  if (rows.length > 0) {
+    const update = db.prepare(`UPDATE diary SET items = ? WHERE id = ?`);
+    db.transaction(() => {
+      for (const row of rows) {
+        const items = fixCachedPaths(JSON.parse(row.items || '[]'));
+        update.run(JSON.stringify(items), row.id);
+      }
+    })();
+    console.log(`[diary] Fixed ${rows.length} diary entries with cached image paths`);
+  }
+} catch {}
 
 export default router;
