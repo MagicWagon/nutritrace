@@ -12,8 +12,7 @@ import {
   dbGetFoods, dbGetFood, dbCreateFood, dbUpdateFood, dbDeleteFood, dbCopyFood,
   dbGetMeals, dbGetMeal, dbCreateMeal, dbUpdateMeal, dbDeleteMeal, dbCopyMeal,
   dbGetDiaryDate, dbSaveDiaryDate, dbGetAllDiary,
-  dbGetWellness, dbUpsertWellness,
-  dbUpsertFromServer, dbUpsertDiaryFromServer, dbUpsertWellnessFromServer,
+  dbUpsertFromServer, dbUpsertDiaryFromServer,
 } from './db-native.js';
 import { getServerUrl, getAuthToken, resolveAssetUrl } from './platform.js';
 import { schedulePush } from './sync.js';
@@ -71,16 +70,6 @@ export const NtApiCached = {
   async getFoods() {
     try {
       const r = await _serverFetch('GET', '/api/foods');
-      // Debug: log foods with/without images
-      const withImg = r.filter(f => f.img_url).length;
-      const without = r.filter(f => !f.img_url).length;
-      console.log(`[foods] server returned ${r.length} foods: ${withImg} with img, ${without} without`);
-      // Log specific foods to debug broken images
-      for (const f of r) {
-        if (f.name && f.name.startsWith('Arborio')) console.log('[foods-debug]', f.name, '| img_url:', f.img_url, '| resolved:', resolveAssetUrl(f.img_url));
-        if (f.name && f.name.startsWith('Aromatic')) console.log('[foods-debug]', f.name, '| img_url:', f.img_url, '| resolved:', resolveAssetUrl(f.img_url));
-        if (f.name && f.name.startsWith('Arancia')) console.log('[foods-debug]', f.name, '| img_url:', f.img_url, '| resolved:', resolveAssetUrl(f.img_url));
-      }
       Promise.resolve().then(async () => { for (const f of r) await dbUpsertFromServer('foods', f).catch(() => {}); });
       return r.map(_foodFromApi);
     } catch {
