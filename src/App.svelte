@@ -345,6 +345,11 @@
 
   /* ── Sync status bar ── */
   .sync-bar {
+    position: fixed;
+    top: var(--safe-top, 0px);
+    left: var(--sidebar-w, 0px);
+    right: 0;
+    z-index: 50;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -353,20 +358,19 @@
     font-size: 12px;
     font-weight: 500;
     color: var(--accent);
-    background: color-mix(in srgb, var(--accent) 8%, transparent);
-    border-bottom: 1px solid color-mix(in srgb, var(--accent) 15%, transparent);
+    background: color-mix(in srgb, var(--accent) 90%, var(--bg));
+    border-bottom: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
     transition: background 0.3s, color 0.3s;
-    margin-left: var(--sidebar-w, 0px);
   }
   .sync-bar-offline {
-    color: var(--text-3);
-    background: color-mix(in srgb, var(--text-3) 8%, transparent);
-    border-color: color-mix(in srgb, var(--text-3) 15%, transparent);
+    color: #fff;
+    background: color-mix(in srgb, var(--text-3) 90%, var(--bg));
+    border-color: color-mix(in srgb, var(--text-3) 30%, transparent);
   }
   .sync-bar-error {
-    color: var(--error, #f87171);
-    background: color-mix(in srgb, var(--error, #f87171) 8%, transparent);
-    border-color: color-mix(in srgb, var(--error, #f87171) 15%, transparent);
+    color: #fff;
+    background: color-mix(in srgb, var(--error, #f87171) 90%, var(--bg));
+    border-color: color-mix(in srgb, var(--error, #f87171) 30%, transparent);
   }
   .sync-bar-icon { font-size: 16px; }
   @keyframes sync-spin { to { transform: rotate(360deg); } }
