@@ -57,8 +57,24 @@ export async function loadAuthState() {
     currentUser.set(user);
     if (user) localStorage.setItem('wl:userId', String(user.id));
     else       localStorage.removeItem('wl:userId');
+    // Cache user + auth state for offline fallback
+    if (user) {
+      localStorage.setItem('nt:cachedUser', JSON.stringify(user));
+      localStorage.setItem('nt:cachedUserMgmt', active ? '1' : '0');
+    }
     if (user) await loadServerSettings();
   } catch {
+    // Offline fallback: use cached user data if available (native server mode)
+    const cached = localStorage.getItem('nt:cachedUser');
+    if (isNative && cached) {
+      try {
+        const user = JSON.parse(cached);
+        currentUser.set(user);
+        userMgmtActive.set(localStorage.getItem('nt:cachedUserMgmt') === '1');
+        localStorage.setItem('wl:userId', String(user.id));
+        return;
+      } catch {}
+    }
     userMgmtActive.set(false);
     currentUser.set(null);
   }
@@ -78,6 +94,8 @@ export async function logout() {
     toRemove.forEach(k => localStorage.removeItem(k));
   }
   localStorage.removeItem('wl:userId');
+  localStorage.removeItem('nt:cachedUser');
+  localStorage.removeItem('nt:cachedUserMgmt');
   currentUser.set(null);
   // needsLogin in App.svelte reacts immediately — no reload needed
 }
