@@ -73,6 +73,8 @@
 
   const NAV_HIDDEN = ['/wizard', '/foods/edit', '/meal-editor', '/profile'];
   $: showNav       = !NAV_HIDDEN.some(p => $location.startsWith(p));
+  // Reset scroll on every route change — new pages always start at top
+  $: if ($location) window.scrollTo(0, 0);
   $: isEditor      = NAV_HIDDEN.some(p => $location.startsWith(p));
   $: _hasSidebar   = showNav && ($navStyle === 'sidebar' || $navStyle === 'both');
   $: sidebarPinned = _hasSidebar && $sidebarPersistent;

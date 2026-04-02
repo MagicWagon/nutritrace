@@ -66,7 +66,6 @@
 
 
   onMount(async () => {
-    window.scrollTo(0, 0);
     isRecipe = editorState.mealIsRecipe || false;
     store    = isRecipe ? 'recipes' : 'meals';
     if (editorState.mealPrefill) {

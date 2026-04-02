@@ -290,7 +290,6 @@
   const UNITS = ['g','ml','oz','lb','cup','tbsp','tsp','piece','slice'];
 
   onMount(async () => {
-    window.scrollTo(0, 0);
     store = editorState.foodStore || 'foodList';
     if (editorState.foodPrefill) {
       const prefill = editorState.foodPrefill;
