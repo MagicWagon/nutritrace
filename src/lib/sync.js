@@ -181,6 +181,8 @@ async function pullChanges() {
 /** Full sync — push then pull then cache images */
 export async function fullSync() {
   if (_syncing) return;
+  // Don't sync without auth token (user logged out)
+  if (!getAuthToken()) return;
   _syncing = true;
   syncState.update(s => ({ ...s, syncing: true, error: null, phase: 'pushing', progress: 'Pushing local changes…' }));
 
