@@ -202,6 +202,11 @@
       aria-label="Open menu"
     >
       <span class="material-symbols-rounded">menu</span>
+      {#if _showSyncBar}
+        <span class="conn-badge" class:conn-online={$syncState.online} class:conn-offline={!$syncState.online}>
+          <span class="material-symbols-rounded" style="font-size:10px">{$syncState.online ? 'cloud_done' : 'cloud_off'}</span>
+        </span>
+      {/if}
     </button>
     <div class="topbar-spacer"></div>
   </header>
@@ -303,6 +308,29 @@
   :global(.diary-bottom-bar) {
     left: var(--sidebar-w, 0px) !important;
     transition: left 0.25s ease !important;
+  }
+
+  /* ── Connection badge on hamburger ── */
+  .conn-badge {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--surface-1);
+    transition: background 0.3s;
+  }
+  .conn-online {
+    background: var(--success, #22c55e);
+    color: #fff;
+  }
+  .conn-offline {
+    background: var(--error, #ef4444);
+    color: #fff;
   }
 
   /* ── Sync status bar ── */
