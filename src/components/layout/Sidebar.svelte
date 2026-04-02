@@ -17,8 +17,12 @@
     await logout();
     open = false;
     dispatch('close');
-    // On native, reload to trigger login gate (needsLogin reactivity doesn't always catch it)
-    if (isNative) setTimeout(() => window.location.reload(), 300);
+    if (isNative) {
+      // Fade out then reload for smooth transition
+      document.body.style.transition = 'opacity 0.3s';
+      document.body.style.opacity = '0';
+      setTimeout(() => window.location.reload(), 350);
+    }
   }
 
   function getInitial(user) {

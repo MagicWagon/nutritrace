@@ -216,7 +216,9 @@
     const { logout } = await import('../stores/auth.js');
     await logout();
     showSuccess('Logged out');
-    setTimeout(() => window.location.reload(), 600);
+    document.body.style.transition = 'opacity 0.3s';
+    document.body.style.opacity = '0';
+    setTimeout(() => window.location.reload(), 350);
   }
 
   function toggleSection(key) {

@@ -211,7 +211,7 @@
 <!-- Sidebar (hamburger menu) -->
 <Sidebar bind:open={sidebarOpen} persistent={sidebarPinned} on:close={() => { if (!sidebarPinned) sidebarOpen = false; }} />
 
-{#if showHamburger}
+{#if showHamburger && $currentUser}
   <header class="app-topbar">
     <button
       class="hamburger"
