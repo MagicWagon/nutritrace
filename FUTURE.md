@@ -64,8 +64,8 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
 - ~~App icon at all mipmap densities~~
 
 ### Phase 2 — Sync & platform integrations
-- **Differential sync** — only push/pull changed records since last sync (timestamp-based), instead of full merge on every connect
-- **Offline cache in server mode** — mirror server data in local SQLite so the app works when server is down; sync diff when back online
+- ~~**Differential sync** — only push/pull changed records since last sync (timestamp-based), instead of full merge on every connect~~
+- ~~**Offline cache in server mode** — mirror server data in local SQLite so the app works when server is down; sync diff when back online~~
 - **Health Connect integration** — read steps, sleep, HR, body comp directly from Android Health Connect API via Capacitor plugin; unifies all Android wearable data
 - **Background sync** — periodic background task (via @capacitor/background-runner or WorkManager bridge) to sync diary/foods/wellness with server when connected
 - **Local full backup (ZIP)** — create full backup on device (JSZip) including images, for phone-to-phone transfer without a server

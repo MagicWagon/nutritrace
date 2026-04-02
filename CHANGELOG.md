@@ -5,6 +5,38 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.29.0-beta] — 2026-04-01
+
+### Added
+- **Phase 2: Differential sync infrastructure** — push/pull endpoints with timestamp tracking; only changed records sync instead of full merge
+- **Phase 2: Offline cache layer** — `NtApiCached` tries server first, falls back to local SQLite when offline
+- **Phase 2: Image caching for offline mode** — downloads server images to device storage for offline access
+- **Sync status bar** — progress phases (pushing/pulling/caching images) with visual feedback
+- **Connection badge on hamburger menu** — green dot when connected to server, red when offline
+- **Three-way merge dialog on server connect** — upload/download/merge options when reconnecting
+- **Sync on app startup and resume** — automatic differential sync when app launches or returns from background
+- **Local fonts for Android** — Material Symbols + Inter bundled in app, identical to CDN versions
+- **Android back button navigation** — navigates back within app history, double-tap to exit
+- **Wellness page: generic "No Device Connected" messaging on mobile** — no API setup prompts on Android
+
+### Fixed
+- **Fitbit score calibration** — readiness HRV neutral set to 62, penalty 400 (uses 30-day baseline)
+- **Score locking** — readiness/stress snapshot on first sync of the day; recalculate button for manual tuning
+- **Wellness date calculations** — use local timezone instead of UTC
+- **Profile page** — missing `resolveAssetUrl` import broke profile loading
+- **Images survive server disconnect** — `loadImageMap` awaited, `NtApiNative` uses `resolveAssetUrl`
+- **Sync bar portalled to body** — stays fixed at top, doesn't scroll with page content
+- **Server: soft deletes on all tables** — `updated_at` tracking for differential sync
+- **Server: /uploads served before auth middleware** — Android WebView can load images without token
+- **Server: ALTER TABLE migration** — uses constant defaults (SQLite limitation workaround)
+- **Source chip clicks** — reactive loop breaking OFF/USDA selection fixed
+- **Settings search bar** — sticky below header
+- **Foods search bar** — uniform style with barcode icon inside pill
+- **Wellness tab bar** — sticky below date bar
+- **Wellness pill position** — uses DOM measurement for pixel-perfect alignment on mobile
+
+---
+
 ## [0.28.0-beta] — 2026-03-31
 
 ### Added
