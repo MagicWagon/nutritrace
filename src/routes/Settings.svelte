@@ -215,8 +215,11 @@
   function logoutServer() {
     document.body.style.transition = 'opacity 0.3s';
     document.body.style.opacity = '0';
-    import('../stores/auth.js').then(({ logout }) => logout());
-    setTimeout(() => window.location.reload(), 350);
+    localStorage.removeItem('wl:userId');
+    localStorage.removeItem('nt:cachedUser');
+    localStorage.removeItem('nt:cachedUserMgmt');
+    if (isNative) setAuthToken(null);
+    setTimeout(() => window.location.reload(), 300);
   }
 
   function toggleSection(key) {
@@ -2384,7 +2387,7 @@
             {/if}
 
             <div class="setting-divider"></div>
-            <button class="setting-row setting-action" on:click={logout}>
+            <button class="setting-row setting-action" on:click={logoutServer}>
               <span class="material-symbols-rounded si" style="color:var(--text-3)">logout</span>
               <span class="setting-label">Sign out</span>
             </button>
