@@ -642,7 +642,7 @@
                 on:click={() => pickFood(food)}
                 on:contextmenu|preventDefault={() => longPress(food)}>
                 {#if $foodsShowThumbnails && food.imgUrl}
-                  <img class="food-thumb" src={food.imgUrl} alt="" loading="lazy" />
+                  <img class="food-thumb" src={food.imgUrl} alt="" loading="lazy" referrerpolicy="no-referrer" on:error={e => e.target.style.display='none'} />
                 {:else}
                   <div class="food-thumb-placeholder">
                     <span class="material-symbols-rounded">{_tabIcon}</span>
@@ -704,7 +704,7 @@
                   on:click={() => pickFood(food)}
                   on:contextmenu|preventDefault={() => longPress(food)}>
                   {#if food.imgUrl}
-                    <img class="food-thumb" src={food.imgUrl} alt="" loading="lazy" />
+                    <img class="food-thumb" src={food.imgUrl} alt="" loading="lazy" referrerpolicy="no-referrer" on:error={e => e.target.style.display='none'} />
                   {:else}
                     <div class="food-thumb-placeholder">
                       <span class="material-symbols-rounded">{searchSource === 'usda' ? 'science' : 'public'}</span>
