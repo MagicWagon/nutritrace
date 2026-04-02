@@ -452,9 +452,10 @@
     // Below-baseline penalty 250 — Fitbit penalizes even small HRV dips aggressively,
     // especially for low-HRV users where the ratio swings are small in absolute terms.
     const hrvRatio = todayHrv / hrvBaseline;
+    // Square-root penalty curve — gentler on big HRV dips, steeper on small ones
     let hrv_score  = hrvRatio >= 1.0
       ? 62 + (hrvRatio - 1.0) * 80
-      : 62 - (1.0 - hrvRatio) * 400;
+      : 62 - Math.sqrt(1.0 - hrvRatio) * 50;
     hrv_score = _clamp(hrv_score, 0, 100);
 
     // RHR score (20% weight) — inverse: lower today is better. Neutral at 55 (not 65).
@@ -607,7 +608,7 @@
     }
     // Sleep component — stronger weight than readiness (35% vs 15%)
     const sleep_s = sleepScore != null ? sleepScore : 75;
-    return (0.40 * hrv_s) + (0.35 * sleep_s) + (0.15 * rhr_s) + 10; // +10 offset — tuned to match Fitbit
+    return (0.40 * hrv_s) + (0.35 * sleep_s) + (0.15 * rhr_s) + 8; // +8 offset — tuned with 9 days of data
   }
 
   function _calcStressScore(todayHrv, todayRhr, todaySleepScore, history30d) {
@@ -637,7 +638,7 @@
     const todayRaw = _rawStressScore(todayHrv, todayRhr, todaySleepScore, hrvBaseline, rhrBaseline);
     if (todayRaw == null) return null;
     const score = Math.round(_clamp(
-      smoothed != null ? 0.65 * smoothed + 0.35 * todayRaw : todayRaw,
+      smoothed != null ? 0.60 * smoothed + 0.40 * todayRaw : todayRaw,
       1, 100
     ));
 
@@ -650,7 +651,7 @@
       baselines: { hrvBaseline: Math.round(hrvBaseline * 100) / 100, rhrBaseline: rhrBaseline != null ? Math.round(rhrBaseline * 10) / 10 : null },
       todayRaw: Math.round(todayRaw * 10) / 10,
       smoothedHistory: smoothed != null ? Math.round(smoothed * 10) / 10 : null,
-      formula: smoothed != null ? `0.65×${Math.round(smoothed*10)/10} + 0.35×${Math.round(todayRaw*10)/10} = ${score}` : `raw=${Math.round(todayRaw*10)/10} → ${score}`,
+      formula: smoothed != null ? `0.60×${Math.round(smoothed*10)/10} + 0.40×${Math.round(todayRaw*10)/10} = ${score}` : `raw=${Math.round(todayRaw*10)/10} → ${score}`,
     }, null, 2));
 
     return {

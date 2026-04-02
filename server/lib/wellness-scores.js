@@ -70,7 +70,7 @@ export function snapshotScores(userId, dateStr, { force = false } = {}) {
 
   // ── Readiness ─────────────────────────────────────────────────
   const hrvRatio = todayHrv / hrvBaseline;
-  let hrv_score = hrvRatio >= 1.0 ? 62 + (hrvRatio - 1.0) * 80 : 62 - (1.0 - hrvRatio) * 400;
+  let hrv_score = hrvRatio >= 1.0 ? 62 + (hrvRatio - 1.0) * 80 : 62 - Math.sqrt(1.0 - hrvRatio) * 50;
   hrv_score = _clamp(hrv_score, 0, 100);
 
   let rhr_score = 55;
@@ -113,7 +113,7 @@ export function snapshotScores(userId, dateStr, { force = false } = {}) {
       r_s = _clamp(r_s, 0, 100);
     }
     const sl = sleep != null ? sleep : 75;
-    return (0.40 * h_s) + (0.35 * sl) + (0.15 * r_s) + 10;
+    return (0.40 * h_s) + (0.35 * sl) + (0.15 * r_s) + 8;
   }
 
   const todayRaw = _rawStress(todayHrv, todayRhr, todaySleep);
@@ -125,7 +125,7 @@ export function snapshotScores(userId, dateStr, { force = false } = {}) {
   let stress;
   if (histStress.length >= 3) {
     const smoothed = _mean(histStress.slice(-7));
-    stress = Math.round(0.65 * smoothed + 0.35 * todayRaw);
+    stress = Math.round(0.60 * smoothed + 0.40 * todayRaw);
   } else {
     stress = Math.round(todayRaw);
   }
