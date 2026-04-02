@@ -81,21 +81,15 @@ export async function loadAuthState() {
 }
 
 export async function logout() {
-  await fetch(_apiUrl('/api/auth/logout'), { method: 'POST', credentials: 'include' });
-  // Clear all user-scoped settings from localStorage (wl_u{id}_* keys)
-  const userId = localStorage.getItem('wl:userId');
-  if (userId) {
-    const prefix = `wl_u${userId}_`;
-    const toRemove = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k?.startsWith(prefix)) toRemove.push(k);
-    }
-    toRemove.forEach(k => localStorage.removeItem(k));
+  try { await fetch(_apiUrl('/api/auth/logout'), { method: 'POST', credentials: 'include', headers: _authHeaders() }); } catch {}
+  // Clear auth state — but keep cached data (foods, images, server URL)
+  if (isNative) {
+    const { setAuthToken } = await import('../lib/platform.js');
+    setAuthToken(null);
   }
   localStorage.removeItem('wl:userId');
   localStorage.removeItem('nt:cachedUser');
   localStorage.removeItem('nt:cachedUserMgmt');
   currentUser.set(null);
-  // needsLogin in App.svelte reacts immediately — no reload needed
+  userMgmtActive.set(false);
 }

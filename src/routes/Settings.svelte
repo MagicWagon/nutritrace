@@ -212,6 +212,16 @@
     setTimeout(() => window.location.reload(), 600);
   }
 
+  function logoutServer() {
+    // Clear auth only — keep server link, cached data, and images
+    setAuthToken(null);
+    localStorage.removeItem('nt:cachedUser');
+    localStorage.removeItem('nt:cachedUserMgmt');
+    localStorage.removeItem('wl:userId');
+    showSuccess('Logged out');
+    setTimeout(() => window.location.reload(), 600);
+  }
+
   function toggleSection(key) {
     openSections = { ...openSections, [key]: !openSections[key] };
   }
@@ -2652,8 +2662,13 @@
               <span class="material-symbols-rounded" style="color:var(--success, #22c55e);font-size:22px">cloud_done</span>
             </div>
             <div class="setting-divider"></div>
-            <div style="padding:12px 16px">
+            <div style="padding:12px 16px;display:flex;flex-direction:column;gap:8px">
+              <button class="btn btn-ghost w-full" on:click={logoutServer}>
+                <span class="material-symbols-rounded" style="font-size:18px">logout</span>
+                Log Out
+              </button>
               <button class="btn btn-ghost w-full" style="color:var(--error,#f87171)" on:click={disconnectServer}>
+                <span class="material-symbols-rounded" style="font-size:18px">link_off</span>
                 Disconnect &amp; Use Locally
               </button>
             </div>
