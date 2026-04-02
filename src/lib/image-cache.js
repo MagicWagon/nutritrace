@@ -7,6 +7,7 @@
  */
 
 import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Capacitor } from '@capacitor/core';
 import { getServerUrl, getAuthToken } from './platform.js';
 
 const CACHE_DIR = 'image_cache';
@@ -29,7 +30,7 @@ async function _downloadImage(serverUrl) {
       path: `${CACHE_DIR}/${filename}`,
       directory: Directory.Data,
     });
-    if (existing.uri) return existing.uri;
+    if (existing.uri) return Capacitor.convertFileSrc(existing.uri);
   } catch {
     // Not cached yet — download
   }
@@ -59,7 +60,8 @@ async function _downloadImage(serverUrl) {
       directory: Directory.Data,
     });
 
-    return uri;
+    // Convert file:// URI to Capacitor's WebView-safe URL
+    return Capacitor.convertFileSrc(uri);
   } catch (e) {
     console.warn('[image-cache] Failed to download:', serverUrl, e.message);
     return null;

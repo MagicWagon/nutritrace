@@ -117,16 +117,16 @@ export function setImageMap(map) {
  */
 export function resolveAssetUrl(path) {
   if (!path) return path;
-  if (path.startsWith('data:') || path.startsWith('file:')) return path;
+  if (path.startsWith('data:') || path.startsWith('file:') || path.startsWith('https://localhost')) return path;
   if (isNative) {
-    // Check image cache by relative path first (works even when server URL is null/offline)
-    if (_imageMap[path]) return _imageMap[path];
     const url = getServerUrl();
-    // Check by full URL
-    const fullUrl = path.startsWith('http') ? path : (url ? url + path : path);
-    if (_imageMap[fullUrl]) return _imageMap[fullUrl];
-    // Fall back to server URL
+    // When server is available, use server URL directly (more reliable than cached files)
     if (url && !path.startsWith('http')) return url + path;
+    if (path.startsWith('http')) return path;
+    // Offline (no server URL) — check local image cache
+    if (_imageMap[path]) return _imageMap[path];
+    const fullUrl = url ? url + path : path;
+    if (_imageMap[fullUrl]) return _imageMap[fullUrl];
   }
   return path;
 }
