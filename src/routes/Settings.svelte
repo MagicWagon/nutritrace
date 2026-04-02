@@ -212,12 +212,9 @@
     setTimeout(() => window.location.reload(), 600);
   }
 
-  function logoutServer() {
-    // Clear auth only — keep server link, cached data, and images
-    setAuthToken(null);
-    localStorage.removeItem('nt:cachedUser');
-    localStorage.removeItem('nt:cachedUserMgmt');
-    localStorage.removeItem('wl:userId');
+  async function logoutServer() {
+    const { logout } = await import('../stores/auth.js');
+    await logout();
     showSuccess('Logged out');
     setTimeout(() => window.location.reload(), 600);
   }
