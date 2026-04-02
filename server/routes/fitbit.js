@@ -416,28 +416,6 @@ router.post('/sync', wrap(async (req, res) => {
   res.json({ ok: true, from, to, ...results });
 }));
 
-// ONE-TIME: seed exact Fitbit scores — remove after calling
-router.post('/seed-scores', wrap((req, res) => {
-  const u = uid(req);
-  const scores = [
-    { date: '2026-04-02', sleep: 82, readiness: 43, stress: 74 },
-  ];
-  const upsert = db.prepare(`
-    INSERT INTO wellness_data (user_id, date, source, metric_type, value, synced_at)
-    VALUES (?, ?, 'fitbit', ?, ?, datetime('now'))
-    ON CONFLICT(user_id, date, source, metric_type) DO UPDATE SET
-      value = excluded.value, synced_at = excluded.synced_at
-  `);
-  db.transaction(() => {
-    for (const s of scores) {
-      upsert.run(u, s.date, 'sleep_score', s.sleep);
-      upsert.run(u, s.date, 'readiness_score', s.readiness);
-      upsert.run(u, s.date, 'stress_score', s.stress);
-    }
-  })();
-  res.json({ ok: true, seeded: scores.length });
-}));
-
 // Recalculate sleep score from stored raw components for a given date
 function _recalcSleep(userId, dateStr) {
   const rows = db.prepare(

@@ -168,10 +168,10 @@
       import('./lib/sync.js').then((mod) => {
         mod.syncState.subscribe(v => syncState.set(v));
         mod.startNetworkMonitor();
-        mod.fullSync(); // Initial sync
-        // Periodic sync every 30 seconds
-        setInterval(() => mod.fullSync(), 30000);
-        // Sync on app resume
+        mod.fullSync(); // Initial sync (visible)
+        // Periodic sync every 30 seconds (silent — only shows bar if changes found)
+        setInterval(() => mod.fullSync(true), 30000);
+        // Sync on app resume (visible)
         import('@capacitor/app').then(({ App }) => {
           App.addListener('resume', () => mod.fullSync());
         });

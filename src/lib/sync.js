@@ -55,11 +55,11 @@ export async function checkOnline() {
   }
 }
 
-/** Push local pending changes to the server */
+/** Push local pending changes to the server. Returns true if anything was pushed. */
 async function pushChanges() {
   const pending = await dbGetPendingChanges();
   const hasPending = pending.foods.length || pending.meals.length || pending.diary.length;
-  if (!hasPending) return;
+  if (!hasPending) return false;
 
   console.log(`[sync] pushing: ${pending.foods.length} foods, ${pending.meals.length} meals, ${pending.diary.length} diary`);
 
@@ -143,6 +143,7 @@ async function pushChanges() {
   await dbPurgeSoftDeleted('diary');
 
   console.log('[sync] push complete');
+  return true;
 }
 
 /** Pull server changes since last sync */
@@ -183,16 +184,21 @@ async function pullChanges() {
     await dbSetSyncMeta('last_sync_at', data.server_time);
   }
 
+  const totalChanges = (data.foods?.length || 0) + (data.meals?.length || 0) + (data.diary?.length || 0) + (data.wellness?.length || 0);
   console.log(`[sync] pull complete: ${data.foods?.length || 0} foods, ${data.meals?.length || 0} meals, ${data.diary?.length || 0} diary, ${data.wellness?.length || 0} wellness`);
+  return totalChanges > 0;
 }
 
-/** Full sync — push then pull then cache images */
-export async function fullSync() {
+/** Full sync — push then pull then cache images
+ * @param {boolean} silent - If true, don't show sync bar unless there are actual changes
+ */
+export async function fullSync(silent = false) {
   if (_syncing) return;
-  // Don't sync without auth token (user logged out)
   if (!getAuthToken()) return;
   _syncing = true;
-  syncState.update(s => ({ ...s, syncing: true, error: null, phase: 'pushing', progress: 'Pushing local changes…' }));
+  if (!silent) {
+    syncState.update(s => ({ ...s, syncing: true, error: null, phase: 'pushing', progress: 'Pushing local changes…' }));
+  }
 
   try {
     const online = await checkOnline();
@@ -202,25 +208,33 @@ export async function fullSync() {
       return;
     }
 
-    syncState.update(s => ({ ...s, phase: 'pushing', progress: 'Pushing local changes…' }));
-    await pushChanges();
+    if (!silent) syncState.update(s => ({ ...s, phase: 'pushing', progress: 'Pushing local changes…' }));
+    const pushed = await pushChanges();
 
-    syncState.update(s => ({ ...s, phase: 'pulling', progress: 'Downloading data…' }));
-    await pullChanges();
+    if (!silent) syncState.update(s => ({ ...s, phase: 'pulling', progress: 'Downloading data…' }));
+    const pulled = await pullChanges();
 
-    // Cache images for offline use
-    syncState.update(s => ({ ...s, phase: 'images', progress: 'Caching images…' }));
-    try {
-      const { cacheAllImages } = await import('./image-cache.js');
-      await cacheAllImages((done, total) => {
-        if (total > 0) {
-          syncState.update(s => ({ ...s, progress: `Caching images… ${done}/${total}` }));
-        }
-      });
-      // Reload image map into memory for resolveAssetUrl
-      await loadImageMap();
-    } catch (e) {
-      console.warn('[sync] Image caching failed:', e.message);
+    const hadChanges = pushed || pulled;
+
+    // Show sync bar for silent syncs only if there were actual changes
+    if (silent && hadChanges) {
+      syncState.update(s => ({ ...s, syncing: true, progress: 'Synced changes' }));
+    }
+
+    // Cache images for offline use (only if changes or non-silent)
+    if (!silent || hadChanges) {
+      syncState.update(s => ({ ...s, phase: 'images', progress: 'Caching images…' }));
+      try {
+        const { cacheAllImages } = await import('./image-cache.js');
+        await cacheAllImages((done, total) => {
+          if (total > 0) {
+            syncState.update(s => ({ ...s, progress: `Caching images… ${done}/${total}` }));
+          }
+        });
+        await loadImageMap();
+      } catch (e) {
+        console.warn('[sync] Image caching failed:', e.message);
+      }
     }
 
     const now = new Date().toISOString();

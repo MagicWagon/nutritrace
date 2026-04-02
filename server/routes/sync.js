@@ -65,10 +65,7 @@ router.get('/pull', wrap((req, res) => {
     `SELECT * FROM wellness_data WHERE synced_at > ? ${u != null ? 'AND user_id = ?' : ''} ORDER BY synced_at`
   ).all(...wellnessParams).map(parse);
 
-  logger.debug(`[sync] pull since=${since} (sql: ${sinceSql}): foods=${foods.length} meals=${meals.length} diary=${diary.length} settings=${settings.length} wellness=${wellness.length}`);
-  // Debug: check if any foods were recently modified
-  const recentFoods = db.prepare('SELECT id, name, updated_at, deleted_at FROM foods ORDER BY updated_at DESC LIMIT 3').all();
-  if (recentFoods.length) logger.debug(`[sync] most recent foods: ${recentFoods.map(f => `${f.name}(${f.updated_at},del=${f.deleted_at})`).join(', ')}`);
+  logger.debug(`[sync] pull since=${sinceSql}: foods=${foods.length} meals=${meals.length} diary=${diary.length} settings=${settings.length} wellness=${wellness.length}`);
 
   res.json({ foods, meals, diary, settings, wellness, server_time: serverTime });
 }));
