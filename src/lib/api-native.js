@@ -18,10 +18,12 @@ import { Filesystem, Directory } from '@capacitor/filesystem';
 
 // ── Field mapping helpers (mirror server-side NtApi in api.js) ─────────────
 
+import { resolveAssetUrl } from './platform.js';
+
 function _foodFromDb(row) {
   if (!row) return null;
   const { img_url, category, sync_status, ...rest } = row;
-  return { ...rest, imgUrl: img_url || '', categories: category ? [category] : [] };
+  return { ...rest, imgUrl: resolveAssetUrl(img_url) || '', categories: category ? [category] : [] };
 }
 
 function _foodToDb(food) {
@@ -36,7 +38,7 @@ function _foodToDb(food) {
 function _mealFromDb(row) {
   if (!row) return null;
   const { img_url, sync_status, ...rest } = row;
-  return { ...rest, imgUrl: img_url || '' };
+  return { ...rest, imgUrl: resolveAssetUrl(img_url) || '' };
 }
 
 function _mealToDb(meal) {

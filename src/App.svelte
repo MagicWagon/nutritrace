@@ -155,9 +155,10 @@
       window.location.hash = '#/wizard';
     }
 
-    // Load cached image map for all native modes (needed after disconnect too)
+    // Load cached image map BEFORE any data renders (must await, not fire-and-forget)
     if (isNative) {
-      import('./lib/platform.js').then(({ loadImageMap }) => loadImageMap());
+      const { loadImageMap } = await import('./lib/platform.js');
+      await loadImageMap();
     }
 
     // Start sync engine in native server-connected mode

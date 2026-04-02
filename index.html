@@ -9,7 +9,10 @@
   <meta name="theme-color" content="#0A0B0F" id="theme-color-meta" />
   <title>NutriTrace</title>
   <link rel="manifest" href="/manifest.webmanifest" />
-  <!-- Fonts — loaded locally, no CDN dependency (works offline) -->
+  <!-- Fonts: CDN with local fallback for offline/Android -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&family=Inter:wght@300;400;500;600;700&display=block" rel="stylesheet" />
   <link rel="stylesheet" href="/fonts/fonts.css" />
   <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png" />
   <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
