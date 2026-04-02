@@ -69,24 +69,12 @@ export const NtApiCached = {
   // ── Foods ─────────────────────────────────────────────────────────────
 
   async getFoods() {
-    // Serve from local cache first (instant), refresh from server in background
-    const local = await dbGetFoods().catch(() => []);
-    if (local.length > 0) {
-      // Update from server in background
-      _serverFetch('GET', '/api/foods').then(serverFoods => {
-        for (const f of serverFoods) dbUpsertFromServer('foods', f).catch(() => {});
-      }).catch(() => {});
-      return local.map(_foodFromApi);
-    }
-    // No local cache — must fetch from server
     try {
-      const serverFoods = await _serverFetch('GET', '/api/foods');
-      Promise.resolve().then(async () => {
-        for (const f of serverFoods) await dbUpsertFromServer('foods', f).catch(() => {});
-      });
-      return serverFoods.map(_foodFromApi);
+      const r = await _serverFetch('GET', '/api/foods');
+      Promise.resolve().then(async () => { for (const f of r) await dbUpsertFromServer('foods', f).catch(() => {}); });
+      return r.map(_foodFromApi);
     } catch {
-      return [];
+      return (await dbGetFoods().catch(() => [])).map(_foodFromApi);
     }
   },
 
@@ -169,16 +157,13 @@ export const NtApiCached = {
   // ── Meals & Recipes ───────────────────────────────────────────────────
 
   async getMeals() {
-    const local = await dbGetMeals(false).catch(() => []);
-    if (local.length > 0) {
-      _serverFetch('GET', '/api/meals').then(r => { for (const m of r) dbUpsertFromServer('meals', m).catch(() => {}); }).catch(() => {});
-      return local.map(_mealFromApi);
-    }
     try {
       const r = await _serverFetch('GET', '/api/meals');
       Promise.resolve().then(async () => { for (const m of r) await dbUpsertFromServer('meals', m).catch(() => {}); });
       return r.map(_mealFromApi);
-    } catch { return []; }
+    } catch {
+      return (await dbGetMeals(false).catch(() => [])).map(_mealFromApi);
+    }
   },
 
   async getGroupMeals() {
@@ -187,16 +172,13 @@ export const NtApiCached = {
   },
 
   async getRecipes() {
-    const local = await dbGetMeals(true).catch(() => []);
-    if (local.length > 0) {
-      _serverFetch('GET', '/api/meals?recipes=1').then(r => { for (const m of r) dbUpsertFromServer('meals', m).catch(() => {}); }).catch(() => {});
-      return local.map(_mealFromApi);
-    }
     try {
       const r = await _serverFetch('GET', '/api/meals?recipes=1');
       Promise.resolve().then(async () => { for (const m of r) await dbUpsertFromServer('meals', m).catch(() => {}); });
       return r.map(_mealFromApi);
-    } catch { return []; }
+    } catch {
+      return (await dbGetMeals(true).catch(() => [])).map(_mealFromApi);
+    }
   },
 
   async getGroupRecipes() {
