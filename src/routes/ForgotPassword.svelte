@@ -1,5 +1,6 @@
 <script>
   import { push } from 'svelte-spa-router';
+  import { apiUrl } from '../lib/platform.js';
 
   let email   = '';
   let loading = false;
@@ -11,7 +12,7 @@
     loading = true;
     error   = '';
     try {
-      const res  = await fetch('/api/auth/forgot-password', {
+      const res  = await fetch(apiUrl('/api/auth/forgot-password'), {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },

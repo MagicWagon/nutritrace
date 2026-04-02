@@ -230,7 +230,7 @@
 {/if}
 
 <!-- Sync status bar (native server mode only) -->
-{#if _showSyncBar && ($syncState.syncing || !$syncState.online || $syncState.error || _syncJustFinished)}
+{#if _showSyncBar && !needsLogin && ($syncState.syncing || !$syncState.online || $syncState.error || _syncJustFinished)}
   <div class="sync-bar" class:sync-bar-error={$syncState.error} class:sync-bar-offline={!$syncState.online}
     use:portal transition:slide={{ duration: 200 }}>
     {#if $syncState.syncing}

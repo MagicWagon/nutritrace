@@ -3,7 +3,7 @@
   import { cubicOut } from 'svelte/easing';
   import { location, push } from 'svelte-spa-router';
   import { createEventDispatcher } from 'svelte';
-  import { resolveAssetUrl } from '../../lib/platform.js';
+  import { resolveAssetUrl, isNative } from '../../lib/platform.js';
   import { currentUser, userMgmtActive, logout } from '../../stores/auth.js';
   import { wellnessEnabled, fitbitEnabled, withingsEnabled, garminEnabled } from '../../stores/settings.js';
   import WellnessIcon from '../icons/WellnessIcon.svelte';
@@ -17,6 +17,8 @@
     await logout();
     open = false;
     dispatch('close');
+    // On native, reload to trigger login gate (needsLogin reactivity doesn't always catch it)
+    if (isNative) setTimeout(() => window.location.reload(), 300);
   }
 
   function getInitial(user) {

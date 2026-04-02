@@ -4,6 +4,7 @@
   import { showError, showSuccess } from '../stores/toast.js';
   import { push } from 'svelte-spa-router';
   import { slide } from 'svelte/transition';
+  import { apiUrl, isNative, getServerUrl, setAuthToken } from '../lib/platform.js';
 
   let username = '';
   let password = '';
@@ -18,7 +19,7 @@
     if (!username.trim() || !password) return;
     loading = true;
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch(apiUrl('/api/auth/login'), {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -26,7 +27,12 @@
       });
       const data = await res.json();
       if (!res.ok) { showError(data.error || 'Login failed'); return; }
+      // Store auth token for native server mode
+      if (isNative && data.token) setAuthToken(data.token);
+      // Cache user for offline fallback
       localStorage.setItem('wl:userId', String(data.user.id));
+      localStorage.setItem('nt:cachedUser', JSON.stringify(data.user));
+      localStorage.setItem('nt:cachedUserMgmt', '1');
       currentUser.set(data.user);
       await loadServerSettings();
       push('/');
@@ -41,7 +47,7 @@
     if (!confirm('This will delete all user accounts. Your food & diary data will be kept. Continue?')) return;
     recovering = true;
     try {
-      const res = await fetch('/api/auth/recover', {
+      const res = await fetch(apiUrl('/api/auth/recover'), {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: recoveryToken.trim() }),
