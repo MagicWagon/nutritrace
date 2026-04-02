@@ -71,10 +71,20 @@ function fixCachedPaths(items) {
   if (!Array.isArray(items)) return items;
   let changed = false;
   const fixed = items.map(i => {
-    if (i.imgUrl && (i.imgUrl.includes('_capacitor_file_') || i.imgUrl.includes('/image_cache/'))) {
+    if (!i.imgUrl) return i;
+    // Fix Capacitor cached paths
+    if (i.imgUrl.includes('_capacitor_file_') || i.imgUrl.includes('/image_cache/')) {
       const filename = i.imgUrl.split('/').pop();
       changed = true;
-      return { ...i, imgUrl: '/uploads/' + filename };
+      if (filename && /\.\w{2,5}$/.test(filename)) {
+        return { ...i, imgUrl: '/uploads/' + filename };
+      }
+      return { ...i, imgUrl: '' }; // Can't determine original
+    }
+    // Fix mangled proxy URLs (e.g., /uploads/proxy)
+    if (i.imgUrl === '/uploads/proxy' || i.imgUrl === '/uploads/proxy?url=') {
+      changed = true;
+      return { ...i, imgUrl: '' };
     }
     return i;
   });
@@ -93,7 +103,7 @@ function parse(row) {
 
 // One-time migration: fix any Capacitor cached paths in existing diary items
 try {
-  const rows = db.prepare(`SELECT id, items FROM diary WHERE items LIKE '%_capacitor_file_%' OR items LIKE '%/image_cache/%'`).all();
+  const rows = db.prepare(`SELECT id, items FROM diary WHERE items LIKE '%_capacitor_file_%' OR items LIKE '%/image_cache/%' OR items LIKE '%/uploads/proxy%'`).all();
   if (rows.length > 0) {
     const update = db.prepare(`UPDATE diary SET items = ? WHERE id = ?`);
     db.transaction(() => {

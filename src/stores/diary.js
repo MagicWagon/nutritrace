@@ -41,7 +41,20 @@ function _stripCachedPaths(items) {
     // Capacitor cached path → strip back to original /uploads/ path
     if (i.imgUrl.includes('_capacitor_file_') || i.imgUrl.includes('/image_cache/')) {
       const filename = i.imgUrl.split('/').pop();
-      return { ...i, imgUrl: '/uploads/' + filename };
+      // Only restore if filename looks like an uploaded image (has extension)
+      if (filename && /\.\w{2,5}$/.test(filename)) {
+        return { ...i, imgUrl: '/uploads/' + filename };
+      }
+      // Can't determine original URL — remove the broken cached path
+      return { ...i, imgUrl: '' };
+    }
+    // Strip proxy URLs back to original (they get resolved at display time)
+    if (i.imgUrl.includes('/api/proxy?url=')) {
+      try {
+        const proxyUrl = new URL(i.imgUrl);
+        const original = proxyUrl.searchParams.get('url');
+        if (original) return { ...i, imgUrl: original };
+      } catch {}
     }
     return i;
   });
