@@ -155,10 +155,13 @@
       window.location.hash = '#/wizard';
     }
 
+    // Load cached image map for all native modes (needed after disconnect too)
+    if (isNative) {
+      import('./lib/platform.js').then(({ loadImageMap }) => loadImageMap());
+    }
+
     // Start sync engine in native server-connected mode
     if (isNative && getNativeMode() === 'server') {
-      // Load cached image map so offline images resolve immediately
-      import('./lib/platform.js').then(({ loadImageMap }) => loadImageMap());
       import('./lib/sync.js').then((mod) => {
         // Mirror the real sync store into our local store so $syncState reactivity works
         mod.syncState.subscribe(v => syncState.set(v));
