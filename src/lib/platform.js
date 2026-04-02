@@ -56,9 +56,13 @@ export function getServerUrl() {
  */
 export function setServerUrl(url) {
   if (url) {
-    localStorage.setItem('nt:serverUrl', url.replace(/\/$/, ''));
+    const clean = url.replace(/\/$/, '');
+    localStorage.setItem('nt:serverUrl', clean);
+    // Keep a copy for image cache lookups even after disconnecting
+    localStorage.setItem('nt:lastServerUrl', clean);
   } else {
     localStorage.removeItem('nt:serverUrl');
+    // Don't remove lastServerUrl — needed for cached image resolution
   }
 }
 
@@ -119,14 +123,17 @@ export function resolveAssetUrl(path) {
   if (!path) return path;
   if (path.startsWith('data:') || path.startsWith('file:') || path.startsWith('https://localhost')) return path;
   if (isNative) {
-    const url = getServerUrl();
-    // When server is available, use server URL directly (more reliable than cached files)
+    // Always check local image cache first (fastest, works offline + disconnected)
+    if (_imageMap[path]) return _imageMap[path];
+    // Also check with server URL prefix for full-URL keys
+    const url = getServerUrl() || localStorage.getItem('nt:lastServerUrl') || '';
+    if (url) {
+      const fullUrl = path.startsWith('http') ? path : url + path;
+      if (_imageMap[fullUrl]) return _imageMap[fullUrl];
+    }
+    // Fall back to server URL when connected
     if (url && !path.startsWith('http')) return url + path;
     if (path.startsWith('http')) return path;
-    // Offline (no server URL) — check local image cache
-    if (_imageMap[path]) return _imageMap[path];
-    const fullUrl = url ? url + path : path;
-    if (_imageMap[fullUrl]) return _imageMap[fullUrl];
   }
   return path;
 }
