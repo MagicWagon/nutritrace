@@ -26,7 +26,7 @@ import { seedSmtpFromEnv } from './email.js';
 import { seedAiFromEnv } from './ai.js';
 
 // Initialise DB (runs schema)
-import './db.js';
+import db from './db.js';
 
 // Seed config from env vars if provided (env vars take priority over UI)
 seedSmtpFromEnv();
