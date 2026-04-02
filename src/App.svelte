@@ -12,8 +12,8 @@
   import { needsNativeSetup, isNative, getNativeMode, getServerUrl } from './lib/platform.js';
   import { writable } from 'svelte/store';
 
-  // Sync state — imported dynamically only in native server mode
-  let syncState = writable({ syncing: false, lastSync: null, error: null, online: true });
+  // Sync state — mirrored from the real sync store (dynamically imported)
+  const syncState = writable({ syncing: false, phase: '', progress: '', lastSync: null, error: null, online: true });
   $: _showSyncBar = isNative && getNativeMode() === 'server';
   let _syncJustFinished = false;
   let _syncHideTimer = null;
@@ -159,7 +159,8 @@
       // Load cached image map so offline images resolve immediately
       import('./lib/platform.js').then(({ loadImageMap }) => loadImageMap());
       import('./lib/sync.js').then((mod) => {
-        syncState = mod.syncState; // Bind the real reactive store
+        // Mirror the real sync store into our local store so $syncState reactivity works
+        mod.syncState.subscribe(v => syncState.set(v));
         mod.fullSync(); // Initial sync on app startup
         // Sync on app resume (coming back from background)
         import('@capacitor/app').then(({ App }) => {
