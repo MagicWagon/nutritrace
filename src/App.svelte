@@ -166,11 +166,12 @@
     // Start sync engine in native server-connected mode
     if (isNative && getNativeMode() === 'server') {
       import('./lib/sync.js').then((mod) => {
-        // Mirror the real sync store into our local store so $syncState reactivity works
         mod.syncState.subscribe(v => syncState.set(v));
-        mod.startNetworkMonitor(); // Listen for online/offline + periodic health check
-        mod.fullSync(); // Initial sync on app startup
-        // Sync on app resume (coming back from background)
+        mod.startNetworkMonitor();
+        mod.fullSync(); // Initial sync
+        // Periodic sync every 30 seconds
+        setInterval(() => mod.fullSync(), 30000);
+        // Sync on app resume
         import('@capacitor/app').then(({ App }) => {
           App.addListener('resume', () => mod.fullSync());
         });
