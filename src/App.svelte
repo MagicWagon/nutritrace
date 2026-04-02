@@ -1,6 +1,7 @@
 <script>
   import { onMount }   from 'svelte';
   import { fade, slide } from 'svelte/transition';
+  import { portal } from './lib/portal.js';
   import Router, { location } from 'svelte-spa-router';
 
   import BottomNav from './components/layout/BottomNav.svelte';
@@ -225,7 +226,7 @@
 <!-- Sync status bar (native server mode only) -->
 {#if _showSyncBar && ($syncState.syncing || !$syncState.online || $syncState.error || _syncJustFinished)}
   <div class="sync-bar" class:sync-bar-error={$syncState.error} class:sync-bar-offline={!$syncState.online}
-    transition:slide={{ duration: 200 }}>
+    use:portal transition:slide={{ duration: 200 }}>
     {#if $syncState.syncing}
       <span class="material-symbols-rounded sync-bar-icon sync-spin">sync</span>
       <span>{$syncState.progress || 'Syncing…'}</span>
@@ -346,10 +347,10 @@
   /* ── Sync status bar ── */
   .sync-bar {
     position: fixed;
-    top: var(--safe-top, 0px);
-    left: var(--sidebar-w, 0px);
+    top: 0;
+    left: 0;
     right: 0;
-    z-index: 50;
+    z-index: 200;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -358,19 +359,19 @@
     font-size: 12px;
     font-weight: 500;
     color: var(--accent);
-    background: color-mix(in srgb, var(--accent) 90%, var(--bg));
-    border-bottom: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    background: color-mix(in srgb, var(--accent) 8%, var(--bg));
+    border-bottom: 1px solid color-mix(in srgb, var(--accent) 15%, transparent);
     transition: background 0.3s, color 0.3s;
   }
   .sync-bar-offline {
-    color: #fff;
-    background: color-mix(in srgb, var(--text-3) 90%, var(--bg));
-    border-color: color-mix(in srgb, var(--text-3) 30%, transparent);
+    color: var(--text-3);
+    background: color-mix(in srgb, var(--text-3) 8%, transparent);
+    border-color: color-mix(in srgb, var(--text-3) 15%, transparent);
   }
   .sync-bar-error {
-    color: #fff;
-    background: color-mix(in srgb, var(--error, #f87171) 90%, var(--bg));
-    border-color: color-mix(in srgb, var(--error, #f87171) 30%, transparent);
+    color: var(--error, #f87171);
+    background: color-mix(in srgb, var(--error, #f87171) 8%, transparent);
+    border-color: color-mix(in srgb, var(--error, #f87171) 15%, transparent);
   }
   .sync-bar-icon { font-size: 16px; }
   @keyframes sync-spin { to { transform: rotate(360deg); } }
