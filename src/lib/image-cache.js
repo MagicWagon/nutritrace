@@ -36,17 +36,17 @@ async function _downloadImage(serverUrl) {
   }
 
   try {
-    const response = await fetch(serverUrl);
-    if (!response.ok) return null;
-    const blob = await response.blob();
-
-    // Convert blob to base64
-    const base64 = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result.split(',')[1]);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
+    // Use CapacitorHttp to bypass CORS (fetch() is blocked by WebView CORS policy)
+    const { CapacitorHttp } = await import('@capacitor/core');
+    const response = await CapacitorHttp.get({
+      url: serverUrl,
+      responseType: 'blob',
     });
+    if (response.status < 200 || response.status >= 300) return null;
+
+    // CapacitorHttp returns base64 data for blob responseType
+    const base64 = response.data;
+    if (!base64) return null;
 
     await Filesystem.writeFile({
       path: `${CACHE_DIR}/${filename}`,

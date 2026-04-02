@@ -610,7 +610,14 @@
 <style>
   .link-btn { color: var(--text-3); margin-bottom: 2px; }
   .link-btn.linked { color: var(--accent); }
-  .editor-page { padding-top: 0; }
+  .editor-page {
+    padding-top: 0;
+    position: fixed;
+    inset: 0;
+    overflow-y: auto;
+    z-index: 30;
+    background: var(--bg);
+  }
   .editor-header {
     display: flex;
     align-items: center;

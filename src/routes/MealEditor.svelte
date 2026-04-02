@@ -779,7 +779,14 @@
 {/if}
 
 <style>
-  .editor-page { padding-top: 0; }
+  .editor-page {
+    padding-top: 0;
+    position: fixed;
+    inset: 0;
+    overflow-y: auto;
+    z-index: 30;
+    background: var(--bg);
+  }
   .editor-header {
     display: flex; align-items: center; gap: 12px;
     padding: calc(var(--safe-top) + 12px) 16px 12px;

@@ -56,7 +56,10 @@ app.use((req, res, next) => {
 // which can't send Authorization headers on <img src> requests)
 const uploadsPath = process.env.UPLOADS_PATH || './uploads';
 app.use('/uploads', express.static(uploadsPath, {
-  setHeaders(res) { res.set('Cache-Control', 'public, max-age=3600'); }
+  setHeaders(res) {
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.set('Access-Control-Allow-Origin', '*');
+  }
 }));
 
 // Proxy also before auth — used by Android WebView to load external images

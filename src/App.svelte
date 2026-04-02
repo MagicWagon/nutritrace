@@ -73,17 +73,8 @@
 
   const NAV_HIDDEN = ['/wizard', '/foods/edit', '/meal-editor', '/profile'];
   $: showNav       = !NAV_HIDDEN.some(p => $location.startsWith(p));
-  // Reset scroll BEFORE route renders for editor pages
-  const SCROLL_RESET_ROUTES = ['/foods/edit', '/meal-editor', '/profile', '/wizard'];
-  if (typeof window !== 'undefined') {
-    window.addEventListener('hashchange', () => {
-      const hash = window.location.hash.slice(1) || '/';
-      if (SCROLL_RESET_ROUTES.some(r => hash.startsWith(r))) {
-        document.documentElement.scrollTop = 0;
-        document.body.scrollTop = 0;
-      }
-    });
-  }
+  const EDITOR_ROUTES = ['/foods/edit', '/meal-editor', '/profile', '/wizard'];
+  $: _isEditorRoute = EDITOR_ROUTES.some(r => $location.startsWith(r));
   $: isEditor      = NAV_HIDDEN.some(p => $location.startsWith(p));
   $: _hasSidebar   = showNav && ($navStyle === 'sidebar' || $navStyle === 'both');
   $: sidebarPinned = _hasSidebar && $sidebarPersistent;
