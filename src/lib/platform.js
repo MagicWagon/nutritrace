@@ -88,15 +88,44 @@ export function getAuthToken() {
 }
 
 /**
+ * In-memory image cache map: server URL → local file URI.
+ * Populated during sync by loadImageMap(). Used by resolveAssetUrl() synchronously.
+ */
+let _imageMap = {};
+
+/** Load the image map from local DB into memory (call once on sync init) */
+export async function loadImageMap() {
+  if (!isNative) return;
+  try {
+    const { getDb } = await import('./db-native.js');
+    const db = await getDb();
+    const r = await db.query(`SELECT value FROM sync_meta WHERE key = 'image_map'`, []);
+    const row = r?.values?.[0];
+    if (row?.value) _imageMap = JSON.parse(row.value);
+  } catch {}
+}
+
+/** Update the in-memory image map (called after image cache downloads) */
+export function setImageMap(map) {
+  _imageMap = map || {};
+}
+
+/**
  * Resolve a relative URL (e.g. /uploads/photo.jpg) to an absolute URL
- * when in native server mode. On web, returns the path unchanged.
+ * when in native server mode. Checks local image cache first for offline support.
+ * On web, returns the path unchanged.
  */
 export function resolveAssetUrl(path) {
   if (!path) return path;
-  if (path.startsWith('http') || path.startsWith('data:') || path.startsWith('file:')) return path;
+  if (path.startsWith('data:') || path.startsWith('file:')) return path;
   if (isNative) {
     const url = getServerUrl();
-    if (url) return url + path;
+    // Build the full server URL for cache lookup
+    const fullUrl = path.startsWith('http') ? path : (url ? url + path : path);
+    // Check local image cache first
+    if (_imageMap[fullUrl]) return _imageMap[fullUrl];
+    // Fall back to server URL
+    if (url && !path.startsWith('http')) return url + path;
   }
   return path;
 }

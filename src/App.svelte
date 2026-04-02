@@ -17,11 +17,18 @@
   $: _showSyncBar = isNative && getNativeMode() === 'server';
   let _syncJustFinished = false;
   let _syncHideTimer = null;
-  // Auto-show "Synced" for 3 seconds after sync completes, then hide
-  $: if (!$syncState.syncing && $syncState.lastSync && _showSyncBar) {
-    _syncJustFinished = true;
-    clearTimeout(_syncHideTimer);
-    _syncHideTimer = setTimeout(() => { _syncJustFinished = false; }, 3000);
+  let _wasSyncing = false;
+  // Only show "Synced" when transitioning from syncing → done (not on cold start)
+  $: {
+    if ($syncState.syncing) {
+      _wasSyncing = true;
+      _syncJustFinished = false;
+    } else if (_wasSyncing && $syncState.lastSync) {
+      _wasSyncing = false;
+      _syncJustFinished = true;
+      clearTimeout(_syncHideTimer);
+      _syncHideTimer = setTimeout(() => { _syncJustFinished = false; }, 3000);
+    }
   }
   import NativeSetup from './routes/NativeSetup.svelte';
 
@@ -149,6 +156,8 @@
 
     // Start sync engine in native server-connected mode
     if (isNative && getNativeMode() === 'server') {
+      // Load cached image map so offline images resolve immediately
+      import('./lib/platform.js').then(({ loadImageMap }) => loadImageMap());
       import('./lib/sync.js').then((mod) => {
         syncState = mod.syncState; // Bind the real reactive store
         mod.fullSync(); // Initial sync on app startup
@@ -214,11 +223,11 @@
 
 <!-- Sync status bar (native server mode only) -->
 {#if _showSyncBar && ($syncState.syncing || !$syncState.online || $syncState.error || _syncJustFinished)}
-  <div class="sync-bar" class:sync-bar-error={$syncState.error} class:sync-bar-offline={!$syncState.online} class:sync-bar-done={_syncJustFinished && !$syncState.syncing}
+  <div class="sync-bar" class:sync-bar-error={$syncState.error} class:sync-bar-offline={!$syncState.online}
     transition:slide={{ duration: 200 }}>
     {#if $syncState.syncing}
       <span class="material-symbols-rounded sync-bar-icon sync-spin">sync</span>
-      <span>Syncing…</span>
+      <span>{$syncState.progress || 'Syncing…'}</span>
     {:else if !$syncState.online}
       <span class="material-symbols-rounded sync-bar-icon">cloud_off</span>
       <span>Offline — changes saved locally</span>

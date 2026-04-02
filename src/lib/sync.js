@@ -7,7 +7,7 @@
  * Uses server_time from pull response as last_sync_at (avoids clock skew).
  */
 
-import { getServerUrl, getAuthToken } from './platform.js';
+import { getServerUrl, getAuthToken, loadImageMap, setImageMap } from './platform.js';
 import {
   dbGetPendingChanges, dbMarkSynced, dbSetServerId,
   dbGetSyncMeta, dbSetSyncMeta,
@@ -19,6 +19,8 @@ import { writable } from 'svelte/store';
 /** Sync state — reactive store for UI */
 export const syncState = writable({
   syncing: false,
+  phase: '',     // 'pushing' | 'pulling' | 'images' | ''
+  progress: '',  // human-readable progress text
   lastSync: null,
   error: null,
   online: true,
@@ -176,28 +178,46 @@ async function pullChanges() {
   console.log(`[sync] pull complete: ${data.foods?.length || 0} foods, ${data.meals?.length || 0} meals, ${data.diary?.length || 0} diary, ${data.wellness?.length || 0} wellness`);
 }
 
-/** Full sync — push then pull */
+/** Full sync — push then pull then cache images */
 export async function fullSync() {
   if (_syncing) return;
   _syncing = true;
-  syncState.update(s => ({ ...s, syncing: true, error: null }));
+  syncState.update(s => ({ ...s, syncing: true, error: null, phase: 'pushing', progress: 'Pushing local changes…' }));
 
   try {
     const online = await checkOnline();
     if (!online) {
-      syncState.update(s => ({ ...s, syncing: false }));
+      syncState.update(s => ({ ...s, syncing: false, phase: '' }));
       _syncing = false;
       return;
     }
 
+    syncState.update(s => ({ ...s, phase: 'pushing', progress: 'Pushing local changes…' }));
     await pushChanges();
+
+    syncState.update(s => ({ ...s, phase: 'pulling', progress: 'Downloading data…' }));
     await pullChanges();
 
+    // Cache images for offline use
+    syncState.update(s => ({ ...s, phase: 'images', progress: 'Caching images…' }));
+    try {
+      const { cacheAllImages } = await import('./image-cache.js');
+      await cacheAllImages((done, total) => {
+        if (total > 0) {
+          syncState.update(s => ({ ...s, progress: `Caching images… ${done}/${total}` }));
+        }
+      });
+      // Reload image map into memory for resolveAssetUrl
+      await loadImageMap();
+    } catch (e) {
+      console.warn('[sync] Image caching failed:', e.message);
+    }
+
     const now = new Date().toISOString();
-    syncState.update(s => ({ ...s, syncing: false, lastSync: now, online: true }));
+    syncState.update(s => ({ ...s, syncing: false, phase: '', progress: '', lastSync: now, online: true }));
   } catch (e) {
     console.error('[sync] error:', e);
-    syncState.update(s => ({ ...s, syncing: false, error: e.message }));
+    syncState.update(s => ({ ...s, syncing: false, phase: '', progress: '', error: e.message }));
   } finally {
     _syncing = false;
   }
