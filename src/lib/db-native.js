@@ -517,7 +517,14 @@ export async function dbUpsertDiaryFromServer(serverRecord) {
   const existing = await db.query(`SELECT id, sync_status FROM diary WHERE date = ? AND user_id = ?`, [date, LOCAL_USER_ID]);
   const local = _row(existing);
 
-  if (local && local.sync_status === 'pending') return; // don't overwrite active edits
+  // If local has pending changes AND is newer than server, skip (local wins)
+  // Otherwise server wins — update local
+  if (local && local.sync_status === 'pending') {
+    const localRow = await db.query(`SELECT updated_at FROM diary WHERE id = ?`, [local.id]);
+    const localUpdated = _row(localRow)?.updated_at || '';
+    const serverUpdated = (updated_at || '').replace('T', ' ').replace('Z', '').replace(/\.\d+$/, '');
+    if (localUpdated > serverUpdated) return; // local is newer, keep it
+  }
 
   await db.run(
     `INSERT INTO diary (server_id, user_id, date, items, body_stats, water, updated_at, sync_status)

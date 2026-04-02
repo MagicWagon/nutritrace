@@ -138,9 +138,19 @@ router.post('/push', wrap((req, res) => {
       }
     }
 
-    // ── Diary (keyed by date, not ID) ────────────────────────────────────
+    // ── Diary (keyed by date, not ID) — only update if client is newer ──
     for (const d of diary) {
       if (!d.date) continue;
+      // Check if server has a newer version
+      const existingDiary = db.prepare(`SELECT updated_at FROM diary WHERE date = ? AND user_id ${u != null ? '= ?' : 'IS NULL'}`)
+        .get(d.date, ...(u != null ? [u] : []));
+      if (existingDiary && norm(d.updated_at) < norm(existingDiary.updated_at)) {
+        // Server is newer — skip this push (server wins)
+        const row = db.prepare(`SELECT id FROM diary WHERE date = ? AND user_id ${u != null ? '= ?' : 'IS NULL'}`)
+          .get(d.date, ...(u != null ? [u] : []));
+        result.diary.push({ client_id: d.client_id, server_id: row?.id, date: d.date });
+        continue;
+      }
       if (d.deleted_at) {
         db.prepare(`UPDATE diary SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE date = ? AND user_id ${u != null ? '= ?' : 'IS NULL'}`)
           .run(d.date, ...(u != null ? [u] : []));
