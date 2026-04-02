@@ -37,8 +37,11 @@ router.get('/pull', wrap((req, res) => {
   const since = req.query.since || '1970-01-01T00:00:00.000Z';
   const serverTime = new Date().toISOString();
 
+  // Convert ISO timestamp to SQLite format for comparison (YYYY-MM-DD HH:MM:SS)
+  const sinceSql = since.replace('T', ' ').replace('Z', '').replace(/\.\d+$/, '');
+
   const userFilter = u != null ? 'AND user_id = ?' : '';
-  const params = u != null ? [since, u] : [since];
+  const params = u != null ? [sinceSql, u] : [sinceSql];
 
   const foods = db.prepare(
     `SELECT * FROM foods WHERE updated_at > ? ${userFilter} ORDER BY updated_at`
@@ -53,13 +56,14 @@ router.get('/pull', wrap((req, res) => {
   ).all(...params).map(parse);
 
   const settings = u != null
-    ? db.prepare('SELECT * FROM user_settings WHERE updated_at > ? AND user_id = ? ORDER BY updated_at').all(since, u)
+    ? db.prepare('SELECT * FROM user_settings WHERE updated_at > ? AND user_id = ? ORDER BY updated_at').all(sinceSql, u)
     : [];
 
   // Wellness data — pull only (server-generated from Fitbit/Withings/Garmin syncs)
+  const wellnessParams = u != null ? [sinceSql, u] : [sinceSql];
   const wellness = db.prepare(
     `SELECT * FROM wellness_data WHERE synced_at > ? ${u != null ? 'AND user_id = ?' : ''} ORDER BY synced_at`
-  ).all(...params).map(parse);
+  ).all(...wellnessParams).map(parse);
 
   logger.debug(`[sync] pull since=${since}: foods=${foods.length} meals=${meals.length} diary=${diary.length} settings=${settings.length} wellness=${wellness.length}`);
 
