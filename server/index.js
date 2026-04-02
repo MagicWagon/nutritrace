@@ -59,6 +59,10 @@ app.use('/uploads', express.static(uploadsPath, {
   setHeaders(res) { res.set('Cache-Control', 'public, max-age=3600'); }
 }));
 
+// Proxy also before auth — used by Android WebView to load external images
+// (DuckDuckGo, Walmart, etc. block direct WebView requests)
+app.use('/api/proxy', proxyRoutes);
+
 app.use(authenticate); // attach req.user on every request
 
 // ── Request logging ────────────────────────────────────────────────────────
@@ -77,7 +81,7 @@ app.use('/api', (req, res, next) => { res.set('Cache-Control', 'no-store'); next
 
 // API routes
 app.use('/api/auth',   authRoutes);
-app.use('/api/proxy',  proxyRoutes);
+// proxy already registered before auth (line 64)
 app.use('/api/data',   dataRoutes);
 app.use('/api/foods',  foodsRoutes);
 app.use('/api/meals',  mealsRoutes);

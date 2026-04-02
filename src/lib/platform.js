@@ -125,13 +125,19 @@ export function resolveAssetUrl(path) {
   if (isNative) {
     // Always check local image cache first (fastest, works offline + disconnected)
     if (_imageMap[path]) return _imageMap[path];
-    // Also check with server URL prefix for full-URL keys
     const url = getServerUrl() || localStorage.getItem('nt:lastServerUrl') || '';
     if (url) {
       const fullUrl = path.startsWith('http') ? path : url + path;
       if (_imageMap[fullUrl]) return _imageMap[fullUrl];
     }
-    // Fall back to server URL when connected
+    // External URLs (not on our server): proxy through server to avoid WebView blocking
+    if (path.startsWith('http') && url) {
+      const serverHost = new URL(url).host;
+      if (!path.includes(serverHost)) {
+        return url + '/api/proxy?url=' + encodeURIComponent(path);
+      }
+    }
+    // Server-hosted images
     if (url && !path.startsWith('http')) return url + path;
     if (path.startsWith('http')) return path;
   }
