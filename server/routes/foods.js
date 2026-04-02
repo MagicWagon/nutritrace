@@ -3,6 +3,7 @@ import db from '../db.js';
 import { wrap } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
 import { sharingEnabled, canRead as _canRead } from '../lib/sharing.js';
+import { localizeImage, isExternalUrl } from '../lib/image-localizer.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -57,31 +58,34 @@ router.get('/:id', wrap((req, res) => {
 }));
 
 // ── POST / ────────────────────────────────────────────────────────────────
-router.post('/', wrap((req, res) => {
+router.post('/', wrap(async (req, res) => {
   const { name, brand, nutrition, portion, unit, img_url, notes, category, barcode, visibility, source_id } = req.body;
   if (!name) return res.status(400).json({ error: 'Name required' });
   const u = uid(req);
   const vis = visibility || 'private';
+  // Download external images to /uploads/ for self-hosting
+  const localImg = isExternalUrl(img_url) ? await localizeImage(img_url) : (img_url || null);
   const result = db.prepare(
     `INSERT INTO foods (user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, visibility, source_id, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
   ).run(u, name, brand || null, JSON.stringify(nutrition || {}), portion ?? 100, unit || 'g',
-    img_url || null, notes || null, category || null, barcode || null, vis, source_id || null);
+    localImg, notes || null, category || null, barcode || null, vis, source_id || null);
   res.status(201).json(parse(db.prepare('SELECT * FROM foods WHERE id = ?').get(result.lastInsertRowid)));
 }));
 
 // ── PUT /:id ──────────────────────────────────────────────────────────────
-router.put('/:id', wrap((req, res) => {
+router.put('/:id', wrap(async (req, res) => {
   const u = uid(req);
   const existing = db.prepare('SELECT * FROM foods WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Not found' });
   if (u != null && existing.user_id !== u) return res.status(403).json({ error: 'Forbidden' });
   const { name, brand, nutrition, portion, unit, img_url, notes, category, barcode, visibility } = req.body;
+  const localImg = (img_url && isExternalUrl(img_url)) ? await localizeImage(img_url) : (img_url ?? existing.img_url);
   db.prepare(
     `UPDATE foods SET name=?, brand=?, nutrition=?, portion=?, unit=?, img_url=?, notes=?, category=?, barcode=?, visibility=?, updated_at=datetime('now') WHERE id=?`
   ).run(name ?? existing.name, brand ?? existing.brand,
     JSON.stringify(nutrition ?? JSON.parse(existing.nutrition || '{}')),
-    portion ?? existing.portion, unit ?? existing.unit, img_url ?? existing.img_url,
+    portion ?? existing.portion, unit ?? existing.unit, localImg,
     notes ?? existing.notes, category ?? existing.category, barcode ?? existing.barcode,
     visibility ?? existing.visibility, req.params.id);
   res.json(parse(db.prepare('SELECT * FROM foods WHERE id = ?').get(req.params.id)));

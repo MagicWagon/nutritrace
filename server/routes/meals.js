@@ -3,6 +3,7 @@ import db from '../db.js';
 import { wrap } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
 import { sharingEnabled, canRead as _canRead } from '../lib/sharing.js';
+import { localizeImage, isExternalUrl } from '../lib/image-localizer.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -52,16 +53,17 @@ router.get('/:id', wrap((req, res) => {
 }));
 
 // ── POST / ────────────────────────────────────────────────────────────────
-router.post('/', wrap((req, res) => {
+router.post('/', wrap(async (req, res) => {
   const { name, nutrition, items, img_url, notes, is_recipe, portion, unit, visibility, source_id } = req.body;
   if (!name) return res.status(400).json({ error: 'Name required' });
   const u = uid(req);
   const vis = visibility || 'private';
+  const localImg = isExternalUrl(img_url) ? await localizeImage(img_url) : (img_url || null);
   const result = db.prepare(
     `INSERT INTO meals (user_id, name, nutrition, items, img_url, notes, is_recipe, portion, unit, visibility, source_id, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
   ).run(u, name, JSON.stringify(nutrition || {}), JSON.stringify(items || []),
-    img_url || null, notes || null, is_recipe ? 1 : 0, portion ?? 100, unit || 'g', vis, source_id || null);
+    localImg, notes || null, is_recipe ? 1 : 0, portion ?? 100, unit || 'g', vis, source_id || null);
   res.status(201).json(parse(db.prepare('SELECT * FROM meals WHERE id = ?').get(result.lastInsertRowid)));
 }));
 

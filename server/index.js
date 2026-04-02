@@ -142,4 +142,32 @@ process.on('uncaughtException', (err) => {
   process.exit(1);
 });
 
-app.listen(PORT, () => logger.info(`NutriTrace running on port ${PORT}`));
+app.listen(PORT, () => {
+  logger.info(`NutriTrace running on port ${PORT}`);
+
+  // One-time migration: download all external food/meal images to /uploads/
+  (async () => {
+    try {
+      const { localizeImage, isExternalUrl } = await import('./lib/image-localizer.js');
+      const foods = db.prepare(`SELECT id, img_url FROM foods WHERE img_url IS NOT NULL AND deleted_at IS NULL`).all();
+      const meals = db.prepare(`SELECT id, img_url FROM meals WHERE img_url IS NOT NULL AND deleted_at IS NULL`).all();
+      const external = [...foods.map(f => ({ ...f, table: 'foods' })), ...meals.map(m => ({ ...m, table: 'meals' }))]
+        .filter(r => isExternalUrl(r.img_url));
+
+      if (external.length > 0) {
+        logger.info(`[image-localizer] Migrating ${external.length} external images to /uploads/...`);
+        let migrated = 0;
+        for (const r of external) {
+          const localPath = await localizeImage(r.img_url);
+          if (localPath !== r.img_url) {
+            db.prepare(`UPDATE ${r.table} SET img_url = ?, updated_at = datetime('now') WHERE id = ?`).run(localPath, r.id);
+            migrated++;
+          }
+        }
+        logger.info(`[image-localizer] Migrated ${migrated}/${external.length} images`);
+      }
+    } catch (e) {
+      logger.warn('[image-localizer] Migration error:', e.message);
+    }
+  })();
+});
