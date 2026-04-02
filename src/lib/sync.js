@@ -98,14 +98,21 @@ async function pushChanges() {
     })),
   };
 
+  console.log(`[sync] push payload: ${payload.foods.length} foods, ${payload.meals.length} meals, ${payload.diary.length} diary`);
+
   const res = await fetch(`${_baseUrl()}/api/sync/push`, {
     method: 'POST',
     headers: _headers(),
     body: JSON.stringify(payload),
   });
 
-  if (!res.ok) throw new Error(`Push failed: ${res.status}`);
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    console.error(`[sync] push failed: ${res.status} ${errText}`);
+    throw new Error(`Push failed: ${res.status}`);
+  }
   const result = await res.json();
+  console.log('[sync] push result:', JSON.stringify(result));
 
   // Update server_id mappings for newly created records
   for (const f of (result.foods || [])) {
@@ -217,12 +224,40 @@ export async function fullSync() {
 
     const now = new Date().toISOString();
     syncState.update(s => ({ ...s, syncing: false, phase: '', progress: '', lastSync: now, online: true }));
+    // Notify the app that sync completed — pages should refresh data
+    window.dispatchEvent(new CustomEvent('nt:sync-complete'));
   } catch (e) {
     console.error('[sync] error:', e);
     syncState.update(s => ({ ...s, syncing: false, phase: '', progress: '', error: e.message }));
   } finally {
     _syncing = false;
   }
+}
+
+/** Start network monitoring — auto-sync when coming back online */
+export function startNetworkMonitor() {
+  // Listen for browser online/offline events
+  window.addEventListener('online', () => {
+    console.log('[sync] Network online detected');
+    fullSync();
+  });
+  window.addEventListener('offline', () => {
+    console.log('[sync] Network offline detected');
+    syncState.update(s => ({ ...s, online: false }));
+  });
+
+  // Periodic health check every 30 seconds (window online/offline is unreliable on Android)
+  setInterval(async () => {
+    if (_syncing) return;
+    const wasOnline = await new Promise(resolve => {
+      syncState.subscribe(s => resolve(s.online))();
+    });
+    const nowOnline = await checkOnline();
+    if (nowOnline && !wasOnline) {
+      console.log('[sync] Server reachable again — syncing');
+      fullSync();
+    }
+  }, 30000);
 }
 
 /** Quick push — debounced, for after local writes */

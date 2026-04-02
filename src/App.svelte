@@ -168,6 +168,7 @@
       import('./lib/sync.js').then((mod) => {
         // Mirror the real sync store into our local store so $syncState reactivity works
         mod.syncState.subscribe(v => syncState.set(v));
+        mod.startNetworkMonitor(); // Listen for online/offline + periodic health check
         mod.fullSync(); // Initial sync on app startup
         // Sync on app resume (coming back from background)
         import('@capacitor/app').then(({ App }) => {
