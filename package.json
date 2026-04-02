@@ -24,6 +24,7 @@
     "@capacitor/keyboard": "^8.0.2",
     "@capacitor/splash-screen": "^8.0.1",
     "@capacitor/status-bar": "^8.0.2",
+    "@devmaxime/capacitor-health-connect": "^1.1.0",
     "chart.js": "^4.4.0",
     "emoji-picker-element": "^1.29.1",
     "nodemailer": "^8.0.3",

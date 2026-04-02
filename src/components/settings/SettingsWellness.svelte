@@ -3,18 +3,32 @@
   import Toggle from './Toggle.svelte';
   import { showSuccess, showError } from '../../stores/toast.js';
   import {
-    wellnessEnabled, fitbitEnabled, wellnessMetrics, wellnessSyncMode, wellnessSyncRange,
+    wellnessEnabled, fitbitEnabled, healthConnectEnabled, wellnessMetrics, wellnessSyncMode, wellnessSyncRange,
     withingsSyncRange, withingsEnabled,
     garminEnabled, garminSyncRange,
   } from '../../stores/settings.js';
   import { DB } from '../../lib/db.js';
   import { NtApi } from '../../lib/api.js';
   import { currentUser, userMgmtActive } from '../../stores/auth.js';
+  import { isNative } from '../../lib/platform.js';
 
   // ── Wellness state ──────────────────────────────────────────────────────────
   let wellnessEnabledVal   = DB.getSetting('wellnessEnabled',   false);
   let fitbitEnabledVal     = DB.getSetting('fitbitEnabled',     false);
   let withingsEnabledVal   = DB.getSetting('withingsEnabled',   false);
+  let healthConnectEnabledVal = DB.getSetting('healthConnectEnabled', false);
+  let healthConnectAvailability = 'checking';
+  let healthConnectPermissions = { read: [] };
+
+  // Check Health Connect availability on mount
+  if (isNative) {
+    import('../../lib/health-connect.js').then(async ({ checkAvailability, getGrantedPermissions }) => {
+      healthConnectAvailability = await checkAvailability();
+      if (healthConnectAvailability === 'Available') {
+        healthConnectPermissions = await getGrantedPermissions();
+      }
+    }).catch(() => { healthConnectAvailability = 'NotSupported'; });
+  }
 
   // ── Wellness metric visibility (per integration, alphabetical by label) ──
   const FITBIT_METRICS = [
@@ -726,6 +740,57 @@
     <div style="display:flex;justify-content:flex-end;margin-top:4px">
       <button class="btn btn-sm" on:click={() => wellnessMetrics.set(null)}>Reset visible metrics</button>
     </div>
+
+    <!-- Health Connect (Android only) -->
+    {#if isNative}
+      <p class="sub-label" style="margin-top:16px">
+        Health Connect
+        <span style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;font-size:10px;padding:2px 6px;border-radius:4px;margin-left:6px;font-weight:600">Experimental</span>
+      </p>
+      <div class="card settings-card">
+        <div class="setting-row">
+          <div>
+            <span class="setting-label">Enable Health Connect</span>
+            <div class="setting-desc">Read steps, heart rate, sleep, weight, and activity from Android Health Connect. Data from any connected wearable.</div>
+          </div>
+          <Toggle checked={healthConnectEnabledVal} on:change={async e => {
+            const enabled = e.detail;
+            if (enabled) {
+              if (healthConnectAvailability !== 'Available') {
+                showError(healthConnectAvailability === 'NotInstalled' ? 'Health Connect is not installed. Install it from the Play Store.' : 'Health Connect is not supported on this device.');
+                return;
+              }
+              const { requestPermissions } = await import('../../lib/health-connect.js');
+              const perms = await requestPermissions();
+              if (perms.read.length === 0) {
+                showError('No permissions granted');
+                return;
+              }
+              healthConnectPermissions = perms;
+              showSuccess(`Health Connect enabled (${perms.read.length} data types)`);
+            }
+            healthConnectEnabledVal = enabled;
+            healthConnectEnabled.set(enabled);
+          }} />
+        </div>
+        {#if healthConnectEnabledVal}
+          <div class="setting-divider"></div>
+          <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:4px">
+            <span class="setting-label" style="font-size:13px">Status</span>
+            {#if healthConnectAvailability === 'Available'}
+              <div class="setting-desc" style="color:var(--success, #22c55e)">
+                <span class="material-symbols-rounded" style="font-size:16px;vertical-align:middle">check_circle</span>
+                Available · {healthConnectPermissions.read.length} data types granted
+              </div>
+            {:else if healthConnectAvailability === 'NotInstalled'}
+              <div class="setting-desc" style="color:var(--error, #ef4444)">Not installed — install Health Connect from the Play Store</div>
+            {:else}
+              <div class="setting-desc" style="color:var(--text-3)">Not supported on this device</div>
+            {/if}
+          </div>
+        {/if}
+      </div>
+    {/if}
   {/if}
 
 </div>

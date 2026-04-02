@@ -747,15 +747,17 @@
   $: if (activeTab === 'sleep' && !_insightsLoaded) loadSleepInsights();
 
   // ── Integration availability ───────────────────────────────────────────────
+  import { healthConnectEnabled } from '../stores/settings.js';
   $: fitbitAvailable   = $fitbitEnabled;
   $: withingsAvailable = $withingsEnabled;
   $: garminAvailable   = $garminEnabled;
-  $: anyAvailable      = fitbitAvailable || withingsAvailable || garminAvailable;
+  $: healthConnectAvailable = isNative && $healthConnectEnabled;
+  $: anyAvailable      = fitbitAvailable || withingsAvailable || garminAvailable || healthConnectAvailable;
 
   // Sliding pill: ordered list of visible tabs + active index
   // Garmin contributes to movement/sleep/heart tabs alongside Fitbit
   $: _wlTabList = [
-    ...(fitbitAvailable || garminAvailable ? ['movement', 'sleep', 'heart'] : []),
+    ...(fitbitAvailable || garminAvailable || healthConnectAvailable ? ['movement', 'sleep', 'heart'] : []),
     ...(withingsAvailable ? ['body'] : []),
   ];
   $: _wlActiveIdx  = Math.max(0, _wlTabList.indexOf(activeTab));

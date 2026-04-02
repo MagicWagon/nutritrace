@@ -208,6 +208,19 @@ export async function fullSync(silent = false) {
       return;
     }
 
+    // Read Health Connect data (if enabled) before push so it's included
+    try {
+      const { DB } = await import('./db.js');
+      if (DB.getSetting('healthConnectEnabled', false)) {
+        if (!silent) syncState.update(s => ({ ...s, phase: 'health', progress: 'Reading Health Connect…' }));
+        const { syncHealthConnect } = await import('./health-connect.js');
+        const today = new Date().toLocaleDateString('sv-SE');
+        await syncHealthConnect(today);
+      }
+    } catch (e) {
+      console.warn('[sync] Health Connect read failed:', e.message);
+    }
+
     if (!silent) syncState.update(s => ({ ...s, phase: 'pushing', progress: 'Pushing local changes…' }));
     const pushed = await pushChanges();
 

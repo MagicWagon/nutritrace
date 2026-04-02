@@ -23,7 +23,7 @@ const SERVER_SETTINGS = new Set([
   'aiEnabled','aiProvider','aiApiKey','aiModel','aiAssistantName',
   'usdaEnabled','usdaApiKey','offUsername','offPassword',
   'mealieEnabled','mealieBaseUrl','mealieApiToken',
-  'wellnessEnabled','fitbitEnabled','wellnessMetrics','wellnessSyncMode','wellnessSyncRange',
+  'wellnessEnabled','fitbitEnabled','healthConnectEnabled','wellnessMetrics','wellnessSyncMode','wellnessSyncRange',
   'withingsEnabled','withingsSyncRange','withingsDataPriority',
   'garminEnabled','garminSyncRange',
   'defaultFoodVisibility',
@@ -245,6 +245,7 @@ export const loopBannerAnimations = createSettingStore('loopBannerAnimations', t
 // Wellness (Activity Tracking)
 export const wellnessEnabled    = createSettingStore('wellnessEnabled',    false);
 export const fitbitEnabled      = createSettingStore('fitbitEnabled',      false);
+export const healthConnectEnabled = createSettingStore('healthConnectEnabled', false);
 export const wellnessMetrics    = createSettingStore('wellnessMetrics',    null); // null = all visible
 export const wellnessSyncMode   = createSettingStore('wellnessSyncMode',   'auto'); // 'auto' | 'manual'
 export const wellnessSyncRange  = createSettingStore('wellnessSyncRange',  7);    // days: 1|7|30|90|365
