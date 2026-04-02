@@ -7,8 +7,7 @@
  */
 
 import { Filesystem, Directory } from '@capacitor/filesystem';
-import { getServerUrl } from './platform.js';
-import { getDb } from './db-native.js';
+import { getServerUrl, getAuthToken } from './platform.js';
 
 const CACHE_DIR = 'image_cache';
 
@@ -72,70 +71,68 @@ async function _downloadImage(serverUrl) {
  * Stored in sync_meta as JSON so resolveAssetUrl can use it.
  */
 async function _loadImageMap() {
-  const db = await getDb();
-  const r = await db.query(`SELECT value FROM sync_meta WHERE key = 'image_map'`, []);
-  const row = r?.values?.[0];
-  if (row?.value) {
-    try { return JSON.parse(row.value); } catch { return {}; }
-  }
+  try {
+    const { getDb } = await import('./db-native.js');
+    const db = await getDb();
+    const r = await db.query(`SELECT value FROM sync_meta WHERE key = 'image_map'`, []);
+    const row = r?.values?.[0];
+    if (row?.value) return JSON.parse(row.value);
+  } catch {}
   return {};
 }
 
 async function _saveImageMap(map) {
-  const db = await getDb();
-  await db.run(
-    `INSERT INTO sync_meta (key, value) VALUES ('image_map', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-    [JSON.stringify(map)]
-  );
+  try {
+    const { getDb } = await import('./db-native.js');
+    const db = await getDb();
+    await db.run(
+      `INSERT INTO sync_meta (key, value) VALUES ('image_map', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      [JSON.stringify(map)]
+    );
+  } catch {}
 }
 
 /**
- * Scan all local data for server image URLs and download them.
- * Returns { total, downloaded, failed }.
+ * Scan server data for image URLs and download them to the device.
+ * Fetches food/meal/diary lists from the SERVER (not local DB) to ensure
+ * we have the complete set of images before going offline.
  * Calls onProgress(downloaded, total) for UI updates.
  */
 export async function cacheAllImages(onProgress) {
   const serverUrl = getServerUrl();
   if (!serverUrl) return { total: 0, downloaded: 0, failed: 0 };
 
-  const db = await getDb();
   const imageMap = await _loadImageMap();
+  const token = getAuthToken();
+  const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
 
-  // Collect all unique image paths (relative like /uploads/photo.jpg)
-  // Store both the relative path AND the full URL as keys so lookups work in all modes
+  // Fetch image URLs from server
   const urlPairs = []; // [{ relative, full }]
 
-  const foods = await db.query(`SELECT img_url FROM foods WHERE img_url IS NOT NULL AND img_url != '' AND deleted_at IS NULL`, []);
-  for (const row of (foods?.values || [])) {
-    if (row.img_url) {
-      const rel = row.img_url.startsWith('http') ? new URL(row.img_url).pathname : row.img_url;
-      const full = row.img_url.startsWith('http') ? row.img_url : serverUrl + row.img_url;
-      urlPairs.push({ relative: rel, full });
-    }
+  function addUrl(imgUrl) {
+    if (!imgUrl) return;
+    const rel = imgUrl.startsWith('http') ? new URL(imgUrl).pathname : imgUrl;
+    const full = imgUrl.startsWith('http') ? imgUrl : serverUrl + imgUrl;
+    urlPairs.push({ relative: rel, full });
   }
 
-  const meals = await db.query(`SELECT img_url FROM meals WHERE img_url IS NOT NULL AND img_url != '' AND deleted_at IS NULL`, []);
-  for (const row of (meals?.values || [])) {
-    if (row.img_url) {
-      const rel = row.img_url.startsWith('http') ? new URL(row.img_url).pathname : row.img_url;
-      const full = row.img_url.startsWith('http') ? row.img_url : serverUrl + row.img_url;
-      urlPairs.push({ relative: rel, full });
-    }
-  }
+  try {
+    const foods = await fetch(`${serverUrl}/api/foods`, { headers }).then(r => r.json());
+    for (const f of foods) addUrl(f.img_url);
+  } catch {}
 
-  const diary = await db.query(`SELECT items FROM diary WHERE deleted_at IS NULL`, []);
-  for (const row of (diary?.values || [])) {
-    try {
-      const items = typeof row.items === 'string' ? JSON.parse(row.items) : (row.items || []);
-      for (const item of items) {
-        if (item.imgUrl) {
-          const rel = item.imgUrl.startsWith('http') ? new URL(item.imgUrl).pathname : item.imgUrl;
-          const full = item.imgUrl.startsWith('http') ? item.imgUrl : serverUrl + item.imgUrl;
-          urlPairs.push({ relative: rel, full });
-        }
-      }
-    } catch {}
-  }
+  try {
+    const meals = await fetch(`${serverUrl}/api/meals`, { headers }).then(r => r.json());
+    for (const m of meals) addUrl(m.img_url);
+  } catch {}
+
+  try {
+    const diary = await fetch(`${serverUrl}/api/diary`, { headers }).then(r => r.json());
+    for (const d of diary) {
+      const items = typeof d.items === 'string' ? JSON.parse(d.items) : (d.items || []);
+      for (const item of items) addUrl(item.imgUrl || item.img_url);
+    }
+  } catch {}
 
   // Deduplicate and filter out already-cached
   const seen = new Set();
