@@ -79,13 +79,16 @@ router.post('/push', wrap((req, res) => {
   const { foods = [], meals = [], diary = [], settings = [] } = req.body;
   const result = { foods: [], meals: [], diary: [], settings: [] };
 
+  // Normalize timestamp for comparison (strip T, Z, milliseconds)
+  const norm = ts => ts ? ts.replace('T', ' ').replace('Z', '').replace(/\.\d+$/, '') : '';
+
   const run = db.transaction(() => {
     // ── Foods ────────────────────────────────────────────────────────────
     for (const f of foods) {
       if (f.server_id) {
         // Update existing — last-write-wins
         const existing = db.prepare('SELECT updated_at FROM foods WHERE id = ?').get(f.server_id);
-        if (existing && f.updated_at > existing.updated_at) {
+        if (existing && norm(f.updated_at) >= norm(existing.updated_at)) {
           if (f.deleted_at) {
             db.prepare(`UPDATE foods SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`).run(f.server_id);
           } else {
@@ -111,7 +114,7 @@ router.post('/push', wrap((req, res) => {
     for (const m of meals) {
       if (m.server_id) {
         const existing = db.prepare('SELECT updated_at FROM meals WHERE id = ?').get(m.server_id);
-        if (existing && m.updated_at > existing.updated_at) {
+        if (existing && norm(m.updated_at) >= norm(existing.updated_at)) {
           if (m.deleted_at) {
             db.prepare(`UPDATE meals SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`).run(m.server_id);
           } else {

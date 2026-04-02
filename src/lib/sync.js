@@ -99,6 +99,7 @@ async function pushChanges() {
   };
 
   console.log(`[sync] push payload: ${payload.foods.length} foods, ${payload.meals.length} meals, ${payload.diary.length} diary`);
+  if (payload.foods.length) console.log('[sync] push foods:', payload.foods.map(f => `${f.name}(cid=${f.client_id},sid=${f.server_id},del=${f.deleted_at})`).join(', '));
 
   const res = await fetch(`${_baseUrl()}/api/sync/push`, {
     method: 'POST',
