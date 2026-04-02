@@ -743,7 +743,7 @@
 
     <!-- Health Connect (Android only) -->
     {#if isNative}
-      <p class="sub-label" style="margin-top:16px">
+      <p class="sub-label">
         Health Connect
         <span style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;font-size:10px;padding:2px 6px;border-radius:4px;margin-left:6px;font-weight:600">Experimental</span>
       </p>
