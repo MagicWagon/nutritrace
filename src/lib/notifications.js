@@ -60,42 +60,36 @@ export async function showNotification(title, body, id = Date.now()) {
 
 // ── Water reminders ─────────────────────────────────────────────────────────
 
-/** Schedule recurring water reminders every `intervalMin` minutes, from 8am to 10pm */
+/** Schedule repeating water reminders every `intervalMin` minutes, 8am–10pm daily */
 export async function scheduleWaterReminders(intervalMin = 120) {
-  if (!isNative) return; // PWA can't schedule future notifications reliably
+  if (!isNative) return;
   const LN = await _getLN();
   if (!LN) return;
-
-  // Cancel existing water reminders first
   await cancelWaterReminders();
 
+  // Create repeating daily notifications at fixed times within 8am-10pm
   const notifications = [];
-  const now = new Date();
   const startHour = 8, endHour = 22;
-
-  // Schedule for today and tomorrow
-  for (let day = 0; day < 2; day++) {
-    const base = new Date(now);
-    base.setDate(base.getDate() + day);
-    base.setHours(startHour, 0, 0, 0);
-
-    while (base.getHours() < endHour) {
-      if (base > now) {
-        notifications.push({
-          id: 1000 + notifications.length,
-          title: 'Hydration Reminder',
-          body: 'Time to drink some water! Stay hydrated.',
-          schedule: { at: new Date(base) },
-          channelId: 'nutritrace',
-        });
-      }
-      base.setMinutes(base.getMinutes() + intervalMin);
-    }
+  let id = 1000;
+  for (let min = startHour * 60; min < endHour * 60; min += intervalMin) {
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    // Schedule first occurrence today or tomorrow
+    const at = new Date();
+    at.setHours(h, m, 0, 0);
+    if (at <= new Date()) at.setDate(at.getDate() + 1);
+    notifications.push({
+      id: id++,
+      title: 'Hydration Reminder',
+      body: 'Time to drink some water! Stay hydrated.',
+      schedule: { at, every: 'day', allowWhileIdle: true },
+      channelId: 'nutritrace',
+    });
   }
 
   if (notifications.length) {
     await LN.schedule({ notifications });
-    console.log(`[notifications] scheduled ${notifications.length} water reminders (every ${intervalMin} min)`);
+    console.log(`[notifications] scheduled ${notifications.length} repeating water reminders`);
   }
 }
 
@@ -104,44 +98,37 @@ export async function cancelWaterReminders() {
   const LN = await _getLN();
   if (!LN) return;
   const pending = await LN.getPending();
-  const waterIds = pending.notifications.filter(n => n.id >= 1000 && n.id < 2000).map(n => ({ id: n.id }));
-  if (waterIds.length) await LN.cancel({ notifications: waterIds });
+  const ids = pending.notifications.filter(n => n.id >= 1000 && n.id < 2000).map(n => ({ id: n.id }));
+  if (ids.length) await LN.cancel({ notifications: ids });
 }
 
 // ── Meal reminders ──────────────────────────────────────────────────────────
 
-/** Schedule daily meal reminders at specified times (e.g. ['08:00', '12:00', '18:00']) */
+/** Schedule repeating daily meal reminders at specified times */
 export async function scheduleMealReminders(times = ['08:00', '12:00', '18:00'], mealNames = ['Breakfast', 'Lunch', 'Dinner']) {
   if (!isNative) return;
   const LN = await _getLN();
   if (!LN) return;
-
   await cancelMealReminders();
 
   const notifications = [];
-  const now = new Date();
-
-  for (let day = 0; day < 2; day++) {
-    times.forEach((time, i) => {
-      const [h, m] = time.split(':').map(Number);
-      const at = new Date(now);
-      at.setDate(at.getDate() + day);
-      at.setHours(h, m, 0, 0);
-      if (at > now) {
-        notifications.push({
-          id: 2000 + day * 10 + i,
-          title: 'Meal Reminder',
-          body: `Time to log your ${mealNames[i] || 'meal'}!`,
-          schedule: { at },
-          channelId: 'nutritrace',
-        });
-      }
+  times.forEach((time, i) => {
+    const [h, m] = time.split(':').map(Number);
+    const at = new Date();
+    at.setHours(h, m, 0, 0);
+    if (at <= new Date()) at.setDate(at.getDate() + 1);
+    notifications.push({
+      id: 2000 + i,
+      title: 'Meal Reminder',
+      body: `Time to log your ${mealNames[i] || 'meal'}!`,
+      schedule: { at, every: 'day', allowWhileIdle: true },
+      channelId: 'nutritrace',
     });
-  }
+  });
 
   if (notifications.length) {
     await LN.schedule({ notifications });
-    console.log(`[notifications] scheduled ${notifications.length} meal reminders`);
+    console.log(`[notifications] scheduled ${notifications.length} repeating meal reminders`);
   }
 }
 
@@ -150,8 +137,8 @@ export async function cancelMealReminders() {
   const LN = await _getLN();
   if (!LN) return;
   const pending = await LN.getPending();
-  const mealIds = pending.notifications.filter(n => n.id >= 2000 && n.id < 3000).map(n => ({ id: n.id }));
-  if (mealIds.length) await LN.cancel({ notifications: mealIds });
+  const ids = pending.notifications.filter(n => n.id >= 2000 && n.id < 3000).map(n => ({ id: n.id }));
+  if (ids.length) await LN.cancel({ notifications: ids });
 }
 
 // ── Unified notify — sends to all enabled delivery methods ──────────────────
@@ -413,25 +400,18 @@ export async function scheduleWeighInReminder(timeStr = '07:00') {
   await cancelWeighInReminder();
 
   const [h, m] = timeStr.split(':').map(Number);
-  const now = new Date();
-  const notifications = [];
+  const at = new Date();
+  at.setHours(h, m, 0, 0);
+  if (at <= new Date()) at.setDate(at.getDate() + 1);
 
-  for (let day = 0; day < 2; day++) {
-    const at = new Date(now);
-    at.setDate(at.getDate() + day);
-    at.setHours(h, m, 0, 0);
-    if (at > now) {
-      notifications.push({
-        id: 4000 + day,
-        title: 'Weigh-in Reminder',
-        body: 'Time to step on the scale!',
-        schedule: { at },
-        channelId: 'nutritrace',
-      });
-    }
-  }
-
-  if (notifications.length) await LN.schedule({ notifications });
+  await LN.schedule({ notifications: [{
+    id: 4000,
+    title: 'Weigh-in Reminder',
+    body: 'Time to step on the scale!',
+    schedule: { at, every: 'day', allowWhileIdle: true },
+    channelId: 'nutritrace',
+  }]});
+  console.log(`[notifications] scheduled repeating weigh-in reminder at ${timeStr}`);
 }
 
 export async function cancelWeighInReminder() {

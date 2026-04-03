@@ -23,7 +23,8 @@ const SERVER_SETTINGS = new Set([
   'aiEnabled','aiProvider','aiApiKey','aiModel','aiAssistantName',
   'usdaEnabled','usdaApiKey','offUsername','offPassword',
   'mealieEnabled','mealieBaseUrl','mealieApiToken',
-  'wellnessEnabled','fitbitEnabled','healthConnectEnabled','wellnessMetrics','workoutsEnabled','wellnessSyncMode','wellnessSyncRange',
+  'wellnessEnabled','fitbitEnabled','healthConnectEnabled','wellnessMetrics','workoutsEnabled',
+  'wellnessSyncMode','wellnessSyncSchedule','wellnessSyncTime','wellnessSyncRange',
   'withingsEnabled','withingsSyncRange','withingsDataPriority',
   'garminEnabled','garminSyncRange',
   'defaultFoodVisibility',
@@ -299,8 +300,10 @@ export const fitbitEnabled      = createSettingStore('fitbitEnabled',      false
 export const healthConnectEnabled = createSettingStore('healthConnectEnabled', false);
 export const wellnessMetrics    = createSettingStore('wellnessMetrics',    null); // null = all visible
 export const workoutsEnabled   = createSettingStore('workoutsEnabled',   false); // show workout history + GPS maps in Movement tab
-export const wellnessSyncMode   = createSettingStore('wellnessSyncMode',   'auto'); // 'auto' | 'manual'
-export const wellnessSyncRange  = createSettingStore('wellnessSyncRange',  7);    // days: 1|7|30|90|365
+export const wellnessSyncMode     = createSettingStore('wellnessSyncMode',     'auto'); // 'auto' | 'manual' | 'scheduled'
+export const wellnessSyncSchedule = createSettingStore('wellnessSyncSchedule', 'daily'); // 'every6h' | 'every12h' | 'daily' | 'weekly'
+export const wellnessSyncTime     = createSettingStore('wellnessSyncTime',     '14:00'); // HH:MM for scheduled sync
+export const wellnessSyncRange    = createSettingStore('wellnessSyncRange',    7);    // days: 1|7|30|90|365
 
 export const withingsEnabled      = createSettingStore('withingsEnabled',      false);
 export const withingsSyncRange    = createSettingStore('withingsSyncRange',    7);

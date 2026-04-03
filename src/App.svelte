@@ -204,6 +204,23 @@
       });
     }
 
+    // Re-schedule reminders on app open (refreshes repeating notifications)
+    if (isNative) {
+      import('./lib/notifications.js').then(async ({ scheduleWaterReminders, scheduleMealReminders, scheduleWeighInReminder }) => {
+        if (DB.getSetting('notifWaterReminders', false)) {
+          await scheduleWaterReminders(DB.getSetting('notifWaterInterval', 120));
+        }
+        if (DB.getSetting('notifMealReminders', false)) {
+          const times = DB.getSetting('notifMealTimes', ['08:00','12:00','18:00']);
+          const names = DB.getSetting('mealNames', ['Breakfast','Lunch','Dinner','Snacks']);
+          await scheduleMealReminders(times, names);
+        }
+        if (DB.getSetting('notifWeighIn', false)) {
+          await scheduleWeighInReminder(DB.getSetting('notifWeighInTime', '07:00'));
+        }
+      }).catch(() => {});
+    }
+
     // PWA: reload settings periodically + on tab focus (picks up changes from phone/other devices)
     if (!isNative && $userMgmtActive && $currentUser) {
       const _refreshSettings = () => import('./stores/settings.js').then(({ loadServerSettings }) => loadServerSettings());

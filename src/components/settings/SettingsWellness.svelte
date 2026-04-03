@@ -4,7 +4,8 @@
   import Toggle from './Toggle.svelte';
   import { showSuccess, showError } from '../../stores/toast.js';
   import {
-    wellnessEnabled, fitbitEnabled, healthConnectEnabled, wellnessMetrics, workoutsEnabled, wellnessSyncMode, wellnessSyncRange,
+    wellnessEnabled, fitbitEnabled, healthConnectEnabled, wellnessMetrics, workoutsEnabled,
+    wellnessSyncMode, wellnessSyncSchedule, wellnessSyncTime, wellnessSyncRange,
     withingsSyncRange, withingsEnabled,
     garminEnabled, garminSyncRange,
   } from '../../stores/settings.js';
@@ -119,8 +120,10 @@
     }
   }
 
-  let wellnessSyncModeVal  = DB.getSetting('wellnessSyncMode',  'auto');
-  let wellnessSyncRangeVal = DB.getSetting('wellnessSyncRange', 7);
+  let wellnessSyncModeVal     = DB.getSetting('wellnessSyncMode',     'auto');
+  let wellnessSyncScheduleVal = DB.getSetting('wellnessSyncSchedule', 'daily');
+  let wellnessSyncTimeVal     = DB.getSetting('wellnessSyncTime',     '14:00');
+  let wellnessSyncRangeVal    = DB.getSetting('wellnessSyncRange',    7);
 
   const SYNC_RANGE_OPTIONS = [
     { value: 1,   label: '1 day'   },
@@ -376,15 +379,41 @@
       <div class="setting-row">
         <div>
           <span class="setting-label">Sync Mode</span>
-          <div class="setting-desc">Auto syncs when you open the Wellness page (15 min cooldown). Manual requires tapping Sync.</div>
+          <div class="setting-desc">
+            {#if wellnessSyncModeVal === 'auto'}Auto syncs when you open the Wellness page (15 min cooldown).
+            {:else if wellnessSyncModeVal === 'manual'}Sync only when you tap the Sync button.
+            {:else if wellnessSyncModeVal === 'scheduled'}Server syncs automatically on a schedule.
+            {/if}
+          </div>
         </div>
         <div class="select-wrap" style="width:150px">
           <select class="select sel-sm" bind:value={wellnessSyncModeVal} on:change={e => wellnessSyncMode.set(e.target.value)}>
             <option value="auto">Auto (on open)</option>
             <option value="manual">Manual only</option>
+            {#if !isNativeLocal}<option value="scheduled">Scheduled</option>{/if}
           </select>
         </div>
       </div>
+      {#if wellnessSyncModeVal === 'scheduled'}
+        <div class="setting-divider"></div>
+        <div class="setting-row">
+          <span class="setting-label">Frequency</span>
+          <div class="select-wrap" style="width:150px">
+            <select class="select sel-sm" bind:value={wellnessSyncScheduleVal} on:change={e => wellnessSyncSchedule.set(e.target.value)}>
+              <option value="every6h">Every 6 hours</option>
+              <option value="every12h">Every 12 hours</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly (Sunday)</option>
+            </select>
+          </div>
+        </div>
+        <div class="setting-divider"></div>
+        <div class="setting-row">
+          <span class="setting-label">Time</span>
+          <input type="time" class="input" style="width:120px;height:36px;padding:0 10px;font-size:13px;text-align:center"
+            value={wellnessSyncTimeVal} on:change={e => { wellnessSyncTimeVal = e.target.value; wellnessSyncTime.set(e.target.value); }} />
+        </div>
+      {/if}
     {/if}
   </div>
 

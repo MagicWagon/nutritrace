@@ -145,6 +145,11 @@ process.on('uncaughtException', (err) => {
 app.listen(PORT, () => {
   logger.info(`NutriTrace running on port ${PORT}`);
 
+  // Start the notification + sync scheduler
+  import('./lib/scheduler.js').then(({ startScheduler }) => startScheduler()).catch(e => {
+    logger.warn(`[scheduler] failed to start: ${e.message}`);
+  });
+
   // One-time migration: download all external food/meal images to /uploads/
   (async () => {
     try {
