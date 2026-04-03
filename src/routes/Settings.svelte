@@ -554,9 +554,16 @@
     set('gotifyUrl', _gotifyUrl);
     set('gotifyToken', _gotifyToken);
     try {
-      const { sendGotify } = await import('../lib/notifications.js');
-      await sendGotify(_gotifyUrl, _gotifyToken, 'NutriTrace', 'Test notification — Gotify is connected!', 5);
-      showSuccess('Test sent — check your Gotify app!');
+      // Use server proxy to avoid CORS + connectivity issues
+      const res = await fetch(apiUrl('/api/settings/gotify-test'), {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...(_authH || {}) },
+        body: JSON.stringify({ url: _gotifyUrl, token: _gotifyToken }),
+      });
+      const data = await res.json();
+      if (res.ok) showSuccess('Test sent — check your Gotify app!');
+      else showError('Gotify test failed: ' + (data.error || res.status));
     } catch (e) { showError('Gotify test failed: ' + (e.message || 'unknown error')); }
     _gotifyTesting = false;
   }
