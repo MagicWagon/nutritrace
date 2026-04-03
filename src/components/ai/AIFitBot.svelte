@@ -11,11 +11,13 @@
 
   // ── State ──────────────────────────────────────────────────────────────────
   let panelOpen  = false;
-  let messages   = [];   // { role, content, time }
+  let messages   = [];   // { role, content, time, image? }
   let input      = '';
   let loading    = false;
   let messagesEl;
   let hasUnread  = false;
+  let attachedImage = null; // { base64, mimeType, preview }
+  let fileInput;
 
   // Whether AI config is locked via env vars (proxy mode)
   let aiEnvLocked = false;
@@ -309,7 +311,8 @@
 
   async function send() {
     const content = input.trim();
-    if (!content || loading) return;
+    if (!content && !attachedImage) return;
+    if (loading) return;
 
     const key      = $aiApiKey;
     const provider = aiProvider.get() || 'claude';
@@ -317,23 +320,30 @@
 
     if (!aiEnvLocked && !key) { showError('Add your API key in Settings → FitBot AI'); return; }
 
-    const userMsg = { role: 'user', content, time: fmtTime() };
+    const image = attachedImage;
+    const userMsg = { role: 'user', content: content || '(image)', time: fmtTime(), image: image?.preview };
     messages = [...messages, userMsg];
     input    = '';
+    attachedImage = null;
     loading  = true;
     await tick();
     _scrollBottom();
 
     // Persist user message to server (best-effort)
-    NtApi.post('/api/ai/history', { role: 'user', content }).catch(() => {});
+    NtApi.post('/api/ai/history', { role: 'user', content: content || '(image attached)' }).catch(() => {});
 
     try {
       const ctx          = await buildContext();
       const systemPrompt = buildSystemPrompt(ctx);
-      // Strip 'time' field before sending; limit to last 20 for context window
+      // Build API messages — include image in the last user message if present
       const apiMessages  = messages
         .map(m => ({ role: m.role, content: m.content }))
         .slice(-20);
+      // If image attached, modify the last user message to include it
+      if (image) {
+        const lastIdx = apiMessages.length - 1;
+        apiMessages[lastIdx] = _buildImageMessage(provider, content || 'What is this?', image);
+      }
       const reply = aiEnvLocked
         ? await callAIProxy({ messages: apiMessages, systemPrompt })
         : await callAI({ provider, apiKey: key, model, messages: apiMessages, systemPrompt });
@@ -349,6 +359,51 @@
       _scrollBottom();
     }
   }
+
+  function _buildImageMessage(provider, text, image) {
+    if (provider === 'claude') {
+      return { role: 'user', content: [
+        { type: 'image', source: { type: 'base64', media_type: image.mimeType, data: image.base64 } },
+        { type: 'text', text },
+      ]};
+    } else if (provider === 'openai') {
+      return { role: 'user', content: [
+        { type: 'image_url', image_url: { url: `data:${image.mimeType};base64,${image.base64}` } },
+        { type: 'text', text },
+      ]};
+    } else if (provider === 'gemini') {
+      // Gemini handles images differently — pass through and let aiChat.js handle it
+      return { role: 'user', content: text, _image: image };
+    }
+    return { role: 'user', content: text };
+  }
+
+  function _attachImage() {
+    if (isNative) {
+      import('@capacitor/camera').then(({ Camera, CameraResultType, CameraSource }) => {
+        Camera.getPhoto({ quality: 80, resultType: CameraResultType.Base64, source: CameraSource.Prompt, width: 1024 })
+          .then(photo => { attachedImage = { base64: photo.base64String, mimeType: `image/${photo.format || 'jpeg'}`, preview: `data:image/${photo.format || 'jpeg'};base64,${photo.base64String}` }; })
+          .catch(() => {});
+      });
+    } else {
+      fileInput?.click();
+    }
+  }
+
+  function _onFileSelected(e) {
+    const file = e.target.files?.[0];
+    if (!file || !file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result;
+      const base64 = dataUrl.split(',')[1];
+      attachedImage = { base64, mimeType: file.type, preview: dataUrl };
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  }
+
+  function _removeImage() { attachedImage = null; }
 
   function _scrollBottom(instant = false) {
     messagesEl?.scrollTo({ top: messagesEl.scrollHeight, behavior: instant ? 'instant' : 'smooth' });
@@ -480,6 +535,9 @@
                 </div>
               {/if}
               <div class="ai-msg-body">
+                {#if msg.image}
+                  <img src={msg.image} alt="Attached" class="ai-msg-image" />
+                {/if}
                 <div class="ai-bubble">{msg.content}</div>
                 {#if msg.time}
                   <div class="ai-time">{msg.time}</div>
@@ -507,7 +565,18 @@
       </div>
 
       <!-- Input bar -->
+      {#if attachedImage}
+        <div class="ai-image-preview">
+          <img src={attachedImage.preview} alt="Attached" />
+          <button class="ai-image-remove" on:click={_removeImage}>
+            <span class="material-symbols-rounded" style="font-size:16px">close</span>
+          </button>
+        </div>
+      {/if}
       <div class="ai-input-bar">
+        <button class="ai-attach-btn" on:click={_attachImage} disabled={loading} title="Attach image">
+          <span class="material-symbols-rounded">photo_camera</span>
+        </button>
         <textarea
           class="ai-textarea"
           bind:value={input}
@@ -516,10 +585,11 @@
           rows="1"
           disabled={loading}
         ></textarea>
-        <button class="ai-send-btn" on:click={send} disabled={loading || !input.trim()}>
+        <button class="ai-send-btn" on:click={send} disabled={loading || (!input.trim() && !attachedImage)}>
           <span class="material-symbols-rounded">send</span>
         </button>
       </div>
+      <input type="file" accept="image/*" bind:this={fileInput} on:change={_onFileSelected} style="display:none" />
     </aside>
   {/if}
 {/if}
@@ -808,4 +878,51 @@
   .ai-send-btn:not(:disabled):hover  { transform: scale(1.08); }
   .ai-send-btn:not(:disabled):active { transform: scale(0.94); }
   .ai-send-btn .material-symbols-rounded { font-size: 20px; }
+
+  .ai-attach-btn {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    background: none;
+    color: var(--text-3);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    transition: color var(--dur-fast), border-color var(--dur-fast);
+  }
+  .ai-attach-btn:hover { color: var(--accent); border-color: var(--accent); }
+  .ai-attach-btn:disabled { opacity: 0.4; cursor: default; }
+  .ai-attach-btn .material-symbols-rounded { font-size: 20px; }
+
+  .ai-image-preview {
+    position: relative;
+    padding: 8px 16px 0;
+    flex-shrink: 0;
+  }
+  .ai-image-preview img {
+    max-height: 120px;
+    max-width: 100%;
+    border-radius: var(--radius-lg);
+    object-fit: cover;
+  }
+  .ai-image-remove {
+    position: absolute;
+    top: 4px;
+    right: 12px;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.6);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .ai-msg-image {
+    max-width: 200px;
+    max-height: 150px;
+    border-radius: var(--radius-lg);
+    margin-bottom: 4px;
+    object-fit: cover;
+  }
 </style>

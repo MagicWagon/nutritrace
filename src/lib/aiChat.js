@@ -108,10 +108,14 @@ async function _callGemini(apiKey, model, messages, systemPrompt) {
   const m = model || AI_DEFAULT_MODELS.gemini;
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${apiKey}`;
   // Gemini uses "model" instead of "assistant" for AI turns
-  const contents = messages.map(msg => ({
-    role: msg.role === 'assistant' ? 'model' : 'user',
-    parts: [{ text: msg.content }],
-  }));
+  const contents = messages.map(msg => {
+    const parts = [];
+    if (msg._image) {
+      parts.push({ inlineData: { mimeType: msg._image.mimeType, data: msg._image.base64 } });
+    }
+    parts.push({ text: typeof msg.content === 'string' ? msg.content : (msg.content || '') });
+    return { role: msg.role === 'assistant' ? 'model' : 'user', parts };
+  });
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
