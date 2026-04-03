@@ -49,6 +49,12 @@ function _authHeaders() {
 }
 
 const _saveQueue = {};
+// Track recently changed keys to protect from pull overwrites during race window
+const _recentlyChanged = new Map(); // key → timestamp
+export function isRecentlyChanged(key) {
+  const ts = _recentlyChanged.get(key);
+  return ts && Date.now() - ts < 10000; // 10-second protection window
+}
 function _isLoggedIn() { return !!localStorage.getItem('wl:userId'); }
 function _shouldSyncToServer() { return _isLoggedIn() && !(isNative && !getServerUrl()); }
 export function scheduleSave(key, value) {
@@ -58,14 +64,17 @@ export function scheduleSave(key, value) {
     // Try direct push to server (fast path when online)
     if (!_shouldSyncToServer()) return;
     try {
-      const res = await fetch(_settingsUrl(), {
+      const url = _settingsUrl();
+      console.log(`[settings] pushing ${key}=${JSON.stringify(value)} to ${url}`);
+      const res = await fetch(url, {
         method: 'PUT',
         credentials: 'include',
         headers: _authHeaders(),
         body: JSON.stringify({ key, value }),
+        signal: AbortSignal.timeout(8000),
       });
       if (!res.ok) throw new Error(`Server responded ${res.status}`);
-      console.log(`[settings] pushed ${key} to server`);
+      console.log(`[settings] pushed ${key} to server OK`);
       // If direct push succeeded on native, mark as synced so differential sync skips it
       if (isNative) {
         try {
@@ -117,6 +126,7 @@ function createSettingStore(key, defaultValue) {
     set(value) {
       DB.setSetting(key, value);
       store.set(value);
+      _recentlyChanged.set(key, Date.now());
       // On native: write to local SQLite immediately (marks as pending for sync protection)
       if (isNative && SERVER_SETTINGS.has(key)) {
         import('../lib/db-native.js').then(({ dbUpsertSetting }) => dbUpsertSetting(key, value)).catch(() => {});

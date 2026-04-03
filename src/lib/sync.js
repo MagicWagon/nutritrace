@@ -195,11 +195,15 @@ async function pullChanges() {
   }
 
   // Apply settings from server → local SQLite + localStorage
-  // Skip settings that have pending local changes (local wins during active editing)
+  // Skip settings that have pending local changes or were recently changed locally
   const pulledSettings = data.settings || [];
   const localPendingKeys = new Set((await dbGetPendingSettings()).map(s => s.key));
+  const { isRecentlyChanged } = await import('../stores/settings.js');
   for (const s of pulledSettings) {
-    if (localPendingKeys.has(s.key)) continue; // local change takes priority
+    if (localPendingKeys.has(s.key) || isRecentlyChanged(s.key)) {
+      console.log(`[sync] skip pulled setting ${s.key} — local change takes priority`);
+      continue;
+    }
     await dbUpsertSettingFromServer(s);
     if (!s.deleted_at) {
       const { DB } = await import('./db.js');
@@ -261,15 +265,6 @@ export async function fullSync(silent = false) {
     if (!silent) syncState.update(s => ({ ...s, phase: 'pulling', progress: 'Downloading data…' }));
     const pulled = await pullChanges();
 
-    // Full settings refresh — catches settings that predated the first sync timestamp
-    // Only on first sync (no prior sync timestamp) to avoid overwriting local pending changes
-    if (!await dbGetSyncMeta('settings_loaded')) {
-      try {
-        const { loadServerSettings } = await import('../stores/settings.js');
-        await loadServerSettings();
-        await dbSetSyncMeta('settings_loaded', '1');
-      } catch {}
-    }
 
     const hadChanges = pushed || pulled;
 
