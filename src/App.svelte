@@ -204,9 +204,19 @@
       });
     }
 
-    // Re-schedule reminders on app open (refreshes repeating notifications)
+    // Request notification permission + re-schedule reminders on app open
     if (isNative) {
-      import('./lib/notifications.js').then(async ({ scheduleWaterReminders, scheduleMealReminders, scheduleWeighInReminder }) => {
+      import('./lib/notifications.js').then(async ({ requestPermission, scheduleWaterReminders, scheduleMealReminders, scheduleWeighInReminder }) => {
+        // Always request permission on startup if any notification is enabled
+        const anyEnabled = DB.getSetting('notifLocalEnabled', true) &&
+          (DB.getSetting('notifWaterReminders', false) || DB.getSetting('notifMealReminders', false) ||
+           DB.getSetting('notifWeighIn', false) || DB.getSetting('notifGoalCelebrations', false) ||
+           DB.getSetting('notifCalorieGoal', false) || DB.getSetting('notifStepGoal', false) ||
+           DB.getSetting('notifWellnessAlerts', false) || DB.getSetting('notifWorkoutSummary', false));
+        if (anyEnabled) {
+          const granted = await requestPermission();
+          console.log('[app] notification permission:', granted ? 'granted' : 'denied');
+        }
         if (DB.getSetting('notifWaterReminders', false)) {
           await scheduleWaterReminders(DB.getSetting('notifWaterInterval', 120));
         }

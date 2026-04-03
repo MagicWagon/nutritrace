@@ -73,12 +73,19 @@ export async function checkPermission() {
 }
 
 /** Show an immediate notification */
-export async function showNotification(title, body, id = Date.now()) {
+export async function showNotification(title, body, id = null) {
+  // ID must be a 32-bit integer for Android
+  const notifId = id || (Math.floor(Math.random() * 2000000000) + 5000);
   if (isNative) {
     const LN = await _getLN();
     if (!LN) return;
     await _ensureChannel();
-    await LN.schedule({ notifications: [{ id, title, body, channelId: 'nutritrace' }] });
+    try {
+      await LN.schedule({ notifications: [{ id: notifId, title, body, channelId: 'nutritrace' }] });
+      console.log(`[notifications] scheduled immediate: "${title}" (id=${notifId})`);
+    } catch (e) {
+      console.error('[notifications] schedule failed:', e);
+    }
   } else if ('Notification' in window && Notification.permission === 'granted') {
     new Notification(title, { body, icon: '/icons/icon-192.png' });
   }
