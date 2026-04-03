@@ -297,14 +297,38 @@ export async function checkStepGoal(steps, goal) {
 export async function sendGotify(url, token, title, message, priority = 5) {
   if (!url || !token) throw new Error('Gotify URL and token required');
   const endpoint = `${url.replace(/\/+$/, '')}/message?token=${encodeURIComponent(token)}`;
-  const res = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title, message, priority }),
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`Gotify ${res.status}: ${body.slice(0, 100)}`);
+
+  if (isNative) {
+    // Native: CapacitorHttp bypasses CORS — call Gotify directly
+    const { CapacitorHttp } = await import('@capacitor/core');
+    const resp = await CapacitorHttp.post({
+      url: endpoint,
+      headers: { 'Content-Type': 'application/json' },
+      data: { title, message, priority },
+    });
+    if (resp.status < 200 || resp.status >= 300) {
+      throw new Error(`Gotify ${resp.status}`);
+    }
+  } else {
+    // PWA: use server proxy to avoid CORS
+    try {
+      const { apiUrl } = await import('./platform.js');
+      const res = await fetch(apiUrl('/api/settings/gotify-push'), {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, message, priority }),
+      });
+      if (!res.ok) throw new Error(`Gotify proxy ${res.status}`);
+    } catch (e) {
+      // Fallback: try direct (may fail due to CORS)
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, message, priority }),
+      });
+      if (!res.ok) throw new Error(`Gotify ${res.status}`);
+    }
   }
 }
 

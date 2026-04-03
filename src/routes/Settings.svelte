@@ -551,25 +551,33 @@
 
   async function _testGotify() {
     _gotifyTesting = true;
-    // Save first in case user hasn't blurred
     set('gotifyUrl', _gotifyUrl);
     set('gotifyToken', _gotifyToken);
     try {
-      // Use server proxy to avoid CORS + connectivity issues
-      const headers = { 'Content-Type': 'application/json' };
-      if (isNative && getServerUrl()) {
-        const t = getAuthToken();
-        if (t) headers['Authorization'] = `Bearer ${t}`;
+      if (isNative) {
+        // Native: call Gotify directly via CapacitorHttp (bypasses CORS)
+        const { CapacitorHttp } = await import('@capacitor/core');
+        const endpoint = `${_gotifyUrl.replace(/\/+$/, '')}/message?token=${encodeURIComponent(_gotifyToken)}`;
+        const resp = await CapacitorHttp.post({
+          url: endpoint,
+          headers: { 'Content-Type': 'application/json' },
+          data: { title: 'NutriTrace', message: 'Test notification — Gotify is connected!', priority: 5 },
+        });
+        if (resp.status >= 200 && resp.status < 300) showSuccess('Test sent — check your Gotify app!');
+        else showError(`Gotify test failed: ${resp.status}`);
+      } else {
+        // PWA: proxy through server to avoid CORS
+        const headers = { 'Content-Type': 'application/json' };
+        const res = await fetch(apiUrl('/api/settings/gotify-test'), {
+          method: 'POST',
+          credentials: 'include',
+          headers,
+          body: JSON.stringify({ url: _gotifyUrl, token: _gotifyToken }),
+        });
+        const data = await res.json();
+        if (res.ok) showSuccess('Test sent — check your Gotify app!');
+        else showError('Gotify test failed: ' + (data.error || res.status));
       }
-      const res = await fetch(apiUrl('/api/settings/gotify-test'), {
-        method: 'POST',
-        credentials: 'include',
-        headers,
-        body: JSON.stringify({ url: _gotifyUrl, token: _gotifyToken }),
-      });
-      const data = await res.json();
-      if (res.ok) showSuccess('Test sent — check your Gotify app!');
-      else showError('Gotify test failed: ' + (data.error || res.status));
     } catch (e) { showError('Gotify test failed: ' + (e.message || 'unknown error')); }
     _gotifyTesting = false;
   }

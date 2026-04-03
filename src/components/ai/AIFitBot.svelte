@@ -84,13 +84,19 @@
     setToolHandler(async (name, args) => {
       switch (name) {
         case 'get_wellness_data': {
+          // Native: read from local SQLite (works offline + local mode)
+          if (isNative) {
+            try {
+              const { dbGetWellnessGrouped } = await import('../../lib/db-native.js');
+              return await dbGetWellnessGrouped(args.from, args.to, null);
+            } catch {}
+          }
           const [fitbit, garmin] = await Promise.allSettled([
             NtApi.get(`/api/wellness/fitbit/data?from=${args.from}&to=${args.to}`),
             NtApi.get(`/api/wellness/garmin/data?from=${args.from}&to=${args.to}`),
           ]);
           const fb = fitbit.status === 'fulfilled' ? fitbit.value : {};
           const gm = garmin.status === 'fulfilled' ? garmin.value : {};
-          // Merge per date (fitbit wins on overlap)
           const merged = {};
           for (const [d, v] of Object.entries(gm)) merged[d] = { ...v };
           for (const [d, v] of Object.entries(fb)) merged[d] = { ...(merged[d] || {}), ...v };
@@ -126,6 +132,12 @@
           } catch { return { date: args.date, error: 'Could not load diary' }; }
         }
         case 'get_workouts': {
+          if (isNative) {
+            try {
+              const { dbGetWorkouts } = await import('../../lib/db-native.js');
+              return await dbGetWorkouts(args.from, args.to);
+            } catch {}
+          }
           try {
             return await NtApi.get(`/api/wellness/fitbit/workouts?from=${args.from}&to=${args.to}`);
           } catch { return []; }
