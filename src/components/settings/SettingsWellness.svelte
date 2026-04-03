@@ -11,7 +11,8 @@
   import { DB } from '../../lib/db.js';
   import { NtApi } from '../../lib/api.js';
   import { currentUser, userMgmtActive } from '../../stores/auth.js';
-  import { isNative } from '../../lib/platform.js';
+  import { isNative, getServerUrl } from '../../lib/platform.js';
+  const isNativeLocal = isNative && !getServerUrl();
 
   // ── Wellness state ──────────────────────────────────────────────────────────
   let wellnessEnabledVal   = DB.getSetting('wellnessEnabled',   false);
@@ -391,6 +392,14 @@
     <!-- ── Fitbit ── -->
     <p class="sub-label" style="padding-top:16px">Fitbit</p>
     <div class="card settings-card">
+      {#if isNativeLocal}
+        <div class="setting-row">
+          <div>
+            <span class="setting-label" style="opacity:0.5">Enable Fitbit</span>
+            <div class="setting-desc">Requires a server connection. Fitbit uses OAuth which needs a server to exchange tokens. Use <strong>Health Connect</strong> below to read Fitbit data in local mode.</div>
+          </div>
+        </div>
+      {:else}
       <div class="setting-row">
         <div>
           <span class="setting-label">Enable Fitbit</span>
@@ -398,6 +407,7 @@
         </div>
         <Toggle checked={fitbitEnabledVal} on:change={e => { fitbitEnabledVal = e.detail; fitbitEnabled.set(e.detail); }} />
       </div>
+      {/if}
 
       {#if fitbitEnabledVal}
         <div class="setting-divider"></div>
@@ -526,6 +536,14 @@
       <span class="labs-badge" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">Experimental</span>
     </p>
     <div class="card settings-card">
+      {#if isNativeLocal}
+        <div class="setting-row">
+          <div>
+            <span class="setting-label" style="opacity:0.5">Enable Garmin</span>
+            <div class="setting-desc">Requires a server connection. Garmin uses OAuth which needs a server to exchange tokens. Use <strong>Health Connect</strong> below to read Garmin data in local mode.</div>
+          </div>
+        </div>
+      {:else}
       <div class="setting-row">
         <div>
           <span class="setting-label">Enable Garmin</span>
@@ -533,8 +551,9 @@
         </div>
         <Toggle checked={garminEnabledVal} on:change={e => { garminEnabledVal = e.detail; garminEnabled.set(e.detail); loadWellnessConfig(); }} />
       </div>
+      {/if}
 
-      {#if garminEnabledVal}
+      {#if garminEnabledVal && !isNativeLocal}
         <div class="setting-divider"></div>
         <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px">
           <div>
@@ -649,6 +668,14 @@
     <!-- ── Withings ── -->
     <p class="sub-label" style="padding-top:16px">Withings</p>
     <div class="card settings-card">
+      {#if isNativeLocal}
+        <div class="setting-row">
+          <div>
+            <span class="setting-label" style="opacity:0.5">Enable Withings</span>
+            <div class="setting-desc">Requires a server connection. Withings uses OAuth which needs a server to exchange tokens. Use <strong>Health Connect</strong> below to read scale data in local mode.</div>
+          </div>
+        </div>
+      {:else}
       <div class="setting-row">
         <div>
           <span class="setting-label">Enable Withings</span>
@@ -656,8 +683,9 @@
         </div>
         <Toggle checked={withingsEnabledVal} on:change={e => { withingsEnabledVal = e.detail; withingsEnabled.set(e.detail); }} />
       </div>
+      {/if}
 
-      {#if withingsEnabledVal}
+      {#if withingsEnabledVal && !isNativeLocal}
         <div class="setting-divider"></div>
         <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px">
           <div>
