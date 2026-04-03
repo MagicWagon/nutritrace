@@ -489,12 +489,28 @@
   let _notifWaterInt = DB.getSetting('notifWaterInterval',   120);
   let _notifMeals    = DB.getSetting('notifMealReminders',   false);
   let _notifGoals    = DB.getSetting('notifGoalCelebrations', false);
+  let _notifCalorie  = DB.getSetting('notifCalorieGoal',     false);
+  let _notifSteps    = DB.getSetting('notifStepGoal',        false);
+  let _notifWeighIn  = DB.getSetting('notifWeighIn',         false);
+  let _notifWeighInTime = DB.getSetting('notifWeighInTime',  '07:00');
+  let _notifWeekly   = DB.getSetting('notifWeeklySummary',   false);
   let _notifWellness = DB.getSetting('notifWellnessAlerts',  false);
   let _notifWorkouts = DB.getSetting('notifWorkoutSummary',  false);
   let _notifSync     = DB.getSetting('notifSyncFailures',    false);
+  let _notifLocal    = DB.getSetting('notifLocalEnabled',     true);
+  let _notifGotify   = DB.getSetting('notifGotifyEnabled',   false);
   let _gotifyUrl     = DB.getSetting('gotifyUrl',            '');
   let _gotifyToken   = DB.getSetting('gotifyToken',          '');
   let _gotifyTesting = false;
+
+  $: _anyNotifEnabled = _notifWater || _notifMeals || _notifGoals || _notifCalorie || _notifSteps || _notifWeighIn || _notifWeekly || _notifWellness || _notifWorkouts || _notifSync;
+
+  async function _requestNotifPermission() {
+    try {
+      const { requestPermission } = await import('../lib/notifications.js');
+      await requestPermission();
+    } catch {}
+  }
 
   async function _scheduleWater() {
     if (_notifWater) {
@@ -2214,7 +2230,7 @@
     {#if sectionOpen(openSections, settingsQuery, 'notifications') && sectionVisible(settingsQuery, 'notifications')}
       <div class="section-body" transition:slide={{ duration: 180 }}>
 
-        <p class="sub-label">Local Reminders</p>
+        <p class="sub-label">Notification Types</p>
         <div class="card settings-card">
           <div class="setting-row">
             <div>
@@ -2249,18 +2265,54 @@
           <div class="setting-row">
             <div>
               <span class="setting-label">Goal Celebrations</span>
-              <div class="setting-desc">Notification when you hit a daily nutrition goal</div>
+              <div class="setting-desc">Notification when you hit a daily nutrition or wellness goal</div>
             </div>
             <Toggle checked={_notifGoals} on:change={e => { _notifGoals = e.detail; set('notifGoalCelebrations', e.detail); }} />
           </div>
-        </div>
-
-        <p class="sub-label">Server Push (Gotify)</p>
-        <div class="card settings-card">
+          <div class="setting-divider"></div>
+          <div class="setting-row">
+            <div>
+              <span class="setting-label">Calorie Goal</span>
+              <div class="setting-desc">Alert when you reach or exceed your daily calorie target</div>
+            </div>
+            <Toggle checked={_notifCalorie} on:change={e => { _notifCalorie = e.detail; set('notifCalorieGoal', e.detail); }} />
+          </div>
+          <div class="setting-divider"></div>
+          <div class="setting-row">
+            <div>
+              <span class="setting-label">Step Goal Progress</span>
+              <div class="setting-desc">Midday nudge with progress toward your step goal</div>
+            </div>
+            <Toggle checked={_notifSteps} on:change={e => { _notifSteps = e.detail; set('notifStepGoal', e.detail); }} />
+          </div>
+          <div class="setting-divider"></div>
+          <div class="setting-row">
+            <div>
+              <span class="setting-label">Weigh-in Reminder</span>
+              <div class="setting-desc">Morning reminder to step on the scale</div>
+            </div>
+            <Toggle checked={_notifWeighIn} on:change={e => { _notifWeighIn = e.detail; set('notifWeighIn', e.detail); }} />
+          </div>
+          {#if _notifWeighIn}
+            <div class="setting-divider"></div>
+            <div class="setting-row">
+              <span class="setting-label">Weigh-in Time</span>
+              <input type="time" class="input" style="width:120px;height:36px;padding:0 10px;font-size:13px;text-align:center" value={_notifWeighInTime} on:change={e => { _notifWeighInTime = e.target.value; set('notifWeighInTime', e.target.value); }} />
+            </div>
+          {/if}
+          <div class="setting-divider"></div>
+          <div class="setting-row">
+            <div>
+              <span class="setting-label">Weekly Summary</span>
+              <div class="setting-desc">Sunday recap of calories, steps, sleep, and weight trends</div>
+            </div>
+            <Toggle checked={_notifWeekly} on:change={e => { _notifWeekly = e.detail; set('notifWeeklySummary', e.detail); }} />
+          </div>
+          <div class="setting-divider"></div>
           <div class="setting-row">
             <div>
               <span class="setting-label">Wellness Alerts</span>
-              <div class="setting-desc">Alerts when HRV drops significantly, sleep trends down, etc.</div>
+              <div class="setting-desc">HRV drops, sleep score declining, resting heart rate spikes</div>
             </div>
             <Toggle checked={_notifWellness} on:change={e => { _notifWellness = e.detail; set('notifWellnessAlerts', e.detail); }} />
           </div>
@@ -2268,7 +2320,7 @@
           <div class="setting-row">
             <div>
               <span class="setting-label">Workout Summaries</span>
-              <div class="setting-desc">Summary notification after a workout syncs</div>
+              <div class="setting-desc">Summary after a workout syncs (duration, distance, calories)</div>
             </div>
             <Toggle checked={_notifWorkouts} on:change={e => { _notifWorkouts = e.detail; set('notifWorkoutSummary', e.detail); }} />
           </div>
@@ -2276,28 +2328,48 @@
           <div class="setting-row">
             <div>
               <span class="setting-label">Sync Failures</span>
-              <div class="setting-desc">Alert when Fitbit/Garmin/Withings sync fails</div>
+              <div class="setting-desc">Alert when device sync fails repeatedly</div>
             </div>
             <Toggle checked={_notifSync} on:change={e => { _notifSync = e.detail; set('notifSyncFailures', e.detail); }} />
           </div>
-
-          {#if _notifWellness || _notifWorkouts || _notifSync}
-            <div class="setting-divider"></div>
-            <div class="form-group" style="padding:10px 16px 14px">
-              <label class="form-label">Gotify Server URL</label>
-              <input class="input" placeholder="https://gotify.example.com" bind:value={_gotifyUrl} on:blur={() => set('gotifyUrl', _gotifyUrl)} />
-            </div>
-            <div class="form-group" style="padding:0 16px 14px">
-              <label class="form-label">App Token</label>
-              <div style="display:flex;gap:8px;align-items:center">
-                <input class="input" style="flex:1" type="password" placeholder="Your Gotify app token" bind:value={_gotifyToken} on:blur={() => set('gotifyToken', _gotifyToken)} />
-                <button class="btn btn-primary" style="height:40px;font-size:13px;white-space:nowrap" on:click={_testGotify} disabled={!_gotifyUrl || !_gotifyToken || _gotifyTesting}>
-                  {#if _gotifyTesting}Testing…{:else}Test{/if}
-                </button>
-              </div>
-            </div>
-          {/if}
         </div>
+
+        {#if _anyNotifEnabled}
+          <p class="sub-label">Delivery Methods</p>
+          <div class="card settings-card">
+            <div class="setting-row">
+              <div>
+                <span class="setting-label">Device Notifications</span>
+                <div class="setting-desc">Native push on Android, browser notifications on PWA</div>
+              </div>
+              <Toggle checked={_notifLocal} on:change={e => { _notifLocal = e.detail; set('notifLocalEnabled', e.detail); if (e.detail) _requestNotifPermission(); }} />
+            </div>
+            <div class="setting-divider"></div>
+            <div class="setting-row">
+              <div>
+                <span class="setting-label">Gotify</span>
+                <div class="setting-desc">Push to your self-hosted Gotify server</div>
+              </div>
+              <Toggle checked={_notifGotify} on:change={e => { _notifGotify = e.detail; set('notifGotifyEnabled', e.detail); }} />
+            </div>
+            {#if _notifGotify}
+              <div class="setting-divider"></div>
+              <div class="form-group" style="padding:10px 16px 14px">
+                <label class="form-label">Gotify Server URL</label>
+                <input class="input" placeholder="https://gotify.example.com" bind:value={_gotifyUrl} on:blur={() => set('gotifyUrl', _gotifyUrl)} />
+              </div>
+              <div class="form-group" style="padding:0 16px 14px">
+                <label class="form-label">App Token</label>
+                <div style="display:flex;gap:8px;align-items:center">
+                  <input class="input" style="flex:1" type="password" placeholder="Your Gotify app token" bind:value={_gotifyToken} on:blur={() => set('gotifyToken', _gotifyToken)} />
+                  <button class="btn btn-primary" style="height:40px;font-size:13px;white-space:nowrap" on:click={_testGotify} disabled={!_gotifyUrl || !_gotifyToken || _gotifyTesting}>
+                    {#if _gotifyTesting}Testing…{:else}Test{/if}
+                  </button>
+                </div>
+              </div>
+            {/if}
+          </div>
+        {/if}
 
       </div>
     {/if}

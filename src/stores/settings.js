@@ -28,8 +28,11 @@ const SERVER_SETTINGS = new Set([
   'garminEnabled','garminSyncRange',
   'defaultFoodVisibility',
   // Notifications
+  'notifLocalEnabled','notifGotifyEnabled',
   'notifWaterReminders','notifWaterInterval','notifMealReminders','notifMealTimes',
-  'notifGoalCelebrations','notifWellnessAlerts','notifWorkoutSummary','notifSyncFailures',
+  'notifGoalCelebrations','notifCalorieGoal','notifStepGoal',
+  'notifWeighIn','notifWeighInTime','notifWeeklySummary',
+  'notifWellnessAlerts','notifWorkoutSummary','notifSyncFailures',
   'gotifyUrl','gotifyToken',
   // Appearance / UI prefs — included so full backups restore the full look-and-feel
   'appearance','accentColor',
@@ -321,11 +324,18 @@ export const aiModel         = createSettingStore('aiModel',         '');
 export const aiAssistantName = createSettingStore('aiAssistantName', 'FitBot');
 
 // Notifications
+export const notifLocalEnabled     = createSettingStore('notifLocalEnabled',     true);
+export const notifGotifyEnabled   = createSettingStore('notifGotifyEnabled',   false);
 export const notifWaterReminders  = createSettingStore('notifWaterReminders',  false);
 export const notifWaterInterval   = createSettingStore('notifWaterInterval',   120); // minutes
 export const notifMealReminders   = createSettingStore('notifMealReminders',   false);
 export const notifMealTimes       = createSettingStore('notifMealTimes',       ['08:00','12:00','18:00']); // HH:MM
 export const notifGoalCelebrations = createSettingStore('notifGoalCelebrations', false);
+export const notifCalorieGoal     = createSettingStore('notifCalorieGoal',     false);
+export const notifStepGoal        = createSettingStore('notifStepGoal',        false);
+export const notifWeighIn         = createSettingStore('notifWeighIn',         false);
+export const notifWeighInTime     = createSettingStore('notifWeighInTime',     '07:00');
+export const notifWeeklySummary   = createSettingStore('notifWeeklySummary',   false);
 export const notifWellnessAlerts  = createSettingStore('notifWellnessAlerts',  false);
 export const notifWorkoutSummary  = createSettingStore('notifWorkoutSummary',  false);
 export const notifSyncFailures    = createSettingStore('notifSyncFailures',    false);
