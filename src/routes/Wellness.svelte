@@ -592,23 +592,22 @@
     const hrvRatio = todayHrv / hrvBaseline;
     // Square-root penalty curve — gentler on big HRV dips, steeper on small ones
     let hrv_score  = hrvRatio >= 1.0
-      ? 62 + (hrvRatio - 1.0) * 80
-      : 62 - Math.sqrt(1.0 - hrvRatio) * 50;
+      ? 65 + (hrvRatio - 1.0) * 100
+      : 65 - Math.sqrt(1.0 - hrvRatio) * 55;
     hrv_score = _clamp(hrv_score, 0, 100);
 
-    // RHR score (20% weight) — inverse: lower today is better. Neutral at 55 (not 65).
-    let rhr_score = 55; // neutral if no baseline
+    // RHR score (22% weight) — inverse: lower today is better. Neutral at 59.
+    let rhr_score = 59; // neutral if no baseline
     if (rhrBaseline != null && todayRhr != null) {
       const rhrRatio = rhrBaseline / todayRhr;
-      rhr_score = 55 + (rhrRatio - 1.0) * 150;
+      rhr_score = 59 + (rhrRatio - 1.0) * 110;
       rhr_score = _clamp(rhr_score, 0, 100);
     }
 
     // HRV × RHR interaction penalty — when both signals go wrong together
-    // Fitbit applies a compounding penalty (proven by Fri data: HRV low + RHR elevated → -12 pts)
     let interaction_penalty = 0;
     if (hrvRatio < 1.0 && rhrBaseline != null && todayRhr != null && todayRhr > rhrBaseline) {
-      interaction_penalty = (1.0 - hrvRatio) * (todayRhr - rhrBaseline) * 30;
+      interaction_penalty = (1.0 - hrvRatio) * (todayRhr - rhrBaseline) * 35;
       interaction_penalty = _clamp(interaction_penalty, 0, 10);
     }
 
@@ -629,7 +628,7 @@
       activity_penalty = _clamp(activity_penalty, 0, 20);
     }
 
-    let score = (0.65 * hrv_score) + (0.20 * rhr_score) + (0.10 * sleepBase) - activity_penalty - interaction_penalty;
+    let score = (0.58 * hrv_score) + (0.22 * rhr_score) + (0.12 * sleepBase) + 1 - activity_penalty - interaction_penalty;
     score     = Math.min(_clamp(Math.round(score), 1, 100), sleep_cap);
 
     const label = score >= 80 ? 'Optimal' : score >= 65 ? 'Good' : score >= 50 ? 'Fair' : score >= 35 ? 'Low' : 'Poor';
@@ -639,7 +638,7 @@
       inputs: { todayHrv, todayRhr, todaySleepScore, todayCalories, historyDays: history30d.length },
       baselines: { hrvBaseline: Math.round(hrvBaseline * 100) / 100, rhrBaseline: rhrBaseline != null ? Math.round(rhrBaseline * 10) / 10 : null },
       components: { hrvRatio: Math.round(hrvRatio * 1000) / 1000, hrv_score: Math.round(hrv_score * 10) / 10, rhr_score: Math.round(rhr_score * 10) / 10, sleepBase, activity_penalty: Math.round(activity_penalty * 10) / 10, interaction_penalty: Math.round(interaction_penalty * 10) / 10 },
-      formula: `(0.65×${Math.round(hrv_score*10)/10}) + (0.20×${Math.round(rhr_score*10)/10}) + (0.10×${sleepBase}) - ${Math.round(activity_penalty*10)/10} - ${Math.round(interaction_penalty*10)/10} = ${score}`,
+      formula: `(0.58×${Math.round(hrv_score*10)/10}) + (0.22×${Math.round(rhr_score*10)/10}) + (0.12×${sleepBase}) + 1 - ${Math.round(activity_penalty*10)/10} - ${Math.round(interaction_penalty*10)/10} = ${score}`,
     }, null, 2));
 
     return {
@@ -746,7 +745,7 @@
     }
     // Sleep component — stronger weight than readiness (35% vs 15%)
     const sleep_s = sleepScore != null ? sleepScore : 75;
-    return (0.40 * hrv_s) + (0.35 * sleep_s) + (0.15 * rhr_s) + 8; // +8 offset — tuned with 9 days of data
+    return (0.35 * hrv_s) + (0.40 * sleep_s) + (0.15 * rhr_s) + 6; // offset 6 — tuned with 10 days of data
   }
 
   function _calcStressScore(todayHrv, todayRhr, todaySleepScore, history30d) {
@@ -769,14 +768,14 @@
     for (const d of history30d) {
       const raw = _rawStressScore(d.hrv_daily_rmssd, d.resting_hr, d.sleep_score, hrvBaseline, rhrBaseline);
       if (raw == null) continue;
-      smoothed = smoothed == null ? raw : 0.65 * smoothed + 0.35 * raw;
+      smoothed = smoothed == null ? raw : 0.50 * smoothed + 0.50 * raw;
     }
 
     // Today's score
     const todayRaw = _rawStressScore(todayHrv, todayRhr, todaySleepScore, hrvBaseline, rhrBaseline);
     if (todayRaw == null) return null;
     const score = Math.round(_clamp(
-      smoothed != null ? 0.60 * smoothed + 0.40 * todayRaw : todayRaw,
+      smoothed != null ? 0.50 * smoothed + 0.50 * todayRaw : todayRaw,
       1, 100
     ));
 

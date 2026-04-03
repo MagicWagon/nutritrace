@@ -70,12 +70,12 @@ export function snapshotScores(userId, dateStr, { force = false } = {}) {
 
   // ── Readiness ─────────────────────────────────────────────────
   const hrvRatio = todayHrv / hrvBaseline;
-  let hrv_score = hrvRatio >= 1.0 ? 62 + (hrvRatio - 1.0) * 80 : 62 - Math.sqrt(1.0 - hrvRatio) * 50;
+  let hrv_score = hrvRatio >= 1.0 ? 65 + (hrvRatio - 1.0) * 100 : 65 - Math.sqrt(1.0 - hrvRatio) * 55;
   hrv_score = _clamp(hrv_score, 0, 100);
 
-  let rhr_score = 55;
+  let rhr_score = 59;
   if (rhrBaseline != null && todayRhr != null) {
-    rhr_score = 55 + (rhrBaseline / todayRhr - 1.0) * 150;
+    rhr_score = 59 + (rhrBaseline / todayRhr - 1.0) * 110;
     rhr_score = _clamp(rhr_score, 0, 100);
   }
 
@@ -95,11 +95,11 @@ export function snapshotScores(userId, dateStr, { force = false } = {}) {
 
   let interaction_penalty = 0;
   if (hrvRatio < 1.0 && rhrBaseline != null && todayRhr != null && todayRhr > rhrBaseline) {
-    interaction_penalty = (1.0 - hrvRatio) * (todayRhr - rhrBaseline) * 30;
+    interaction_penalty = (1.0 - hrvRatio) * (todayRhr - rhrBaseline) * 35;
     interaction_penalty = _clamp(interaction_penalty, 0, 10);
   }
 
-  let readiness = (0.65 * hrv_score) + (0.20 * rhr_score) + (0.10 * sleepBase) - activity_penalty - interaction_penalty;
+  let readiness = (0.58 * hrv_score) + (0.22 * rhr_score) + (0.12 * sleepBase) + 1 - activity_penalty - interaction_penalty;
   readiness = Math.min(_clamp(Math.round(readiness), 1, 100), sleep_cap);
 
   // ── Stress ────────────────────────────────────────────────────
@@ -113,7 +113,7 @@ export function snapshotScores(userId, dateStr, { force = false } = {}) {
       r_s = _clamp(r_s, 0, 100);
     }
     const sl = sleep != null ? sleep : 75;
-    return (0.40 * h_s) + (0.35 * sl) + (0.15 * r_s) + 8;
+    return (0.35 * h_s) + (0.40 * sl) + (0.15 * r_s) + 6;
   }
 
   const todayRaw = _rawStress(todayHrv, todayRhr, todaySleep);
@@ -125,7 +125,7 @@ export function snapshotScores(userId, dateStr, { force = false } = {}) {
   let stress;
   if (histStress.length >= 3) {
     const smoothed = _mean(histStress.slice(-7));
-    stress = Math.round(0.60 * smoothed + 0.40 * todayRaw);
+    stress = Math.round(0.50 * smoothed + 0.50 * todayRaw);
   } else {
     stress = Math.round(todayRaw);
   }

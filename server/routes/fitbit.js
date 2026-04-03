@@ -468,6 +468,28 @@ router.post('/recalculate', wrap(async (req, res) => {
   res.json({ ok: true, date: today, ...result });
 }));
 
+// ── POST /seed-scores — override scores with exact Fitbit values for calibration ──
+router.post('/seed-scores', wrap(async (req, res) => {
+  const u = uid(req);
+  const { date, sleep_score, readiness_score, stress_score } = req.body;
+  if (!date) return res.status(400).json({ error: 'date required' });
+
+  const upsert = db.prepare(`
+    INSERT INTO wellness_data (user_id, date, source, metric_type, value, synced_at)
+    VALUES (?, ?, 'fitbit', ?, ?, datetime('now'))
+    ON CONFLICT(user_id, date, source, metric_type) DO UPDATE SET
+      value = excluded.value, synced_at = excluded.synced_at
+  `);
+  db.transaction(() => {
+    if (sleep_score != null) upsert.run(u, date, 'sleep_score', sleep_score);
+    if (readiness_score != null) upsert.run(u, date, 'readiness_score', readiness_score);
+    if (stress_score != null) upsert.run(u, date, 'stress_score', stress_score);
+  })();
+
+  logger.info(`[fitbit] seeded scores for ${date}: sleep=${sleep_score} readiness=${readiness_score} stress=${stress_score}`);
+  res.json({ ok: true, date, sleep_score, readiness_score, stress_score });
+}));
+
 // ── GET /data — return stored wellness data ───────────────────────────────────
 router.get('/data', wrap((req, res) => {
   const u = uid(req);
