@@ -85,6 +85,31 @@ const SCHEMA = `
     UNIQUE(user_id, date, source, metric_type)
   );
 
+  CREATE TABLE IF NOT EXISTS workouts (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    server_id       INTEGER,
+    user_id         INTEGER DEFAULT 1,
+    source          TEXT NOT NULL DEFAULT 'fitbit',
+    source_id       TEXT NOT NULL,
+    date            TEXT NOT NULL,
+    activity_type   TEXT,
+    activity_name   TEXT,
+    start_time      TEXT,
+    duration_ms     INTEGER,
+    distance_km     REAL,
+    calories        INTEGER,
+    avg_hr          INTEGER,
+    max_hr          INTEGER,
+    steps           INTEGER,
+    has_gps         INTEGER DEFAULT 0,
+    gps_data        TEXT,
+    synced_at       TEXT DEFAULT (datetime('now')),
+    updated_at      TEXT DEFAULT (datetime('now')),
+    UNIQUE(user_id, source, source_id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_workouts_user_date ON workouts(user_id, date);
+
   CREATE TABLE IF NOT EXISTS user_settings (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id     INTEGER DEFAULT 1,
@@ -562,6 +587,49 @@ export async function dbUpsertWellnessFromServer(record) {
     [LOCAL_USER_ID, record.date, record.source, record.metric_type, record.value,
      typeof record.metadata === 'string' ? record.metadata : JSON.stringify(record.metadata || {}),
      record.synced_at]
+  );
+}
+
+// ── Workouts ─────────────────────────────────────────────────────────
+
+export async function dbGetWorkouts(from, to) {
+  const db = await getDb();
+  const r = await db.query(
+    `SELECT * FROM workouts WHERE user_id = ? AND date >= ? AND date <= ? ORDER BY date DESC, start_time DESC`,
+    [LOCAL_USER_ID, from, to]
+  );
+  return _rows(r).map(row => ({ ...row, gps_data: _parseJson(row.gps_data, null), has_gps: !!row.has_gps }));
+}
+
+export async function dbGetWorkout(id) {
+  const db = await getDb();
+  const r = await db.query(`SELECT * FROM workouts WHERE id = ? AND user_id = ?`, [id, LOCAL_USER_ID]);
+  const row = _row(r);
+  if (!row) return null;
+  return { ...row, gps_data: _parseJson(row.gps_data, null), has_gps: !!row.has_gps };
+}
+
+export async function dbUpsertWorkoutFromServer(record) {
+  const db = await getDb();
+  const { id: serverId, deleted_at, gps_data, ...data } = record;
+
+  if (deleted_at) {
+    await db.run(`DELETE FROM workouts WHERE server_id = ?`, [serverId]);
+    return;
+  }
+
+  await db.run(
+    `INSERT INTO workouts (server_id, user_id, source, source_id, date, activity_type, activity_name, start_time, duration_ms, distance_km, calories, avg_hr, max_hr, steps, has_gps, gps_data, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(user_id, source, source_id) DO UPDATE SET
+       server_id=excluded.server_id, activity_type=excluded.activity_type, activity_name=excluded.activity_name,
+       start_time=excluded.start_time, duration_ms=excluded.duration_ms, distance_km=excluded.distance_km,
+       calories=excluded.calories, avg_hr=excluded.avg_hr, max_hr=excluded.max_hr, steps=excluded.steps,
+       has_gps=excluded.has_gps, gps_data=COALESCE(excluded.gps_data, workouts.gps_data), updated_at=excluded.updated_at`,
+    [serverId, LOCAL_USER_ID, data.source, data.source_id, data.date, data.activity_type, data.activity_name,
+     data.start_time, data.duration_ms, data.distance_km, data.calories, data.avg_hr, data.max_hr, data.steps,
+     data.has_gps ? 1 : 0, gps_data ? (typeof gps_data === 'string' ? gps_data : JSON.stringify(gps_data)) : null,
+     data.updated_at]
   );
 }
 

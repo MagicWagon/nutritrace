@@ -3,7 +3,7 @@
   import Toggle from './Toggle.svelte';
   import { showSuccess, showError } from '../../stores/toast.js';
   import {
-    wellnessEnabled, fitbitEnabled, healthConnectEnabled, wellnessMetrics, wellnessSyncMode, wellnessSyncRange,
+    wellnessEnabled, fitbitEnabled, healthConnectEnabled, wellnessMetrics, workoutsEnabled, wellnessSyncMode, wellnessSyncRange,
     withingsSyncRange, withingsEnabled,
     garminEnabled, garminSyncRange,
   } from '../../stores/settings.js';
@@ -17,6 +17,7 @@
   let fitbitEnabledVal     = DB.getSetting('fitbitEnabled',     false);
   let withingsEnabledVal   = DB.getSetting('withingsEnabled',   false);
   let healthConnectEnabledVal = DB.getSetting('healthConnectEnabled', false);
+  let workoutsEnabledVal     = DB.getSetting('workoutsEnabled',     false);
   let healthConnectAvailability = 'checking';
   let healthConnectPermissions = { read: [] };
 
@@ -483,6 +484,14 @@
                 on:click={() => toggleWellnessMetric(m.id)}>{m.label}</button>
             {/each}
           </div>
+        </div>
+        <div class="setting-divider"></div>
+        <div class="setting-row">
+          <div>
+            <span class="setting-label">Workout History</span>
+            <div class="setting-desc">Show recorded workouts with GPS route maps in the Movement tab. Requires a GPS-enabled device.</div>
+          </div>
+          <Toggle checked={workoutsEnabledVal} on:change={e => { workoutsEnabledVal = e.detail; workoutsEnabled.set(e.detail); }} />
         </div>
       {/if}
     </div>

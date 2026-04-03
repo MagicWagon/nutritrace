@@ -65,9 +65,15 @@ router.get('/pull', wrap((req, res) => {
     `SELECT * FROM wellness_data WHERE synced_at > ? ${u != null ? 'AND user_id = ?' : ''} ORDER BY synced_at`
   ).all(...wellnessParams).map(parse);
 
-  logger.debug(`[sync] pull since=${sinceSql}: foods=${foods.length} meals=${meals.length} diary=${diary.length} settings=${settings.length} wellness=${wellness.length}`);
+  // Workouts — pull only (server-generated from Fitbit activity log syncs)
+  const workoutsParams = u != null ? [sinceSql, u] : [sinceSql];
+  const workouts = db.prepare(
+    `SELECT * FROM workouts WHERE updated_at > ? ${u != null ? 'AND user_id = ?' : ''} ORDER BY updated_at`
+  ).all(...workoutsParams).map(parse);
 
-  res.json({ foods, meals, diary, settings, wellness, server_time: serverTime });
+  logger.debug(`[sync] pull since=${sinceSql}: foods=${foods.length} meals=${meals.length} diary=${diary.length} settings=${settings.length} wellness=${wellness.length} workouts=${workouts.length}`);
+
+  res.json({ foods, meals, diary, settings, wellness, workouts, server_time: serverTime });
 }));
 
 // ── POST /push ───────────────────────────────────────────────────────────────

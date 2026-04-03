@@ -168,6 +168,30 @@ db.exec(`
     user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     PRIMARY KEY (meal_id, user_id)
   );
+
+  -- Workout activity logs (from Fitbit / Garmin)
+  CREATE TABLE IF NOT EXISTS workouts (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id         INTEGER,
+    source          TEXT NOT NULL DEFAULT 'fitbit',
+    source_id       TEXT NOT NULL,
+    date            TEXT NOT NULL,
+    activity_type   TEXT,
+    activity_name   TEXT,
+    start_time      TEXT,
+    duration_ms     INTEGER,
+    distance_km     REAL,
+    calories        INTEGER,
+    avg_hr          INTEGER,
+    max_hr          INTEGER,
+    steps           INTEGER,
+    has_gps         INTEGER DEFAULT 0,
+    gps_data        TEXT,
+    synced_at       TEXT DEFAULT (datetime('now')),
+    updated_at      TEXT DEFAULT (datetime('now')),
+    UNIQUE(user_id, source, source_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_workouts_user_date ON workouts(user_id, date);
 `);
 
 // ── Migrations ─────────────────────────────────────────────────────────────

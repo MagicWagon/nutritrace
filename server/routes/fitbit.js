@@ -493,6 +493,149 @@ router.get('/data', wrap((req, res) => {
   res.json(byDate);
 }));
 
+// ── GET /workouts — return stored workouts for a date or range ────────────────
+router.get('/workouts', wrap((req, res) => {
+  const u = uid(req);
+  const { date, from, to } = req.query;
+  let rows;
+  if (date) {
+    rows = db.prepare('SELECT * FROM workouts WHERE user_id=? AND date=? ORDER BY start_time DESC').all(u, date);
+  } else {
+    const start = from || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+    const end = to || new Date().toISOString().slice(0, 10);
+    rows = db.prepare('SELECT * FROM workouts WHERE user_id=? AND date>=? AND date<=? ORDER BY date DESC, start_time DESC').all(u, start, end);
+  }
+  // Parse gps_data JSON, omit from list view for efficiency if not requested
+  const includeGps = req.query.gps === '1';
+  res.json(rows.map(r => ({
+    ...r,
+    gps_data: includeGps && r.gps_data ? JSON.parse(r.gps_data) : undefined,
+    has_gps: !!r.has_gps,
+  })));
+}));
+
+// ── GET /workouts/:id — single workout with GPS data ──────────────────────────
+router.get('/workouts/:id', wrap((req, res) => {
+  const u = uid(req);
+  const row = db.prepare('SELECT * FROM workouts WHERE id=? AND user_id=?').get(req.params.id, u);
+  if (!row) return res.status(404).json({ error: 'Workout not found' });
+  res.json({ ...row, gps_data: row.gps_data ? JSON.parse(row.gps_data) : null, has_gps: !!row.has_gps });
+}));
+
+// ── POST /workouts/sync — fetch activity logs from Fitbit API ─────────────────
+router.post('/workouts/sync', wrap(async (req, res) => {
+  const u = uid(req);
+  const { from, to } = req.body;
+  const afterDate = from || new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+  const beforeDate = to || new Date().toISOString().slice(0, 10);
+
+  // Fetch activity log list
+  const data = await _get(u, `/1/user/-/activities/list.json?afterDate=${afterDate}&sort=asc&offset=0&limit=100`);
+  const activities = (data.activities || []).filter(a => {
+    const d = (a.startDate || a.originalStartTime?.slice(0, 10) || '');
+    return d >= afterDate && d <= beforeDate;
+  });
+
+  const upsert = db.prepare(`
+    INSERT INTO workouts (user_id, source, source_id, date, activity_type, activity_name, start_time, duration_ms, distance_km, calories, avg_hr, max_hr, steps, has_gps, updated_at)
+    VALUES (?, 'fitbit', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    ON CONFLICT(user_id, source, source_id) DO UPDATE SET
+      activity_type=excluded.activity_type, activity_name=excluded.activity_name,
+      start_time=excluded.start_time, duration_ms=excluded.duration_ms,
+      distance_km=excluded.distance_km, calories=excluded.calories,
+      avg_hr=excluded.avg_hr, max_hr=excluded.max_hr, steps=excluded.steps,
+      has_gps=excluded.has_gps, updated_at=excluded.updated_at
+  `);
+
+  let synced = 0;
+  db.transaction(() => {
+    for (const a of activities) {
+      const logId = String(a.logId);
+      const date = a.startDate || a.originalStartTime?.slice(0, 10) || '';
+      const activityName = a.activityName || a.name || 'Unknown';
+      const activityType = (a.activityTypeId || '').toString();
+      const startTime = a.originalStartTime || a.startTime || '';
+      const durationMs = a.activeDuration || a.duration || 0;
+      const distanceKm = a.distance != null ? a.distance * (a.distanceUnit === 'Mile' ? 1.60934 : 1) : null;
+      const calories = a.calories || 0;
+      const avgHr = a.averageHeartRate || null;
+      const maxHr = a.heartRateZones?.reduce((max, z) => Math.max(max, z.max || 0), 0) || null;
+      const steps = a.steps || null;
+      const hasGps = a.hasGps ? 1 : 0;
+
+      upsert.run(u, logId, date, activityType, activityName, startTime, durationMs, distanceKm, calories, avgHr, maxHr, steps, hasGps);
+      synced++;
+    }
+  })();
+
+  logger.info(`[fitbit] synced ${synced} workouts for user ${u} (${afterDate} → ${beforeDate})`);
+  res.json({ ok: true, synced, total: activities.length });
+}));
+
+// ── POST /workouts/:sourceId/gps — fetch TCX GPS data for a specific workout ──
+router.post('/workouts/:sourceId/gps', wrap(async (req, res) => {
+  const u = uid(req);
+  const { sourceId } = req.params;
+
+  // Check if we already have GPS data cached
+  const existing = db.prepare('SELECT gps_data FROM workouts WHERE user_id=? AND source=? AND source_id=?').get(u, 'fitbit', sourceId);
+  if (existing?.gps_data) {
+    return res.json({ ok: true, cached: true, gps_data: JSON.parse(existing.gps_data) });
+  }
+
+  // Fetch TCX from Fitbit
+  let tok = await _token(u);
+  let tcxRes = await fetch(`https://api.fitbit.com/1/user/-/activities/${sourceId}.tcx?includePartialTCX=true`, {
+    headers: { Authorization: `Bearer ${tok}` },
+  });
+  if (tcxRes.status === 401) {
+    tok = await _refresh(u);
+    tcxRes = await fetch(`https://api.fitbit.com/1/user/-/activities/${sourceId}.tcx?includePartialTCX=true`, {
+      headers: { Authorization: `Bearer ${tok}` },
+    });
+  }
+  if (!tcxRes.ok) {
+    return res.status(tcxRes.status).json({ error: `Fitbit TCX fetch failed: ${tcxRes.status}` });
+  }
+
+  const tcxText = await tcxRes.text();
+
+  // Parse TCX XML → extract trackpoints with lat/lng/hr/time
+  const points = [];
+  const trackpointRegex = /<Trackpoint>([\s\S]*?)<\/Trackpoint>/g;
+  let match;
+  while ((match = trackpointRegex.exec(tcxText)) !== null) {
+    const block = match[1];
+    const lat = block.match(/<LatitudeDegrees>([\d.-]+)<\/LatitudeDegrees>/)?.[1];
+    const lng = block.match(/<LongitudeDegrees>([\d.-]+)<\/LongitudeDegrees>/)?.[1];
+    const hr = block.match(/<HeartRateBpm>[\s\S]*?<Value>(\d+)<\/Value>/)?.[1];
+    const time = block.match(/<Time>([^<]+)<\/Time>/)?.[1];
+    const alt = block.match(/<AltitudeMeters>([\d.-]+)<\/AltitudeMeters>/)?.[1];
+
+    if (lat && lng) {
+      points.push({
+        lat: parseFloat(lat),
+        lng: parseFloat(lng),
+        hr: hr ? parseInt(hr) : null,
+        alt: alt ? parseFloat(alt) : null,
+        time: time || null,
+      });
+    }
+  }
+
+  if (points.length === 0) {
+    return res.json({ ok: true, gps_data: null, message: 'No GPS data in TCX' });
+  }
+
+  // Cache GPS data in the workouts table
+  const gpsJson = JSON.stringify(points);
+  db.prepare('UPDATE workouts SET gps_data=?, has_gps=1, updated_at=datetime(\'now\') WHERE user_id=? AND source=? AND source_id=?')
+    .run(gpsJson, u, 'fitbit', sourceId);
+
+  logger.info(`[fitbit] cached ${points.length} GPS points for workout ${sourceId}`);
+  res.json({ ok: true, gps_data: points, count: points.length });
+}));
+
 // ── DELETE /disconnect ────────────────────────────────────────────────────────
 router.delete('/disconnect', wrap((req, res) => {
   db.prepare('DELETE FROM fitbit_tokens WHERE user_id=?').run(uid(req));

@@ -14,6 +14,7 @@ import {
   dbUpsertFromServer, dbUpsertDiaryFromServer, dbUpsertWellnessFromServer,
   dbPurgeSoftDeleted,
   dbGetPendingSettings, dbMarkSettingsSynced, dbUpsertSettingFromServer,
+  dbUpsertWorkoutFromServer,
 } from './db-native.js';
 import { writable } from 'svelte/store';
 
@@ -206,13 +207,18 @@ async function pullChanges() {
     }
   }
 
+  // Apply workouts from server
+  for (const w of (data.workouts || [])) {
+    await dbUpsertWorkoutFromServer(w);
+  }
+
   // Save server time as last_sync_at
   if (data.server_time) {
     await dbSetSyncMeta('last_sync_at', data.server_time);
   }
 
-  const totalChanges = (data.foods?.length || 0) + (data.meals?.length || 0) + (data.diary?.length || 0) + (data.wellness?.length || 0) + pulledSettings.length;
-  console.log(`[sync] pull complete: ${data.foods?.length || 0} foods, ${data.meals?.length || 0} meals, ${data.diary?.length || 0} diary, ${data.wellness?.length || 0} wellness, ${pulledSettings.length} settings`);
+  const totalChanges = (data.foods?.length || 0) + (data.meals?.length || 0) + (data.diary?.length || 0) + (data.wellness?.length || 0) + pulledSettings.length + (data.workouts?.length || 0);
+  console.log(`[sync] pull complete: ${data.foods?.length || 0} foods, ${data.meals?.length || 0} meals, ${data.diary?.length || 0} diary, ${data.wellness?.length || 0} wellness, ${pulledSettings.length} settings, ${data.workouts?.length || 0} workouts`);
   return totalChanges > 0;
 }
 

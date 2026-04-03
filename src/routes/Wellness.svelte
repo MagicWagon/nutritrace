@@ -367,6 +367,104 @@
     } catch(e) { showError(e.message); }
   }
 
+  // ── Workouts ────────────────────────────────────────────────────────────────
+  let _workouts = [];
+  let _workoutsLoaded = false;
+  let _selectedWorkout = null;
+  let _showWorkoutDetail = false;
+  let _workoutGps = null;
+  let _loadingGps = false;
+
+  async function loadWorkouts() {
+    if (!$workoutsEnabled) return;
+    try {
+      if (isNative) {
+        const { dbGetWorkouts } = await import('../lib/db-native.js');
+        _workouts = await dbGetWorkouts(dateStr, dateStr);
+      } else {
+        _workouts = await NtApi.get(`/api/wellness/fitbit/workouts?date=${dateStr}`);
+      }
+    } catch (e) {
+      console.warn('[wellness] load workouts failed:', e.message);
+      _workouts = [];
+    }
+    _workoutsLoaded = true;
+  }
+
+  async function syncWorkouts() {
+    if (!$workoutsEnabled) return;
+    try {
+      const range = $wellnessSyncRange || 7;
+      const end = new Date(dateStr + 'T12:00:00');
+      const start = new Date(end);
+      start.setDate(start.getDate() - (range - 1));
+      await NtApi.post('/api/wellness/fitbit/workouts/sync', {
+        from: start.toLocaleDateString('sv-SE'),
+        to: dateStr,
+      });
+      await _pullWellnessToLocal();
+      await loadWorkouts();
+    } catch (e) {
+      console.warn('[wellness] sync workouts failed:', e.message);
+    }
+  }
+
+  function _openWorkout(w) {
+    _selectedWorkout = w;
+    _workoutGps = w.gps_data || null;
+    _showWorkoutDetail = true;
+    // Fetch GPS if has_gps but no cached data
+    if (w.has_gps && !w.gps_data && w.source_id) {
+      _loadGpsData(w);
+    }
+  }
+
+  async function _loadGpsData(w) {
+    _loadingGps = true;
+    try {
+      const result = await NtApi.post(`/api/wellness/fitbit/workouts/${w.source_id}/gps`);
+      if (result.gps_data) {
+        _workoutGps = result.gps_data;
+        w.gps_data = result.gps_data;
+      }
+    } catch (e) {
+      console.warn('[wellness] GPS fetch failed:', e.message);
+    }
+    _loadingGps = false;
+  }
+
+  function _workoutIcon(name) {
+    const n = (name || '').toLowerCase();
+    if (n.includes('run'))    return 'directions_run';
+    if (n.includes('walk'))   return 'directions_walk';
+    if (n.includes('hike'))   return 'hiking';
+    if (n.includes('bike') || n.includes('cycl'))  return 'directions_bike';
+    if (n.includes('swim'))   return 'pool';
+    if (n.includes('yoga'))   return 'self_improvement';
+    if (n.includes('weight') || n.includes('strength')) return 'fitness_center';
+    if (n.includes('elliptical') || n.includes('cross')) return 'fitness_center';
+    if (n.includes('tennis') || n.includes('basketball') || n.includes('soccer')) return 'sports_tennis';
+    if (n.includes('dance'))  return 'nightlife';
+    return 'exercise';
+  }
+
+  function _fmtDuration(ms) {
+    if (!ms) return '0:00';
+    const totalSec = Math.round(ms / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    return `${m}:${String(s).padStart(2,'0')}`;
+  }
+
+  function _fmtWorkoutDist(km) {
+    if (km == null) return '';
+    const du = $distUnit || 'km';
+    if (du === 'mi') return `${(km * 0.621371).toFixed(2)} mi`;
+    return `${km.toFixed(2)} km`;
+  }
+
   // ── Sleep Insights: Debt + Chronotype ─────────────────────────────────────
   let sleepInsightsRange = 14; // nights to look back for debt calculation
   let sleepDebt     = null;    // { debtMin, nights, goalMin } | null
@@ -783,7 +881,7 @@
   $: if (activeTab === 'sleep' && !_insightsLoaded) loadSleepInsights();
 
   // ── Integration availability ───────────────────────────────────────────────
-  import { healthConnectEnabled } from '../stores/settings.js';
+  import { healthConnectEnabled, workoutsEnabled } from '../stores/settings.js';
   $: fitbitAvailable   = $fitbitEnabled;
   $: withingsAvailable = $withingsEnabled;
   $: garminAvailable   = $garminEnabled;
@@ -958,7 +1056,7 @@
         const last = localStorage.getItem(key);
         const cooldownMs = 15 * 60 * 1000;
         if (!last || Date.now() - Number(last) > cooldownMs) {
-          if (status.connected)       await sync(true);
+          if (status.connected)       { await sync(true); syncWorkouts(); }
           if (garminStatus?.connected) await syncGarmin(true);
         }
       }
@@ -1015,6 +1113,7 @@
     loadingData = false;
     if (activeTab === 'heart') { _readinessLoaded = false; _stressLoaded = false; }
     loadSparklines();
+    loadWorkouts();
   }
 
   /** After a server-side wellness sync (Fitbit/Garmin/Withings), pull new data into local SQLite */
@@ -1047,6 +1146,7 @@
     if (activeTab === 'heart') { _readinessLoaded = false; _stressLoaded = false; }
     // Load sparklines in background (not awaited — don't block date display)
     loadSparklines();
+    loadWorkouts();
   }
 
   async function sync(silent = false) {
@@ -1409,6 +1509,45 @@
                 </div>
               {/each}
             </div>
+
+            <!-- ── Workouts section (within Movement tab) ── -->
+            {#if $workoutsEnabled && _workouts.length > 0}
+              <div class="section-title" style="margin-top:20px">
+                <span class="material-symbols-rounded" style="font-size:18px;vertical-align:middle;margin-right:4px">fitness_center</span>
+                Today's Workouts
+              </div>
+              <div class="workout-list">
+                {#each _workouts as w}
+                  <button class="card workout-card" on:click={() => _openWorkout(w)}>
+                    <div class="workout-icon-wrap">
+                      <span class="material-symbols-rounded workout-icon">{_workoutIcon(w.activity_name)}</span>
+                    </div>
+                    <div class="workout-body">
+                      <span class="workout-name">{w.activity_name}</span>
+                      <span class="workout-meta">
+                        {_fmtDuration(w.duration_ms)}
+                        {#if w.distance_km != null} · {_fmtWorkoutDist(w.distance_km)}{/if}
+                        {#if w.calories} · {w.calories.toLocaleString()} kcal{/if}
+                      </span>
+                      {#if w.avg_hr}
+                        <span class="workout-hr">
+                          <span class="material-symbols-rounded" style="font-size:14px;color:var(--error,#ef4444)">favorite</span>
+                          {w.avg_hr} avg{#if w.max_hr} · {w.max_hr} max{/if} bpm
+                        </span>
+                      {/if}
+                    </div>
+                    <div class="workout-trail">
+                      {#if w.has_gps}
+                        <span class="material-symbols-rounded" style="font-size:18px;color:var(--accent)" title="GPS route available">map</span>
+                      {/if}
+                      <span class="material-symbols-rounded" style="font-size:18px;color:var(--text-3)">chevron_right</span>
+                    </div>
+                  </button>
+                {/each}
+              </div>
+            {:else if $workoutsEnabled && !loadingData && _workoutsLoaded}
+              <!-- No workouts today — show subtle hint -->
+            {/if}
 
           <!-- ── Sleep tab ── -->
           {:else if activeTab === 'sleep'}
@@ -1888,6 +2027,127 @@
     </div>
   </div>
 {/if}
+
+<!-- ── Workout Detail Modal ── -->
+{#if _showWorkoutDetail && _selectedWorkout}
+  {@const w = _selectedWorkout}
+  <div class="workout-overlay" on:click|self={() => _showWorkoutDetail = false} use:portal>
+    <div class="workout-detail">
+      <div class="workout-detail-header">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="material-symbols-rounded" style="font-size:24px;color:var(--accent)">{_workoutIcon(w.activity_name)}</span>
+          <div>
+            <h3 style="margin:0;font-size:16px;font-weight:600">{w.activity_name}</h3>
+            <span class="text-3 text-sm">
+              {w.start_time ? new Date(w.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : dateStr}
+            </span>
+          </div>
+        </div>
+        <button class="workout-close" on:click={() => _showWorkoutDetail = false}>
+          <span class="material-symbols-rounded">close</span>
+        </button>
+      </div>
+
+      <!-- GPS Map -->
+      {#if _loadingGps}
+        <div class="workout-map-placeholder">
+          <span class="material-symbols-rounded spin">sync</span>
+          <span>Loading route…</span>
+        </div>
+      {:else if _workoutGps && _workoutGps.length > 1}
+        <div class="workout-map" id="workout-map-container"></div>
+        {#await import('https://unpkg.com/leaflet@1.9.4/dist/leaflet-src.esm.js') then L}
+          {@const _ = (() => {
+            // Render map after DOM is ready
+            setTimeout(() => {
+              const el = document.getElementById('workout-map-container');
+              if (!el || el._leaflet_id) return;
+              const pts = _workoutGps;
+              const map = L.map(el, { zoomControl: false, attributionControl: false });
+              L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+              // Color route by heart rate if available
+              const hasHr = pts.some(p => p.hr);
+              if (hasHr) {
+                // Draw segments colored by HR zone
+                for (let i = 1; i < pts.length; i++) {
+                  const hr = pts[i].hr || pts[i-1].hr || 100;
+                  const color = hr > 170 ? '#ef4444' : hr > 150 ? '#f59e0b' : hr > 130 ? '#22c55e' : '#3b82f6';
+                  L.polyline([[pts[i-1].lat, pts[i-1].lng], [pts[i].lat, pts[i].lng]], {
+                    color, weight: 4, opacity: 0.85
+                  }).addTo(map);
+                }
+              } else {
+                L.polyline(pts.map(p => [p.lat, p.lng]), { color: 'var(--accent)', weight: 4 }).addTo(map);
+              }
+              // Start/end markers
+              L.circleMarker([pts[0].lat, pts[0].lng], { radius: 6, color: '#22c55e', fillColor: '#22c55e', fillOpacity: 1 }).addTo(map).bindPopup('Start');
+              L.circleMarker([pts[pts.length-1].lat, pts[pts.length-1].lng], { radius: 6, color: '#ef4444', fillColor: '#ef4444', fillOpacity: 1 }).addTo(map).bindPopup('Finish');
+              map.fitBounds(pts.map(p => [p.lat, p.lng]), { padding: [20, 20] });
+            }, 100);
+          })()}
+        {/await}
+      {:else if w.has_gps}
+        <div class="workout-map-placeholder">
+          <span class="material-symbols-rounded">map</span>
+          <span>No GPS data available</span>
+        </div>
+      {/if}
+
+      <!-- Stats grid -->
+      <div class="workout-stats-grid">
+        <div class="workout-stat">
+          <span class="workout-stat-val">{_fmtDuration(w.duration_ms)}</span>
+          <span class="workout-stat-lbl">Duration</span>
+        </div>
+        {#if w.distance_km != null}
+          <div class="workout-stat">
+            <span class="workout-stat-val">{_fmtWorkoutDist(w.distance_km)}</span>
+            <span class="workout-stat-lbl">Distance</span>
+          </div>
+        {/if}
+        {#if w.calories}
+          <div class="workout-stat">
+            <span class="workout-stat-val">{w.calories.toLocaleString()}</span>
+            <span class="workout-stat-lbl">kcal</span>
+          </div>
+        {/if}
+        {#if w.steps}
+          <div class="workout-stat">
+            <span class="workout-stat-val">{w.steps.toLocaleString()}</span>
+            <span class="workout-stat-lbl">Steps</span>
+          </div>
+        {/if}
+        {#if w.avg_hr}
+          <div class="workout-stat">
+            <span class="workout-stat-val">{w.avg_hr}</span>
+            <span class="workout-stat-lbl">Avg HR</span>
+          </div>
+        {/if}
+        {#if w.max_hr}
+          <div class="workout-stat">
+            <span class="workout-stat-val">{w.max_hr}</span>
+            <span class="workout-stat-lbl">Max HR</span>
+          </div>
+        {/if}
+      </div>
+
+      {#if _workoutGps && _workoutGps.some(p => p.hr)}
+        <div class="workout-hr-legend" style="margin-top:8px;display:flex;gap:12px;justify-content:center;font-size:11px;color:var(--text-3)">
+          <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#3b82f6;margin-right:3px"></span>&lt;130</span>
+          <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#22c55e;margin-right:3px"></span>130–150</span>
+          <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#f59e0b;margin-right:3px"></span>150–170</span>
+          <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#ef4444;margin-right:3px"></span>&gt;170</span>
+        </div>
+      {/if}
+    </div>
+  </div>
+{/if}
+
+<svelte:head>
+  {#if _showWorkoutDetail}
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  {/if}
+</svelte:head>
 
 <style>
   /*
@@ -2606,5 +2866,71 @@
   }
   .seg-val {
     color: var(--text-1);
+  }
+
+  /* ── Workouts ── */
+  .workout-list { display: flex; flex-direction: column; gap: 8px; }
+  .workout-card {
+    display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+    cursor: pointer; border: none; text-align: left; width: 100%;
+    transition: transform 0.1s, box-shadow 0.1s;
+  }
+  .workout-card:active { transform: scale(0.98); }
+  .workout-icon-wrap {
+    width: 40px; height: 40px; border-radius: 10px;
+    background: var(--accent-dim, rgba(100,200,180,0.15));
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .workout-icon { font-size: 22px; color: var(--accent); }
+  .workout-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .workout-name { font-size: 14px; font-weight: 600; color: var(--text-1); }
+  .workout-meta { font-size: 12px; color: var(--text-3); }
+  .workout-hr { font-size: 12px; color: var(--text-3); display: flex; align-items: center; gap: 3px; }
+  .workout-trail { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+
+  /* Workout detail modal */
+  .workout-overlay {
+    position: fixed; inset: 0; z-index: 9999;
+    background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px;
+  }
+  .workout-detail {
+    background: var(--surface-1); border-radius: 16px;
+    width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto;
+    padding: 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  }
+  .workout-detail-header {
+    display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px;
+  }
+  .workout-close {
+    background: none; border: none; cursor: pointer; padding: 4px;
+    color: var(--text-3); border-radius: 8px;
+  }
+  .workout-close:hover { background: var(--surface-2); }
+  .workout-map {
+    width: 100%; height: 280px; border-radius: 12px; overflow: hidden; margin-bottom: 16px;
+    background: var(--surface-2);
+  }
+  .workout-map-placeholder {
+    width: 100%; height: 140px; border-radius: 12px; margin-bottom: 16px;
+    background: var(--surface-2); display: flex; align-items: center; justify-content: center;
+    gap: 8px; color: var(--text-3); font-size: 14px;
+  }
+  .workout-stats-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+    gap: 12px; text-align: center;
+  }
+  .workout-stat {
+    display: flex; flex-direction: column; gap: 2px;
+    padding: 10px 4px; border-radius: 10px; background: var(--surface-2);
+  }
+  .workout-stat-val { font-size: 18px; font-weight: 700; color: var(--text-1); }
+  .workout-stat-lbl { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.5px; }
+
+  @media (max-width: 400px) {
+    .workout-stats-grid { grid-template-columns: repeat(3, 1fr); }
+    .workout-map { height: 220px; }
+    .workout-detail { padding: 14px; }
   }
 </style>

@@ -329,7 +329,10 @@
         interaction: { mode: 'index', intersect: false },
         plugins: {
           legend: { display: datasets.length > 1, labels: { color: textColor, boxHeight: 2, usePointStyle: true } },
-          tooltip: { displayColors: datasets.length > 1 }
+          tooltip: {
+            displayColors: datasets.length > 1,
+            callbacks: { label: ctx => `${ctx.dataset.label || ''}: ${ctx.parsed.y.toLocaleString()} ${getMetricUnit()}`.trim() }
+          }
         },
         scales: {
           x: {
@@ -338,7 +341,7 @@
           },
           y: {
             grid: { color: gridColor },
-            ticks: { color: textColor },
+            ticks: { color: textColor, callback: v => v.toLocaleString() },
             beginAtZero: $statsYZero,
           }
         }
@@ -476,22 +479,22 @@
       <div class="summary-card card">
         <div class="summary-grid">
           <div class="summary-item">
-            <span class="summary-val">{summary.avg}</span>
+            <span class="summary-val">{summary.avg.toLocaleString()}</span>
             <span class="summary-unit">{getMetricUnit()}</span>
             <span class="summary-lbl">Average</span>
           </div>
           <div class="summary-item">
-            <span class="summary-val">{summary.min}</span>
+            <span class="summary-val">{summary.min.toLocaleString()}</span>
             <span class="summary-unit">{getMetricUnit()}</span>
             <span class="summary-lbl">Min</span>
           </div>
           <div class="summary-item">
-            <span class="summary-val">{summary.max}</span>
+            <span class="summary-val">{summary.max.toLocaleString()}</span>
             <span class="summary-unit">{getMetricUnit()}</span>
             <span class="summary-lbl">Max</span>
           </div>
           <div class="summary-item">
-            <span class="summary-val">{summary.daysWithData}</span>
+            <span class="summary-val">{summary.daysWithData.toLocaleString()}</span>
             <span class="summary-unit">days</span>
             <span class="summary-lbl">Logged</span>
           </div>
@@ -536,7 +539,7 @@
                     return row.date;
                   })()}
                 </span>
-                <span class="timeline-val accent-text">{row.val} {getMetricUnit()}</span>
+                <span class="timeline-val accent-text">{row.val.toLocaleString()} {getMetricUnit()}</span>
               </div>
             {/if}
           {/each}
