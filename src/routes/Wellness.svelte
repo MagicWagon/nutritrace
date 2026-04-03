@@ -389,7 +389,13 @@
       _workouts = [];
     }
     _workoutsLoaded = true;
+    // If no workouts found and we haven't synced yet, trigger initial sync in background
+    if (_workouts.length === 0 && !_workoutsSyncedOnce && status?.connected) {
+      _workoutsSyncedOnce = true;
+      syncWorkouts();
+    }
   }
+  let _workoutsSyncedOnce = false;
 
   async function syncWorkouts() {
     if (!$workoutsEnabled) return;
@@ -1050,7 +1056,7 @@
     await initGarmin();
 
     if (status.connected || garminStatus?.connected) {
-      await loadData();
+      await loadData(); // loadData already calls loadWorkouts()
       if ($wellnessSyncMode === 'auto' && isToday) {
         const key = `wl_wellness_lastSync_${dateStr}`;
         const last = localStorage.getItem(key);
@@ -1196,6 +1202,7 @@
       }
     }
     syncing = false;
+    syncWorkouts(); // fetch workout activity logs alongside metrics
     _insightsLoaded  = false;
     _readinessLoaded = false;
     _stressLoaded    = false;
