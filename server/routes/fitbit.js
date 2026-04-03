@@ -368,6 +368,56 @@ async function _syncDate(u, dateStr) {
 }
 
 
+// ── Gotify wellness alerts ────────────────────────────────────────────────────
+async function _checkWellnessAlerts(userId, metrics) {
+  try {
+    const { alertWellness } = await import('../lib/gotify.js');
+    const alerts = [];
+
+    // HRV drop: check if today's HRV is 20%+ below 7-day average
+    if (metrics.hrv_daily_rmssd != null) {
+      const rows = db.prepare(
+        `SELECT value FROM wellness_data WHERE user_id=? AND source='fitbit' AND metric_type='hrv_daily_rmssd' AND date >= date('now','-7 days') AND date < date('now')`
+      ).all(userId);
+      if (rows.length >= 3) {
+        const avg = rows.reduce((s, r) => s + r.value, 0) / rows.length;
+        if (metrics.hrv_daily_rmssd < avg * 0.8) {
+          alerts.push(`HRV dropped to ${metrics.hrv_daily_rmssd.toFixed(1)}ms (7-day avg: ${avg.toFixed(1)}ms). Consider extra rest today.`);
+        }
+      }
+    }
+
+    // Sleep score trending down 3 days in a row
+    if (metrics.sleep_score != null) {
+      const rows = db.prepare(
+        `SELECT value FROM wellness_data WHERE user_id=? AND source='fitbit' AND metric_type='sleep_score' AND date >= date('now','-3 days') AND date <= date('now') ORDER BY date`
+      ).all(userId);
+      if (rows.length >= 3 && rows.every((r, i) => i === 0 || r.value < rows[i-1].value)) {
+        alerts.push(`Sleep score has declined 3 days in a row (${rows.map(r => Math.round(r.value)).join(' → ')}). Prioritize sleep tonight.`);
+      }
+    }
+
+    // Resting HR spike: 5+ bpm above 7-day average
+    if (metrics.resting_hr != null) {
+      const rows = db.prepare(
+        `SELECT value FROM wellness_data WHERE user_id=? AND source='fitbit' AND metric_type='resting_hr' AND date >= date('now','-7 days') AND date < date('now')`
+      ).all(userId);
+      if (rows.length >= 3) {
+        const avg = rows.reduce((s, r) => s + r.value, 0) / rows.length;
+        if (metrics.resting_hr > avg + 5) {
+          alerts.push(`Resting HR elevated at ${Math.round(metrics.resting_hr)} bpm (7-day avg: ${Math.round(avg)} bpm). Could indicate stress, illness, or poor recovery.`);
+        }
+      }
+    }
+
+    for (const msg of alerts) {
+      await alertWellness(userId, msg);
+    }
+  } catch (e) {
+    logger.debug(`[gotify] wellness alert check failed: ${e.message}`);
+  }
+}
+
 // ── POST /sync — fetch Fitbit metrics for a date or date range ────────────────
 // Body: { date? } for single day  OR  { from, to } for a range
 // Rate limit: Fitbit allows 150 req/hr (6 req/day → max 25 days/hr).
@@ -382,6 +432,10 @@ router.post('/sync', wrap(async (req, res) => {
   if (!from || !to) {
     const dateStr = req.body.date || today;
     const { metrics, errors } = await _syncDate(u, dateStr);
+    // Gotify: wellness alerts for today's data
+    if (dateStr === today && metrics) {
+      _checkWellnessAlerts(u, metrics).catch(() => {});
+    }
     return res.json({ ok: true, date: dateStr, metrics, errors });
   }
 
@@ -598,6 +652,21 @@ router.post('/workouts/sync', wrap(async (req, res) => {
   })();
 
   logger.info(`[fitbit] synced ${synced} workouts for user ${u} (${afterDate} → ${beforeDate})`);
+
+  // Gotify: workout summary for newly synced workouts
+  if (synced > 0) {
+    try {
+      const { notifyWorkout } = await import('../lib/gotify.js');
+      for (const a of activities.slice(-3)) { // last 3 max
+        const dur = Math.round((a.activeDuration || 0) / 60000);
+        const dist = a.distance != null ? `${(a.distance * (a.distanceUnit === 'Mile' ? 1.60934 : 1)).toFixed(1)} km` : '';
+        const cal = a.calories || 0;
+        const name = a.activityName || 'Workout';
+        notifyWorkout(u, `${name}: ${dur} min${dist ? ', ' + dist : ''}${cal ? ', ' + cal + ' kcal' : ''}`);
+      }
+    } catch {}
+  }
+
   res.json({ ok: true, synced, total: activities.length });
 }));
 

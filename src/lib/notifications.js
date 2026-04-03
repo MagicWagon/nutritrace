@@ -1,0 +1,192 @@
+/**
+ * notifications.js — Local notification scheduling for NutriTrace
+ *
+ * Handles water reminders, meal reminders, and goal celebrations.
+ * Uses @capacitor/local-notifications on native, Notification API on PWA.
+ */
+
+import { isNative } from './platform.js';
+
+let _LocalNotifications = null;
+
+async function _getLN() {
+  if (_LocalNotifications) return _LocalNotifications;
+  if (isNative) {
+    const mod = await import('@capacitor/local-notifications');
+    _LocalNotifications = mod.LocalNotifications;
+    return _LocalNotifications;
+  }
+  return null;
+}
+
+/** Request notification permission */
+export async function requestPermission() {
+  if (isNative) {
+    const LN = await _getLN();
+    if (!LN) return false;
+    const result = await LN.requestPermissions();
+    return result.display === 'granted';
+  }
+  // PWA: use Notification API
+  if ('Notification' in window) {
+    const result = await Notification.requestPermission();
+    return result === 'granted';
+  }
+  return false;
+}
+
+/** Check if notifications are permitted */
+export async function checkPermission() {
+  if (isNative) {
+    const LN = await _getLN();
+    if (!LN) return false;
+    const result = await LN.checkPermissions();
+    return result.display === 'granted';
+  }
+  if ('Notification' in window) return Notification.permission === 'granted';
+  return false;
+}
+
+/** Show an immediate notification */
+export async function showNotification(title, body, id = Date.now()) {
+  if (isNative) {
+    const LN = await _getLN();
+    if (!LN) return;
+    await LN.schedule({ notifications: [{ id, title, body, channelId: 'nutritrace' }] });
+  } else if ('Notification' in window && Notification.permission === 'granted') {
+    new Notification(title, { body, icon: '/icons/icon-192.png' });
+  }
+}
+
+// ── Water reminders ─────────────────────────────────────────────────────────
+
+/** Schedule recurring water reminders every `intervalMin` minutes, from 8am to 10pm */
+export async function scheduleWaterReminders(intervalMin = 120) {
+  if (!isNative) return; // PWA can't schedule future notifications reliably
+  const LN = await _getLN();
+  if (!LN) return;
+
+  // Cancel existing water reminders first
+  await cancelWaterReminders();
+
+  const notifications = [];
+  const now = new Date();
+  const startHour = 8, endHour = 22;
+
+  // Schedule for today and tomorrow
+  for (let day = 0; day < 2; day++) {
+    const base = new Date(now);
+    base.setDate(base.getDate() + day);
+    base.setHours(startHour, 0, 0, 0);
+
+    while (base.getHours() < endHour) {
+      if (base > now) {
+        notifications.push({
+          id: 1000 + notifications.length,
+          title: 'Hydration Reminder',
+          body: 'Time to drink some water! Stay hydrated.',
+          schedule: { at: new Date(base) },
+          channelId: 'nutritrace',
+        });
+      }
+      base.setMinutes(base.getMinutes() + intervalMin);
+    }
+  }
+
+  if (notifications.length) {
+    await LN.schedule({ notifications });
+    console.log(`[notifications] scheduled ${notifications.length} water reminders (every ${intervalMin} min)`);
+  }
+}
+
+export async function cancelWaterReminders() {
+  if (!isNative) return;
+  const LN = await _getLN();
+  if (!LN) return;
+  const pending = await LN.getPending();
+  const waterIds = pending.notifications.filter(n => n.id >= 1000 && n.id < 2000).map(n => ({ id: n.id }));
+  if (waterIds.length) await LN.cancel({ notifications: waterIds });
+}
+
+// ── Meal reminders ──────────────────────────────────────────────────────────
+
+/** Schedule daily meal reminders at specified times (e.g. ['08:00', '12:00', '18:00']) */
+export async function scheduleMealReminders(times = ['08:00', '12:00', '18:00'], mealNames = ['Breakfast', 'Lunch', 'Dinner']) {
+  if (!isNative) return;
+  const LN = await _getLN();
+  if (!LN) return;
+
+  await cancelMealReminders();
+
+  const notifications = [];
+  const now = new Date();
+
+  for (let day = 0; day < 2; day++) {
+    times.forEach((time, i) => {
+      const [h, m] = time.split(':').map(Number);
+      const at = new Date(now);
+      at.setDate(at.getDate() + day);
+      at.setHours(h, m, 0, 0);
+      if (at > now) {
+        notifications.push({
+          id: 2000 + day * 10 + i,
+          title: 'Meal Reminder',
+          body: `Time to log your ${mealNames[i] || 'meal'}!`,
+          schedule: { at },
+          channelId: 'nutritrace',
+        });
+      }
+    });
+  }
+
+  if (notifications.length) {
+    await LN.schedule({ notifications });
+    console.log(`[notifications] scheduled ${notifications.length} meal reminders`);
+  }
+}
+
+export async function cancelMealReminders() {
+  if (!isNative) return;
+  const LN = await _getLN();
+  if (!LN) return;
+  const pending = await LN.getPending();
+  const mealIds = pending.notifications.filter(n => n.id >= 2000 && n.id < 3000).map(n => ({ id: n.id }));
+  if (mealIds.length) await LN.cancel({ notifications: mealIds });
+}
+
+// ── Goal celebration ────────────────────────────────────────────────────────
+
+export async function notifyGoalHit(goalName, value, unit) {
+  await showNotification(
+    'Goal Reached!',
+    `You hit your ${goalName} goal: ${value.toLocaleString()} ${unit}`,
+    3000 + (Date.now() % 1000),
+  );
+}
+
+// ── Gotify push ─────────────────────────────────────────────────────────────
+
+/** Send a notification via Gotify server */
+export async function sendGotify(url, token, title, message, priority = 5) {
+  if (!url || !token) return;
+  try {
+    const res = await fetch(`${url.replace(/\/+$/, '')}/message?token=${token}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, message, priority }),
+    });
+    if (!res.ok) console.warn(`[gotify] push failed: ${res.status}`);
+  } catch (e) {
+    console.warn('[gotify] push failed:', e.message);
+  }
+}
+
+/** Test Gotify connection */
+export async function testGotify(url, token) {
+  try {
+    await sendGotify(url, token, 'NutriTrace', 'Test notification — Gotify is connected!', 5);
+    return true;
+  } catch {
+    return false;
+  }
+}

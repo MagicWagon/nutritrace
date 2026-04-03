@@ -30,6 +30,8 @@
 - **Settings auto-save**: most save reactively via `$: set(key, value)`. Meal names save on blur.
 - **Wellness scores**: sleep score estimated server-side (Fitbit API doesn't expose it). Readiness and stress calculated client-side from 30-day HRV/RHR baselines.
 - **Fitbit OAuth scopes**: `activity heartrate sleep oxygen_saturation respiratory_rate cardio_fitness temperature profile location` — `location` is required for TCX/GPS route data on workout logs.
+- **AI FitBot tool use**: FitBot uses function calling (tool use) across all providers (Claude, OpenAI, Gemini). Five tools: `get_wellness_data`, `get_body_composition`, `get_diary`, `get_workouts`, `get_goals`. Execution loop runs up to 5 rounds. System prompt instructs AI to always use tools to fetch real data rather than relying on context. See `src/lib/aiChat.js`.
+- **Settings sync feedback loop**: `_suppressSync` flag in the settings store prevents a feedback loop when loading server settings back into Svelte stores. A 10-second recently-changed protection window prevents server pull from overwriting local changes. Settings are written to SQLite immediately (not debounced) on `.set()`. PWA polls server every 30s and on `visibilitychange` for real-time sync.
 
 ## Svelte Reactivity Rules
 
@@ -70,6 +72,7 @@ The Android app is a Capacitor 8 shell wrapping the same Svelte PWA. It runs off
 - **Settings sync**: on Android, setting changes write to local SQLite `user_settings` (queued as 'pending'), attempt a direct PUT to server, and fall back to the differential sync engine. Server settings are pulled on sync and applied via `wl:setting` custom events.
 - **Workout sync**: workouts are included in the differential sync pull. The local `workouts` table mirrors the server schema; GPS data is cached in `gps_data` after first view for offline access.
 - **Wellness offline cache**: `Wellness.svelte` reads from local SQLite on native (all sources: fitbit, garmin, withings, health_connect). Listens for `nt:sync-complete` and reloads; manual source syncs trigger a differential pull before reload.
+- **Mobile OAuth** (`src/lib/oauth-native.js`): Fitbit, Garmin, and Withings OAuth flows on Android open the system browser via `@capacitor/browser` instead of an in-app WebView. Callback is handled via the `nutritrace://` deep link scheme. AndroidManifest declares an intent filter for `nutritrace://callback`.
 
 ### Build & Run
 ```bash

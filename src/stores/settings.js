@@ -27,6 +27,10 @@ const SERVER_SETTINGS = new Set([
   'withingsEnabled','withingsSyncRange','withingsDataPriority',
   'garminEnabled','garminSyncRange',
   'defaultFoodVisibility',
+  // Notifications
+  'notifWaterReminders','notifWaterInterval','notifMealReminders','notifMealTimes',
+  'notifGoalCelebrations','notifWellnessAlerts','notifWorkoutSummary','notifSyncFailures',
+  'gotifyUrl','gotifyToken',
   // Appearance / UI prefs — included so full backups restore the full look-and-feel
   'appearance','accentColor',
   'navStyle','sidebarPersistent','startPage','disableAnimations','goalCelebrations','pageBanners','loopBannerAnimations',
@@ -315,3 +319,15 @@ export const aiProvider      = createSettingStore('aiProvider',      'claude');
 export const aiApiKey        = createSettingStore('aiApiKey',        '');
 export const aiModel         = createSettingStore('aiModel',         '');
 export const aiAssistantName = createSettingStore('aiAssistantName', 'FitBot');
+
+// Notifications
+export const notifWaterReminders  = createSettingStore('notifWaterReminders',  false);
+export const notifWaterInterval   = createSettingStore('notifWaterInterval',   120); // minutes
+export const notifMealReminders   = createSettingStore('notifMealReminders',   false);
+export const notifMealTimes       = createSettingStore('notifMealTimes',       ['08:00','12:00','18:00']); // HH:MM
+export const notifGoalCelebrations = createSettingStore('notifGoalCelebrations', false);
+export const notifWellnessAlerts  = createSettingStore('notifWellnessAlerts',  false);
+export const notifWorkoutSummary  = createSettingStore('notifWorkoutSummary',  false);
+export const notifSyncFailures    = createSettingStore('notifSyncFailures',    false);
+export const gotifyUrl            = createSettingStore('gotifyUrl',            '');
+export const gotifyToken          = createSettingStore('gotifyToken',          '');

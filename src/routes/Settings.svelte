@@ -48,7 +48,7 @@
   $: isDark = $appearance === 'dark' || ($appearance === 'system' && (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches));
   let openSections = { serverConnection: false, appearance: false, regional: false, diary: false, foods: false, water: false,
                        categories: false, nutrients: false, bodyStats: false, statistics: false,
-                       connectedServices: false, ai: false, wellness: false, sharing: false,
+                       connectedServices: false, ai: false, notifications: false, wellness: false, sharing: false,
                        backup: false, email: false, users: false, about: false };
 
   // ── Server Connection (native only) ─────────────────────────────────────
@@ -243,6 +243,7 @@
     statistics:        ['statistics','chart','y-axis','average','goal line','trend','stats'],
     connectedServices: ['connected services','usda','open food facts','mealie','recipe','search language','country','api key','credentials','username','password'],
     ai:                ['ai','fitbot','assistant','provider','model','api key','artificial intelligence','chat'],
+    notifications:     ['notifications','reminders','water reminder','meal reminder','gotify','push','alerts','wellness alerts','goal celebration'],
     wellness:          ['wellness','activity tracking','fitbit','withings','garmin','steps','sleep','heart rate','hrv','spo2','sync mode','sync range','connect','disconnect','connected devices','fitness tracker','body battery','stress'],
     sharing:           ['sharing','share','group','catalogue','catalog','visibility','private','members','food sharing'],
     backup:            ['backup','export','import','restore','csv','clear data','json','full backup','images','zip'],
@@ -481,6 +482,53 @@
   // Reset model to provider default when provider changes
   $: if (aiModelVal && !AI_MODELS[aiProviderVal]?.find(m => m.value === aiModelVal)) {
     aiModelVal = AI_DEFAULT_MODELS[aiProviderVal] || '';
+  }
+
+  // ── Notifications ──────────────────────────────────────────────────────────
+  let _notifWater    = DB.getSetting('notifWaterReminders',  false);
+  let _notifWaterInt = DB.getSetting('notifWaterInterval',   120);
+  let _notifMeals    = DB.getSetting('notifMealReminders',   false);
+  let _notifGoals    = DB.getSetting('notifGoalCelebrations', false);
+  let _notifWellness = DB.getSetting('notifWellnessAlerts',  false);
+  let _notifWorkouts = DB.getSetting('notifWorkoutSummary',  false);
+  let _notifSync     = DB.getSetting('notifSyncFailures',    false);
+  let _gotifyUrl     = DB.getSetting('gotifyUrl',            '');
+  let _gotifyToken   = DB.getSetting('gotifyToken',          '');
+  let _gotifyTesting = false;
+
+  async function _scheduleWater() {
+    if (_notifWater) {
+      const { requestPermission, scheduleWaterReminders } = await import('../lib/notifications.js');
+      await requestPermission();
+      await scheduleWaterReminders(_notifWaterInt);
+    } else {
+      const { cancelWaterReminders } = await import('../lib/notifications.js');
+      await cancelWaterReminders();
+    }
+  }
+
+  async function _scheduleMeals() {
+    if (_notifMeals) {
+      const { requestPermission, scheduleMealReminders } = await import('../lib/notifications.js');
+      await requestPermission();
+      const names = DB.getSetting('mealNames', ['Breakfast','Lunch','Dinner','Snacks']);
+      const times = DB.getSetting('notifMealTimes', ['08:00','12:00','18:00']);
+      await scheduleMealReminders(times, names);
+    } else {
+      const { cancelMealReminders } = await import('../lib/notifications.js');
+      await cancelMealReminders();
+    }
+  }
+
+  async function _testGotify() {
+    _gotifyTesting = true;
+    try {
+      const { testGotify } = await import('../lib/notifications.js');
+      const ok = await testGotify(_gotifyUrl, _gotifyToken);
+      if (ok) showSuccess('Gotify connected — check your device!');
+      else showError('Gotify test failed');
+    } catch (e) { showError(e.message); }
+    _gotifyTesting = false;
   }
 
   // ── Wellness ── (extracted to SettingsWellness.svelte)
@@ -2154,6 +2202,103 @@
             {/if}
           {/if}
         </div>
+      </div>
+    {/if}
+
+    <!-- ── Notifications ────────────────────────────────────────────────────── -->
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'notifications')} on:click={() => toggleSection('notifications')}>
+      <span class="material-symbols-rounded si">notifications</span>
+      <span>Notifications</span>
+      <span class="material-symbols-rounded chevron" class:rotated={openSections.notifications}>expand_more</span>
+    </button>
+    {#if sectionOpen(openSections, settingsQuery, 'notifications') && sectionVisible(settingsQuery, 'notifications')}
+      <div class="section-body" transition:slide={{ duration: 180 }}>
+
+        <p class="sub-label">Local Reminders</p>
+        <div class="card settings-card">
+          <div class="setting-row">
+            <div>
+              <span class="setting-label">Water Reminders</span>
+              <div class="setting-desc">Periodic reminders to stay hydrated (8am–10pm)</div>
+            </div>
+            <Toggle checked={_notifWater} on:change={e => { _notifWater = e.detail; set('notifWaterReminders', e.detail); _scheduleWater(); }} />
+          </div>
+          {#if _notifWater}
+            <div class="setting-divider"></div>
+            <div class="setting-row">
+              <span class="setting-label">Interval</span>
+              <div class="select-wrap" style="width:130px">
+                <select class="select sel-sm" value={_notifWaterInt} on:change={e => { _notifWaterInt = Number(e.target.value); set('notifWaterInterval', _notifWaterInt); _scheduleWater(); }}>
+                  <option value={60}>Every 1 hour</option>
+                  <option value={90}>Every 1.5 hours</option>
+                  <option value={120}>Every 2 hours</option>
+                  <option value={180}>Every 3 hours</option>
+                </select>
+              </div>
+            </div>
+          {/if}
+          <div class="setting-divider"></div>
+          <div class="setting-row">
+            <div>
+              <span class="setting-label">Meal Log Reminders</span>
+              <div class="setting-desc">Daily reminders to log your meals</div>
+            </div>
+            <Toggle checked={_notifMeals} on:change={e => { _notifMeals = e.detail; set('notifMealReminders', e.detail); _scheduleMeals(); }} />
+          </div>
+          <div class="setting-divider"></div>
+          <div class="setting-row">
+            <div>
+              <span class="setting-label">Goal Celebrations</span>
+              <div class="setting-desc">Notification when you hit a daily nutrition goal</div>
+            </div>
+            <Toggle checked={_notifGoals} on:change={e => { _notifGoals = e.detail; set('notifGoalCelebrations', e.detail); }} />
+          </div>
+        </div>
+
+        <p class="sub-label">Server Push (Gotify)</p>
+        <div class="card settings-card">
+          <div class="setting-row">
+            <div>
+              <span class="setting-label">Wellness Alerts</span>
+              <div class="setting-desc">Alerts when HRV drops significantly, sleep trends down, etc.</div>
+            </div>
+            <Toggle checked={_notifWellness} on:change={e => { _notifWellness = e.detail; set('notifWellnessAlerts', e.detail); }} />
+          </div>
+          <div class="setting-divider"></div>
+          <div class="setting-row">
+            <div>
+              <span class="setting-label">Workout Summaries</span>
+              <div class="setting-desc">Summary notification after a workout syncs</div>
+            </div>
+            <Toggle checked={_notifWorkouts} on:change={e => { _notifWorkouts = e.detail; set('notifWorkoutSummary', e.detail); }} />
+          </div>
+          <div class="setting-divider"></div>
+          <div class="setting-row">
+            <div>
+              <span class="setting-label">Sync Failures</span>
+              <div class="setting-desc">Alert when Fitbit/Garmin/Withings sync fails</div>
+            </div>
+            <Toggle checked={_notifSync} on:change={e => { _notifSync = e.detail; set('notifSyncFailures', e.detail); }} />
+          </div>
+
+          {#if _notifWellness || _notifWorkouts || _notifSync}
+            <div class="setting-divider"></div>
+            <div class="form-group" style="padding:10px 16px 14px">
+              <label class="form-label">Gotify Server URL</label>
+              <input class="input" placeholder="https://gotify.example.com" bind:value={_gotifyUrl} on:blur={() => set('gotifyUrl', _gotifyUrl)} />
+            </div>
+            <div class="form-group" style="padding:0 16px 14px">
+              <label class="form-label">App Token</label>
+              <div style="display:flex;gap:8px;align-items:center">
+                <input class="input" style="flex:1" type="password" placeholder="Your Gotify app token" bind:value={_gotifyToken} on:blur={() => set('gotifyToken', _gotifyToken)} />
+                <button class="btn btn-primary" style="height:40px;font-size:13px;white-space:nowrap" on:click={_testGotify} disabled={!_gotifyUrl || !_gotifyToken || _gotifyTesting}>
+                  {#if _gotifyTesting}Testing…{:else}Test{/if}
+                </button>
+              </div>
+            </div>
+          {/if}
+        </div>
+
       </div>
     {/if}
 
