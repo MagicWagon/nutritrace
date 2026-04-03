@@ -5,7 +5,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [0.31.0-beta] — 2026-04-03
+## [0.32.0-beta] — 2026-04-03
 
 ### Added
 - **Bidirectional settings sync** — settings changes on Android now sync to server via differential sync engine; server setting changes (from PWA) pull down to Android and update stores in real-time
@@ -20,6 +20,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Mobile OAuth via system browser** — Fitbit, Garmin, and Withings OAuth on Android now opens the system browser via `@capacitor/browser` with callback via `nutritrace://` deep link (AndroidManifest intent filter for `nutritrace://callback`)
 - **PWA settings poll** — PWA polls server for setting changes every 30 seconds and on tab focus (`visibilitychange`) for near-real-time sync
 - **Diary scroll position save/restore** — diary saves and restores exact scroll position when adding food (page-transition is a fixed scroll container)
+- **Notification system** — 10 notification types (water reminders, meal reminders, weigh-in, goal celebrations, calorie goal, step goal progress, wellness alerts, workout summaries, weekly summary, sync failures); delivery via device notifications + push service
+- **Push service support** — dropdown: Apprise, Gotify, ntfy; each with own config; native uses CapacitorHttp (no CORS), PWA proxies through server; test button for all services
+- **Scheduled wellness sync** — new sync mode alongside Auto and Manual; server-side scheduler runs every 15 minutes; frequency options: every 6h, every 12h, daily, weekly
+- **Server-side scheduler** — push reminders (water, meal, weigh-in) via configured push service for PWA users; weekly summary on Sundays; scheduled wellness sync trigger
+- **Repeating local notifications** — water, meal, weigh-in reminders use `every: 'day'` for infinite repeat; re-scheduled on every app open
+- **Eye icon on all password/token fields** — OFF password, SMTP password, new user password, admin password, Gotify token, ntfy token all have visibility toggle
+- **Local mode audit** — Fitbit/Garmin/Withings show disabled state with explanation in native local mode; Health Connect promoted as local alternative; Gotify works in local mode via CapacitorHttp; FitBot reads from local SQLite
 
 ### Fixed
 - **Health Connect section spacing** — uniform `padding-top:16px` matching Fitbit, Garmin, and Withings sections
