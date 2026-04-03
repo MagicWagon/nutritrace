@@ -204,6 +204,15 @@
       });
     }
 
+    // PWA: reload settings when tab becomes visible (picks up changes from phone/other devices)
+    if (!isNative && $userMgmtActive && $currentUser) {
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          import('./stores/settings.js').then(({ loadServerSettings }) => loadServerSettings());
+        }
+      });
+    }
+
     // Migrate assistant name: 'Buddy' → 'FitBot'
     if (DB.getSetting('aiAssistantName', null) === 'Buddy') {
       DB.setSetting('aiAssistantName', 'FitBot');
