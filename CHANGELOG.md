@@ -5,7 +5,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [0.30.0-beta] — 2026-04-02
+## [0.31.0-beta] — 2026-04-03
 
 ### Added
 - **Bidirectional settings sync** — settings changes on Android now sync to server via differential sync engine; server setting changes (from PWA) pull down to Android and update stores in real-time
@@ -15,6 +15,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **`workoutsEnabled` setting toggle** — Settings → Wellness → Fitbit; enables/disables workout log sync and display
 - **Comma formatting on large numbers** — `toLocaleString()` applied to calories, steps, and other large numbers across Diary, Foods, Wellness, and Statistics
 - **Fitbit OAuth `location` scope** — added to authorize request for GPS/TCX route access
+- **FitBot AI tool use** — FitBot now fetches real data on demand via function calling instead of hallucinating from context; tools: `get_wellness_data`, `get_body_composition`, `get_diary`, `get_workouts`, `get_goals`; supports Claude, OpenAI, and Gemini; queries any date range; tool execution loop up to 5 rounds
+- **FitBot image attachments** — attach images to FitBot messages; camera on native (via `@capacitor/camera`), file picker always available on PWA, camera option shown on PWA if webcam is detected
+- **Mobile OAuth via system browser** — Fitbit, Garmin, and Withings OAuth on Android now opens the system browser via `@capacitor/browser` with callback via `nutritrace://` deep link (AndroidManifest intent filter for `nutritrace://callback`)
+- **PWA settings poll** — PWA polls server for setting changes every 30 seconds and on tab focus (`visibilitychange`) for near-real-time sync
+- **Diary scroll position save/restore** — diary saves and restores exact scroll position when adding food (page-transition is a fixed scroll container)
 
 ### Fixed
 - **Health Connect section spacing** — uniform `padding-top:16px` matching Fitbit, Garmin, and Withings sections
@@ -25,6 +30,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **"Save &amp; Connect" HTML entity** — raw `&amp;` entity no longer displays as literal text in button labels
 - **Settings Wellness connection status loading slow** — Fitbit/Withings/Garmin status API calls now run in parallel; connection status auto-loads on component mount instead of waiting for section expand
 - **Workouts table in full backup** — workouts table now included in full backup dump and restore
+- **Settings sync feedback loop** — `_suppressSync` flag prevents feedback loop when loading server settings into stores; 10-second recently-changed protection window prevents server pull from overwriting local changes; settings written to SQLite immediately on `.set()` (not debounced)
+- **Statistics units showing "kcal" for all metrics** — replaced broken `getMetricUnit()` function calls with reactive `$: _metricUnit` variable
+- **`_DB` reference error crashing settings sync** — `_DB` used before definition in `Statistics.svelte` and `Settings.svelte`; fixed declaration order
+- **Gradle 9.3 proguard compatibility** — `proguard-android.txt` → `proguard-android-optimize.txt`
+
+### Changed
+- **Readiness and stress score formulas recalibrated** — 10-day dataset used to tune coefficients; MAE improved from 2.5→1.4 (readiness) and 2.5→1.6 (stress); see `reference_fitbit_scores.md` for formula versions and calibration log
 
 ---
 
