@@ -139,7 +139,7 @@
       if (mode === 'upload' || mode === 'merge') {
         // Push local settings to server
         mergeProgress = 'Uploading settings…';
-        const allSettings = _DB.getAllSettings();
+        const allSettings = DB.getAllSettings();
         for (const [key, value] of Object.entries(allSettings)) {
           await fetch(`${url}/api/settings`, { method: 'PUT', headers: _authH, body: JSON.stringify({ key, value }) }).catch(() => {});
         }

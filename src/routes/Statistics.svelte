@@ -15,8 +15,8 @@
   // Reload when settings change
   if (typeof window !== 'undefined') {
     window.addEventListener('wl:setting', () => {
-      _waterShowInStats = _DB.getSetting('waterShowInStats', true);
-      _waterUnit        = _DB.getSetting('waterUnit', 'ml');
+      _waterShowInStats = DB.getSetting('waterShowInStats', true);
+      _waterUnit        = DB.getSetting('waterUnit', 'ml');
     });
   }
 
