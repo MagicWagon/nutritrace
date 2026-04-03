@@ -6,17 +6,11 @@
  */
 
 import { isNative } from './platform.js';
+import { LocalNotifications } from '@capacitor/local-notifications';
 
-let _LocalNotifications = null;
-
-async function _getLN() {
-  if (_LocalNotifications) return _LocalNotifications;
-  if (isNative) {
-    const mod = await import('@capacitor/local-notifications');
-    _LocalNotifications = mod.LocalNotifications;
-    return _LocalNotifications;
-  }
-  return null;
+function _getLN() {
+  if (!isNative) return null;
+  return LocalNotifications;
 }
 
 let _channelCreated = false;
@@ -24,7 +18,7 @@ let _channelCreated = false;
 /** Ensure the notification channel exists (Android requires this) */
 async function _ensureChannel() {
   if (_channelCreated || !isNative) return;
-  const LN = await _getLN();
+  const LN = _getLN();
   if (!LN) return;
   try {
     await LN.createChannel({
@@ -46,9 +40,8 @@ async function _ensureChannel() {
 /** Request notification permission */
 export async function requestPermission() {
   if (isNative) {
-    const LN = await _getLN();
+    const LN = _getLN();
     if (!LN) return false;
-    await _ensureChannel();
     const result = await LN.requestPermissions();
     return result.display === 'granted';
   }
@@ -63,7 +56,7 @@ export async function requestPermission() {
 /** Check if notifications are permitted */
 export async function checkPermission() {
   if (isNative) {
-    const LN = await _getLN();
+    const LN = _getLN();
     if (!LN) return false;
     const result = await LN.checkPermissions();
     return result.display === 'granted';
@@ -74,17 +67,30 @@ export async function checkPermission() {
 
 /** Show an immediate notification */
 export async function showNotification(title, body, id = null) {
-  // ID must be a 32-bit integer for Android
-  const notifId = id || (Math.floor(Math.random() * 2000000000) + 5000);
+  const notifId = id || (Math.floor(Math.random() * 100000) + 5000);
   if (isNative) {
-    const LN = await _getLN();
-    if (!LN) return;
-    await _ensureChannel();
+    const LN = _getLN();
+    if (!LN) { console.error('[notifications] LocalNotifications not available'); return; }
+    // Check permission first
+    const perm = await LN.checkPermissions();
+    if (perm.display !== 'granted') {
+      const req = await LN.requestPermissions();
+      if (req.display !== 'granted') {
+        console.warn('[notifications] permission denied');
+        return;
+      }
+    }
     try {
-      await LN.schedule({ notifications: [{ id: notifId, title, body, channelId: 'nutritrace' }] });
-      console.log(`[notifications] scheduled immediate: "${title}" (id=${notifId})`);
+      await LN.schedule({
+        notifications: [{
+          id: notifId,
+          title,
+          body,
+        }]
+      });
+      console.log(`[notifications] scheduled OK: "${title}" id=${notifId}`);
     } catch (e) {
-      console.error('[notifications] schedule failed:', e);
+      console.error('[notifications] schedule FAILED:', e);
     }
   } else if ('Notification' in window && Notification.permission === 'granted') {
     new Notification(title, { body, icon: '/icons/icon-192.png' });
@@ -96,7 +102,7 @@ export async function showNotification(title, body, id = null) {
 /** Schedule repeating water reminders every `intervalMin` minutes, 8am–10pm daily */
 export async function scheduleWaterReminders(intervalMin = 120) {
   if (!isNative) return;
-  const LN = await _getLN();
+  const LN = _getLN();
   if (!LN) return;
   await cancelWaterReminders();
 
@@ -116,7 +122,6 @@ export async function scheduleWaterReminders(intervalMin = 120) {
       title: '💧 Hydration Reminder',
       body: 'Time to drink some water! Stay hydrated.',
       schedule: { at, every: 'day', allowWhileIdle: true },
-      channelId: 'nutritrace',
     });
   }
 
@@ -128,7 +133,7 @@ export async function scheduleWaterReminders(intervalMin = 120) {
 
 export async function cancelWaterReminders() {
   if (!isNative) return;
-  const LN = await _getLN();
+  const LN = _getLN();
   if (!LN) return;
   const pending = await LN.getPending();
   const ids = pending.notifications.filter(n => n.id >= 1000 && n.id < 2000).map(n => ({ id: n.id }));
@@ -140,7 +145,7 @@ export async function cancelWaterReminders() {
 /** Schedule repeating daily meal reminders at specified times */
 export async function scheduleMealReminders(times = ['08:00', '12:00', '18:00'], mealNames = ['Breakfast', 'Lunch', 'Dinner']) {
   if (!isNative) return;
-  const LN = await _getLN();
+  const LN = _getLN();
   if (!LN) return;
   await cancelMealReminders();
 
@@ -155,7 +160,6 @@ export async function scheduleMealReminders(times = ['08:00', '12:00', '18:00'],
       title: '🍽️ Meal Reminder',
       body: `Time to log your ${mealNames[i] || 'meal'}!`,
       schedule: { at, every: 'day', allowWhileIdle: true },
-      channelId: 'nutritrace',
     });
   });
 
@@ -167,7 +171,7 @@ export async function scheduleMealReminders(times = ['08:00', '12:00', '18:00'],
 
 export async function cancelMealReminders() {
   if (!isNative) return;
-  const LN = await _getLN();
+  const LN = _getLN();
   if (!LN) return;
   const pending = await LN.getPending();
   const ids = pending.notifications.filter(n => n.id >= 2000 && n.id < 3000).map(n => ({ id: n.id }));
@@ -397,24 +401,14 @@ export async function sendGotify(url, token, title, message, priority = 5) {
     }
   } else {
     // PWA: use server proxy to avoid CORS
-    try {
-      const { apiUrl } = await import('./platform.js');
-      const res = await fetch(apiUrl('/api/settings/gotify-push'), {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, message, priority }),
-      });
-      if (!res.ok) throw new Error(`Gotify proxy ${res.status}`);
-    } catch (e) {
-      // Fallback: try direct (may fail due to CORS)
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, message, priority }),
-      });
-      if (!res.ok) throw new Error(`Gotify ${res.status}`);
-    }
+    const { apiUrl } = await import('./platform.js');
+    const res = await fetch(apiUrl('/api/settings/push-test'), {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ service: 'gotify', title, message, priority }),
+    });
+    if (!res.ok) throw new Error(`Gotify proxy ${res.status}`);
   }
 }
 
@@ -432,7 +426,7 @@ export async function testGotify(url, token) {
 
 export async function scheduleWeighInReminder(timeStr = '07:00') {
   if (!isNative) return;
-  const LN = await _getLN();
+  const LN = _getLN();
   if (!LN) return;
   await cancelWeighInReminder();
 
@@ -453,7 +447,7 @@ export async function scheduleWeighInReminder(timeStr = '07:00') {
 
 export async function cancelWeighInReminder() {
   if (!isNative) return;
-  const LN = await _getLN();
+  const LN = _getLN();
   if (!LN) return;
   const pending = await LN.getPending();
   const ids = pending.notifications.filter(n => n.id >= 4000 && n.id < 5000).map(n => ({ id: n.id }));
