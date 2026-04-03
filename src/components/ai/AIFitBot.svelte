@@ -18,6 +18,16 @@
   let hasUnread  = false;
   let attachedImage = null; // { base64, mimeType, preview }
   let fileInput;
+  let _cameraInput;
+  let _showAttachMenu = false;
+  let _hasCamera = false;
+
+  // Check if device has a camera (PWA only)
+  if (!isNative && navigator.mediaDevices?.enumerateDevices) {
+    navigator.mediaDevices.enumerateDevices().then(devices => {
+      _hasCamera = devices.some(d => d.kind === 'videoinput');
+    }).catch(() => {});
+  }
 
   // Whether AI config is locked via env vars (proxy mode)
   let aiEnvLocked = false;
@@ -385,10 +395,15 @@
           .then(photo => { attachedImage = { base64: photo.base64String, mimeType: `image/${photo.format || 'jpeg'}`, preview: `data:image/${photo.format || 'jpeg'};base64,${photo.base64String}` }; })
           .catch(() => {});
       });
+    } else if (_hasCamera) {
+      _showAttachMenu = !_showAttachMenu;
     } else {
       fileInput?.click();
     }
   }
+
+  function _attachFromCamera() { _showAttachMenu = false; _cameraInput?.click(); }
+  function _attachFromFile()   { _showAttachMenu = false; fileInput?.click(); }
 
   function _onFileSelected(e) {
     const file = e.target.files?.[0];
@@ -574,9 +589,21 @@
         </div>
       {/if}
       <div class="ai-input-bar">
-        <button class="ai-attach-btn" on:click={_attachImage} disabled={loading} title="Attach image">
-          <span class="material-symbols-rounded">photo_camera</span>
-        </button>
+        <div style="position:relative">
+          <button class="ai-attach-btn" on:click={_attachImage} disabled={loading} title="Attach image">
+            <span class="material-symbols-rounded">photo_camera</span>
+          </button>
+          {#if _showAttachMenu}
+            <div class="ai-attach-menu">
+              <button class="ai-attach-option" on:click={_attachFromCamera}>
+                <span class="material-symbols-rounded" style="font-size:18px">photo_camera</span> Camera
+              </button>
+              <button class="ai-attach-option" on:click={_attachFromFile}>
+                <span class="material-symbols-rounded" style="font-size:18px">photo_library</span> Gallery
+              </button>
+            </div>
+          {/if}
+        </div>
         <textarea
           class="ai-textarea"
           bind:value={input}
@@ -590,6 +617,7 @@
         </button>
       </div>
       <input type="file" accept="image/*" bind:this={fileInput} on:change={_onFileSelected} style="display:none" />
+      <input type="file" accept="image/*" capture="environment" bind:this={_cameraInput} on:change={_onFileSelected} style="display:none" />
     </aside>
   {/if}
 {/if}
@@ -893,6 +921,34 @@
   .ai-attach-btn:hover { color: var(--accent); border-color: var(--accent); }
   .ai-attach-btn:disabled { opacity: 0.4; cursor: default; }
   .ai-attach-btn .material-symbols-rounded { font-size: 20px; }
+
+  .ai-attach-menu {
+    position: absolute;
+    bottom: 48px;
+    left: 0;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+    overflow: hidden;
+    z-index: 10;
+    min-width: 140px;
+  }
+  .ai-attach-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 10px 14px;
+    background: none;
+    border: none;
+    color: var(--text-1);
+    font-size: 14px;
+    cursor: pointer;
+    text-align: left;
+  }
+  .ai-attach-option:hover { background: var(--surface-2); }
+  .ai-attach-option + .ai-attach-option { border-top: 1px solid var(--border); }
 
   .ai-image-preview {
     position: relative;
