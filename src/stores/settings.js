@@ -55,10 +55,20 @@ export function isRecentlyChanged(key) {
   const ts = _recentlyChanged.get(key);
   return ts && Date.now() - ts < 10000; // 10-second protection window
 }
+// Suppress scheduleSave when loading settings from server (prevents feedback loop)
+let _suppressSync = false;
+
+/** Apply a server-sourced setting to localStorage + notify stores without pushing back */
+export function _applySetting(key, value) {
+  _suppressSync = true;
+  DB.setSetting(key, value);
+  _suppressSync = false;
+}
 function _isLoggedIn() { return !!localStorage.getItem('wl:userId'); }
 function _shouldSyncToServer() { return _isLoggedIn() && !(isNative && !getServerUrl()); }
 export function scheduleSave(key, value) {
   if (!SERVER_SETTINGS.has(key)) return;
+  if (_suppressSync) return;
   clearTimeout(_saveQueue[key]);
   _saveQueue[key] = setTimeout(async () => {
     // Try direct push to server (fast path when online)
@@ -96,15 +106,15 @@ export function scheduleSave(key, value) {
 export async function loadServerSettings() {
   if (!_shouldSyncToServer()) return;
   try {
-    const res = await fetch(_settingsUrl(), { credentials: 'include', headers: _authHeaders() });
+    const res = await fetch(_settingsUrl(), { credentials: 'include', headers: _authHeaders(), signal: AbortSignal.timeout(8000) });
     if (!res.ok) return;
     const serverSettings = await res.json();
+    _suppressSync = true; // Don't push these back to server
     for (const [key, value] of Object.entries(serverSettings)) {
-      // Use raw key for localStorage (DB.setSetting prefixes with wl_)
       DB.setSetting(key, value);
-      window.dispatchEvent(new CustomEvent('wl:setting', { detail: { key: `wl_${key}` } }));
     }
-  } catch {}
+    _suppressSync = false;
+  } catch { _suppressSync = false; }
 }
 
 /**
@@ -126,6 +136,7 @@ function createSettingStore(key, defaultValue) {
     set(value) {
       DB.setSetting(key, value);
       store.set(value);
+      if (_suppressSync) return; // Server-sourced update — don't push back
       _recentlyChanged.set(key, Date.now());
       // On native: write to local SQLite immediately (marks as pending for sync protection)
       if (isNative && SERVER_SETTINGS.has(key)) {

@@ -198,9 +198,9 @@ async function pullChanges() {
   // Skip settings that have pending local changes or were recently changed locally
   const pulledSettings = data.settings || [];
   const localPendingKeys = new Set((await dbGetPendingSettings()).map(s => s.key));
-  const { isRecentlyChanged } = await import('../stores/settings.js');
+  const settingsMod = await import('../stores/settings.js');
   for (const s of pulledSettings) {
-    if (localPendingKeys.has(s.key) || isRecentlyChanged(s.key)) {
+    if (localPendingKeys.has(s.key) || settingsMod.isRecentlyChanged(s.key)) {
       console.log(`[sync] skip pulled setting ${s.key} — local change takes priority`);
       continue;
     }
@@ -208,7 +208,7 @@ async function pullChanges() {
     if (!s.deleted_at) {
       const { DB } = await import('./db.js');
       const val = typeof s.value === 'string' ? _parseJson(s.value) : s.value;
-      DB.setSetting(s.key, val);
+      settingsMod._applySetting(s.key, val);
     }
   }
 
