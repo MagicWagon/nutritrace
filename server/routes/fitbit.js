@@ -371,7 +371,7 @@ async function _syncDate(u, dateStr) {
 // ── Gotify wellness alerts ────────────────────────────────────────────────────
 async function _checkWellnessAlerts(userId, metrics) {
   try {
-    const { alertWellness } = await import('../lib/gotify.js');
+    const { alertWellness } = await import('../lib/push-notify.js');
     const alerts = [];
 
     // HRV drop: check if today's HRV is 20%+ below 7-day average
@@ -436,7 +436,7 @@ router.post('/sync', wrap(async (req, res) => {
     if (dateStr === today && metrics) {
       _checkWellnessAlerts(u, metrics).catch(() => {});
       if (metrics.steps) {
-        import('../lib/gotify.js').then(({ notifyStepGoal }) => {
+        import('../lib/push-notify.js').then(({ notifyStepGoal }) => {
           // Read step goal from user settings
           const goalRow = db.prepare('SELECT value FROM user_settings WHERE user_id=? AND key=?').get(u, 'goals');
           if (goalRow?.value) {
@@ -478,7 +478,7 @@ router.post('/sync', wrap(async (req, res) => {
       }
       results.errors.push({ date: ds, errors: [e.message] });
       // Gotify: sync failure
-      import('../lib/gotify.js').then(({ alertSyncFailure }) => {
+      import('../lib/push-notify.js').then(({ alertSyncFailure }) => {
         alertSyncFailure(u, `Fitbit sync failed for ${ds}: ${e.message}`);
       }).catch(() => {});
     }
@@ -488,7 +488,7 @@ router.post('/sync', wrap(async (req, res) => {
 
   // Weekly summary on Sundays
   if (new Date().getDay() === 0) {
-    import('../lib/gotify.js').then(({ sendWeeklySummary }) => {
+    import('../lib/push-notify.js').then(({ sendWeeklySummary }) => {
       sendWeeklySummary(u).catch(() => {});
     }).catch(() => {});
   }
@@ -680,7 +680,7 @@ router.post('/workouts/sync', wrap(async (req, res) => {
   // Gotify: workout summary for newly synced workouts
   if (synced > 0) {
     try {
-      const { notifyWorkout } = await import('../lib/gotify.js');
+      const { notifyWorkout } = await import('../lib/push-notify.js');
       for (const a of activities.slice(-3)) { // last 3 max
         const dur = Math.round((a.activeDuration || 0) / 60000);
         const dist = a.distance != null ? `${(a.distance * (a.distanceUnit === 'Mile' ? 1.60934 : 1)).toFixed(1)} km` : '';

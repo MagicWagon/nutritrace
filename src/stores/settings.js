@@ -28,12 +28,12 @@ const SERVER_SETTINGS = new Set([
   'garminEnabled','garminSyncRange',
   'defaultFoodVisibility',
   // Notifications
-  'notifLocalEnabled','notifGotifyEnabled',
+  'notifLocalEnabled','notifPushService',
   'notifWaterReminders','notifWaterInterval','notifMealReminders','notifMealTimes',
   'notifGoalCelebrations','notifCalorieGoal','notifStepGoal',
   'notifWeighIn','notifWeighInTime','notifWeeklySummary',
   'notifWellnessAlerts','notifWorkoutSummary','notifSyncFailures',
-  'gotifyUrl','gotifyToken',
+  'appriseUrl','appriseTag','gotifyUrl','gotifyToken','ntfyUrl','ntfyTopic','ntfyToken',
   // Appearance / UI prefs — included so full backups restore the full look-and-feel
   'appearance','accentColor',
   'navStyle','sidebarPersistent','startPage','disableAnimations','goalCelebrations','pageBanners','loopBannerAnimations',
@@ -325,7 +325,7 @@ export const aiAssistantName = createSettingStore('aiAssistantName', 'FitBot');
 
 // Notifications
 export const notifLocalEnabled     = createSettingStore('notifLocalEnabled',     true);
-export const notifGotifyEnabled   = createSettingStore('notifGotifyEnabled',   false);
+export const notifPushService     = createSettingStore('notifPushService',     'none'); // 'none' | 'gotify' | 'ntfy' | 'apprise'
 export const notifWaterReminders  = createSettingStore('notifWaterReminders',  false);
 export const notifWaterInterval   = createSettingStore('notifWaterInterval',   120); // minutes
 export const notifMealReminders   = createSettingStore('notifMealReminders',   false);
@@ -339,5 +339,10 @@ export const notifWeeklySummary   = createSettingStore('notifWeeklySummary',   f
 export const notifWellnessAlerts  = createSettingStore('notifWellnessAlerts',  false);
 export const notifWorkoutSummary  = createSettingStore('notifWorkoutSummary',  false);
 export const notifSyncFailures    = createSettingStore('notifSyncFailures',    false);
+export const appriseUrl           = createSettingStore('appriseUrl',           '');
+export const appriseTag           = createSettingStore('appriseTag',           '');
 export const gotifyUrl            = createSettingStore('gotifyUrl',            '');
 export const gotifyToken          = createSettingStore('gotifyToken',          '');
+export const ntfyUrl              = createSettingStore('ntfyUrl',              'https://ntfy.sh');
+export const ntfyTopic            = createSettingStore('ntfyTopic',            '');
+export const ntfyToken            = createSettingStore('ntfyToken',            '');

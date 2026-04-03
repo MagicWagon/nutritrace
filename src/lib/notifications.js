@@ -181,14 +181,11 @@ export async function notify(settingKey, title, body, priority = 5) {
     await showNotification(title, body);
   }
 
-  // Gotify
-  if (_getSetting('notifGotifyEnabled', false)) {
-    const url = _getSetting('gotifyUrl', '');
-    const token = _getSetting('gotifyToken', '');
-    if (url && token) {
-      try { await sendGotify(url, token, title, body, priority); } catch (e) {
-        console.warn('[notify] gotify push failed:', e.message);
-      }
+  // Push service (Gotify / ntfy / Apprise)
+  const pushService = _getSetting('notifPushService', 'none');
+  if (pushService !== 'none') {
+    try { await sendPush(pushService, title, body, priority); } catch (e) {
+      console.warn(`[notify] ${pushService} push failed:`, e.message);
     }
   }
 }
@@ -294,6 +291,71 @@ export async function checkStepGoal(steps, goal) {
 // ── Gotify push ─────────────────────────────────────────────────────────────
 
 /** Send a notification via Gotify server */
+/** Send push notification via the user's configured service */
+export async function sendPush(service, title, message, priority = 5) {
+  switch (service) {
+    case 'gotify': {
+      const url = _getSetting('gotifyUrl', '');
+      const token = _getSetting('gotifyToken', '');
+      return sendGotify(url, token, title, message, priority);
+    }
+    case 'ntfy': {
+      const url = _getSetting('ntfyUrl', 'https://ntfy.sh');
+      const topic = _getSetting('ntfyTopic', '');
+      const token = _getSetting('ntfyToken', '');
+      return sendNtfy(url, topic, token, title, message, priority);
+    }
+    case 'apprise': {
+      const url = _getSetting('appriseUrl', '');
+      const tag = _getSetting('appriseTag', '');
+      return sendApprise(url, tag, title, message, priority);
+    }
+  }
+}
+
+export async function sendNtfy(url, topic, token, title, message, priority = 5) {
+  if (!topic) throw new Error('ntfy topic required');
+  const endpoint = `${(url || 'https://ntfy.sh').replace(/\/+$/, '')}/${encodeURIComponent(topic)}`;
+  const headers = { 'Title': title, 'Priority': String(Math.min(5, priority)) };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  if (isNative) {
+    const { CapacitorHttp } = await import('@capacitor/core');
+    const resp = await CapacitorHttp.post({ url: endpoint, headers, data: message });
+    if (resp.status < 200 || resp.status >= 300) throw new Error(`ntfy ${resp.status}`);
+  } else {
+    const { apiUrl } = await import('./platform.js');
+    // Proxy through server on PWA
+    const res = await fetch(apiUrl('/api/settings/push-test'), {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ service: 'ntfy', title, message, priority }),
+    });
+    if (!res.ok) throw new Error(`ntfy proxy ${res.status}`);
+  }
+}
+
+export async function sendApprise(url, tag, title, message, priority = 5) {
+  if (!url) throw new Error('Apprise URL required');
+  const body = { title, body: message, type: priority >= 7 ? 'warning' : 'info' };
+  if (tag) body.tag = tag;
+  const endpoint = `${url.replace(/\/+$/, '')}/notify`;
+
+  if (isNative) {
+    const { CapacitorHttp } = await import('@capacitor/core');
+    const resp = await CapacitorHttp.post({ url: endpoint, headers: { 'Content-Type': 'application/json' }, data: body });
+    if (resp.status < 200 || resp.status >= 300) throw new Error(`Apprise ${resp.status}`);
+  } else {
+    const { apiUrl } = await import('./platform.js');
+    const res = await fetch(apiUrl('/api/settings/push-test'), {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ service: 'apprise', title, message, priority }),
+    });
+    if (!res.ok) throw new Error(`Apprise proxy ${res.status}`);
+  }
+}
+
 export async function sendGotify(url, token, title, message, priority = 5) {
   if (!url || !token) throw new Error('Gotify URL and token required');
   const endpoint = `${url.replace(/\/+$/, '')}/message?token=${encodeURIComponent(token)}`;

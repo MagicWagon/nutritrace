@@ -499,13 +499,19 @@
   let _notifWorkouts = DB.getSetting('notifWorkoutSummary',  false);
   let _notifSync     = DB.getSetting('notifSyncFailures',    false);
   let _notifLocal    = DB.getSetting('notifLocalEnabled',     true);
-  let _notifGotify   = DB.getSetting('notifGotifyEnabled',   false);
+  let _notifPushService = DB.getSetting('notifPushService', 'none');
   let _gotifyUrl     = DB.getSetting('gotifyUrl',            '');
   let _gotifyToken   = DB.getSetting('gotifyToken',          '');
+  let _appriseUrl    = DB.getSetting('appriseUrl',  '');
+  let _appriseTag    = DB.getSetting('appriseTag',  '');
+  let _ntfyUrl       = DB.getSetting('ntfyUrl',     'https://ntfy.sh');
+  let _ntfyTopic     = DB.getSetting('ntfyTopic',   '');
+  let _ntfyToken     = DB.getSetting('ntfyToken',   '');
+  let _ntfyShowToken = false;
   let _gotifyTesting = false;
   let _gotifyShowToken = false;
 
-  $: _anyNotifEnabled = _notifWater || _notifMeals || _notifGoals || _notifCalorie || _notifSteps || _notifWeighIn || _notifWeekly || _notifWellness || _notifWorkouts || _notifSync;
+  $: _anyNotifEnabled = _notifLocal || _notifPushService !== 'none';
 
   async function _requestNotifPermission() {
     try {
@@ -549,36 +555,17 @@
     }
   }
 
-  async function _testGotify() {
+  async function _testPush() {
     _gotifyTesting = true;
-    set('gotifyUrl', _gotifyUrl);
-    set('gotifyToken', _gotifyToken);
+    // Save all current values
+    set('gotifyUrl', _gotifyUrl); set('gotifyToken', _gotifyToken);
+    set('ntfyUrl', _ntfyUrl); set('ntfyTopic', _ntfyTopic); set('ntfyToken', _ntfyToken);
+    set('appriseUrl', _appriseUrl); set('appriseTag', _appriseTag);
     try {
-      if (isNative) {
-        // Native: call Gotify directly via CapacitorHttp (bypasses CORS)
-        const { CapacitorHttp } = await import('@capacitor/core');
-        const endpoint = `${_gotifyUrl.replace(/\/+$/, '')}/message?token=${encodeURIComponent(_gotifyToken)}`;
-        const resp = await CapacitorHttp.post({
-          url: endpoint,
-          headers: { 'Content-Type': 'application/json' },
-          data: { title: 'NutriTrace', message: 'Test notification — Gotify is connected!', priority: 5 },
-        });
-        if (resp.status >= 200 && resp.status < 300) showSuccess('Test sent — check your Gotify app!');
-        else showError(`Gotify test failed: ${resp.status}`);
-      } else {
-        // PWA: proxy through server to avoid CORS
-        const headers = { 'Content-Type': 'application/json' };
-        const res = await fetch(apiUrl('/api/settings/gotify-test'), {
-          method: 'POST',
-          credentials: 'include',
-          headers,
-          body: JSON.stringify({ url: _gotifyUrl, token: _gotifyToken }),
-        });
-        const data = await res.json();
-        if (res.ok) showSuccess('Test sent — check your Gotify app!');
-        else showError('Gotify test failed: ' + (data.error || res.status));
-      }
-    } catch (e) { showError('Gotify test failed: ' + (e.message || 'unknown error')); }
+      const { sendPush } = await import('../lib/notifications.js');
+      await sendPush(_notifPushService, 'NutriTrace', 'Test notification — push service connected!', 5);
+      showSuccess('Test sent — check your device!');
+    } catch (e) { showError(`Test failed: ${e.message || 'unknown error'}`); }
     _gotifyTesting = false;
   }
 
@@ -2290,15 +2277,42 @@
           <div class="setting-divider"></div>
           <div class="setting-row">
             <div>
-              <span class="setting-label">Gotify Server</span>
-              <div class="setting-desc">Push to your self-hosted Gotify instance</div>
+              <span class="setting-label">Push Service</span>
+              <div class="setting-desc">Self-hosted notification server</div>
             </div>
-            <Toggle checked={_notifGotify} on:change={e => { _notifGotify = e.detail; set('notifGotifyEnabled', e.detail); }} />
+            <div class="select-wrap" style="width:130px">
+              <select class="select sel-sm" value={_notifPushService} on:change={e => { _notifPushService = e.target.value; set('notifPushService', e.target.value); }}>
+                <option value="none">None</option>
+                <option value="apprise">Apprise</option>
+                <option value="gotify">Gotify</option>
+                <option value="ntfy">ntfy</option>
+              </select>
+            </div>
           </div>
-          {#if _notifGotify}
+
+          <!-- Apprise config -->
+          {#if _notifPushService === 'apprise'}
             <div class="setting-divider"></div>
             <div class="form-group" style="padding:10px 16px 4px">
-              <label class="form-label">Server URL</label>
+              <label class="form-label">Apprise Server URL</label>
+              <input class="input" placeholder="https://apprise.example.com" bind:value={_appriseUrl} on:blur={() => set('appriseUrl', _appriseUrl)} />
+            </div>
+            <div class="form-group" style="padding:8px 16px 14px">
+              <label class="form-label">Tag (optional)</label>
+              <div style="display:flex;gap:8px;align-items:center">
+                <input class="input" style="flex:1" placeholder="e.g. nutritrace" bind:value={_appriseTag} on:blur={() => set('appriseTag', _appriseTag)} />
+                <button class="btn btn-primary" style="height:40px;font-size:13px;white-space:nowrap" on:click={_testPush} disabled={!_appriseUrl || _gotifyTesting}>
+                  {#if _gotifyTesting}Testing…{:else}Test{/if}
+                </button>
+              </div>
+            </div>
+          {/if}
+
+          <!-- Gotify config -->
+          {#if _notifPushService === 'gotify'}
+            <div class="setting-divider"></div>
+            <div class="form-group" style="padding:10px 16px 4px">
+              <label class="form-label">Gotify Server URL</label>
               <input class="input" placeholder="https://gotify.example.com" bind:value={_gotifyUrl} on:blur={() => set('gotifyUrl', _gotifyUrl)} />
             </div>
             <div class="form-group" style="padding:8px 16px 14px">
@@ -2312,7 +2326,36 @@
                 <button class="btn-icon" on:click={() => _gotifyShowToken = !_gotifyShowToken} title={_gotifyShowToken ? 'Hide' : 'Show'}>
                   <span class="material-symbols-rounded">{_gotifyShowToken ? 'visibility_off' : 'visibility'}</span>
                 </button>
-                <button class="btn btn-primary" style="height:40px;font-size:13px;white-space:nowrap" on:click={_testGotify} disabled={!_gotifyUrl || !_gotifyToken || _gotifyTesting}>
+                <button class="btn btn-primary" style="height:40px;font-size:13px;white-space:nowrap" on:click={_testPush} disabled={!_gotifyUrl || !_gotifyToken || _gotifyTesting}>
+                  {#if _gotifyTesting}Testing…{:else}Test{/if}
+                </button>
+              </div>
+            </div>
+          {/if}
+
+          <!-- ntfy config -->
+          {#if _notifPushService === 'ntfy'}
+            <div class="setting-divider"></div>
+            <div class="form-group" style="padding:10px 16px 4px">
+              <label class="form-label">ntfy Server URL</label>
+              <input class="input" placeholder="https://ntfy.sh" bind:value={_ntfyUrl} on:blur={() => set('ntfyUrl', _ntfyUrl)} />
+            </div>
+            <div class="form-group" style="padding:8px 16px 4px">
+              <label class="form-label">Topic</label>
+              <input class="input" placeholder="e.g. my-nutritrace" bind:value={_ntfyTopic} on:blur={() => set('ntfyTopic', _ntfyTopic)} />
+            </div>
+            <div class="form-group" style="padding:8px 16px 14px">
+              <label class="form-label">Access Token (optional — for private topics)</label>
+              <div style="display:flex;gap:8px;align-items:center">
+                {#if _ntfyShowToken}
+                  <input class="input" style="flex:1" type="text" placeholder="Bearer token" bind:value={_ntfyToken} on:blur={() => set('ntfyToken', _ntfyToken)} />
+                {:else}
+                  <input class="input" style="flex:1" type="password" placeholder="Bearer token" bind:value={_ntfyToken} on:blur={() => set('ntfyToken', _ntfyToken)} />
+                {/if}
+                <button class="btn-icon" on:click={() => _ntfyShowToken = !_ntfyShowToken} title={_ntfyShowToken ? 'Hide' : 'Show'}>
+                  <span class="material-symbols-rounded">{_ntfyShowToken ? 'visibility_off' : 'visibility'}</span>
+                </button>
+                <button class="btn btn-primary" style="height:40px;font-size:13px;white-space:nowrap" on:click={_testPush} disabled={!_ntfyTopic || _gotifyTesting}>
                   {#if _gotifyTesting}Testing…{:else}Test{/if}
                 </button>
               </div>
@@ -2320,7 +2363,7 @@
           {/if}
         </div>
 
-        {#if _notifLocal || _notifGotify}
+        {#if _anyNotifEnabled}
           <!-- Notification types — all go through whichever delivery methods are enabled -->
           <p class="sub-label">Reminders</p>
           <div class="card settings-card">

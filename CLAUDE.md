@@ -67,7 +67,11 @@ The Android app is a Capacitor 8 shell wrapping the same Svelte PWA. It runs off
 - **HTTP**: `CapacitorHttp.get()` for OFF/USDA API calls — bypasses CORS restrictions that block `fetch()` inside the WebView.
 - **API routing**: every `fetch('/api/...')` call in the codebase uses `apiUrl()` to prefix the server URL when in connected mode. In local mode, these calls go to `NtApiNative` instead.
 - **Service worker**: disabled when running inside Capacitor (`src/registerSW.js` checks `isNative`) to prevent the offline.html redirect from intercepting WebView navigation.
-- **Hidden settings**: features that require a server (User Management, Email/SMTP, Food Sharing, persistent sidebar, flashlight toggle, Full Backup) are hidden when running in native local mode.
+- **Settings in local mode**: 
+  - Server-only features hidden: User Management, Email/SMTP, Food Sharing, persistent sidebar, flashlight toggle, Full Backup
+  - Fitbit/Garmin/Withings toggles show disabled state with explanation message pointing to Health Connect as the recommended alternative (OAuth requires server for token exchange)
+  - Health Connect is the recommended path for local-only users (works without a server, reads directly from Android Health Connect API)
+  - Gotify works in local mode via `CapacitorHttp` (no server proxy needed, bypasses CORS)
 - **Auth** (`src/stores/auth.js`): on native server mode, `loadAuthState()` returns cached user from localStorage immediately; `_fetchAuthFromServer()` runs in the background. No blocking server calls on startup.
 - **Settings sync**: on Android, setting changes write to local SQLite `user_settings` (queued as 'pending'), attempt a direct PUT to server, and fall back to the differential sync engine. Server settings are pulled on sync and applied via `wl:setting` custom events.
 - **Workout sync**: workouts are included in the differential sync pull. The local `workouts` table mirrors the server schema; GPS data is cached in `gps_data` after first view for offline access.
