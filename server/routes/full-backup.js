@@ -94,6 +94,13 @@ function restoreFromZip(zip) {
       VALUES (@id, @user_id, @date, @source, @metric_type, @value, @metadata, @synced_at, @device_model)
     `);
     for (const w of data.wellness_data || []) insWellness.run(w);
+
+    db.prepare('DELETE FROM workouts').run();
+    const insWorkout = db.prepare(`
+      INSERT OR IGNORE INTO workouts (id, user_id, source, source_id, date, activity_type, activity_name, start_time, duration_ms, distance_km, calories, avg_hr, max_hr, steps, has_gps, gps_data, synced_at, updated_at)
+      VALUES (@id, @user_id, @source, @source_id, @date, @activity_type, @activity_name, @start_time, @duration_ms, @distance_km, @calories, @avg_hr, @max_hr, @steps, @has_gps, @gps_data, @synced_at, @updated_at)
+    `);
+    for (const w of data.workouts || []) insWorkout.run(w);
   })();
 
   // Restore images
@@ -124,6 +131,7 @@ function dumpDatabase() {
     app_config:       db.prepare('SELECT * FROM app_config').all(),
     ai_chat_history:  db.prepare('SELECT * FROM ai_chat_history').all(),
     wellness_data:    db.prepare('SELECT * FROM wellness_data').all(),
+    workouts:         db.prepare('SELECT * FROM workouts').all(),
   };
 }
 
