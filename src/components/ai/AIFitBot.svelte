@@ -8,6 +8,7 @@
   import { callAI, callAIProxy } from '../../lib/aiChat.js';
   import { aiEnabled, aiAssistantName, aiApiKey, aiProvider, aiModel, goals, mealNames, energyUnit, dateFormat, tempUnit } from '../../stores/settings.js';
   import { showError } from '../../stores/toast.js';
+  import { isNative } from '../../lib/platform.js';
 
   // ── State ──────────────────────────────────────────────────────────────────
   let panelOpen  = false;
