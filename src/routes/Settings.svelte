@@ -491,7 +491,6 @@
   let _notifWaterInt = DB.getSetting('notifWaterInterval',   120);
   let _notifMeals    = DB.getSetting('notifMealReminders',   false);
   let _notifGoals    = DB.getSetting('notifGoalCelebrations', false);
-  let _notifCalorie  = DB.getSetting('notifCalorieGoal',     false);
   let _notifSteps    = DB.getSetting('notifStepGoal',        false);
   let _notifWeighIn  = DB.getSetting('notifWeighIn',         false);
   let _notifWeighInTime = DB.getSetting('notifWeighInTime',  '07:00');
@@ -1760,7 +1759,7 @@
 
         <!-- Containers list -->
         <p class="section-title" style="margin-top:14px">Water Containers</p>
-        <p class="setting-desc" style="padding:0 var(--page-px) 10px">Define bottles, cups, or glasses for one-tap quick-add</p>
+        <p class="setting-desc" style="padding:0 var(--page-px) 10px">Quick-add buttons shown in the Diary for logging water intake</p>
         <div class="card settings-card">
           {#each $waterContainers as container, i}
             {#if i > 0}<div class="setting-divider"></div>{/if}
@@ -2259,7 +2258,7 @@
     <!-- ── Notifications ────────────────────────────────────────────────────── -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'notifications')} on:click={() => toggleSection('notifications')}>
       <span class="material-symbols-rounded si">notifications</span>
-      <span>Notifications <span style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;font-size:10px;padding:2px 6px;border-radius:4px;margin-left:4px;font-weight:600;vertical-align:middle">Experimental</span></span>
+      <span>Notifications <span class="labs-badge" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);vertical-align:middle">Experimental</span></span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.notifications}>expand_more</span>
     </button>
     {#if sectionOpen(openSections, settingsQuery, 'notifications') && sectionVisible(settingsQuery, 'notifications')}
@@ -2366,7 +2365,7 @@
 
         {#if _anyNotifEnabled}
           <!-- Notification types — all go through whichever delivery methods are enabled -->
-          <p class="sub-label">Reminders</p>
+          <p class="sub-label">Scheduled Reminders</p>
           <div class="card settings-card">
             <div class="setting-row">
               <div>
@@ -2414,39 +2413,28 @@
             {/if}
           </div>
 
-          <p class="sub-label">Goals & Progress</p>
+          <p class="sub-label">Alerts & Summaries</p>
           <div class="card settings-card">
             <div class="setting-row">
               <div>
                 <span class="setting-label">Goal Celebrations</span>
-                <div class="setting-desc">Notification when you hit a daily nutrition or wellness goal</div>
+                <div class="setting-desc">Celebrates when you hit any daily goal — calories, protein, carbs, fat, water, steps, sleep, and more</div>
               </div>
               <Toggle checked={_notifGoals} on:change={e => { _notifGoals = e.detail; set('notifGoalCelebrations', e.detail); }} />
             </div>
             <div class="setting-divider"></div>
             <div class="setting-row">
               <div>
-                <span class="setting-label">Calorie Goal</span>
-                <div class="setting-desc">Alert when you reach or exceed your daily calorie target</div>
+                <span class="setting-label">Step Goal Progress</span>
+                <div class="setting-desc">Midday nudge if you're behind on your step goal</div>
               </div>
-              <Toggle checked={_notifCalorie} on:change={e => { _notifCalorie = e.detail; set('notifCalorieGoal', e.detail); }} />
+              <Toggle checked={_notifSteps} on:change={e => { _notifSteps = e.detail; set('notifStepGoal', e.detail); }} />
             </div>
             <div class="setting-divider"></div>
             <div class="setting-row">
               <div>
-                <span class="setting-label">Step Goal Progress</span>
-                <div class="setting-desc">Midday nudge with progress toward your step goal</div>
-              </div>
-              <Toggle checked={_notifSteps} on:change={e => { _notifSteps = e.detail; set('notifStepGoal', e.detail); }} />
-            </div>
-          </div>
-
-          <p class="sub-label">Health & Activity</p>
-          <div class="card settings-card">
-            <div class="setting-row">
-              <div>
                 <span class="setting-label">Wellness Alerts</span>
-                <div class="setting-desc">HRV drops, sleep score declining, resting heart rate spikes</div>
+                <div class="setting-desc">Warns when HRV drops significantly, sleep quality declines, or resting heart rate spikes</div>
               </div>
               <Toggle checked={_notifWellness} on:change={e => { _notifWellness = e.detail; set('notifWellnessAlerts', e.detail); }} />
             </div>
@@ -2454,7 +2442,7 @@
             <div class="setting-row">
               <div>
                 <span class="setting-label">Workout Summaries</span>
-                <div class="setting-desc">Summary after a workout syncs</div>
+                <div class="setting-desc">Recap after a workout syncs — duration, distance, calories burned</div>
               </div>
               <Toggle checked={_notifWorkouts} on:change={e => { _notifWorkouts = e.detail; set('notifWorkoutSummary', e.detail); }} />
             </div>
@@ -2462,7 +2450,7 @@
             <div class="setting-row">
               <div>
                 <span class="setting-label">Weekly Summary</span>
-                <div class="setting-desc">Sunday recap of calories, steps, sleep, and weight trends</div>
+                <div class="setting-desc">Sunday recap with average steps, calories, and sleep for the week</div>
               </div>
               <Toggle checked={_notifWeekly} on:change={e => { _notifWeekly = e.detail; set('notifWeeklySummary', e.detail); }} />
             </div>
@@ -2470,7 +2458,7 @@
             <div class="setting-row">
               <div>
                 <span class="setting-label">Sync Failures</span>
-                <div class="setting-desc">Alert when device sync fails repeatedly</div>
+                <div class="setting-desc">Alert when Fitbit, Garmin, or Withings sync fails</div>
               </div>
               <Toggle checked={_notifSync} on:change={e => { _notifSync = e.detail; set('notifSyncFailures', e.detail); }} />
             </div>

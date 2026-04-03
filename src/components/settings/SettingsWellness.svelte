@@ -425,7 +425,7 @@
         <div class="setting-row">
           <div>
             <span class="setting-label" style="opacity:0.5">Enable Fitbit</span>
-            <div class="setting-desc">Requires a server connection. Fitbit uses OAuth which needs a server to exchange tokens. Use <strong>Health Connect</strong> below to read Fitbit data in local mode.</div>
+            <div class="setting-desc">Requires a server connection for OAuth authentication. In local mode, use <strong>Health Connect</strong> below to read Fitbit data directly from your Android device.</div>
           </div>
         </div>
       {:else}
@@ -504,7 +504,7 @@
           <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:12px">
             <div>
               <span class="setting-label">API Credentials</span>
-              <div class="setting-desc">Register a free app at <strong>dev.fitbit.com</strong> (OAuth 2.0, Application Type: Personal) and paste your Client ID and Secret below.</div>
+              <div class="setting-desc">From <strong>dev.fitbit.com</strong> — OAuth 2.0, Application Type: Personal</div>
             </div>
             <div style="width:100%;display:flex;flex-direction:column;gap:8px">
               <div class="form-group" style="margin:0">
@@ -569,7 +569,7 @@
         <div class="setting-row">
           <div>
             <span class="setting-label" style="opacity:0.5">Enable Garmin</span>
-            <div class="setting-desc">Requires a server connection. Garmin uses OAuth which needs a server to exchange tokens. Use <strong>Health Connect</strong> below to read Garmin data in local mode.</div>
+            <div class="setting-desc">Requires a server connection for OAuth authentication. In local mode, use <strong>Health Connect</strong> below to read Garmin data directly from your Android device.</div>
           </div>
         </div>
       {:else}
@@ -647,7 +647,7 @@
           <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:12px">
             <div>
               <span class="setting-label">API Credentials</span>
-              <div class="setting-desc">Apply for the <strong>Garmin Health API</strong> at <strong>developer.garmin.com/health-api</strong>. Once approved, paste your Consumer Key and Secret below. Garmin uses OAuth 1.0a — the redirect URI must match exactly.</div>
+              <div class="setting-desc">From <strong>developer.garmin.com/health-api</strong> — OAuth 1.0a, redirect URI must match exactly</div>
             </div>
             <div style="width:100%;display:flex;flex-direction:column;gap:8px">
               <div class="form-group" style="margin:0">
@@ -701,7 +701,7 @@
         <div class="setting-row">
           <div>
             <span class="setting-label" style="opacity:0.5">Enable Withings</span>
-            <div class="setting-desc">Requires a server connection. Withings uses OAuth which needs a server to exchange tokens. Use <strong>Health Connect</strong> below to read scale data in local mode.</div>
+            <div class="setting-desc">Requires a server connection for OAuth authentication. In local mode, use <strong>Health Connect</strong> below to read Withings data directly from your Android device.</div>
           </div>
         </div>
       {:else}
@@ -780,7 +780,7 @@
           <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:12px">
             <div>
               <span class="setting-label">API Credentials</span>
-              <div class="setting-desc">Register a free app at <strong>developer.withings.com</strong>, add the redirect URI, then paste your Client ID and Secret below.</div>
+              <div class="setting-desc">From <strong>developer.withings.com</strong> — add the redirect URI below</div>
             </div>
             <div style="width:100%;display:flex;flex-direction:column;gap:8px">
               <div class="form-group" style="margin:0">
@@ -835,7 +835,7 @@
     {#if isNative}
       <p class="sub-label" style="padding-top:16px">
         Health Connect
-        <span style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;font-size:10px;padding:2px 6px;border-radius:4px;margin-left:6px;font-weight:600">Experimental</span>
+        <span class="labs-badge" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">Experimental</span>
       </p>
       <div class="card settings-card">
         <div class="setting-row">
