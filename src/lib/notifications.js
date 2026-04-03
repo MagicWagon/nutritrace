@@ -19,11 +19,36 @@ async function _getLN() {
   return null;
 }
 
+let _channelCreated = false;
+
+/** Ensure the notification channel exists (Android requires this) */
+async function _ensureChannel() {
+  if (_channelCreated || !isNative) return;
+  const LN = await _getLN();
+  if (!LN) return;
+  try {
+    await LN.createChannel({
+      id: 'nutritrace',
+      name: 'NutriTrace',
+      description: 'NutriTrace notifications',
+      importance: 4, // HIGH
+      visibility: 1, // PUBLIC
+      sound: 'default',
+      vibration: true,
+    });
+    _channelCreated = true;
+    console.log('[notifications] channel created');
+  } catch (e) {
+    console.warn('[notifications] channel creation failed:', e.message);
+  }
+}
+
 /** Request notification permission */
 export async function requestPermission() {
   if (isNative) {
     const LN = await _getLN();
     if (!LN) return false;
+    await _ensureChannel();
     const result = await LN.requestPermissions();
     return result.display === 'granted';
   }
@@ -52,6 +77,7 @@ export async function showNotification(title, body, id = Date.now()) {
   if (isNative) {
     const LN = await _getLN();
     if (!LN) return;
+    await _ensureChannel();
     await LN.schedule({ notifications: [{ id, title, body, channelId: 'nutritrace' }] });
   } else if ('Notification' in window && Notification.permission === 'granted') {
     new Notification(title, { body, icon: '/icons/icon-192.png' });
