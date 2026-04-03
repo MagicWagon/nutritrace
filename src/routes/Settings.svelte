@@ -435,6 +435,7 @@
   let usdaApiKey    = DB.getSetting('usdaApiKey',    '');
   let offUsername   = DB.getSetting('offUsername',   '');
   let offPassword   = DB.getSetting('offPassword',   '');
+  let offShowPass   = false;
   let usdaEnabled   = DB.getSetting('usdaEnabled',   false);
 
   const OFF_LANGUAGE_OPTS = [
@@ -1180,6 +1181,7 @@
   let smtpSecure = false;
   let smtpUser   = '';
   let smtpPass   = '';
+  let smtpShowPass = false;
   let smtpFrom   = '';
   let smtpTestStatus = ''; // '', 'testing', 'ok', 'fail'
 
@@ -1283,6 +1285,7 @@
   let showAddUser    = false;
   let newUsername    = '';
   let newPassword    = '';
+  let newShowPass    = false;
   let newFullName    = '';
   let newRole        = 'user';
   let umError        = '';
@@ -1292,6 +1295,7 @@
   let showEnableUm    = false;
   let enableAdminUser = '';
   let enableAdminPass = '';
+  let enableShowPass = false;
   let enableAdminConf = '';
   let enableAdminName = '';
   let enableUmError   = '';
@@ -2079,7 +2083,16 @@
             <label class="form-label" for="off-user">Account username</label>
             <input id="off-user" class="input" style="margin-bottom:8px" placeholder="Optional — required to contribute edits" bind:value={offUsername} />
             <label class="form-label" for="off-pass">Account password</label>
-            <input id="off-pass" class="input" type="password" style="margin-bottom:10px" placeholder="OFF account password" bind:value={offPassword} />
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+              {#if offShowPass}
+                <input id="off-pass" class="input" type="text" style="flex:1" placeholder="OFF account password" bind:value={offPassword} />
+              {:else}
+                <input id="off-pass" class="input" type="password" style="flex:1" placeholder="OFF account password" bind:value={offPassword} />
+              {/if}
+              <button class="btn-icon" on:click={() => offShowPass = !offShowPass} title={offShowPass ? 'Hide' : 'Show'}>
+                <span class="material-symbols-rounded">{offShowPass ? 'visibility_off' : 'visibility'}</span>
+              </button>
+            </div>
             <button class="btn btn-primary" style="height:36px;font-size:13px;align-self:flex-start" on:click={saveOff}>
               {#if offSaved}<span class="material-symbols-rounded" style="font-size:16px">check</span> Saved{:else}Save{/if}
             </button>
@@ -2536,7 +2549,16 @@
                   <div class="um-add-form" transition:slide={{ duration: 160 }}>
                     <div class="um-form-row">
                       <input class="input" type="text" bind:value={newUsername} placeholder="Username *" autocomplete="off" />
-                      <input class="input" type="password" bind:value={newPassword} placeholder="Password *" autocomplete="new-password" />
+                      <div style="display:flex;gap:4px;align-items:center;flex:1">
+                        {#if newShowPass}
+                          <input class="input" style="flex:1" type="text" bind:value={newPassword} placeholder="Password *" autocomplete="new-password" />
+                        {:else}
+                          <input class="input" style="flex:1" type="password" bind:value={newPassword} placeholder="Password *" autocomplete="new-password" />
+                        {/if}
+                        <button class="btn-icon" on:click={() => newShowPass = !newShowPass} style="flex-shrink:0">
+                          <span class="material-symbols-rounded" style="font-size:18px">{newShowPass ? 'visibility_off' : 'visibility'}</span>
+                        </button>
+                      </div>
                     </div>
                     <div class="um-form-row">
                       <input class="input" type="text" bind:value={newFullName} placeholder="Full name (optional)" />
@@ -2668,8 +2690,21 @@
                     <input class="input" type="text" bind:value={enableAdminName} placeholder="Full name (optional)" />
                   </div>
                   <div class="um-form-row">
-                    <input class="input" type="password" bind:value={enableAdminPass} placeholder="Password *" autocomplete="new-password" />
-                    <input class="input" type="password" bind:value={enableAdminConf} placeholder="Confirm *" autocomplete="new-password" />
+                    <div style="display:flex;gap:4px;align-items:center;flex:1">
+                      {#if enableShowPass}
+                        <input class="input" style="flex:1" type="text" bind:value={enableAdminPass} placeholder="Password *" autocomplete="new-password" />
+                      {:else}
+                        <input class="input" style="flex:1" type="password" bind:value={enableAdminPass} placeholder="Password *" autocomplete="new-password" />
+                      {/if}
+                      <button class="btn-icon" on:click={() => enableShowPass = !enableShowPass} style="flex-shrink:0">
+                        <span class="material-symbols-rounded" style="font-size:18px">{enableShowPass ? 'visibility_off' : 'visibility'}</span>
+                      </button>
+                    </div>
+                    {#if enableShowPass}
+                      <input class="input" type="text" bind:value={enableAdminConf} placeholder="Confirm *" autocomplete="new-password" />
+                    {:else}
+                      <input class="input" type="password" bind:value={enableAdminConf} placeholder="Confirm *" autocomplete="new-password" />
+                    {/if}
                   </div>
                   {#if enableUmError}<p class="um-error">{enableUmError}</p>{/if}
                   <button class="btn btn-primary" style="width:100%" on:click={enableUserManagement} disabled={enableUmLoading}>
@@ -2724,8 +2759,18 @@
           </div>
           <div class="form-group">
             <label class="form-label">Password</label>
-            <input class="input" type="password" autocomplete="new-password" placeholder="SMTP password or app password"
-              bind:value={smtpPass} disabled={envLocks.smtp} />
+            <div style="display:flex;gap:8px;align-items:center">
+              {#if smtpShowPass}
+                <input class="input" style="flex:1" type="text" autocomplete="new-password" placeholder="SMTP password or app password"
+                  bind:value={smtpPass} disabled={envLocks.smtp} />
+              {:else}
+                <input class="input" style="flex:1" type="password" autocomplete="new-password" placeholder="SMTP password or app password"
+                  bind:value={smtpPass} disabled={envLocks.smtp} />
+              {/if}
+              <button class="btn-icon" on:click={() => smtpShowPass = !smtpShowPass} title={smtpShowPass ? 'Hide' : 'Show'}>
+                <span class="material-symbols-rounded">{smtpShowPass ? 'visibility_off' : 'visibility'}</span>
+              </button>
+            </div>
           </div>
           <div class="form-group">
             <label class="form-label">From address</label>
