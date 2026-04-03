@@ -218,6 +218,7 @@ const GOAL_UNITS = {
 export async function checkGoals(goals, values) {
   if (!goals || !values) return;
   _resetCelebrations();
+  console.log('[notifications] checkGoals:', { goals: Object.keys(goals), values: Object.keys(values) });
 
   for (const [key, goal] of Object.entries(goals)) {
     if (!goal) continue;
@@ -228,15 +229,19 @@ export async function checkGoals(goals, values) {
     if (target == null) continue;
 
     const celebKey = `${key}_${new Date().toLocaleDateString('sv-SE')}`;
-    if (_celebratedToday.has(celebKey)) continue;
+    if (_celebratedToday.has(celebKey)) { console.log(`[notifications] ${key} already celebrated`); continue; }
 
-    // Goal celebration: hit the target (min) or reached limit (max)
-    if (goal.min != null && val >= goal.min) {
+    console.log(`[notifications] checking ${key}: val=${val}, min=${goal.min}, max=${goal.max}`);
+
+    // Goal celebration: hit min target OR reached max target
+    if ((goal.min != null && val >= goal.min) || (goal.max != null && val >= goal.max)) {
       _celebratedToday.add(celebKey);
       const label = GOAL_LABELS[key] || key;
       const unit = GOAL_UNITS[key] || '';
+      const tgt = goal.min ?? goal.max;
+      console.log(`[notifications] FIRING goal celebration for ${key}: ${val} >= ${tgt}`);
       await notify('notifGoalCelebrations', 'Goal Reached!',
-        `You hit your ${label} goal: ${Math.round(val).toLocaleString()} ${unit} (target: ${Math.round(goal.min).toLocaleString()})`, 5);
+        `You hit your ${label} goal: ${Math.round(val).toLocaleString()} ${unit} (target: ${Math.round(tgt).toLocaleString()})`, 5);
     }
 
     // Calorie goal specific
