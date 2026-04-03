@@ -1,4 +1,5 @@
 <script>
+  import { onMount } from 'svelte';
   import { slide } from 'svelte/transition';
   import Toggle from './Toggle.svelte';
   import { showSuccess, showError } from '../../stores/toast.js';
@@ -30,6 +31,9 @@
       }
     }).catch(() => { healthConnectAvailability = 'NotSupported'; });
   }
+
+  // Auto-load config when component mounts (in case parent didn't call loadWellnessConfig)
+  onMount(() => { loadWellnessConfig(); });
 
   // ── Wellness metric visibility (per integration, alphabetical by label) ──
   const FITBIT_METRICS = [
@@ -181,39 +185,44 @@
     fitbitRedirectSuggested = window.location.origin + '/api/wellness/fitbit/callback';
     withingsRedirectSuggested = window.location.origin + '/api/wellness/withings/callback';
     garminRedirectSuggested = window.location.origin + '/api/wellness/garmin/callback';
-    // Load per-user credential config
-    try {
-      const cfg = await NtApi.get('/api/wellness/fitbit/config');
-      fitbitClientId    = cfg.client_id    || '';
-      fitbitRedirectUri = cfg.redirect_uri || '';
-    } catch { /* ignore */ }
-    try {
-      const cfg = await NtApi.get('/api/wellness/withings/config');
-      withingsClientId    = cfg.client_id    || '';
-      withingsRedirectUri = cfg.redirect_uri || '';
-    } catch { /* ignore */ }
-    // Admin: also load secrets from app-config for display (single-user or migration)
-    if ($currentUser?.role === 'admin' || !$userMgmtActive) {
-      try {
-        const cfg = await NtApi.get('/api/app-config');
-        if (!fitbitClientId)     fitbitClientId     = cfg.fitbit_client_id     || '';
-        if (!fitbitClientSecret) fitbitClientSecret = cfg.fitbit_client_secret || '';
-        if (!fitbitRedirectUri)  fitbitRedirectUri  = cfg.fitbit_redirect_uri  || '';
-        if (!withingsClientId)     withingsClientId     = cfg.withings_client_id     || '';
-        if (!withingsClientSecret) withingsClientSecret = cfg.withings_client_secret || '';
-        if (!withingsRedirectUri)  withingsRedirectUri  = cfg.withings_redirect_uri  || '';
-      } catch { /* ignore */ }
+    // Load all configs in parallel
+    const isAdmin = $currentUser?.role === 'admin' || !$userMgmtActive;
+    const [fitbitCfg, withingsCfg, garminCfg, appCfg] = await Promise.allSettled([
+      NtApi.get('/api/wellness/fitbit/config'),
+      NtApi.get('/api/wellness/withings/config'),
+      NtApi.get('/api/wellness/garmin/config'),
+      isAdmin ? NtApi.get('/api/app-config') : Promise.resolve(null),
+    ]);
+    if (fitbitCfg.status === 'fulfilled' && fitbitCfg.value) {
+      fitbitClientId    = fitbitCfg.value.client_id    || '';
+      fitbitRedirectUri = fitbitCfg.value.redirect_uri || '';
     }
-    // Load Garmin config
-    try {
-      const cfg = await NtApi.get('/api/wellness/garmin/config');
-      garminConsumerKey = cfg.consumer_key  || '';
-      garminRedirectUri = cfg.redirect_uri  || '';
-    } catch { /* ignore */ }
-    // Load connection status for all users
-    try { fitbitConnectionStatus   = await NtApi.get('/api/wellness/fitbit/status');   } catch { fitbitConnectionStatus   = { connected: false }; }
-    try { withingsConnectionStatus = await NtApi.get('/api/wellness/withings/status'); } catch { withingsConnectionStatus = { connected: false }; }
-    try { garminConnectionStatus   = await NtApi.get('/api/wellness/garmin/status');   } catch { garminConnectionStatus   = { connected: false }; }
+    if (withingsCfg.status === 'fulfilled' && withingsCfg.value) {
+      withingsClientId    = withingsCfg.value.client_id    || '';
+      withingsRedirectUri = withingsCfg.value.redirect_uri || '';
+    }
+    if (garminCfg.status === 'fulfilled' && garminCfg.value) {
+      garminConsumerKey = garminCfg.value.consumer_key  || '';
+      garminRedirectUri = garminCfg.value.redirect_uri  || '';
+    }
+    if (isAdmin && appCfg.status === 'fulfilled' && appCfg.value) {
+      const cfg = appCfg.value;
+      if (!fitbitClientId)       fitbitClientId       = cfg.fitbit_client_id       || '';
+      if (!fitbitClientSecret)   fitbitClientSecret   = cfg.fitbit_client_secret   || '';
+      if (!fitbitRedirectUri)    fitbitRedirectUri    = cfg.fitbit_redirect_uri    || '';
+      if (!withingsClientId)     withingsClientId     = cfg.withings_client_id     || '';
+      if (!withingsClientSecret) withingsClientSecret = cfg.withings_client_secret || '';
+      if (!withingsRedirectUri)  withingsRedirectUri  = cfg.withings_redirect_uri  || '';
+    }
+    // Load connection status for all users (in parallel)
+    const [fitbitSt, withingsSt, garminSt] = await Promise.allSettled([
+      NtApi.get('/api/wellness/fitbit/status'),
+      NtApi.get('/api/wellness/withings/status'),
+      NtApi.get('/api/wellness/garmin/status'),
+    ]);
+    fitbitConnectionStatus   = fitbitSt.status   === 'fulfilled' ? fitbitSt.value   : { connected: false };
+    withingsConnectionStatus = withingsSt.status === 'fulfilled' ? withingsSt.value : { connected: false };
+    garminConnectionStatus   = garminSt.status   === 'fulfilled' ? garminSt.value   : { connected: false };
   }
 
   async function disconnectFitbitFromSettings() {
@@ -471,7 +480,7 @@
                 </div>
                 <div class="setting-desc" style="font-size:11px;margin-top:2px">Format: <code style="font-size:11px">https://your-domain.com/api/wellness/fitbit/callback</code></div>
               </div>
-              <button class="btn btn-primary" style="align-self:flex-end" on:click={saveFitbitConfig}>{fitbitEditingCreds ? 'Save' : 'Save &amp; Connect'}</button>
+              <button class="btn btn-primary" style="align-self:flex-end" on:click={saveFitbitConfig}>{fitbitEditingCreds ? 'Save' : 'Save & Connect'}</button>
             </div>
           </div>
         {/if}
@@ -605,7 +614,7 @@
                 </div>
                 <div class="setting-desc" style="font-size:11px;margin-top:2px">Format: <code style="font-size:11px">https://your-domain.com/api/wellness/garmin/callback</code></div>
               </div>
-              <button class="btn btn-primary" style="align-self:flex-end" on:click={saveGarminConfig}>{garminEditingCreds ? 'Save' : 'Save &amp; Connect'}</button>
+              <button class="btn btn-primary" style="align-self:flex-end" on:click={saveGarminConfig}>{garminEditingCreds ? 'Save' : 'Save & Connect'}</button>
             </div>
           </div>
         {/if}
@@ -729,7 +738,7 @@
                 </div>
                 <div class="setting-desc" style="font-size:11px;margin-top:2px">Format: <code style="font-size:11px">https://your-domain.com/api/wellness/withings/callback</code></div>
               </div>
-              <button class="btn btn-primary" style="align-self:flex-end" on:click={saveWithingsConfig}>{withingsEditingCreds ? 'Save' : 'Save &amp; Connect'}</button>
+              <button class="btn btn-primary" style="align-self:flex-end" on:click={saveWithingsConfig}>{withingsEditingCreds ? 'Save' : 'Save & Connect'}</button>
             </div>
           </div>
         {/if}
