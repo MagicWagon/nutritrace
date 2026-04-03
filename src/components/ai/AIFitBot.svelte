@@ -5,7 +5,7 @@
   import { NtApi }     from '../../lib/api.js';
   import { localDateStr } from '../../lib/db.js';
   import { Nutrition } from '../../lib/nutrition.js';
-  import { callAI, callAIProxy } from '../../lib/aiChat.js';
+  import { callAI, callAIProxy, TOOLS, setToolHandler } from '../../lib/aiChat.js';
   import { aiEnabled, aiAssistantName, aiApiKey, aiProvider, aiModel, goals, mealNames, energyUnit, dateFormat, tempUnit } from '../../stores/settings.js';
   import { showError } from '../../stores/toast.js';
   import { isNative } from '../../lib/platform.js';
@@ -18,6 +18,7 @@
   let messagesEl;
   let hasUnread  = false;
   let attachedImage = null; // { base64, mimeType, preview }
+  let _toolStatus = ''; // shown while AI is calling tools
   let fileInput;
   let _cameraInput;
   let _showAttachMenu = false;
@@ -78,6 +79,65 @@
         if (res.ok) { const d = await res.json(); aiEnvLocked = !!d.ai; }
       }
     } catch {}
+
+    // Register tool handler for AI function calling
+    setToolHandler(async (name, args) => {
+      switch (name) {
+        case 'get_wellness_data': {
+          const [fitbit, garmin] = await Promise.allSettled([
+            NtApi.get(`/api/wellness/fitbit/data?from=${args.from}&to=${args.to}`),
+            NtApi.get(`/api/wellness/garmin/data?from=${args.from}&to=${args.to}`),
+          ]);
+          const fb = fitbit.status === 'fulfilled' ? fitbit.value : {};
+          const gm = garmin.status === 'fulfilled' ? garmin.value : {};
+          // Merge per date (fitbit wins on overlap)
+          const merged = {};
+          for (const [d, v] of Object.entries(gm)) merged[d] = { ...v };
+          for (const [d, v] of Object.entries(fb)) merged[d] = { ...(merged[d] || {}), ...v };
+          return merged;
+        }
+        case 'get_body_composition': {
+          try {
+            const data = await NtApi.get(`/api/wellness/withings/data?from=${args.from}&to=${args.to}`);
+            return data;
+          } catch { return {}; }
+        }
+        case 'get_diary': {
+          try {
+            const entry = await NtApi.getDiaryDate(args.date);
+            if (!entry || !entry.items?.length) return { date: args.date, items: [], totals: null };
+            const totals = Nutrition.sum(entry.items.map(i => Nutrition.calculate(i)));
+            const names = mealNames.get();
+            const meals = {};
+            for (const it of entry.items) {
+              const mIdx = it.meal ?? 0;
+              const mName = names[mIdx] || `Meal ${mIdx + 1}`;
+              (meals[mName] = meals[mName] || []).push({
+                name: it.name, portion: it.portion, unit: it.unit, quantity: it.quantity,
+                calories: Math.round((it.nutrition?.calories || 0) * (it.quantity || 1)),
+              });
+            }
+            return {
+              date: args.date, meals,
+              totals: { calories: Math.round(totals.calories || 0), protein: Math.round(totals.proteins || 0), carbs: Math.round(totals.carbohydrates || 0), fat: Math.round(totals.fat || 0) },
+              body_stats: entry.body_stats || entry.bodyStats || {},
+              water_ml: (entry.water || []).reduce((s, l) => s + (l.amount || 0), 0),
+            };
+          } catch { return { date: args.date, error: 'Could not load diary' }; }
+        }
+        case 'get_workouts': {
+          try {
+            return await NtApi.get(`/api/wellness/fitbit/workouts?from=${args.from}&to=${args.to}`);
+          } catch { return []; }
+        }
+        case 'get_goals': {
+          const g = goals.get();
+          return g || {};
+        }
+        default:
+          return { error: `Unknown tool: ${name}` };
+      }
+    });
   });
 
   function _fmtCreatedAt(iso) {
@@ -300,20 +360,27 @@
 
   function buildSystemPrompt(ctx) {
     const name = $aiAssistantName;
-    return `You are ${name}, a friendly and knowledgeable AI nutrition and fitness coach built into NutriTrace. `
-         + `You have full access to the user's health data: food diary, nutrition goals, body stats, water intake, `
-         + `all wellness metrics from connected devices (Fitbit, Garmin, Withings), workout history with GPS routes, `
-         + `daily readiness scores, and stress management scores. `
-         + `You can discuss and provide insight on all of it — food choices, macros, sleep quality, activity, `
-         + `heart health, recovery, hydration, body composition, workout performance, and more. `
-         + `Be warm, encouraging, and concise. Give practical, evidence-based advice.\n\n`
-         + `Current date: ${ctx.today}\n\n`
-         + `TODAY'S FOOD LOG:\n${ctx.diaryText}\n`
-         + `NUTRITION GOALS:\n${ctx.goalsText}\n\n`
-         + `WATER INTAKE TODAY:\n${ctx.waterText}`
-         + (ctx.statsText    ? `\n\nBODY STATS TODAY:\n${ctx.statsText}` : '')
-         + (ctx.wellnessText ? `\n\nWELLNESS / FITNESS DATA TODAY:\n${ctx.wellnessText}`
-                             : '\n\nWELLNESS DATA: No device data synced for today yet.');
+    return `You are ${name}, a friendly and knowledgeable AI nutrition and fitness coach built into NutriTrace.
+
+You have FULL ACCESS to the user's complete health data through tools. ALWAYS use tools to look up data — NEVER guess or make up numbers. Available data:
+- **Food diary**: meals, items, portions, full nutrition (any date)
+- **Wellness metrics**: steps, calories burned, distance, active minutes, sleep (duration, stages, score, efficiency), heart rate (resting HR, HRV, SpO2), respiratory rate, readiness score, stress score, skin temp, VO2 max — from Fitbit, Garmin, Health Connect (any date range)
+- **Body composition**: weight, body fat %, muscle mass, bone mass, body water, lean/fat mass, visceral fat, vascular age, metabolic age, BMR, nerve health, ECG — from Withings (any date range)
+- **Workouts**: recorded exercises with duration, distance, calories, heart rate, steps, GPS (any date range)
+- **Nutrition goals**: calorie and macro targets
+
+When the user asks about their data (steps, sleep, weight, food log, etc.) for ANY date or date range, USE THE APPROPRIATE TOOL to fetch the real data. Do not estimate or hallucinate numbers.
+
+Be warm, encouraging, and concise. Give practical, evidence-based advice. Use the data to personalize your responses.
+
+Current date: ${ctx.today}
+
+TODAY'S SUMMARY (for quick reference — use tools for detailed or historical data):
+${ctx.diaryText}
+Goals: ${ctx.goalsText}
+Water: ${ctx.waterText}`
+         + (ctx.statsText    ? `\nBody stats: ${ctx.statsText}` : '')
+         + (ctx.wellnessText ? `\nWellness: ${ctx.wellnessText}` : '');
   }
 
   function fmtTime() {
@@ -357,7 +424,9 @@
       }
       const reply = aiEnvLocked
         ? await callAIProxy({ messages: apiMessages, systemPrompt })
-        : await callAI({ provider, apiKey: key, model, messages: apiMessages, systemPrompt });
+        : await callAI({ provider, apiKey: key, model, messages: apiMessages, systemPrompt, tools: TOOLS,
+            onToolCall: (toolName) => { _toolStatus = `Fetching ${toolName.replace(/_/g, ' ')}…`; },
+          });
       messages = [...messages, { role: 'assistant', content: reply, time: fmtTime() }];
       // Persist assistant reply to server (best-effort)
       NtApi.post('/api/ai/history', { role: 'assistant', content: reply }).catch(() => {});
@@ -366,6 +435,7 @@
       showError(e.message || 'AI request failed');
     } finally {
       loading = false;
+      _toolStatus = '';
       await tick();
       _scrollBottom();
     }
@@ -571,9 +641,14 @@
             </div>
             <div class="ai-msg-body">
               <div class="ai-bubble ai-typing">
-                <span class="ai-dot"></span>
-                <span class="ai-dot"></span>
-                <span class="ai-dot"></span>
+                {#if _toolStatus}
+                  <span class="material-symbols-rounded" style="font-size:14px;animation:ai-bounce 1s infinite">search</span>
+                  <span style="font-size:12px;color:var(--text-3)">{_toolStatus}</span>
+                {:else}
+                  <span class="ai-dot"></span>
+                  <span class="ai-dot"></span>
+                  <span class="ai-dot"></span>
+                {/if}
               </div>
             </div>
           </div>
