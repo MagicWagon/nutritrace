@@ -134,6 +134,12 @@ function createSettingStore(key, defaultValue) {
   return {
     subscribe: store.subscribe,
     set(value) {
+      // Skip if value hasn't changed (prevents $: reactive statements from flooding on mount)
+      const current = DB.getSetting(key, defaultValue);
+      if (JSON.stringify(current) === JSON.stringify(value)) {
+        store.set(value); // still update store in case it's stale
+        return;
+      }
       DB.setSetting(key, value);
       store.set(value);
       if (_suppressSync) return; // Server-sourced update — don't push back
