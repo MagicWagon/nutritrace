@@ -76,6 +76,9 @@
   const EDITOR_ROUTES = ['/foods/edit', '/meal-editor', '/profile', '/wizard'];
   $: _isEditorRoute = EDITOR_ROUTES.some(r => $location.startsWith(r));
   $: isEditor      = NAV_HIDDEN.some(p => $location.startsWith(p));
+
+  // Scroll to top on route change (standard SPA behavior)
+  $: if ($location) window.scrollTo(0, 0);
   $: _hasSidebar   = showNav && ($navStyle === 'sidebar' || $navStyle === 'both');
   $: sidebarPinned = _hasSidebar && $sidebarPersistent;
   $: showHamburger = _hasSidebar && !sidebarPinned;
