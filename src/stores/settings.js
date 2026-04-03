@@ -55,24 +55,17 @@ export function scheduleSave(key, value) {
   if (!SERVER_SETTINGS.has(key)) return;
   clearTimeout(_saveQueue[key]);
   _saveQueue[key] = setTimeout(async () => {
-    // On native: always write to local SQLite (queues for differential sync)
-    if (isNative) {
-      try {
-        const { dbUpsertSetting } = await import('../lib/db-native.js');
-        await dbUpsertSetting(key, value);
-      } catch (e) {
-        console.warn('[settings] failed to save to local db:', e.message);
-      }
-    }
     // Try direct push to server (fast path when online)
     if (!_shouldSyncToServer()) return;
     try {
-      await fetch(_settingsUrl(), {
+      const res = await fetch(_settingsUrl(), {
         method: 'PUT',
         credentials: 'include',
         headers: _authHeaders(),
         body: JSON.stringify({ key, value }),
       });
+      if (!res.ok) throw new Error(`Server responded ${res.status}`);
+      console.log(`[settings] pushed ${key} to server`);
       // If direct push succeeded on native, mark as synced so differential sync skips it
       if (isNative) {
         try {
@@ -82,6 +75,7 @@ export function scheduleSave(key, value) {
       }
     } catch (e) {
       console.warn(`[settings] direct push failed for ${key}:`, e.message);
+      // Leave as 'pending' in local SQLite — differential sync will push it later
     }
   }, 600);
 }
@@ -123,6 +117,10 @@ function createSettingStore(key, defaultValue) {
     set(value) {
       DB.setSetting(key, value);
       store.set(value);
+      // On native: write to local SQLite immediately (marks as pending for sync protection)
+      if (isNative && SERVER_SETTINGS.has(key)) {
+        import('../lib/db-native.js').then(({ dbUpsertSetting }) => dbUpsertSetting(key, value)).catch(() => {});
+      }
       scheduleSave(key, value);
     },
     update(fn) {
