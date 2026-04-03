@@ -386,7 +386,7 @@
 
       {#if fitbitEnabledVal}
         <div class="setting-divider"></div>
-        <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px;min-width:0;overflow:hidden">
+        <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px">
           <div>
             <span class="setting-label">Sync Range</span>
             <div class="setting-desc">How far back the manual Sync button fetches. Auto-sync always covers today only.</div>
@@ -485,7 +485,7 @@
           </div>
         {/if}
         <div class="setting-divider"></div>
-        <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px;min-width:0;overflow:hidden">
+        <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px">
           <span class="setting-label">Visible Metrics</span>
           <div class="chip-group" style="flex-wrap:wrap;gap:6px">
             {#each FITBIT_METRICS as m}
@@ -521,7 +521,7 @@
 
       {#if garminEnabledVal}
         <div class="setting-divider"></div>
-        <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px;min-width:0;overflow:hidden">
+        <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px">
           <div>
             <span class="setting-label">Sync Range</span>
             <div class="setting-desc">How far back the manual Sync button fetches.</div>
@@ -619,7 +619,7 @@
           </div>
         {/if}
         <div class="setting-divider"></div>
-        <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px;min-width:0;overflow:hidden">
+        <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px">
           <span class="setting-label">Visible Metrics</span>
           <div class="chip-group" style="flex-wrap:wrap;gap:6px">
             {#each GARMIN_METRICS as m}
@@ -644,7 +644,7 @@
 
       {#if withingsEnabledVal}
         <div class="setting-divider"></div>
-        <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px;min-width:0;overflow:hidden">
+        <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px">
           <div>
             <span class="setting-label">Sync Range</span>
             <div class="setting-desc">How far back the manual Sync button fetches.</div>
@@ -743,7 +743,7 @@
           </div>
         {/if}
         <div class="setting-divider"></div>
-        <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px;min-width:0;overflow:hidden">
+        <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px">
           <span class="setting-label">Visible Metrics</span>
           <div class="chip-group" style="flex-wrap:wrap;gap:6px">
             {#each WITHINGS_METRICS as m}
@@ -814,6 +814,23 @@
 </div>
 
 <style>
+  /* Mirror Settings.svelte scoped styles so cards look identical */
+  .section-body { padding: 12px var(--page-px); display: flex; flex-direction: column; gap: 10px; }
+  .settings-card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .setting-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 13px 16px;
+    min-height: 50px;
+  }
   .setting-label { font-size: 14px; font-weight: 500; flex: 1; }
   .setting-desc  { font-size: 12px; color: var(--text-3); margin-top: 2px; font-weight: 400; }
   .setting-divider { height: 1px; background: var(--border); margin: 0 16px; }
