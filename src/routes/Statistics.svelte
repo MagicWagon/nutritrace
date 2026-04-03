@@ -14,9 +14,12 @@
   let _waterUnit        = DB.getSetting('waterUnit', 'ml');
   // Reload when settings change
   if (typeof window !== 'undefined') {
-    window.addEventListener('wl:setting', () => {
-      _waterShowInStats = DB.getSetting('waterShowInStats', true);
-      _waterUnit        = DB.getSetting('waterUnit', 'ml');
+    window.addEventListener('wl:setting', (e) => {
+      const k = e.detail?.key;
+      if (k === 'waterShowInStats' || k === 'waterUnit') {
+        _waterShowInStats = DB.getSetting('waterShowInStats', true);
+        _waterUnit        = DB.getSetting('waterUnit', 'ml');
+      }
     });
   }
 
@@ -362,6 +365,15 @@
     return m ? (m.unit || '') : '';
   }
 
+  // Compute metric unit reactively (not via function call — avoids stale reads)
+  $: _metricUnit = (() => {
+    if (metric === 'water') return _waterUnit;
+    const wl = WELLNESS_METRICS.find(x => x.value === metric);
+    if (wl) return wl.isWeight ? ($weightUnit === 'lb' ? 'lbs' : 'kg') : wl.unit;
+    const m = [...NUTRIMENTS, ...BODY_STATS].find(x => x.value === metric || x.id === metric);
+    return m ? (m.unit || '') : '';
+  })();
+
   $: { metric; range; customStart; customEnd; $statsChartType; $statsYZero; $statsAvgLine; $statsGoalLine; $statsTrendLine;
        if (canvasEl) loadData(); }
 
@@ -480,17 +492,17 @@
         <div class="summary-grid">
           <div class="summary-item">
             <span class="summary-val">{summary.avg.toLocaleString()}</span>
-            <span class="summary-unit">{getMetricUnit()}</span>
+            <span class="summary-unit">{_metricUnit}</span>
             <span class="summary-lbl">Average</span>
           </div>
           <div class="summary-item">
             <span class="summary-val">{summary.min.toLocaleString()}</span>
-            <span class="summary-unit">{getMetricUnit()}</span>
+            <span class="summary-unit">{_metricUnit}</span>
             <span class="summary-lbl">Min</span>
           </div>
           <div class="summary-item">
             <span class="summary-val">{summary.max.toLocaleString()}</span>
-            <span class="summary-unit">{getMetricUnit()}</span>
+            <span class="summary-unit">{_metricUnit}</span>
             <span class="summary-lbl">Max</span>
           </div>
           <div class="summary-item">
@@ -539,7 +551,7 @@
                     return row.date;
                   })()}
                 </span>
-                <span class="timeline-val accent-text">{row.val.toLocaleString()} {getMetricUnit()}</span>
+                <span class="timeline-val accent-text">{row.val.toLocaleString()} {_metricUnit}</span>
               </div>
             {/if}
           {/each}
