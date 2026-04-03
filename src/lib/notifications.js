@@ -186,7 +186,9 @@ export async function notify(settingKey, title, body, priority = 5) {
     const url = _getSetting('gotifyUrl', '');
     const token = _getSetting('gotifyToken', '');
     if (url && token) {
-      await sendGotify(url, token, title, body, priority);
+      try { await sendGotify(url, token, title, body, priority); } catch (e) {
+        console.warn('[notify] gotify push failed:', e.message);
+      }
     }
   }
 }
@@ -293,16 +295,16 @@ export async function checkStepGoal(steps, goal) {
 
 /** Send a notification via Gotify server */
 export async function sendGotify(url, token, title, message, priority = 5) {
-  if (!url || !token) return;
-  try {
-    const res = await fetch(`${url.replace(/\/+$/, '')}/message?token=${token}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: `NutriTrace — ${title}`, message, priority }),
-    });
-    if (!res.ok) console.warn(`[gotify] push failed: ${res.status}`);
-  } catch (e) {
-    console.warn('[gotify] push failed:', e.message);
+  if (!url || !token) throw new Error('Gotify URL and token required');
+  const endpoint = `${url.replace(/\/+$/, '')}/message?token=${encodeURIComponent(token)}`;
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, message, priority }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Gotify ${res.status}: ${body.slice(0, 100)}`);
   }
 }
 

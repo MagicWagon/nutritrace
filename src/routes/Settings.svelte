@@ -502,6 +502,7 @@
   let _gotifyUrl     = DB.getSetting('gotifyUrl',            '');
   let _gotifyToken   = DB.getSetting('gotifyToken',          '');
   let _gotifyTesting = false;
+  let _gotifyShowToken = false;
 
   $: _anyNotifEnabled = _notifWater || _notifMeals || _notifGoals || _notifCalorie || _notifSteps || _notifWeighIn || _notifWeekly || _notifWellness || _notifWorkouts || _notifSync;
 
@@ -549,12 +550,14 @@
 
   async function _testGotify() {
     _gotifyTesting = true;
+    // Save first in case user hasn't blurred
+    set('gotifyUrl', _gotifyUrl);
+    set('gotifyToken', _gotifyToken);
     try {
-      const { testGotify } = await import('../lib/notifications.js');
-      const ok = await testGotify(_gotifyUrl, _gotifyToken);
-      if (ok) showSuccess('Gotify connected — check your device!');
-      else showError('Gotify test failed');
-    } catch (e) { showError(e.message); }
+      const { sendGotify } = await import('../lib/notifications.js');
+      await sendGotify(_gotifyUrl, _gotifyToken, 'NutriTrace', 'Test notification — Gotify is connected!', 5);
+      showSuccess('Test sent — check your Gotify app!');
+    } catch (e) { showError('Gotify test failed: ' + (e.message || 'unknown error')); }
     _gotifyTesting = false;
   }
 
@@ -2268,7 +2271,14 @@
             <div class="form-group" style="padding:8px 16px 14px">
               <label class="form-label">App Token</label>
               <div style="display:flex;gap:8px;align-items:center">
-                <input class="input" style="flex:1" type="password" placeholder="Your Gotify app token" bind:value={_gotifyToken} on:blur={() => set('gotifyToken', _gotifyToken)} />
+                {#if _gotifyShowToken}
+                  <input class="input" style="flex:1" type="text" placeholder="Your Gotify app token" bind:value={_gotifyToken} on:blur={() => set('gotifyToken', _gotifyToken)} />
+                {:else}
+                  <input class="input" style="flex:1" type="password" placeholder="Your Gotify app token" bind:value={_gotifyToken} on:blur={() => set('gotifyToken', _gotifyToken)} />
+                {/if}
+                <button class="btn-icon" on:click={() => _gotifyShowToken = !_gotifyShowToken} title={_gotifyShowToken ? 'Hide' : 'Show'}>
+                  <span class="material-symbols-rounded">{_gotifyShowToken ? 'visibility_off' : 'visibility'}</span>
+                </button>
                 <button class="btn btn-primary" style="height:40px;font-size:13px;white-space:nowrap" on:click={_testGotify} disabled={!_gotifyUrl || !_gotifyToken || _gotifyTesting}>
                   {#if _gotifyTesting}Testing…{:else}Test{/if}
                 </button>
