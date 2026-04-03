@@ -240,7 +240,7 @@
     const p = Math.round((t.proteins || 0) * 4 / cal * 100);
     const c = Math.round((t.carbohydrates || 0) * 4 / cal * 100);
     const f = Math.round((t.fat || 0) * 9 / cal * 100);
-    return { cal: Math.round(cal), p, c, f };
+    return { cal: Math.round(cal).toLocaleString(), p, c, f };
   }
 
   function getMealItems(entryItems, mealIdx) {
@@ -743,7 +743,7 @@
   <!-- Text summary row — taps to expand/collapse -->
   <button class="dbb-summary-row" on:click={() => barExpanded = !barExpanded}
     aria-label="{barExpanded ? 'Collapse' : 'Expand'} nutrition panel">
-    <span class="dbb-summary-text"><span style="color:var(--macro-protein)">{_mp.protein}% P</span> · <span style="color:var(--macro-carbs)">{_mp.carbs}% C</span> · <span style="color:var(--macro-fat)">{_mp.fat}% F</span> · <span style="color:var(--macro-calories)">{Math.round($_calTween)} kcal</span>{#if _waterShowInDiary} · <span style="color:var(--water-blue)"><span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">water_drop</span> {_waterDisplay(_waterTotal)}</span>{/if}</span>
+    <span class="dbb-summary-text"><span style="color:var(--macro-protein)">{_mp.protein}% P</span> · <span style="color:var(--macro-carbs)">{_mp.carbs}% C</span> · <span style="color:var(--macro-fat)">{_mp.fat}% F</span> · <span style="color:var(--macro-calories)">{Math.round($_calTween).toLocaleString()} kcal</span>{#if _waterShowInDiary} · <span style="color:var(--water-blue)"><span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">water_drop</span> {_waterDisplay(_waterTotal)}</span>{/if}</span>
     <span class="dbb-chevron material-symbols-rounded">{barExpanded ? 'expand_more' : 'expand_less'}</span>
   </button>
 
@@ -762,10 +762,10 @@
       <div class="dbb-detail-row">
         <div class="dbb-kcal">
           {#if _totalsMode === 'remaining'}
-            <span class="dbb-num">{Math.max(0, caloriesGoal - Math.round($_calTween))}</span>
+            <span class="dbb-num">{Math.max(0, caloriesGoal - Math.round($_calTween)).toLocaleString()}</span>
             <span class="dbb-unit">kcal left</span>
           {:else}
-            <span class="dbb-num">{Math.round($_calTween)}</span>
+            <span class="dbb-num">{Math.round($_calTween).toLocaleString()}</span>
             <span class="dbb-unit">kcal eaten</span>
           {/if}
         </div>
@@ -986,7 +986,7 @@
       </div>
       <div class="edit-macros">
         <div class="edit-macro-pill">
-          <span class="edit-macro-val">{Math.round(editCalc.calories || 0)}</span>
+          <span class="edit-macro-val">{Math.round(editCalc.calories || 0).toLocaleString()}</span>
           <span class="edit-macro-label">kcal</span>
         </div>
         <div class="edit-macro-pill">
@@ -1211,7 +1211,7 @@
             <span class="ns-macro-lbl">Fat</span>
           </div>
           <div class="ns-macro-pill" style="background:var(--macro-calories-dim)">
-            <span class="ns-macro-val" style="color:var(--macro-calories)">{Math.round(totals.calories || 0)}</span>
+            <span class="ns-macro-val" style="color:var(--macro-calories)">{Math.round(totals.calories || 0).toLocaleString()}</span>
             <span class="ns-macro-lbl">kcal</span>
           </div>
         </div>

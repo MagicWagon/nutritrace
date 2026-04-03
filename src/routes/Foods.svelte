@@ -474,7 +474,7 @@
       totalKcal: Math.round(items.reduce((s,i) => {
         const factor = (i.quantity || 1);
         return s + (i.nutrition?.calories || i.calories || 0) * factor;
-      }, 0))
+      }, 0)).toLocaleString()
     }));
   }
 
@@ -656,7 +656,7 @@
                   {:else}
                     {@const _kcal = Math.round(Nutrition.sum((food.items||[]).map(i => Nutrition.calculate(i))).calories || food.nutrition?.calories || 0)}
                     <span class="food-brand text-3 text-sm">{mealServing(food.items)}{#if food._shared_by} · <span style="color:var(--accent)">by {food._shared_by}</span>{/if}</span>
-                    <span class="food-kcal text-sm">{_kcal} kcal</span>
+                    <span class="food-kcal text-sm">{_kcal.toLocaleString()} kcal</span>
                   {/if}
                 </div>
                 <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
@@ -713,7 +713,7 @@
                   <div class="food-info">
                     <span class="food-name">{food.name}</span>
                     {#if food.brand}<span class="food-brand text-3 text-sm">{food.brand}</span>{/if}
-                    <span class="food-kcal text-sm">{Math.round(food.nutrition?.calories || food.calories || 0)} kcal</span>
+                    <span class="food-kcal text-sm">{Math.round(food.nutrition?.calories || food.calories || 0).toLocaleString()} kcal</span>
                   </div>
                 </button>
               </li>
