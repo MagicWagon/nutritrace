@@ -555,10 +555,15 @@
     set('gotifyToken', _gotifyToken);
     try {
       // Use server proxy to avoid CORS + connectivity issues
+      const headers = { 'Content-Type': 'application/json' };
+      if (isNative && getServerUrl()) {
+        const t = getAuthToken();
+        if (t) headers['Authorization'] = `Bearer ${t}`;
+      }
       const res = await fetch(apiUrl('/api/settings/gotify-test'), {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json', ...(_authH || {}) },
+        headers,
         body: JSON.stringify({ url: _gotifyUrl, token: _gotifyToken }),
       });
       const data = await res.json();
