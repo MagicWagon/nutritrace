@@ -28,7 +28,7 @@
     hasUnread     = false;
     assistantName = $aiAssistantName;
     apiKey        = $aiApiKey;
-    tick().then(() => _scrollBottom());
+    tick().then(() => _scrollBottom(true));
   }
 
   onMount(async () => {
@@ -350,8 +350,8 @@
     }
   }
 
-  function _scrollBottom() {
-    messagesEl?.scrollTo({ top: messagesEl.scrollHeight, behavior: 'smooth' });
+  function _scrollBottom(instant = false) {
+    messagesEl?.scrollTo({ top: messagesEl.scrollHeight, behavior: instant ? 'instant' : 'smooth' });
   }
 
   function onKey(e) {
