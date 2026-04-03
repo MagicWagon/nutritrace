@@ -80,6 +80,21 @@
     }
   }
 
+  // ── Local-first data helper (native: read from SQLite, PWA: read from server)
+  async function _getWellnessRange(source, from, to) {
+    if (isNative) {
+      try {
+        const { dbGetWellnessGrouped } = await import('../lib/db-native.js');
+        return await dbGetWellnessGrouped(from, to, source);
+      } catch (e) {
+        console.warn('[wellness] local range load failed:', e.message);
+        return {};
+      }
+    }
+    // PWA: fetch from server
+    return NtApi.get(`/api/wellness/${source}/data?from=${from}&to=${to}`);
+  }
+
   // ── State ──────────────────────────────────────────────────────────────────
   let activeTab   = 'movement';
   let dateStr     = localDateStr();
@@ -89,6 +104,9 @@
   let lastSync    = null;
   let connecting  = false;
   let loadingData = true;
+
+  // On native: tracks whether we have cached wellness data (show data even if server unreachable)
+  let _hasLocalData = false;
 
   // Withings state
   let withingsStatus     = null;
@@ -229,7 +247,12 @@
         from = start.toLocaleDateString('sv-SE');
       }
       const result = await NtApi.post('/api/wellness/withings/sync', { from, to });
-      await loadWithingsData();
+      await _pullWellnessToLocal();
+      if (isNative) {
+        await loadLocalWellnessData();
+      } else {
+        await loadWithingsData();
+      }
       _checkWellnessGoals(data, withingsData);
       withingsLastSync = new Date();
       if (!silent) showSuccess(`Synced ${result.dates} day${result.dates === 1 ? '' : 's'} from Withings`);
@@ -301,7 +324,12 @@
         from = start.toLocaleDateString('sv-SE');
       }
       const result = await NtApi.post('/api/wellness/garmin/sync', { from, to });
-      await loadGarminData();
+      await _pullWellnessToLocal();
+      if (isNative) {
+        await loadLocalWellnessData();
+      } else {
+        await loadGarminData();
+      }
       if (!silent) showSuccess(`Synced ${result.synced ?? 0} day${result.synced === 1 ? '' : 's'} from Garmin`);
     } catch(e) {
       if (!silent) {
@@ -380,8 +408,12 @@
     const toStr   = today.toLocaleDateString('sv-SE');
 
     let fitbitRows = {}, garminRows = {};
-    try { if ($fitbitEnabled)  fitbitRows  = await NtApi.get(`/api/wellness/fitbit/data?from=${fromStr}&to=${toStr}`); } catch {}
-    try { if ($garminEnabled)  garminRows  = await NtApi.get(`/api/wellness/garmin/data?from=${fromStr}&to=${toStr}`); } catch {}
+    if (isNative) {
+      try { fitbitRows = await _getWellnessRange(null, fromStr, toStr); } catch {}
+    } else {
+      try { if ($fitbitEnabled)  fitbitRows  = await NtApi.get(`/api/wellness/fitbit/data?from=${fromStr}&to=${toStr}`); } catch {}
+      try { if ($garminEnabled)  garminRows  = await NtApi.get(`/api/wellness/garmin/data?from=${fromStr}&to=${toStr}`); } catch {}
+    }
 
     // Build merged per-date sleep records, most recent last
     const dates = [];
@@ -718,8 +750,12 @@
     while (cur <= today) { dates.push(cur.toLocaleDateString('sv-SE')); cur.setDate(cur.getDate() + 1); }
 
     let fitbitRange = {}, garminRange = {};
-    try { if ($fitbitEnabled)  fitbitRange  = await NtApi.get(`/api/wellness/fitbit/data?from=${fromStr}&to=${toStr}`); } catch {}
-    try { if ($garminEnabled)  garminRange  = await NtApi.get(`/api/wellness/garmin/data?from=${fromStr}&to=${toStr}`); } catch {}
+    if (isNative) {
+      try { fitbitRange = await _getWellnessRange(null, fromStr, toStr); } catch {}
+    } else {
+      try { if ($fitbitEnabled)  fitbitRange  = await NtApi.get(`/api/wellness/fitbit/data?from=${fromStr}&to=${toStr}`); } catch {}
+      try { if ($garminEnabled)  garminRange  = await NtApi.get(`/api/wellness/garmin/data?from=${fromStr}&to=${toStr}`); } catch {}
+    }
 
     const result = {};
     for (const m of ALL_METRICS) {
@@ -894,6 +930,20 @@
 
   // ── Init ───────────────────────────────────────────────────────────────────
   async function init() {
+    if (isNative) {
+      // Native: load cached data IMMEDIATELY — don't wait for server status checks
+      await loadLocalWellnessData();
+      // Set defaults so template doesn't show loading spinner
+      if (!status) status = { connected: false, configured: false };
+      if (!withingsStatus) withingsStatus = { connected: false, configured: false };
+      if (!garminStatus) garminStatus = { connected: false, configured: false };
+
+      // Check server status in background — updates UI if connected
+      _initServerStatus();
+      return;
+    }
+
+    // PWA: sequential status checks then load
     try {
       status = await NtApi.get('/api/wellness/fitbit/status');
     } catch { status = { connected: false, configured: false }; }
@@ -903,11 +953,10 @@
 
     if (status.connected || garminStatus?.connected) {
       await loadData();
-      // Auto-sync on open if sync mode = auto and it's today
       if ($wellnessSyncMode === 'auto' && isToday) {
         const key = `wl_wellness_lastSync_${dateStr}`;
         const last = localStorage.getItem(key);
-        const cooldownMs = 15 * 60 * 1000; // 15 minutes
+        const cooldownMs = 15 * 60 * 1000;
         if (!last || Date.now() - Number(last) > cooldownMs) {
           if (status.connected)       await sync(true);
           if (garminStatus?.connected) await syncGarmin(true);
@@ -918,8 +967,74 @@
     }
   }
 
+  /** Native: check server status in background and auto-sync if connected */
+  async function _initServerStatus() {
+    try {
+      status = await NtApi.get('/api/wellness/fitbit/status');
+    } catch { status = { connected: false, configured: false }; }
+    try {
+      withingsStatus = await NtApi.get('/api/wellness/withings/status');
+    } catch { withingsStatus = { connected: false, configured: false }; }
+    try {
+      garminStatus = await NtApi.get('/api/wellness/garmin/status');
+    } catch { garminStatus = { connected: false, configured: false }; }
+
+    // Auto-sync if connected and due
+    const anyConnected = status.connected || garminStatus?.connected;
+    if (anyConnected && $wellnessSyncMode === 'auto' && isToday) {
+      const key = `wl_wellness_lastSync_${dateStr}`;
+      const last = localStorage.getItem(key);
+      const cooldownMs = 15 * 60 * 1000;
+      if (!last || Date.now() - Number(last) > cooldownMs) {
+        if (status.connected)       await sync(true);
+        if (garminStatus?.connected) await syncGarmin(true);
+      }
+    }
+  }
+
+  /** Load wellness data from local SQLite (native only) — works offline */
+  async function loadLocalWellnessData() {
+    loadingData = true;
+    try {
+      const { dbGetWellnessGrouped } = await import('../lib/db-native.js');
+      // Load each source separately so we can populate the right state vars
+      const [fitbitData, garminLocal, withingsLocal, hcData] = await Promise.all([
+        dbGetWellnessGrouped(dateStr, dateStr, 'fitbit'),
+        dbGetWellnessGrouped(dateStr, dateStr, 'garmin'),
+        dbGetWellnessGrouped(dateStr, dateStr, 'withings'),
+        dbGetWellnessGrouped(dateStr, dateStr, 'health_connect'),
+      ]);
+      data = { ...(hcData[dateStr] || {}), ...(fitbitData[dateStr] || {}) };
+      garminData = garminLocal[dateStr] || {};
+      withingsData = withingsLocal[dateStr] || {};
+      _hasLocalData = Object.keys(data).length > 0 || Object.keys(garminData).length > 0 || Object.keys(withingsData).length > 0;
+    } catch (e) {
+      console.warn('[wellness] local load failed:', e.message);
+    }
+    _checkWellnessGoals({ ...garminData, ...data }, withingsData);
+    loadingData = false;
+    if (activeTab === 'heart') { _readinessLoaded = false; _stressLoaded = false; }
+    loadSparklines();
+  }
+
+  /** After a server-side wellness sync (Fitbit/Garmin/Withings), pull new data into local SQLite */
+  async function _pullWellnessToLocal() {
+    if (!isNative) return;
+    try {
+      const { fullSync } = await import('../lib/sync.js');
+      await fullSync(true); // silent pull — gets new wellness_data rows into local SQLite
+    } catch (e) {
+      console.warn('[wellness] pull after sync failed:', e.message);
+    }
+  }
+
   async function loadData() {
     loadingData = true;
+    // On native: load from local SQLite (includes all synced data)
+    if (isNative) {
+      await loadLocalWellnessData();
+      return;
+    }
     try {
       const byDate = await NtApi.get(`/api/wellness/fitbit/data?date=${dateStr}`);
       data = byDate[dateStr] || {};
@@ -947,6 +1062,7 @@
         start.setDate(start.getDate() - (range - 1));
         const from = start.toLocaleDateString('sv-SE');
         result = await NtApi.post('/api/wellness/fitbit/sync', { from, to: dateStr });
+        await _pullWellnessToLocal();
         await loadData(); // reload displayed date from DB after range sync
         lastSync = new Date();
         localStorage.setItem(`wl_wellness_lastSync_${dateStr}`, String(Date.now()));
@@ -957,9 +1073,14 @@
       } else {
         // Auto-sync or 1-day range: single day
         result = await NtApi.post('/api/wellness/fitbit/sync', { date: dateStr });
-        const newData = result.metrics || {};
-        _checkWellnessGoals(newData, withingsData);
-        data = newData;
+        await _pullWellnessToLocal();
+        if (isNative) {
+          await loadData();
+        } else {
+          const newData = result.metrics || {};
+          _checkWellnessGoals(newData, withingsData);
+          data = newData;
+        }
         lastSync = new Date();
         localStorage.setItem(`wl_wellness_lastSync_${dateStr}`, String(Date.now()));
         if (!silent) showSuccess('Synced');
@@ -1024,9 +1145,20 @@
       history.replaceState({}, '', '/#/wellness');
     }
     init();
+
+    // On native: reload wellness data when background sync completes
+    if (isNative) {
+      _syncCompleteHandler = () => {
+        loadLocalWellnessData();
+      };
+      window.addEventListener('nt:sync-complete', _syncCompleteHandler);
+    }
   });
 
-  onDestroy(() => {});
+  let _syncCompleteHandler = null;
+  onDestroy(() => {
+    if (_syncCompleteHandler) window.removeEventListener('nt:sync-complete', _syncCompleteHandler);
+  });
 
   // ── Goal celebrations ─────────────────────────────────────────────────────
   let _celebratingMetrics = new Set();
@@ -1059,12 +1191,12 @@
   // ── Merged display data: only include data from enabled integrations ─────────
   $: displayData = (() => {
     const merged = {};
-    if ($garminEnabled) {
+    if ($garminEnabled || (isNative && Object.keys(garminData).length)) {
       for (const [k, v] of Object.entries(garminData)) {
         if (v != null) merged[k] = v;
       }
     }
-    if ($fitbitEnabled) {
+    if ($fitbitEnabled || (isNative && Object.keys(data).length)) {
       for (const [k, v] of Object.entries(data)) {
         if (v != null) {
           // Garmin sleep_score is device-measured; don't let Fitbit's estimate overwrite it
@@ -1200,7 +1332,7 @@
       <!-- ── Fitbit tabs (Movement / Sleep / Heart) ── -->
       {#if activeTab === 'movement' || activeTab === 'sleep' || activeTab === 'heart'}
 
-        {#if !status.connected}
+        {#if !status.connected && !(isNative && _hasLocalData)}
           <!-- Fitbit configured but not yet connected -->
           {#if !status.configured}
             <div class="connect-card">
@@ -1566,7 +1698,7 @@
 
       <!-- ── Body tab (Withings) ── -->
       {:else if activeTab === 'body'}
-        {#if withingsStatus.connected}
+        {#if withingsStatus.connected || (isNative && _hasLocalData)}
           <div class="metric-grid">
             {#each BODY_METRICS.filter(m => isVisible(m.id)) as m}
               {@const raw = withingsData[m.id]}

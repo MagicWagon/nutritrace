@@ -5,6 +5,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.30.0-beta] — 2026-04-02
+
+### Added
+- **Bidirectional settings sync** — settings changes on Android now sync to server via differential sync engine; server setting changes (from PWA) pull down to Android and update stores in real-time
+- **Wellness offline cache** — Wellness page reads from local SQLite on Android, showing synced Fitbit/Garmin/Withings/Health Connect data even when offline
+- **Local wellness data for sparklines, readiness, and stress** — all range-based data loads (sparklines, sleep insights, readiness, stress) use local SQLite on native instead of server API
+
+### Fixed
+- **Health Connect section spacing** — uniform `padding-top:16px` matching Fitbit, Garmin, and Withings sections
+- **Wellness "No Device Connected" on offline** — no longer shows connection prompt when cached wellness data is available
+- **Debug logging cleanup** — removed verbose push food details and raw JSON result logging from sync engine
+
+---
+
 ## [0.29.0-beta] — 2026-04-01
 
 ### Added

@@ -13,6 +13,7 @@ import {
   dbGetSyncMeta, dbSetSyncMeta,
   dbUpsertFromServer, dbUpsertDiaryFromServer, dbUpsertWellnessFromServer,
   dbPurgeSoftDeleted,
+  dbGetPendingSettings, dbMarkSettingsSynced, dbUpsertSettingFromServer,
 } from './db-native.js';
 import { writable } from 'svelte/store';
 
@@ -27,6 +28,12 @@ export const syncState = writable({
 });
 
 let _syncing = false;
+
+function _parseJson(val) {
+  if (val == null) return null;
+  if (typeof val !== 'string') return val;
+  try { return JSON.parse(val); } catch { return val; }
+}
 
 function _headers() {
   const h = { 'Content-Type': 'application/json' };
@@ -58,10 +65,11 @@ export async function checkOnline() {
 /** Push local pending changes to the server. Returns true if anything was pushed. */
 async function pushChanges() {
   const pending = await dbGetPendingChanges();
-  const hasPending = pending.foods.length || pending.meals.length || pending.diary.length;
+  const pendingSettings = await dbGetPendingSettings();
+  const hasPending = pending.foods.length || pending.meals.length || pending.diary.length || pendingSettings.length;
   if (!hasPending) return false;
 
-  console.log(`[sync] pushing: ${pending.foods.length} foods, ${pending.meals.length} meals, ${pending.diary.length} diary`);
+  console.log(`[sync] pushing: ${pending.foods.length} foods, ${pending.meals.length} meals, ${pending.diary.length} diary, ${pendingSettings.length} settings`);
 
   // Build push payload with client_id and server_id
   const payload = {
@@ -96,10 +104,15 @@ async function pushChanges() {
       updated_at: d.updated_at,
       deleted_at: d.deleted_at || null,
     })),
+    settings: pendingSettings.map(s => ({
+      key: s.key,
+      value: _parseJson(s.value),
+      updated_at: s.updated_at,
+      deleted_at: s.deleted_at || null,
+    })),
   };
 
-  console.log(`[sync] push payload: ${payload.foods.length} foods, ${payload.meals.length} meals, ${payload.diary.length} diary`);
-  if (payload.foods.length) console.log('[sync] push foods:', payload.foods.map(f => `${f.name}(cid=${f.client_id},sid=${f.server_id},del=${f.deleted_at})`).join(', '));
+  console.log(`[sync] push payload: ${payload.foods.length} foods, ${payload.meals.length} meals, ${payload.diary.length} diary, ${payload.settings.length} settings`);
 
   const res = await fetch(`${_baseUrl()}/api/sync/push`, {
     method: 'POST',
@@ -113,7 +126,7 @@ async function pushChanges() {
     throw new Error(`Push failed: ${res.status}`);
   }
   const result = await res.json();
-  console.log('[sync] push result:', JSON.stringify(result));
+  console.log(`[sync] push result: ${result.foods?.length || 0} foods, ${result.meals?.length || 0} meals, ${result.diary?.length || 0} diary`);
 
   // Update server_id mappings for newly created records
   for (const f of (result.foods || [])) {
@@ -136,6 +149,7 @@ async function pushChanges() {
   await dbMarkSynced('foods', pending.foods.map(f => f.id));
   await dbMarkSynced('meals', pending.meals.map(m => m.id));
   await dbMarkSynced('diary', pending.diary.map(d => d.id));
+  if (pendingSettings.length) await dbMarkSettingsSynced(pendingSettings.map(s => s.key));
 
   // Purge soft-deleted records that have been confirmed pushed
   await dbPurgeSoftDeleted('foods');
@@ -179,13 +193,26 @@ async function pullChanges() {
     await dbUpsertWellnessFromServer(w);
   }
 
+  // Apply settings from server → local SQLite + localStorage
+  const pulledSettings = data.settings || [];
+  for (const s of pulledSettings) {
+    await dbUpsertSettingFromServer(s);
+    // Also update localStorage so Svelte stores pick it up immediately
+    if (!s.deleted_at) {
+      const { DB } = await import('./db.js');
+      const val = typeof s.value === 'string' ? _parseJson(s.value) : s.value;
+      DB.setSetting(s.key, val);
+      window.dispatchEvent(new CustomEvent('wl:setting', { detail: { key: `wl_${s.key}` } }));
+    }
+  }
+
   // Save server time as last_sync_at
   if (data.server_time) {
     await dbSetSyncMeta('last_sync_at', data.server_time);
   }
 
-  const totalChanges = (data.foods?.length || 0) + (data.meals?.length || 0) + (data.diary?.length || 0) + (data.wellness?.length || 0);
-  console.log(`[sync] pull complete: ${data.foods?.length || 0} foods, ${data.meals?.length || 0} meals, ${data.diary?.length || 0} diary, ${data.wellness?.length || 0} wellness`);
+  const totalChanges = (data.foods?.length || 0) + (data.meals?.length || 0) + (data.diary?.length || 0) + (data.wellness?.length || 0) + pulledSettings.length;
+  console.log(`[sync] pull complete: ${data.foods?.length || 0} foods, ${data.meals?.length || 0} meals, ${data.diary?.length || 0} diary, ${data.wellness?.length || 0} wellness, ${pulledSettings.length} settings`);
   return totalChanges > 0;
 }
 

@@ -45,10 +45,33 @@ export async function loadAuthState() {
     return;
   }
 
+  // Native server mode: use cached auth IMMEDIATELY so app renders fast,
+  // then refresh from server in the background
+  if (isNative && getServerUrl()) {
+    const cached = localStorage.getItem('nt:cachedUser');
+    if (cached) {
+      try {
+        const user = JSON.parse(cached);
+        currentUser.set(user);
+        userMgmtActive.set(localStorage.getItem('nt:cachedUserMgmt') === '1');
+        localStorage.setItem('wl:userId', String(user.id));
+      } catch {}
+    }
+    // Refresh auth from server in the background (non-blocking)
+    _refreshAuthFromServer();
+    return;
+  }
+
+  // PWA: fetch from server (blocking — no cache to fall back on initially)
+  await _fetchAuthFromServer();
+}
+
+/** Fetch auth state from server — used by PWA (blocking) and as background refresh for native */
+async function _fetchAuthFromServer() {
   try {
     const [statusRes, meRes] = await Promise.all([
-      fetch(_apiUrl('/api/auth/status'), { credentials: 'include', headers: _authHeaders() }),
-      fetch(_apiUrl('/api/auth/me'),     { credentials: 'include', headers: _authHeaders() }),
+      fetch(_apiUrl('/api/auth/status'), { credentials: 'include', headers: _authHeaders(), signal: AbortSignal.timeout(8000) }),
+      fetch(_apiUrl('/api/auth/me'),     { credentials: 'include', headers: _authHeaders(), signal: AbortSignal.timeout(8000) }),
     ]);
     const { active } = await statusRes.json();
     const meData     = await meRes.json();
@@ -57,16 +80,16 @@ export async function loadAuthState() {
     currentUser.set(user);
     if (user) localStorage.setItem('wl:userId', String(user.id));
     else       localStorage.removeItem('wl:userId');
-    // Cache user + auth state for offline fallback
+    // Cache for offline fallback
     if (user) {
       localStorage.setItem('nt:cachedUser', JSON.stringify(user));
       localStorage.setItem('nt:cachedUserMgmt', active ? '1' : '0');
     }
     if (user) await loadServerSettings();
   } catch {
-    // Offline fallback: use cached user data if available (native server mode)
+    // Offline fallback for PWA (native uses cached auth above)
     const cached = localStorage.getItem('nt:cachedUser');
-    if (isNative && cached) {
+    if (cached) {
       try {
         const user = JSON.parse(cached);
         currentUser.set(user);
@@ -78,6 +101,13 @@ export async function loadAuthState() {
     userMgmtActive.set(false);
     currentUser.set(null);
   }
+}
+
+/** Background refresh — updates cached auth if server is reachable */
+async function _refreshAuthFromServer() {
+  try {
+    await _fetchAuthFromServer();
+  } catch {}
 }
 
 export async function logout() {

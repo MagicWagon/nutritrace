@@ -85,6 +85,17 @@ const SCHEMA = `
     UNIQUE(user_id, date, source, metric_type)
   );
 
+  CREATE TABLE IF NOT EXISTS user_settings (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER DEFAULT 1,
+    key         TEXT NOT NULL,
+    value       TEXT,
+    updated_at  TEXT DEFAULT (datetime('now')),
+    deleted_at  TEXT DEFAULT NULL,
+    sync_status TEXT DEFAULT 'synced',
+    UNIQUE(user_id, key)
+  );
+
   CREATE TABLE IF NOT EXISTS sync_meta (
     key   TEXT PRIMARY KEY,
     value TEXT
@@ -551,6 +562,98 @@ export async function dbUpsertWellnessFromServer(record) {
     [LOCAL_USER_ID, record.date, record.source, record.metric_type, record.value,
      typeof record.metadata === 'string' ? record.metadata : JSON.stringify(record.metadata || {}),
      record.synced_at]
+  );
+}
+
+/**
+ * Get wellness data grouped by date, matching server API shape:
+ * { [date]: { [metric_type]: value } }
+ * @param {string} from - start date (YYYY-MM-DD)
+ * @param {string} to - end date (YYYY-MM-DD)
+ * @param {string|null} source - filter by source (e.g. 'fitbit', 'garmin', 'health_connect'), null = all
+ */
+export async function dbGetWellnessGrouped(from, to, source = null) {
+  const db = await getDb();
+  let sql = `SELECT date, metric_type, value FROM wellness_data WHERE user_id = ? AND date >= ? AND date <= ?`;
+  const params = [LOCAL_USER_ID, from, to];
+  if (source) { sql += ` AND source = ?`; params.push(source); }
+  sql += ` ORDER BY date`;
+  const r = await db.query(sql, params);
+  const byDate = {};
+  for (const row of _rows(r)) {
+    byDate[row.date] ??= {};
+    byDate[row.date][row.metric_type] = row.value;
+  }
+  return byDate;
+}
+
+/**
+ * Get wellness data for a single date, matching server API shape:
+ * { [date]: { [metric_type]: value } }
+ */
+export async function dbGetWellnessByDate(date, source = null) {
+  return dbGetWellnessGrouped(date, date, source);
+}
+
+// ── Settings sync ────────────────────────────────────────────────────
+
+export async function dbGetPendingSettings() {
+  const db = await getDb();
+  const r = await db.query(
+    `SELECT * FROM user_settings WHERE sync_status = 'pending' AND user_id = ?`,
+    [LOCAL_USER_ID]
+  );
+  return _rows(r);
+}
+
+export async function dbMarkSettingsSynced(keys) {
+  if (!keys.length) return;
+  const db = await getDb();
+  for (const key of keys) {
+    await db.run(
+      `UPDATE user_settings SET sync_status = 'synced' WHERE key = ? AND user_id = ?`,
+      [key, LOCAL_USER_ID]
+    );
+  }
+}
+
+export async function dbUpsertSetting(key, value) {
+  const db = await getDb();
+  await db.run(
+    `INSERT INTO user_settings (user_id, key, value, updated_at, sync_status)
+     VALUES (?, ?, ?, ?, 'pending')
+     ON CONFLICT(user_id, key) DO UPDATE SET
+       value=excluded.value, updated_at=excluded.updated_at, sync_status='pending'`,
+    [LOCAL_USER_ID, key, JSON.stringify(value), _now()]
+  );
+}
+
+export async function dbUpsertSettingFromServer(record) {
+  const db = await getDb();
+  const { key, value, updated_at, deleted_at } = record;
+
+  if (deleted_at) {
+    await db.run(
+      `DELETE FROM user_settings WHERE key = ? AND user_id = ?`,
+      [key, LOCAL_USER_ID]
+    );
+    return;
+  }
+
+  // Don't overwrite pending local changes
+  const existing = await db.query(
+    `SELECT sync_status FROM user_settings WHERE key = ? AND user_id = ?`,
+    [key, LOCAL_USER_ID]
+  );
+  const local = _row(existing);
+  if (local && local.sync_status === 'pending') return;
+
+  await db.run(
+    `INSERT INTO user_settings (user_id, key, value, updated_at, sync_status)
+     VALUES (?, ?, ?, ?, 'synced')
+     ON CONFLICT(user_id, key) DO UPDATE SET
+       value=excluded.value, updated_at=excluded.updated_at, sync_status='synced'`,
+    [LOCAL_USER_ID, key, typeof value === 'string' ? value : JSON.stringify(value), updated_at]
   );
 }
 
