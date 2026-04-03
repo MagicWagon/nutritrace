@@ -289,19 +289,28 @@ export async function fullSync(silent = false) {
       }
     }
 
-    // Check step goals + wellness alerts after sync (client-side)
+    // Check wellness goals after sync (steps, sleep, etc.)
     try {
       const { dbGetWellnessByDate } = await import('./db-native.js');
       const today = new Date().toLocaleDateString('sv-SE');
       const todayData = await dbGetWellnessByDate(today);
       const metrics = todayData[today] || {};
-      if (metrics.steps) {
-        const { checkStepGoal } = await import('./notifications.js');
-        const { DB } = await import('./db.js');
-        const goals = DB.getSetting('goals', {});
-        const stepGoal = goals.steps?.min || goals.steps?.max;
-        if (stepGoal) await checkStepGoal(metrics.steps, stepGoal);
-      }
+      const { checkStepGoal, checkGoals } = await import('./notifications.js');
+      const { DB } = await import('./db.js');
+      const goals = DB.getSetting('goals', {});
+
+      // Step goal
+      const stepGoal = goals.steps?.min || goals.steps?.max;
+      if (metrics.steps && stepGoal) await checkStepGoal(metrics.steps, stepGoal);
+
+      // All wellness goals (sleep, active minutes, distance, etc.)
+      const wellnessValues = {};
+      if (metrics.sleep_duration_min) wellnessValues.sleep_duration_min = metrics.sleep_duration_min;
+      if (metrics.active_minutes) wellnessValues.active_minutes = metrics.active_minutes;
+      if (metrics.distance_km) wellnessValues.distance_km = metrics.distance_km;
+      if (metrics.calories_out) wellnessValues.calories_out = metrics.calories_out;
+      if (metrics.steps) wellnessValues.steps = metrics.steps;
+      if (Object.keys(wellnessValues).length) await checkGoals(goals, wellnessValues);
     } catch {}
 
     const now = new Date().toISOString();

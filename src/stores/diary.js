@@ -102,8 +102,10 @@ async function _save(entry) {
       const { DB } = await import('../lib/db.js');
       const goals = DB.getSetting('goals', {});
       const totals = Nutrition.sum(result.items.map(i => Nutrition.calculate(i)));
-      // Add water total to the values
       const waterMl = (result.water || []).reduce((s, l) => s + (l.amount || 0), 0);
+      // Add water goal from waterGoalMl setting (it's separate from the goals object)
+      const waterGoal = DB.getSetting('waterGoalMl', 0);
+      if (waterGoal > 0) goals.water_ml = { min: waterGoal };
       await checkGoals(goals, { ...totals, water_ml: waterMl });
     } catch (e) {
       console.debug('[diary] goal check failed:', e.message);

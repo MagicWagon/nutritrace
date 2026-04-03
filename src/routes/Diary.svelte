@@ -532,6 +532,19 @@
     await loadEntry($currentDate);
     _waterCustomAmt  = '';
     _waterShowCustom = false;
+    // Check water + nutrition goals immediately
+    const today = localDateStr();
+    if ($currentDate === today) {
+      try {
+        const { checkGoals } = await import('../lib/notifications.js');
+        const waterTotal = updated.water.reduce((s, l) => s + (l.amount || 0), 0);
+        const waterGoal = DB.getSetting('waterGoalMl', 0);
+        const goals = DB.getSetting('goals', {});
+        if (waterGoal > 0) goals.water_ml = { min: waterGoal };
+        const totals = Nutrition.sum((updated.items || []).map(i => Nutrition.calculate(i)));
+        await checkGoals(goals, { ...totals, water_ml: waterTotal });
+      } catch {}
+    }
   }
 
   async function _removeWaterLog(index) {

@@ -328,7 +328,7 @@
                       <div class="goal-progress-fill" class:over={bad} style="width:{pct}%"></div>
                     </div>
                     <span class="text-3 text-sm">
-                      {cur != null ? Math.round(cur*10)/10 : '—'} / {tgt} {stat.unit || ''}
+                      {cur != null ? (Math.round(cur*10)/10).toLocaleString() : '—'} / {tgt.toLocaleString()} {stat.unit || ''}
                       {#if isMin}<span style="opacity:0.6">(min)</span>{/if}
                     </span>
                   {:else}
@@ -359,7 +359,7 @@
                       <div class="goal-progress-fill" class:over={bad} style="width:{pct}%"></div>
                     </div>
                     <span class="text-3 text-sm">
-                      {cur != null ? Math.round(cur*10)/10 : '—'} / {tgt} {stat.unit || ''}
+                      {cur != null ? (Math.round(cur*10)/10).toLocaleString() : '—'} / {tgt.toLocaleString()} {stat.unit || ''}
                       {#if isMin}<span style="opacity:0.6">(min)</span>{/if}
                     </span>
                   {:else}
@@ -383,7 +383,7 @@
             <div class="goal-progress-bar">
               <div class="goal-progress-fill" style="width:{waterPct}%"></div>
             </div>
-            <span class="text-3 text-sm">{waterTodayDisplay} / {waterGoalDisplay} {$waterUnit}</span>
+            <span class="text-3 text-sm">{waterTodayDisplay.toLocaleString()} / {waterGoalDisplay.toLocaleString()} {$waterUnit}</span>
           </div>
           <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
         </button>
@@ -404,7 +404,7 @@
                   <div class="goal-progress-bar">
                     <div class="goal-progress-fill" style="width:{pct}%"></div>
                   </div>
-                  <span class="text-3 text-sm">{cur != null ? Math.round(cur*10)/10 : '—'} / {tgt} {stat.unit}</span>
+                  <span class="text-3 text-sm">{cur != null ? (Math.round(cur*10)/10).toLocaleString() : '—'} / {tgt.toLocaleString()} {stat.unit}</span>
                 {:else}
                   <span class="text-3 text-sm">Not set</span>
                 {/if}
@@ -434,7 +434,7 @@
                 <div class="goal-progress-bar">
                   <div class="goal-progress-fill" style="width:{pct}%"></div>
                 </div>
-                <span class="text-3 text-sm">{cur != null ? Math.round(cur*10)/10 : '—'} / {tgt} {stat.unit}</span>
+                <span class="text-3 text-sm">{cur != null ? (Math.round(cur*10)/10).toLocaleString() : '—'} / {tgt.toLocaleString()} {stat.unit}</span>
               {:else}
                 <span class="text-3 text-sm" style="opacity:0.4">No goal</span>
               {/if}
@@ -459,7 +459,7 @@
                 <div class="goal-progress-bar">
                   <div class="goal-progress-fill" style="width:{pct}%"></div>
                 </div>
-                <span class="text-3 text-sm">{cur != null ? Math.round(cur*10)/10 : '—'} / {tgt} {stat.unit}</span>
+                <span class="text-3 text-sm">{cur != null ? (Math.round(cur*10)/10).toLocaleString() : '—'} / {tgt.toLocaleString()} {stat.unit}</span>
               {:else}
                 <span class="text-3 text-sm" style="opacity:0.4">No goal</span>
               {/if}
@@ -478,7 +478,7 @@
             <div class="goal-progress-bar">
               <div class="goal-progress-fill" style="width:{waterPct}%"></div>
             </div>
-            <span class="text-3 text-sm">{waterTodayDisplay} / {waterGoalDisplay} {$waterUnit}</span>
+            <span class="text-3 text-sm">{waterTodayDisplay.toLocaleString()} / {waterGoalDisplay.toLocaleString()} {$waterUnit}</span>
           </div>
           <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
         </button>
@@ -500,7 +500,7 @@
                   <div class="goal-progress-bar">
                     <div class="goal-progress-fill" style="width:{pct}%"></div>
                   </div>
-                  <span class="text-3 text-sm">{cur != null ? Math.round(cur*10)/10 : '—'} / {tgt} {stat.unit}</span>
+                  <span class="text-3 text-sm">{cur != null ? (Math.round(cur*10)/10).toLocaleString() : '—'} / {tgt.toLocaleString()} {stat.unit}</span>
                 {:else}
                   <span class="text-3 text-sm" style="opacity:0.4">No goal</span>
                 {/if}
