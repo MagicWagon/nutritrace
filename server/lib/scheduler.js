@@ -103,7 +103,7 @@ async function _pushReminders(userId) {
       // Check if current time falls on an interval boundary (within 15 min window)
       const minSinceStart = currentMin - startMin;
       if (minSinceStart % interval < 15 && !_ranRecently(userId, `water_${Math.floor(minSinceStart / interval)}`, interval * 60 * 1000)) {
-        await pushNotify(userId, 'notifWaterReminders', 'Hydration Reminder', 'Time to drink some water! Stay hydrated.', 4);
+        await pushNotify(userId, 'notifWaterReminders', '💧 Hydration Reminder', 'Time to drink some water! Stay hydrated.', 4);
       }
     }
   }
@@ -116,7 +116,7 @@ async function _pushReminders(userId) {
       const [th, tm] = time.split(':').map(Number);
       const targetMin = th * 60 + tm;
       if (currentMin >= targetMin && currentMin < targetMin + 15 && !_ranRecently(userId, `meal_${i}`)) {
-        pushNotify(userId, 'notifMealReminders', 'Meal Reminder', `Time to log your ${mealNames[i] || 'meal'}!`, 4);
+        pushNotify(userId, 'notifMealReminders', '🍽️ Meal Reminder', `Time to log your ${mealNames[i] || 'meal'}!`, 4);
       }
     });
   }
@@ -127,7 +127,7 @@ async function _pushReminders(userId) {
     const [th, tm] = time.split(':').map(Number);
     const targetMin = th * 60 + tm;
     if (currentMin >= targetMin && currentMin < targetMin + 15 && !_ranRecently(userId, 'weighin')) {
-      await pushNotify(userId, 'notifWeighIn', 'Weigh-in Reminder', 'Time to step on the scale!', 4);
+      await pushNotify(userId, 'notifWeighIn', '⚖️ Weigh-in Reminder', 'Time to step on the scale!', 4);
     }
   }
 

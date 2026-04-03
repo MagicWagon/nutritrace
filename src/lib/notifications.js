@@ -106,7 +106,7 @@ export async function scheduleWaterReminders(intervalMin = 120) {
     if (at <= new Date()) at.setDate(at.getDate() + 1);
     notifications.push({
       id: id++,
-      title: 'Hydration Reminder',
+      title: '💧 Hydration Reminder',
       body: 'Time to drink some water! Stay hydrated.',
       schedule: { at, every: 'day', allowWhileIdle: true },
       channelId: 'nutritrace',
@@ -145,7 +145,7 @@ export async function scheduleMealReminders(times = ['08:00', '12:00', '18:00'],
     if (at <= new Date()) at.setDate(at.getDate() + 1);
     notifications.push({
       id: 2000 + i,
-      title: 'Meal Reminder',
+      title: '🍽️ Meal Reminder',
       body: `Time to log your ${mealNames[i] || 'meal'}!`,
       schedule: { at, every: 'day', allowWhileIdle: true },
       channelId: 'nutritrace',
@@ -266,7 +266,7 @@ export async function checkGoals(goals, values) {
       const unit = GOAL_UNITS[key] || '';
       const tgt = goal.min ?? goal.max;
       console.log(`[notifications] FIRING goal celebration for ${key}: ${val} >= ${tgt}`);
-      await notify('notifGoalCelebrations', 'Goal Reached!',
+      await notify('notifGoalCelebrations', '🎯 Goal Reached!',
         `You hit your ${label} goal: ${Math.round(val).toLocaleString()} ${unit} (target: ${Math.round(tgt).toLocaleString()})`, 5);
     }
 
@@ -274,7 +274,7 @@ export async function checkGoals(goals, values) {
     if (key === 'calories' && goal.max != null && val >= goal.max) {
       if (!_celebratedToday.has('cal_max')) {
         _celebratedToday.add('cal_max');
-        await notify('notifCalorieGoal', 'Calorie Target Reached',
+        await notify('notifCalorieGoal', '🔥 Calorie Target Reached',
           `You've hit ${Math.round(val).toLocaleString()} kcal — your daily target is ${Math.round(goal.max).toLocaleString()} kcal`, 6);
       }
     }
@@ -292,15 +292,14 @@ export async function checkStepGoal(steps, goal) {
 
   if (steps >= goal && !_celebratedToday.has('steps_hit')) {
     _celebratedToday.add('steps_hit');
-    await notify('notifStepGoal', 'Step Goal Reached!',
+    await notify('notifStepGoal', '👟 Step Goal Reached!',
       `You've walked ${steps.toLocaleString()} steps — goal was ${goal.toLocaleString()}!`, 5);
   } else if (!_celebratedToday.has('steps_midday')) {
-    // Midday nudge: if it's between 12pm-2pm and under 50% of goal
     const hour = new Date().getHours();
     if (hour >= 12 && hour <= 14 && steps < goal * 0.5) {
       _celebratedToday.add('steps_midday');
       const remaining = goal - steps;
-      await notify('notifStepGoal', 'Step Goal Progress',
+      await notify('notifStepGoal', '🚶 Step Goal Progress',
         `You're at ${steps.toLocaleString()} steps — ${remaining.toLocaleString()} to go!`, 4);
     }
   }
@@ -437,7 +436,7 @@ export async function scheduleWeighInReminder(timeStr = '07:00') {
 
   await LN.schedule({ notifications: [{
     id: 4000,
-    title: 'Weigh-in Reminder',
+    title: '⚖️ Weigh-in Reminder',
     body: 'Time to step on the scale!',
     schedule: { at, every: 'day', allowWhileIdle: true },
     channelId: 'nutritrace',

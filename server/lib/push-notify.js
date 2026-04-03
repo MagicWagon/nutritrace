@@ -99,31 +99,31 @@ export async function pushNotify(userId, settingKey, title, message, priority = 
 }
 
 export function alertWellness(userId, message) {
-  return pushNotify(userId, 'notifWellnessAlerts', 'Wellness Alert', message, 7);
+  return pushNotify(userId, 'notifWellnessAlerts', '⚠️ Wellness Alert', message, 7);
 }
 
 export function notifyWorkout(userId, message) {
-  return pushNotify(userId, 'notifWorkoutSummary', 'Workout Complete', message, 5);
+  return pushNotify(userId, 'notifWorkoutSummary', '🏋️ Workout Complete', message, 5);
 }
 
 export function alertSyncFailure(userId, message) {
-  return pushNotify(userId, 'notifSyncFailures', 'Sync Issue', message, 8);
+  return pushNotify(userId, 'notifSyncFailures', '🔄 Sync Issue', message, 8);
 }
 
 export function notifyStepGoal(userId, steps, goal) {
   if (steps >= goal) {
-    return pushNotify(userId, 'notifStepGoal', 'Step Goal Reached!',
+    return pushNotify(userId, 'notifStepGoal', '👟 Step Goal Reached!',
       `${steps.toLocaleString()} steps — goal was ${goal.toLocaleString()}!`, 5);
   }
   const hour = new Date().getHours();
   if (hour >= 12 && hour <= 14 && steps < goal * 0.5) {
-    return pushNotify(userId, 'notifStepGoal', 'Step Goal Progress',
+    return pushNotify(userId, 'notifStepGoal', '🚶 Step Goal Progress',
       `${steps.toLocaleString()} steps so far — ${(goal - steps).toLocaleString()} to go!`, 4);
   }
 }
 
 export function notifyCalorieGoal(userId, calories, goal) {
-  return pushNotify(userId, 'notifCalorieGoal', 'Calorie Target Reached',
+  return pushNotify(userId, 'notifCalorieGoal', '🔥 Calorie Target Reached',
     `${Math.round(calories).toLocaleString()} kcal — daily target is ${Math.round(goal).toLocaleString()} kcal`, 5);
 }
 
@@ -148,6 +148,6 @@ export async function sendWeeklySummary(userId) {
   }
 
   if (parts.length) {
-    return pushNotify(userId, 'notifWeeklySummary', 'Weekly Summary', parts.join('\n'), 4);
+    return pushNotify(userId, 'notifWeeklySummary', '📊 Weekly Summary', parts.join('\n'), 4);
   }
 }
