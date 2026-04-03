@@ -91,7 +91,26 @@ export async function loadEntry(dateStr) {
 
 async function _save(entry) {
   const saved = await NtApi.saveDiaryDate(entry.date, _toApi(entry));
-  return _fromApi(saved);
+  const result = _fromApi(saved);
+
+  // Check goals after every save (only for today)
+  const today = new Date().toLocaleDateString('sv-SE');
+  if (entry.date === today && result.items?.length) {
+    try {
+      const { Nutrition } = await import('../lib/nutrition.js');
+      const { checkGoals } = await import('../lib/notifications.js');
+      const { DB } = await import('../lib/db.js');
+      const goals = DB.getSetting('goals', {});
+      const totals = Nutrition.sum(result.items.map(i => Nutrition.calculate(i)));
+      // Add water total to the values
+      const waterMl = (result.water || []).reduce((s, l) => s + (l.amount || 0), 0);
+      await checkGoals(goals, { ...totals, water_ml: waterMl });
+    } catch (e) {
+      console.debug('[diary] goal check failed:', e.message);
+    }
+  }
+
+  return result;
 }
 
 export async function addDiaryItem(foodItem, meal, date) {

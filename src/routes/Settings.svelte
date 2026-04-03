@@ -536,6 +536,17 @@
     }
   }
 
+  async function _scheduleWeighIn() {
+    if (_notifWeighIn) {
+      const { requestPermission, scheduleWeighInReminder } = await import('../lib/notifications.js');
+      await requestPermission();
+      await scheduleWeighInReminder(_notifWeighInTime);
+    } else {
+      const { cancelWeighInReminder } = await import('../lib/notifications.js');
+      await cancelWeighInReminder();
+    }
+  }
+
   async function _testGotify() {
     _gotifyTesting = true;
     try {
@@ -2305,13 +2316,13 @@
                 <span class="setting-label">Weigh-in Reminder</span>
                 <div class="setting-desc">Morning reminder to step on the scale</div>
               </div>
-              <Toggle checked={_notifWeighIn} on:change={e => { _notifWeighIn = e.detail; set('notifWeighIn', e.detail); }} />
+              <Toggle checked={_notifWeighIn} on:change={e => { _notifWeighIn = e.detail; set('notifWeighIn', e.detail); _scheduleWeighIn(); }} />
             </div>
             {#if _notifWeighIn}
               <div class="setting-divider"></div>
               <div class="setting-row">
                 <span class="setting-label">Time</span>
-                <input type="time" class="input" style="width:120px;height:36px;padding:0 10px;font-size:13px;text-align:center" value={_notifWeighInTime} on:change={e => { _notifWeighInTime = e.target.value; set('notifWeighInTime', e.target.value); }} />
+                <input type="time" class="input" style="width:120px;height:36px;padding:0 10px;font-size:13px;text-align:center" value={_notifWeighInTime} on:change={e => { _notifWeighInTime = e.target.value; set('notifWeighInTime', e.target.value); _scheduleWeighIn(); }} />
               </div>
             {/if}
           </div>

@@ -64,3 +64,49 @@ export function notifyWorkout(userId, message) {
 export function alertSyncFailure(userId, message) {
   return pushGotify(userId, 'notifSyncFailures', 'Sync Issue', message, 8);
 }
+
+/** Convenience: step goal notification */
+export function notifyStepGoal(userId, steps, goal) {
+  if (steps >= goal) {
+    return pushGotify(userId, 'notifStepGoal', 'Step Goal Reached!',
+      `${steps.toLocaleString()} steps — goal was ${goal.toLocaleString()}!`, 5);
+  }
+  // Midday nudge
+  const hour = new Date().getHours();
+  if (hour >= 12 && hour <= 14 && steps < goal * 0.5) {
+    return pushGotify(userId, 'notifStepGoal', 'Step Goal Progress',
+      `${steps.toLocaleString()} steps so far — ${(goal - steps).toLocaleString()} to go!`, 4);
+  }
+}
+
+/** Convenience: calorie goal alert */
+export function notifyCalorieGoal(userId, calories, goal) {
+  return pushGotify(userId, 'notifCalorieGoal', 'Calorie Target Reached',
+    `${Math.round(calories).toLocaleString()} kcal — daily target is ${Math.round(goal).toLocaleString()} kcal`, 5);
+}
+
+/** Generate and send weekly summary */
+export async function sendWeeklySummary(userId) {
+  const rows = db.prepare(
+    `SELECT metric_type, AVG(value) as avg FROM wellness_data
+     WHERE user_id=? AND source='fitbit' AND date >= date('now','-7 days')
+     AND metric_type IN ('steps','calories_out','sleep_duration_min')
+     GROUP BY metric_type`
+  ).all(userId);
+
+  const m = {};
+  for (const r of rows) m[r.metric_type] = r.avg;
+
+  const parts = [];
+  if (m.steps) parts.push(`Avg steps: ${Math.round(m.steps).toLocaleString()}`);
+  if (m.calories_out) parts.push(`Avg cal burned: ${Math.round(m.calories_out).toLocaleString()}`);
+  if (m.sleep_duration_min) {
+    const h = Math.floor(m.sleep_duration_min / 60);
+    const min = Math.round(m.sleep_duration_min % 60);
+    parts.push(`Avg sleep: ${h}h ${min}m`);
+  }
+
+  if (parts.length) {
+    return pushGotify(userId, 'notifWeeklySummary', 'Weekly Summary', parts.join('\n'), 4);
+  }
+}

@@ -432,9 +432,22 @@ router.post('/sync', wrap(async (req, res) => {
   if (!from || !to) {
     const dateStr = req.body.date || today;
     const { metrics, errors } = await _syncDate(u, dateStr);
-    // Gotify: wellness alerts for today's data
+    // Gotify: wellness alerts + step goal for today's data
     if (dateStr === today && metrics) {
       _checkWellnessAlerts(u, metrics).catch(() => {});
+      if (metrics.steps) {
+        import('../lib/gotify.js').then(({ notifyStepGoal }) => {
+          // Read step goal from user settings
+          const goalRow = db.prepare('SELECT value FROM user_settings WHERE user_id=? AND key=?').get(u, 'goals');
+          if (goalRow?.value) {
+            try {
+              const goals = JSON.parse(goalRow.value);
+              const stepGoal = goals.steps?.min || goals.steps?.max;
+              if (stepGoal) notifyStepGoal(u, metrics.steps, stepGoal);
+            } catch {}
+          }
+        }).catch(() => {});
+      }
     }
     return res.json({ ok: true, date: dateStr, metrics, errors });
   }
@@ -464,9 +477,20 @@ router.post('/sync', wrap(async (req, res) => {
         break;
       }
       results.errors.push({ date: ds, errors: [e.message] });
+      // Gotify: sync failure
+      import('../lib/gotify.js').then(({ alertSyncFailure }) => {
+        alertSyncFailure(u, `Fitbit sync failed for ${ds}: ${e.message}`);
+      }).catch(() => {});
     }
     cur.setDate(cur.getDate() + 1);
     if (cur <= end) await new Promise(r => setTimeout(r, 250)); // throttle
+  }
+
+  // Weekly summary on Sundays
+  if (new Date().getDay() === 0) {
+    import('../lib/gotify.js').then(({ sendWeeklySummary }) => {
+      sendWeeklySummary(u).catch(() => {});
+    }).catch(() => {});
   }
 
   res.json({ ok: true, from, to, ...results });

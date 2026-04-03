@@ -289,6 +289,21 @@ export async function fullSync(silent = false) {
       }
     }
 
+    // Check step goals + wellness alerts after sync (client-side)
+    try {
+      const { dbGetWellnessByDate } = await import('./db-native.js');
+      const today = new Date().toLocaleDateString('sv-SE');
+      const todayData = await dbGetWellnessByDate(today);
+      const metrics = todayData[today] || {};
+      if (metrics.steps) {
+        const { checkStepGoal } = await import('./notifications.js');
+        const { DB } = await import('./db.js');
+        const goals = DB.getSetting('goals', {});
+        const stepGoal = goals.steps?.min || goals.steps?.max;
+        if (stepGoal) await checkStepGoal(metrics.steps, stepGoal);
+      }
+    } catch {}
+
     const now = new Date().toISOString();
     syncState.update(s => ({ ...s, syncing: false, phase: '', progress: '', lastSync: now, online: true }));
     // Notify the app that sync completed — pages should refresh data
@@ -296,6 +311,11 @@ export async function fullSync(silent = false) {
   } catch (e) {
     console.error('[sync] error:', e);
     syncState.update(s => ({ ...s, syncing: false, phase: '', progress: '', error: e.message }));
+    // Notify on sync failure
+    try {
+      const { notify } = await import('./notifications.js');
+      await notify('notifSyncFailures', 'Sync Failed', e.message || 'Could not sync with server');
+    } catch {}
   } finally {
     _syncing = false;
   }
