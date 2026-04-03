@@ -195,15 +195,16 @@ async function pullChanges() {
   }
 
   // Apply settings from server → local SQLite + localStorage
+  // Skip settings that have pending local changes (local wins during active editing)
   const pulledSettings = data.settings || [];
+  const localPendingKeys = new Set((await dbGetPendingSettings()).map(s => s.key));
   for (const s of pulledSettings) {
+    if (localPendingKeys.has(s.key)) continue; // local change takes priority
     await dbUpsertSettingFromServer(s);
-    // Also update localStorage so Svelte stores pick it up immediately
     if (!s.deleted_at) {
       const { DB } = await import('./db.js');
       const val = typeof s.value === 'string' ? _parseJson(s.value) : s.value;
       DB.setSetting(s.key, val);
-      // DB.setSetting already dispatches wl:setting with the raw key — no need to dispatch again
     }
   }
 
@@ -261,10 +262,14 @@ export async function fullSync(silent = false) {
     const pulled = await pullChanges();
 
     // Full settings refresh — catches settings that predated the first sync timestamp
-    try {
-      const { loadServerSettings } = await import('../stores/settings.js');
-      await loadServerSettings();
-    } catch {}
+    // Only on first sync (no prior sync timestamp) to avoid overwriting local pending changes
+    if (!await dbGetSyncMeta('settings_loaded')) {
+      try {
+        const { loadServerSettings } = await import('../stores/settings.js');
+        await loadServerSettings();
+        await dbSetSyncMeta('settings_loaded', '1');
+      } catch {}
+    }
 
     const hadChanges = pushed || pulled;
 

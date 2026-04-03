@@ -80,7 +80,9 @@ export function scheduleSave(key, value) {
           await dbMarkSettingsSynced([key]);
         } catch {}
       }
-    } catch {}
+    } catch (e) {
+      console.warn(`[settings] direct push failed for ${key}:`, e.message);
+    }
   }, 600);
 }
 
