@@ -204,13 +204,13 @@
       });
     }
 
-    // PWA: reload settings when tab becomes visible (picks up changes from phone/other devices)
+    // PWA: reload settings periodically + on tab focus (picks up changes from phone/other devices)
     if (!isNative && $userMgmtActive && $currentUser) {
+      const _refreshSettings = () => import('./stores/settings.js').then(({ loadServerSettings }) => loadServerSettings());
       document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') {
-          import('./stores/settings.js').then(({ loadServerSettings }) => loadServerSettings());
-        }
+        if (document.visibilityState === 'visible') _refreshSettings();
       });
+      setInterval(_refreshSettings, 30000); // every 30 seconds
     }
 
     // Migrate assistant name: 'Buddy' → 'FitBot'
