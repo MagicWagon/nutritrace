@@ -4,6 +4,7 @@
   import { slide, fade } from 'svelte/transition';
   import { portal } from '../lib/portal.js';
   import Toggle from '../components/settings/Toggle.svelte';
+  import TimePicker from '../components/ui/TimePicker.svelte';
   import SettingsWellness from '../components/settings/SettingsWellness.svelte';
   import { APP_VERSION } from '../lib/version.js';
   import Sheet  from '../components/ui/Sheet.svelte';
@@ -2408,7 +2409,7 @@
               <div class="setting-divider"></div>
               <div class="setting-row">
                 <span class="setting-label">Time</span>
-                <input type="time" class="input" style="width:120px;height:36px;padding:0 10px;font-size:13px;text-align:center" value={_notifWeighInTime} on:change={e => { _notifWeighInTime = e.target.value; set('notifWeighInTime', e.target.value); _scheduleWeighIn(); }} />
+                <TimePicker value={_notifWeighInTime} on:change={e => { _notifWeighInTime = e.detail; set('notifWeighInTime', e.detail); _scheduleWeighIn(); }} />
               </div>
             {/if}
           </div>

@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { slide } from 'svelte/transition';
   import Toggle from './Toggle.svelte';
+  import TimePicker from '../ui/TimePicker.svelte';
   import { showSuccess, showError } from '../../stores/toast.js';
   import {
     wellnessEnabled, fitbitEnabled, healthConnectEnabled, wellnessMetrics, workoutsEnabled,
@@ -410,8 +411,7 @@
         <div class="setting-divider"></div>
         <div class="setting-row">
           <span class="setting-label">Time</span>
-          <input type="time" class="input" style="width:120px;height:36px;padding:0 10px;font-size:13px;text-align:center"
-            value={wellnessSyncTimeVal} on:change={e => { wellnessSyncTimeVal = e.target.value; wellnessSyncTime.set(e.target.value); }} />
+          <TimePicker value={wellnessSyncTimeVal} on:change={e => { wellnessSyncTimeVal = e.detail; wellnessSyncTime.set(e.detail); }} />
         </div>
       {/if}
     {/if}
