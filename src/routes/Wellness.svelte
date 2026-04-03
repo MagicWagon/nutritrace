@@ -390,15 +390,17 @@
     }
     _workoutsLoaded = true;
     // If no workouts found and we haven't synced yet, trigger initial sync in background
-    if (_workouts.length === 0 && !_workoutsSyncedOnce && status?.connected) {
+    if (_workouts.length === 0 && !_workoutsSyncedOnce) {
       _workoutsSyncedOnce = true;
+      console.log('[wellness] no workouts found, triggering initial sync');
       syncWorkouts();
     }
   }
   let _workoutsSyncedOnce = false;
 
   async function syncWorkouts() {
-    if (!$workoutsEnabled) return;
+    if (!$workoutsEnabled) { console.log('[wellness] syncWorkouts skipped: not enabled'); return; }
+    console.log('[wellness] syncWorkouts starting');
     try {
       const range = $wellnessSyncRange || 7;
       const end = new Date(dateStr + 'T12:00:00');

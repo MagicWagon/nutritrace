@@ -530,7 +530,12 @@ router.post('/workouts/sync', wrap(async (req, res) => {
   const beforeDate = to || new Date().toISOString().slice(0, 10);
 
   // Fetch activity log list
+  logger.info(`[fitbit] fetching activity logs for user ${u}: ${afterDate} → ${beforeDate}`);
   const data = await _get(u, `/1/user/-/activities/list.json?afterDate=${afterDate}&sort=asc&offset=0&limit=100`);
+  logger.info(`[fitbit] Fitbit returned ${(data.activities || []).length} activities`);
+  if ((data.activities || []).length > 0) {
+    logger.debug(`[fitbit] first activity: ${JSON.stringify(data.activities[0]).slice(0, 300)}`);
+  }
   const activities = (data.activities || []).filter(a => {
     const d = (a.startDate || a.originalStartTime?.slice(0, 10) || '');
     return d >= afterDate && d <= beforeDate;
