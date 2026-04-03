@@ -11,10 +11,10 @@ router.use(requireAuth);
 const uid = req => userMgmtActive() ? req.user.id : 0;
 
 // DB-backed PKCE helpers — survive server restarts during the OAuth redirect dance
-function _pkceSet(state, userId, codeVerifier) {
+function _pkceSet(state, userId, codeVerifier, isNative = false) {
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
   db.prepare(`INSERT OR REPLACE INTO oauth_state (state, user_id, provider, data, expires_at)
-              VALUES (?, ?, 'fitbit', ?, ?)`).run(state, userId, JSON.stringify({ codeVerifier }), expiresAt);
+              VALUES (?, ?, 'fitbit', ?, ?)`).run(state, userId, JSON.stringify({ codeVerifier, isNative }), expiresAt);
   // Clean up any expired states
   db.prepare(`DELETE FROM oauth_state WHERE expires_at < datetime('now')`).run();
 }
@@ -24,7 +24,7 @@ function _pkceGet(state) {
   db.prepare(`DELETE FROM oauth_state WHERE state = ?`).run(state);
   if (row.expires_at < new Date().toISOString()) return null;
   const data = JSON.parse(row.data);
-  return { codeVerifier: data.codeVerifier, userId: row.user_id };
+  return { codeVerifier: data.codeVerifier, userId: row.user_id, isNative: !!data.isNative };
 }
 
 // Read credential: user_settings first (multi-user), app_config fallback (single-user / migration)
@@ -155,7 +155,8 @@ router.get('/authorize', wrap((req, res) => {
   const codeChallenge = createHash('sha256').update(codeVerifier).digest('base64url');
   const state         = randomBytes(16).toString('hex');
 
-  _pkceSet(state, u, codeVerifier);
+  const isNativeOAuth = req.query.native === '1';
+  _pkceSet(state, u, codeVerifier, isNativeOAuth);
 
   const url = new URL('https://www.fitbit.com/oauth2/authorize');
   url.searchParams.set('response_type',          'code');
@@ -182,6 +183,7 @@ router.get('/callback', wrap(async (req, res) => {
   if (!pkce) {
     return res.redirect('/?fitbit=error&msg=invalid_state#/wellness');
   }
+  const _redir = (path) => pkce.isNative ? `nutritrace://callback${path}` : path;
 
   const clientId    = _userCfg('fitbit_client_id',     pkce.userId);
   const clientSecret = _userCfg('fitbit_client_secret', pkce.userId);
@@ -203,7 +205,7 @@ router.get('/callback', wrap(async (req, res) => {
 
   if (!tokenRes.ok) {
     const body = await tokenRes.text().catch(() => '');
-    return res.redirect(`/?fitbit=error&msg=${encodeURIComponent('Token exchange failed: ' + body.slice(0, 80))}#/wellness`);
+    return res.redirect(_redir(`/?fitbit=error&msg=${encodeURIComponent('Token exchange failed: ' + body.slice(0, 80))}#/wellness`));
   }
 
   const td = await tokenRes.json();
@@ -219,7 +221,7 @@ router.get('/callback', wrap(async (req, res) => {
       fitbit_user_id = excluded.fitbit_user_id
   `).run(pkce.userId, td.access_token, td.refresh_token, expiresAt, td.user_id || null);
 
-  res.redirect('/?fitbit=connected#/wellness');
+  res.redirect(_redir('/?fitbit=connected#/wellness'));
 }));
 
 // ── Helper: sync a single date, return { metrics, errors } ───────────────────

@@ -77,10 +77,10 @@ function _oauthHeader(method, url, extraParams, consumerKey, consumerSecret, tok
 }
 
 // DB-backed request token helpers — survive server restarts during the OAuth handshake
-function _reqTokenSet(token, userId, secret) {
+function _reqTokenSet(token, userId, secret, isNative = false) {
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
   db.prepare(`INSERT OR REPLACE INTO oauth_state (state, user_id, provider, data, expires_at)
-              VALUES (?, ?, 'garmin', ?, ?)`).run(token, userId, JSON.stringify({ secret }), expiresAt);
+              VALUES (?, ?, 'garmin', ?, ?)`).run(token, userId, JSON.stringify({ secret, isNative }), expiresAt);
   db.prepare(`DELETE FROM oauth_state WHERE expires_at < datetime('now')`).run();
 }
 function _reqTokenGet(token) {
@@ -88,7 +88,8 @@ function _reqTokenGet(token) {
   if (!row) return null;
   db.prepare(`DELETE FROM oauth_state WHERE state = ?`).run(token);
   if (row.expires_at < new Date().toISOString()) return null;
-  return { secret: JSON.parse(row.data).secret, userId: row.user_id };
+  const data = JSON.parse(row.data);
+  return { secret: data.secret, userId: row.user_id, isNative: !!data.isNative };
 }
 
 // ── GET /config ────────────────────────────────────────────────────────────────
@@ -165,7 +166,7 @@ router.get('/authorize', wrap(async (req, res) => {
 
   if (!oauth_token) return res.status(502).json({ error: 'No oauth_token in Garmin response' });
 
-  _reqTokenSet(oauth_token, u, oauth_token_secret);
+  _reqTokenSet(oauth_token, u, oauth_token_secret, req.query.native === '1');
 
   const authorizeUrl = `${GARMIN_OAUTH}/oauth-service/oauth/authorize?oauth_token=${encodeURIComponent(oauth_token)}`;
   res.json({ url: authorizeUrl });
@@ -184,6 +185,7 @@ router.get('/callback', wrap(async (req, res) => {
   if (!stored) {
     return res.redirect('/?garmin=error&msg=token_expired#/wellness');
   }
+  const _redir = (path) => stored.isNative ? `nutritrace://callback${path}` : path;
 
   const u              = stored.userId;
   const consumerKey    = _userCfg('garmin_consumer_key',    u);
@@ -204,14 +206,14 @@ router.get('/callback', wrap(async (req, res) => {
 
   if (!resp.ok) {
     const body = await resp.text().catch(() => '');
-    return res.redirect(`/?garmin=error&msg=${encodeURIComponent('Token exchange failed: ' + body.slice(0, 80))}#/wellness`);
+    return res.redirect(_redir(`/?garmin=error&msg=${encodeURIComponent('Token exchange failed: ' + body.slice(0, 80))}#/wellness`));
   }
 
   const raw = await resp.text();
   const qs  = Object.fromEntries(new URLSearchParams(raw));
   const { oauth_token: accessToken, oauth_token_secret: accessSecret } = qs;
 
-  if (!accessToken) return res.redirect('/?garmin=error&msg=no_access_token#/wellness');
+  if (!accessToken) return res.redirect(_redir('/?garmin=error&msg=no_access_token#/wellness'));
 
   db.prepare(`
     INSERT INTO garmin_tokens (user_id, access_token, access_secret, garmin_user_id)
@@ -222,7 +224,7 @@ router.get('/callback', wrap(async (req, res) => {
       garmin_user_id = excluded.garmin_user_id
   `).run(u, accessToken, accessSecret, qs.userId || null);
 
-  res.redirect('/?garmin=connected#/wellness');
+  res.redirect(_redir('/?garmin=connected#/wellness'));
 }));
 
 // ── Authenticated Garmin API GET ──────────────────────────────────────────────

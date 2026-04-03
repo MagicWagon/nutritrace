@@ -77,8 +77,6 @@
   $: _isEditorRoute = EDITOR_ROUTES.some(r => $location.startsWith(r));
   $: isEditor      = NAV_HIDDEN.some(p => $location.startsWith(p));
 
-  // Scroll to top on route change (standard SPA behavior)
-  $: if ($location) window.scrollTo(0, 0);
   $: _hasSidebar   = showNav && ($navStyle === 'sidebar' || $navStyle === 'both');
   $: sidebarPinned = _hasSidebar && $sidebarPersistent;
   $: showHamburger = _hasSidebar && !sidebarPinned;
@@ -142,6 +140,31 @@
                 showSuccess('Tap again to exit');
               });
             }
+          }
+        });
+        // Listen for OAuth deep link callbacks (nutritrace://callback?fitbit=connected)
+        App.addListener('appUrlOpen', async ({ url }) => {
+          console.log('[app] deep link received:', url);
+          try {
+            const { closeBrowser } = await import('./lib/oauth-native.js');
+            await closeBrowser();
+          } catch {}
+          // Parse the deep link URL: nutritrace://callback?fitbit=connected
+          try {
+            const u = new URL(url);
+            const params = u.searchParams;
+            if (params.get('fitbit') === 'connected' || params.get('withings') === 'connected' || params.get('garmin') === 'connected') {
+              const provider = params.get('fitbit') ? 'fitbit' : params.get('withings') ? 'withings' : 'garmin';
+              import('./stores/toast.js').then(({ showSuccess }) => showSuccess(`${provider.charAt(0).toUpperCase() + provider.slice(1)} connected!`));
+              // Navigate to Wellness page to pick up new connection
+              window.location.hash = '#/wellness';
+            } else if (params.get('fitbit') === 'error' || params.get('withings') === 'error' || params.get('garmin') === 'error') {
+              const msg = params.get('msg') || 'Authorization failed';
+              import('./stores/toast.js').then(({ showError }) => showError(msg));
+              window.location.hash = '#/wellness';
+            }
+          } catch (e) {
+            console.warn('[app] deep link parse error:', e);
           }
         });
       });
@@ -317,11 +340,13 @@
   .topbar-spacer { flex: 1; }
 
   :global(.page-transition) {
-    position: relative;
-    min-height: 100dvh;
-    width: calc(100% - var(--sidebar-w, 0px));
-    margin-left: var(--sidebar-w, 0px);
-    transition: margin-left 0.25s ease, width 0.25s ease;
+    position: fixed;
+    top: 0;
+    left: var(--sidebar-w, 0px);
+    right: 0;
+    bottom: 0;
+    overflow-y: auto;
+    transition: left 0.25s ease;
   }
   :global(.bottom-nav) {
     left: var(--sidebar-w, 0px) !important;

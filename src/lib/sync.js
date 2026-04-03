@@ -203,7 +203,7 @@ async function pullChanges() {
       const { DB } = await import('./db.js');
       const val = typeof s.value === 'string' ? _parseJson(s.value) : s.value;
       DB.setSetting(s.key, val);
-      window.dispatchEvent(new CustomEvent('wl:setting', { detail: { key: `wl_${s.key}` } }));
+      // DB.setSetting already dispatches wl:setting with the raw key — no need to dispatch again
     }
   }
 
@@ -259,6 +259,12 @@ export async function fullSync(silent = false) {
 
     if (!silent) syncState.update(s => ({ ...s, phase: 'pulling', progress: 'Downloading data…' }));
     const pulled = await pullChanges();
+
+    // Full settings refresh — catches settings that predated the first sync timestamp
+    try {
+      const { loadServerSettings } = await import('../stores/settings.js');
+      await loadServerSettings();
+    } catch {}
 
     const hadChanges = pushed || pulled;
 

@@ -203,7 +203,33 @@
           const tv = isFahr ? fd.skin_temp_variation * 9 / 5 : fd.skin_temp_variation;
           parts.push(`Skin temp variation: ${tv >= 0 ? '+' : ''}${tv.toFixed(2)}${isFahr ? '°F' : '°C'}`);
         }
+        if (fd.sleep_deep_min != null)       parts.push(`Deep sleep: ${Math.round(fd.sleep_deep_min)} min`);
+        if (fd.sleep_light_min != null)      parts.push(`Light sleep: ${Math.round(fd.sleep_light_min)} min`);
+        if (fd.sleep_rem_min != null)        parts.push(`REM sleep: ${Math.round(fd.sleep_rem_min)} min`);
+        if (fd.sleep_wake_min != null)       parts.push(`Awake: ${Math.round(fd.sleep_wake_min)} min`);
+        if (fd.readiness_score != null)     parts.push(`Daily readiness: ${Math.round(fd.readiness_score)}/100`);
+        if (fd.stress_score != null)        parts.push(`Stress management: ${Math.round(fd.stress_score)}/100`);
         if (parts.length) wellnessText += `Fitbit: ${parts.join(', ')}`;
+      }
+    } catch {}
+    // Workouts today
+    try {
+      const workouts = await NtApi.get(`/api/wellness/fitbit/workouts?date=${today}`);
+      if (workouts?.length) {
+        const wParts = workouts.map(w => {
+          let s = w.activity_name;
+          const details = [];
+          if (w.duration_ms) details.push(`${Math.round(w.duration_ms/60000)} min`);
+          if (w.distance_km) details.push(`${w.distance_km.toFixed(2)} km`);
+          if (w.calories) details.push(`${w.calories} kcal`);
+          if (w.avg_hr) details.push(`avg HR ${w.avg_hr} bpm`);
+          if (w.max_hr) details.push(`max HR ${w.max_hr} bpm`);
+          if (w.steps) details.push(`${w.steps.toLocaleString()} steps`);
+          if (w.has_gps) details.push('GPS route recorded');
+          if (details.length) s += ` (${details.join(', ')})`;
+          return s;
+        });
+        wellnessText += (wellnessText ? '\n' : '') + `Workouts today: ${wParts.join('; ')}`;
       }
     } catch {}
     try {
@@ -224,6 +250,11 @@
         if (gd.body_battery_low != null)      parts.push(`Body battery low: ${Math.round(gd.body_battery_low)}`);
         if (gd.stress_avg != null)            parts.push(`Avg stress: ${Math.round(gd.stress_avg)}/100`);
         if (gd.max_hr != null)                parts.push(`Max HR: ${Math.round(gd.max_hr)} bpm`);
+        if (gd.moderate_intensity_min != null) parts.push(`Moderate intensity: ${Math.round(gd.moderate_intensity_min)} min`);
+        if (gd.vigorous_intensity_min != null) parts.push(`Vigorous intensity: ${Math.round(gd.vigorous_intensity_min)} min`);
+        if (gd.sleep_deep_min != null)        parts.push(`Deep sleep: ${Math.round(gd.sleep_deep_min)} min`);
+        if (gd.sleep_rem_min != null)         parts.push(`REM sleep: ${Math.round(gd.sleep_rem_min)} min`);
+        if (gd.respiratory_rate != null)      parts.push(`Respiratory rate: ${gd.respiratory_rate.toFixed(1)} brpm`);
         if (parts.length) wellnessText += (wellnessText ? '\n' : '') + `Garmin: ${parts.join(', ')}`;
       }
     } catch {}
@@ -240,6 +271,13 @@
         if (wd.visceral_fat?.value != null)    parts.push(`Visceral fat: ${wd.visceral_fat.value.toFixed(1)}`);
         if (wd.vascular_age?.value != null)    parts.push(`Vascular age: ${Math.round(wd.vascular_age.value)} yrs`);
         if (wd.metabolic_age?.value != null)   parts.push(`Metabolic age: ${Math.round(wd.metabolic_age.value)} yrs`);
+        if (wd.lean_mass_kg?.value != null)   parts.push(`Lean mass: ${wd.lean_mass_kg.value.toFixed(1)} kg`);
+        if (wd.fat_mass_kg?.value != null)    parts.push(`Fat mass: ${wd.fat_mass_kg.value.toFixed(1)} kg`);
+        if (wd.basal_metabolic_rate?.value != null) parts.push(`BMR: ${Math.round(wd.basal_metabolic_rate.value)} kcal/day`);
+        if (wd.nerve_health_score?.value != null) parts.push(`Nerve health: ${Math.round(wd.nerve_health_score.value)}`);
+        if (wd.pulse_wave_velocity?.value != null) parts.push(`Pulse wave velocity: ${wd.pulse_wave_velocity.value.toFixed(1)} m/s`);
+        if (wd.ecg_heart_rate?.value != null)  parts.push(`ECG HR: ${Math.round(wd.ecg_heart_rate.value)} bpm`);
+        if (wd.ecg_afib?.value != null)        parts.push(`AFib: ${wd.ecg_afib.value === 1 ? 'Detected' : 'Normal'}`);
         if (parts.length) wellnessText += (wellnessText ? '\n' : '') + `Withings: ${parts.join(', ')}`;
       }
     } catch {}
@@ -251,9 +289,10 @@
     const name = $aiAssistantName;
     return `You are ${name}, a friendly and knowledgeable AI nutrition and fitness coach built into NutriTrace. `
          + `You have full access to the user's health data: food diary, nutrition goals, body stats, water intake, `
-         + `and all wellness metrics from connected devices (Fitbit, Garmin, Withings). `
+         + `all wellness metrics from connected devices (Fitbit, Garmin, Withings), workout history with GPS routes, `
+         + `daily readiness scores, and stress management scores. `
          + `You can discuss and provide insight on all of it — food choices, macros, sleep quality, activity, `
-         + `heart health, recovery, hydration, body composition, and more. `
+         + `heart health, recovery, hydration, body composition, workout performance, and more. `
          + `Be warm, encouraging, and concise. Give practical, evidence-based advice.\n\n`
          + `Current date: ${ctx.today}\n\n`
          + `TODAY'S FOOD LOG:\n${ctx.diaryText}\n`

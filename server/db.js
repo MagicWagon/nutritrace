@@ -65,9 +65,10 @@ db.exec(`
   );
 
   CREATE TABLE IF NOT EXISTS user_settings (
-    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    key     TEXT NOT NULL,
-    value   TEXT,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    key        TEXT NOT NULL,
+    value      TEXT,
+    updated_at TEXT DEFAULT (datetime('now')),
     PRIMARY KEY (user_id, key)
   );
 

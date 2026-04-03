@@ -29,6 +29,7 @@
 - **`addDiaryItem` reads from DB**: never relies on `currentEntry` being current.
 - **Settings auto-save**: most save reactively via `$: set(key, value)`. Meal names save on blur.
 - **Wellness scores**: sleep score estimated server-side (Fitbit API doesn't expose it). Readiness and stress calculated client-side from 30-day HRV/RHR baselines.
+- **Fitbit OAuth scopes**: `activity heartrate sleep oxygen_saturation respiratory_rate cardio_fitness temperature profile location` — `location` is required for TCX/GPS route data on workout logs.
 
 ## Svelte Reactivity Rules
 
@@ -56,7 +57,7 @@ The Android app is a Capacitor 8 shell wrapping the same Svelte PWA. It runs off
 
 - **Platform layer** (`src/lib/platform.js`): `isNative` detects Capacitor environment; `apiUrl()` returns empty string (local mode) or server URL (connected mode); `getServerUrl()` and `getNativeMode()` read from Capacitor Preferences.
 - **Native API** (`src/lib/api-native.js`): `NtApiNative` class provides the same CRUD interface as the server API but backed by local SQLite. Used when `isNative && mode === 'local'`.
-- **Native DB** (`src/lib/db-native.js`): SQLite schema and queries via `@capacitor-community/sqlite`. Mirrors server tables (foods, meals, diary, user_settings).
+- **Native DB** (`src/lib/db-native.js`): SQLite schema and queries via `@capacitor-community/sqlite`. Mirrors server tables (foods, meals, diary, user_settings, workouts). Key helpers: `dbGetWellnessGrouped`, `dbGetWellnessByDate`, settings sync queue helpers (read/write 'pending' rows).
 - **NativeSetup wizard**: shown on first launch. Offers "Use Locally" (pure offline) or "Connect to Server" (enter URL, authenticate, merge dialog for existing local data).
 - **Merge on connect**: when connecting to a server with existing local data, a dialog lets the user push local foods/meals/diary to the server and choose which settings win (local or server).
 - **Barcode scanning**: `@capacitor-mlkit/barcode-scanning` with Google Code Scanner fallback. Replaces the web QuaggaJS scanner on native.
@@ -65,6 +66,10 @@ The Android app is a Capacitor 8 shell wrapping the same Svelte PWA. It runs off
 - **API routing**: every `fetch('/api/...')` call in the codebase uses `apiUrl()` to prefix the server URL when in connected mode. In local mode, these calls go to `NtApiNative` instead.
 - **Service worker**: disabled when running inside Capacitor (`src/registerSW.js` checks `isNative`) to prevent the offline.html redirect from intercepting WebView navigation.
 - **Hidden settings**: features that require a server (User Management, Email/SMTP, Food Sharing, persistent sidebar, flashlight toggle, Full Backup) are hidden when running in native local mode.
+- **Auth** (`src/stores/auth.js`): on native server mode, `loadAuthState()` returns cached user from localStorage immediately; `_fetchAuthFromServer()` runs in the background. No blocking server calls on startup.
+- **Settings sync**: on Android, setting changes write to local SQLite `user_settings` (queued as 'pending'), attempt a direct PUT to server, and fall back to the differential sync engine. Server settings are pulled on sync and applied via `wl:setting` custom events.
+- **Workout sync**: workouts are included in the differential sync pull. The local `workouts` table mirrors the server schema; GPS data is cached in `gps_data` after first view for offline access.
+- **Wellness offline cache**: `Wellness.svelte` reads from local SQLite on native (all sources: fitbit, garmin, withings, health_connect). Listens for `nt:sync-complete` and reloads; manual source syncs trigger a differential pull before reload.
 
 ### Build & Run
 ```bash

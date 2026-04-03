@@ -25,10 +25,10 @@ function _getTokens(userId) {
 }
 
 // DB-backed OAuth state helpers — survive server restarts during the redirect dance
-function _stateSet(state, userId) {
+function _stateSet(state, userId, isNative = false) {
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
   db.prepare(`INSERT OR REPLACE INTO oauth_state (state, user_id, provider, data, expires_at)
-              VALUES (?, ?, 'withings', '{}', ?)`).run(state, userId, expiresAt);
+              VALUES (?, ?, 'withings', ?, ?)`).run(state, userId, JSON.stringify({ isNative }), expiresAt);
   db.prepare(`DELETE FROM oauth_state WHERE expires_at < datetime('now')`).run();
 }
 function _stateGet(state) {
@@ -36,7 +36,8 @@ function _stateGet(state) {
   if (!row) return null;
   db.prepare(`DELETE FROM oauth_state WHERE state = ?`).run(state);
   if (row.expires_at < new Date().toISOString()) return null;
-  return { userId: row.user_id };
+  const data = row.data ? JSON.parse(row.data) : {};
+  return { userId: row.user_id, isNative: !!data.isNative };
 }
 
 // Token refresh
@@ -150,7 +151,7 @@ router.get('/authorize', wrap((req, res) => {
     return res.status(400).json({ error: 'Withings client_id and redirect_uri must be configured in Settings → Wellness.' });
   }
   const state = randomBytes(16).toString('hex');
-  _stateSet(state, uid(req));
+  _stateSet(state, uid(req), req.query.native === '1');
 
   const url = 'https://account.withings.com/oauth2_user/authorize2?' + new URLSearchParams({
     response_type: 'code',
@@ -176,6 +177,7 @@ router.get('/callback', wrap(async (req, res) => {
   if (!stored) {
     return res.redirect(`/?withings=error&msg=state_mismatch#/wellness`);
   }
+  const _redir = (path) => stored.isNative ? `nutritrace://callback${path}` : path;
 
   const clientId     = _userCfg('withings_client_id',     stored.userId);
   const clientSecret = _userCfg('withings_client_secret', stored.userId);
@@ -195,7 +197,7 @@ router.get('/callback', wrap(async (req, res) => {
   });
   const json = await tokenRes.json();
   if (json.status !== 0) {
-    return res.redirect(`/?withings=error&msg=${encodeURIComponent(json.error || 'Token exchange failed')}#/wellness`);
+    return res.redirect(_redir(`/?withings=error&msg=${encodeURIComponent(json.error || 'Token exchange failed')}#/wellness`));
   }
   const d = json.body;
   const expiresAt = new Date(Date.now() + d.expires_in * 1000).toISOString();
@@ -211,7 +213,7 @@ router.get('/callback', wrap(async (req, res) => {
       withings_user_id=excluded.withings_user_id
   `).run(userId, d.access_token, d.refresh_token, expiresAt, String(d.userid || ''));
 
-  res.redirect(`/?withings=connected#/wellness`);
+  res.redirect(_redir(`/?withings=connected#/wellness`));
 }));
 
 // ── Measurement type → metric mapping ────────────────────────────────────────

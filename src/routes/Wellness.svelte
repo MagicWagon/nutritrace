@@ -272,8 +272,13 @@
   async function connectWithings() {
     withingsConnecting = true;
     try {
-      const { url } = await NtApi.get('/api/wellness/withings/authorize');
-      window.location.href = url;
+      const { url } = await NtApi.get('/api/wellness/withings/authorize' + (isNative ? '?native=1' : ''));
+      if (isNative) {
+        const { openOAuth } = await import('../lib/oauth-native.js');
+        await openOAuth(url);
+      } else {
+        window.location.href = url;
+      }
     } catch(e) {
       showError(e.message || 'Could not start Withings authorization');
       withingsConnecting = false;
@@ -350,8 +355,13 @@
   async function connectGarmin() {
     garminConnecting = true;
     try {
-      const { url } = await NtApi.get('/api/wellness/garmin/authorize');
-      window.location.href = url;
+      const { url } = await NtApi.get('/api/wellness/garmin/authorize' + (isNative ? '?native=1' : ''));
+      if (isNative) {
+        const { openOAuth } = await import('../lib/oauth-native.js');
+        await openOAuth(url);
+      } else {
+        window.location.href = url;
+      }
     } catch(e) {
       showError(e.message || 'Could not start Garmin authorization');
       garminConnecting = false;
@@ -1212,8 +1222,13 @@
   async function connect() {
     connecting = true;
     try {
-      const { url } = await NtApi.get('/api/wellness/fitbit/authorize');
-      window.location.href = url;
+      const { url } = await NtApi.get('/api/wellness/fitbit/authorize' + (isNative ? '?native=1' : ''));
+      if (isNative) {
+        const { openOAuth } = await import('../lib/oauth-native.js');
+        await openOAuth(url);
+      } else {
+        window.location.href = url;
+      }
     } catch (e) {
       showError(e.message || 'Could not start Fitbit authorization');
       connecting = false;

@@ -133,12 +133,15 @@
   const _fatTween  = tweened(0, { duration: 400, easing: cubicOut });
   $: _calTween.set(Math.round(totals.calories || 0),       { duration: $disableAnimations ? 0 : 500 });
 
-  // Scroll to meal after food added from Foods page
+  // Restore scroll position after food added from Foods page
   $: if (editorState.lastMealAdded != null) {
     requestAnimationFrame(() => {
-      const mealEl = document.getElementById(`meal-${editorState.lastMealAdded}`);
-      if (mealEl) mealEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      editorState.lastMealAdded = null;  // reset so it only scrolls once per add
+      const scrollContainer = document.querySelector('.page-transition');
+      if (scrollContainer && editorState.diaryScrollY != null) {
+        scrollContainer.scrollTop = editorState.diaryScrollY;
+        editorState.diaryScrollY = null;
+      }
+      editorState.lastMealAdded = null;
     });
   }
   $: _protTween.set(Math.round((totals.proteins||0)*10)/10,       { duration: $disableAnimations ? 0 : 400 });
@@ -216,6 +219,9 @@
 
   function openAddFood(mealIdx) {
     addMealIdx = mealIdx;
+    // Save scroll position so we can restore it when returning
+    const scrollContainer = document.querySelector('.page-transition');
+    editorState.diaryScrollY = scrollContainer ? scrollContainer.scrollTop : 0;
     push('/foods?pick=1&meal=' + mealIdx + '&date=' + $currentDate);
   }
 

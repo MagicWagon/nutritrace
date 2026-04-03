@@ -11,11 +11,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Bidirectional settings sync** — settings changes on Android now sync to server via differential sync engine; server setting changes (from PWA) pull down to Android and update stores in real-time
 - **Wellness offline cache** — Wellness page reads from local SQLite on Android, showing synced Fitbit/Garmin/Withings/Health Connect data even when offline
 - **Local wellness data for sparklines, readiness, and stress** — all range-based data loads (sparklines, sleep insights, readiness, stress) use local SQLite on native instead of server API
+- **Workout history with GPS route maps** — Fitbit activity log sync via `activities/list` endpoint; TCX GPS parsing for route data; Leaflet/OpenStreetMap route display with HR-colored polyline segments; workout detail modal with map, duration, distance, calories, HR, and steps
+- **`workoutsEnabled` setting toggle** — Settings → Wellness → Fitbit; enables/disables workout log sync and display
+- **Comma formatting on large numbers** — `toLocaleString()` applied to calories, steps, and other large numbers across Diary, Foods, Wellness, and Statistics
+- **Fitbit OAuth `location` scope** — added to authorize request for GPS/TCX route access
 
 ### Fixed
 - **Health Connect section spacing** — uniform `padding-top:16px` matching Fitbit, Garmin, and Withings sections
 - **Wellness "No Device Connected" on offline** — no longer shows connection prompt when cached wellness data is available
 - **Debug logging cleanup** — removed verbose push food details and raw JSON result logging from sync engine
+- **Statistics history rows missing comma formatting** — large numbers (calories, steps) in history rows now formatted with `toLocaleString()`
+- **Settings Wellness cards missing scoped styles** — `.section-body`, `.settings-card`, `.setting-row` styles now scoped inside SettingsWellness.svelte, matching uniform card appearance in Connected Services
+- **"Save &amp; Connect" HTML entity** — raw `&amp;` entity no longer displays as literal text in button labels
+- **Settings Wellness connection status loading slow** — Fitbit/Withings/Garmin status API calls now run in parallel; connection status auto-loads on component mount instead of waiting for section expand
+- **Workouts table in full backup** — workouts table now included in full backup dump and restore
 
 ---
 
