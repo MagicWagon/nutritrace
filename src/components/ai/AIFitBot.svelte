@@ -3,7 +3,7 @@
   import { fly, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import { NtApi }     from '../../lib/api.js';
-  import { localDateStr } from '../../lib/db.js';
+  import { DB, localDateStr } from '../../lib/db.js';
   import { Nutrition } from '../../lib/nutrition.js';
   import { callAI, callAIProxy, TOOLS, setToolHandler } from '../../lib/aiChat.js';
   import { aiEnabled, aiAssistantName, aiApiKey, aiProvider, aiModel, goals, mealNames, energyUnit, dateFormat, tempUnit } from '../../stores/settings.js';
@@ -367,7 +367,13 @@
       }
     } catch {}
 
-    return { today, diaryText, goalsText, statsText, wellnessText, waterText };
+    return { today, diaryText, goalsText, statsText, wellnessText, waterText,
+      weightUnit: DB.getSetting('weightUnit', 'lb'),
+      distUnit: DB.getSetting('distUnit', 'km'),
+      heightUnit: DB.getSetting('heightUnit', 'ft'),
+      tempUnit: DB.getSetting('tempUnit', 'F'),
+      energyUnit: DB.getSetting('energyUnit', 'kcal'),
+    };
   }
 
   function buildSystemPrompt(ctx) {
@@ -382,6 +388,14 @@ You have FULL ACCESS to the user's complete health data through tools. ALWAYS us
 - **Nutrition goals**: calorie and macro targets
 
 When the user asks about their data (steps, sleep, weight, food log, etc.) for ANY date or date range, USE THE APPROPRIATE TOOL to fetch the real data. Do not estimate or hallucinate numbers.
+
+IMPORTANT — User's preferred units (ALWAYS use these when presenting data):
+- Weight: ${ctx.weightUnit === 'lb' ? 'pounds (lbs)' : 'kilograms (kg)'}
+- Distance: ${ctx.distUnit === 'mi' ? 'miles (mi)' : 'kilometers (km)'}
+- Height/length: ${ctx.heightUnit === 'ft' ? 'feet/inches' : 'centimeters'}
+- Temperature: ${ctx.tempUnit === 'F' ? 'Fahrenheit (°F)' : 'Celsius (°C)'}
+- Energy: ${ctx.energyUnit === 'kJ' ? 'kilojoules (kJ)' : 'kilocalories (kcal)'}
+Convert all values from raw data to these units before presenting to the user.
 
 Be warm, encouraging, and concise. Give practical, evidence-based advice. Use the data to personalize your responses.
 

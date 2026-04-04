@@ -1243,7 +1243,7 @@
           {#each NUTRIMENTS.filter(n => ($diaryShowAllNutrients ? true : n.default) && (totals[n.id] || 0) > 0) as n}
             <div class="ns-row">
               <span>{n.label}</span>
-              <span class="font-medium">{Math.round((totals[n.id]||0)*10)/10} {n.unit}</span>
+              <span class="font-medium">{(Math.round((totals[n.id]||0)*10)/10).toLocaleString()} {n.unit}</span>
             </div>
           {/each}
         </div>
