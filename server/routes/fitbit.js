@@ -764,4 +764,5 @@ router.delete('/disconnect', wrap((req, res) => {
   res.json({ ok: true });
 }));
 
+export { _syncDate as syncDate };
 export default router;

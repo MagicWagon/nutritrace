@@ -65,18 +65,19 @@ async function _syncWellness(userId) {
 
   // Import and run Fitbit sync
   try {
+    const today = now.toISOString().slice(0, 10);
+
+    // Fitbit sync — call internal sync function directly (no HTTP/auth needed)
     const hasFitbit = db.prepare('SELECT 1 FROM fitbit_tokens WHERE user_id=?').get(userId);
     if (hasFitbit) {
-      const today = now.toISOString().slice(0, 10);
-      // Dynamic import to avoid circular deps
-      const fitbit = await import('../routes/fitbit.js');
-      // We can't easily call the route handler directly, so use the internal sync function
-      // Instead, trigger via a self-fetch to the server
-      const port = process.env.PORT || 3001;
-      const token = db.prepare('SELECT access_token FROM fitbit_tokens WHERE user_id=?').get(userId);
-      if (token) {
-        logger.info(`[scheduler] triggering Fitbit sync for user ${userId} date ${today}`);
-        // Use the push-notify module to send wellness alerts after sync
+      try {
+        const { syncDate } = await import('../routes/fitbit.js');
+        logger.info(`[scheduler] Fitbit sync for user ${userId} date ${today}`);
+        const { metrics, errors } = await syncDate(userId, today);
+        logger.info(`[scheduler] Fitbit sync done: ${Object.keys(metrics || {}).length} metrics, ${errors?.length || 0} errors`);
+      } catch (e) {
+        logger.warn(`[scheduler] Fitbit sync error for user ${userId}: ${e.message}`);
+        try { const { alertSyncFailure } = await import('./push-notify.js'); alertSyncFailure(userId, `Scheduled Fitbit sync failed: ${e.message}`); } catch {}
       }
     }
   } catch (e) {
