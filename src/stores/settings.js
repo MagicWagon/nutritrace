@@ -18,7 +18,7 @@ const SERVER_SETTINGS = new Set([
   'offSearchLanguage','offSearchCountry','offUploadCountry',
   'weightUnit','heightUnit','lengthUnit','distUnit','tempUnit',
   'waterGoalMl','waterUnit','waterContainers','waterShowInStats','waterShowInDiary',
-  'dateFormat','timeFormat',
+  'dateFormat','timeFormat','timezone',
   'statsChartType','statsYZero','statsAvgLine','statsGoalLine','statsTrendLine',
   'aiEnabled','aiProvider','aiApiKey','aiModel','aiAssistantName',
   'usdaEnabled','usdaApiKey','offUsername','offPassword',
@@ -253,6 +253,7 @@ export const goalCelebrations   = createSettingStore('goalCelebrations',   true)
 // Date / time display format
 export const dateFormat = createSettingStore('dateFormat', 'US');   // 'ISO' | 'US' | 'EU' | 'natural'
 export const timeFormat = createSettingStore('timeFormat', '12h');  // '12h' | '24h'
+export const timezone   = createSettingStore('timezone',   '');     // IANA timezone (e.g. 'America/New_York'), empty = auto-detect
 
 // Statistics chart settings
 export const statsChartType = createSettingStore('statsChartType', 'bar');

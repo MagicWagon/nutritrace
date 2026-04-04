@@ -231,6 +231,13 @@
       }).catch(() => {});
     }
 
+    // Auto-detect timezone and save so server scheduler uses correct local time
+    const detectedTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (detectedTz && !DB.getSetting('timezone', '')) {
+      DB.setSetting('timezone', detectedTz);
+      import('./stores/settings.js').then(({ scheduleSave }) => scheduleSave('timezone', detectedTz));
+    }
+
     // PWA: reload settings periodically + on tab focus (picks up changes from phone/other devices)
     if (!isNative && $userMgmtActive && $currentUser) {
       const _refreshSettings = () => import('./stores/settings.js').then(({ loadServerSettings }) => loadServerSettings());

@@ -490,6 +490,7 @@
   let _notifWater    = DB.getSetting('notifWaterReminders',  false);
   let _notifWaterInt = DB.getSetting('notifWaterInterval',   120);
   let _notifMeals    = DB.getSetting('notifMealReminders',   false);
+  let _notifMealTimes = DB.getSetting('notifMealTimes', ['08:00','12:00','18:00']);
   let _notifGoals    = DB.getSetting('notifGoalCelebrations', false);
   let _notifSteps    = DB.getSetting('notifStepGoal',        false);
   let _notifWeighIn  = DB.getSetting('notifWeighIn',         false);
@@ -2396,6 +2397,16 @@
               </div>
               <Toggle checked={_notifMeals} on:change={e => { _notifMeals = e.detail; set('notifMealReminders', e.detail); _scheduleMeals(); }} />
             </div>
+            {#if _notifMeals}
+              {@const mealNames = DB.getSetting('mealNames', ['Breakfast','Lunch','Dinner','Snacks'])}
+              {#each _notifMealTimes as time, i}
+                <div class="setting-divider"></div>
+                <div class="setting-row">
+                  <span class="setting-label">{mealNames[i] || `Meal ${i+1}`}</span>
+                  <TimePicker value={time} on:change={e => { _notifMealTimes[i] = e.detail; _notifMealTimes = _notifMealTimes; set('notifMealTimes', _notifMealTimes); _scheduleMeals(); }} />
+                </div>
+              {/each}
+            {/if}
             <div class="setting-divider"></div>
             <div class="setting-row">
               <div>

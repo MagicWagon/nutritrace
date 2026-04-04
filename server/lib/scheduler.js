@@ -20,6 +20,38 @@ function _getUserSetting(userId, key) {
   try { return JSON.parse(row.value); } catch { return row.value; }
 }
 
+/** Get current time in the user's timezone */
+function _getUserLocalTime(userId) {
+  const tz = _getUserSetting(userId, 'timezone');
+  if (tz) {
+    try {
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: tz, hour: 'numeric', minute: 'numeric', hour12: false,
+        year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short',
+      }).formatToParts(new Date());
+      const get = (type) => parts.find(p => p.type === type)?.value;
+      return {
+        hour: parseInt(get('hour')),
+        minute: parseInt(get('minute')),
+        day: parseInt(get('day')),
+        weekday: new Date().toLocaleDateString('en-US', { timeZone: tz, weekday: 'short' }),
+        dayOfWeek: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].indexOf(
+          new Date().toLocaleDateString('en-US', { timeZone: tz, weekday: 'short' })
+        ),
+        dateStr: new Date().toLocaleDateString('sv-SE', { timeZone: tz }),
+      };
+    } catch {}
+  }
+  // Fallback: server time
+  const now = new Date();
+  return {
+    hour: now.getHours(), minute: now.getMinutes(),
+    day: now.getDate(), weekday: now.toLocaleDateString('en-US', { weekday: 'short' }),
+    dayOfWeek: now.getDay(),
+    dateStr: now.toISOString().slice(0, 10),
+  };
+}
+
 function _isEnabled(userId, key) {
   const val = _getUserSetting(userId, key);
   return val === true || val === 'true';
@@ -43,20 +75,19 @@ async function _syncWellness(userId) {
 
   const schedule = _getUserSetting(userId, 'wellnessSyncSchedule') || 'daily';
   const syncTime = _getUserSetting(userId, 'wellnessSyncTime') || '14:00';
-  const now = new Date();
   const [h, m] = syncTime.split(':').map(Number);
-  const hour = now.getHours(), minute = now.getMinutes();
+  const local = _getUserLocalTime(userId);
 
-  // Check if we're within the 15-minute window of the scheduled time
+  // Check if we're within the 15-minute window of the scheduled time (in USER's timezone)
   const scheduledMin = h * 60 + m;
-  const currentMin = hour * 60 + minute;
+  const currentMin = local.hour * 60 + local.minute;
   const diff = currentMin - scheduledMin;
 
   let shouldSync = false;
   if (schedule === 'daily' && diff >= 0 && diff < 15) shouldSync = true;
-  if (schedule === 'every6h' && hour % 6 === h % 6 && minute < 15) shouldSync = true;
-  if (schedule === 'every12h' && hour % 12 === h % 12 && minute < 15) shouldSync = true;
-  if (schedule === 'weekly' && now.getDay() === 0 && diff >= 0 && diff < 15) shouldSync = true;
+  if (schedule === 'every6h' && local.hour % 6 === h % 6 && local.minute < 15) shouldSync = true;
+  if (schedule === 'every12h' && local.hour % 12 === h % 12 && local.minute < 15) shouldSync = true;
+  if (schedule === 'weekly' && local.dayOfWeek === 0 && diff >= 0 && diff < 15) shouldSync = true;
 
   if (!shouldSync) return;
   if (_ranRecently(userId, 'wellness_sync', 5 * 60 * 60 * 1000)) return; // 5h dedup for daily
@@ -120,9 +151,8 @@ async function _pushReminders(userId) {
   if (!pushService || pushService === 'none') return;
 
   const { pushNotify } = await import('./push-notify.js');
-  const now = new Date();
-  const hour = now.getHours(), minute = now.getMinutes();
-  const currentMin = hour * 60 + minute;
+  const local = _getUserLocalTime(userId);
+  const currentMin = local.hour * 60 + local.minute;
 
   // Water reminders
   if (_isEnabled(userId, 'notifWaterReminders')) {
@@ -161,7 +191,7 @@ async function _pushReminders(userId) {
   }
 
   // Weekly summary (Sunday)
-  if (_isEnabled(userId, 'notifWeeklySummary') && now.getDay() === 0 && hour >= 9 && hour < 10 && !_ranRecently(userId, 'weekly', 6 * 24 * 60 * 60 * 1000)) {
+  if (_isEnabled(userId, 'notifWeeklySummary') && local.dayOfWeek === 0 && local.hour >= 9 && local.hour < 10 && !_ranRecently(userId, 'weekly', 6 * 24 * 60 * 60 * 1000)) {
     const { sendWeeklySummary } = await import('./push-notify.js');
     await sendWeeklySummary(userId);
   }
