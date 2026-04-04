@@ -99,7 +99,7 @@ export function snapshotScores(userId, dateStr, { force = false } = {}) {
     interaction_penalty = _clamp(interaction_penalty, 0, 10);
   }
 
-  let readiness = (0.58 * hrv_score) + (0.22 * rhr_score) + (0.12 * sleepBase) + 1 - activity_penalty - interaction_penalty;
+  let readiness = (0.58 * hrv_score) + (0.22 * rhr_score) + (0.12 * sleepBase) - activity_penalty - interaction_penalty;
   readiness = Math.min(_clamp(Math.round(readiness), 1, 100), sleep_cap);
 
   // ── Stress ────────────────────────────────────────────────────
@@ -113,7 +113,7 @@ export function snapshotScores(userId, dateStr, { force = false } = {}) {
       r_s = _clamp(r_s, 0, 100);
     }
     const sl = sleep != null ? sleep : 75;
-    return (0.35 * h_s) + (0.40 * sl) + (0.15 * r_s) + 6;
+    return (0.35 * h_s) + (0.40 * sl) + (0.15 * r_s) + 4;
   }
 
   const todayRaw = _rawStress(todayHrv, todayRhr, todaySleep);

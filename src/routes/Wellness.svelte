@@ -638,7 +638,7 @@
       activity_penalty = _clamp(activity_penalty, 0, 20);
     }
 
-    let score = (0.58 * hrv_score) + (0.22 * rhr_score) + (0.12 * sleepBase) + 1 - activity_penalty - interaction_penalty;
+    let score = (0.58 * hrv_score) + (0.22 * rhr_score) + (0.12 * sleepBase) - activity_penalty - interaction_penalty;
     score     = Math.min(_clamp(Math.round(score), 1, 100), sleep_cap);
 
     const label = score >= 80 ? 'Optimal' : score >= 65 ? 'Good' : score >= 50 ? 'Fair' : score >= 35 ? 'Low' : 'Poor';
@@ -648,7 +648,7 @@
       inputs: { todayHrv, todayRhr, todaySleepScore, todayCalories, historyDays: history30d.length },
       baselines: { hrvBaseline: Math.round(hrvBaseline * 100) / 100, rhrBaseline: rhrBaseline != null ? Math.round(rhrBaseline * 10) / 10 : null },
       components: { hrvRatio: Math.round(hrvRatio * 1000) / 1000, hrv_score: Math.round(hrv_score * 10) / 10, rhr_score: Math.round(rhr_score * 10) / 10, sleepBase, activity_penalty: Math.round(activity_penalty * 10) / 10, interaction_penalty: Math.round(interaction_penalty * 10) / 10 },
-      formula: `(0.58×${Math.round(hrv_score*10)/10}) + (0.22×${Math.round(rhr_score*10)/10}) + (0.12×${sleepBase}) + 1 - ${Math.round(activity_penalty*10)/10} - ${Math.round(interaction_penalty*10)/10} = ${score}`,
+      formula: `(0.58×${Math.round(hrv_score*10)/10}) + (0.22×${Math.round(rhr_score*10)/10}) + (0.12×${sleepBase}) - ${Math.round(activity_penalty*10)/10} - ${Math.round(interaction_penalty*10)/10} = ${score}`,
     }, null, 2));
 
     return {
@@ -755,7 +755,7 @@
     }
     // Sleep component — stronger weight than readiness (35% vs 15%)
     const sleep_s = sleepScore != null ? sleepScore : 75;
-    return (0.35 * hrv_s) + (0.40 * sleep_s) + (0.15 * rhr_s) + 6; // offset 6 — tuned with 10 days of data
+    return (0.35 * hrv_s) + (0.40 * sleep_s) + (0.15 * rhr_s) + 4; // offset 4 — tuned with 11 days of data
   }
 
   function _calcStressScore(todayHrv, todayRhr, todaySleepScore, history30d) {
