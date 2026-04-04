@@ -67,7 +67,7 @@ async function _syncWellness(userId) {
   try {
     const today = now.toISOString().slice(0, 10);
 
-    // Fitbit sync — call internal sync function directly (no HTTP/auth needed)
+    // Fitbit sync
     const hasFitbit = db.prepare('SELECT 1 FROM fitbit_tokens WHERE user_id=?').get(userId);
     if (hasFitbit) {
       try {
@@ -78,6 +78,34 @@ async function _syncWellness(userId) {
       } catch (e) {
         logger.warn(`[scheduler] Fitbit sync error for user ${userId}: ${e.message}`);
         try { const { alertSyncFailure } = await import('./push-notify.js'); alertSyncFailure(userId, `Scheduled Fitbit sync failed: ${e.message}`); } catch {}
+      }
+    }
+
+    // Withings sync
+    const hasWithings = db.prepare('SELECT 1 FROM withings_tokens WHERE user_id=?').get(userId);
+    if (hasWithings) {
+      try {
+        const { syncRange } = await import('../routes/withings.js');
+        logger.info(`[scheduler] Withings sync for user ${userId} date ${today}`);
+        const result = await syncRange(userId, today, today);
+        logger.info(`[scheduler] Withings sync done: ${result?.dates || 0} dates`);
+      } catch (e) {
+        logger.warn(`[scheduler] Withings sync error for user ${userId}: ${e.message}`);
+        try { const { alertSyncFailure } = await import('./push-notify.js'); alertSyncFailure(userId, `Scheduled Withings sync failed: ${e.message}`); } catch {}
+      }
+    }
+
+    // Garmin sync
+    const hasGarmin = db.prepare('SELECT 1 FROM garmin_tokens WHERE user_id=?').get(userId);
+    if (hasGarmin) {
+      try {
+        const { syncRange } = await import('../routes/garmin.js');
+        logger.info(`[scheduler] Garmin sync for user ${userId} date ${today}`);
+        const result = await syncRange(userId, today, today);
+        logger.info(`[scheduler] Garmin sync done: ${result?.synced || 0} synced`);
+      } catch (e) {
+        logger.warn(`[scheduler] Garmin sync error for user ${userId}: ${e.message}`);
+        try { const { alertSyncFailure } = await import('./push-notify.js'); alertSyncFailure(userId, `Scheduled Garmin sync failed: ${e.message}`); } catch {}
       }
     }
   } catch (e) {

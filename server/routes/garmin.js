@@ -455,4 +455,5 @@ router.delete('/disconnect', wrap((req, res) => {
   res.json({ ok: true });
 }));
 
+export { _syncRange as syncRange };
 export default router;
