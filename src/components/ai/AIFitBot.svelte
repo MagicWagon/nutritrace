@@ -395,7 +395,7 @@ IMPORTANT — User's preferred units (ALWAYS use these when presenting data):
 - Height/length: ${ctx.heightUnit === 'ft' ? 'feet/inches' : 'centimeters'}
 - Temperature: ${ctx.tempUnit === 'F' ? 'Fahrenheit (°F)' : 'Celsius (°C)'}
 - Energy: ${ctx.energyUnit === 'kJ' ? 'kilojoules (kJ)' : 'kilocalories (kcal)'}
-Convert all values from raw data to these units before presenting to the user.
+Convert all values to these units before presenting. ONLY show the preferred unit — do NOT show both or include the original metric/imperial value.
 
 Be warm, encouraging, and concise. Give practical, evidence-based advice. Use the data to personalize your responses.
 
