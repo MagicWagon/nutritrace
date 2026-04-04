@@ -80,32 +80,78 @@
       }
     } catch {}
 
+    // Unit conversion for tool results — convert before AI sees the data
+    function _convertWellnessUnits(data) {
+      const distUnit = DB.getSetting('distUnit', 'km');
+      const weightUnit = DB.getSetting('weightUnit', 'lb');
+      const tempUnit = DB.getSetting('tempUnit', 'F');
+      const converted = {};
+      for (const [date, metrics] of Object.entries(data)) {
+        const m = { ...metrics };
+        // Distance: km → mi
+        if (m.distance_km != null && distUnit === 'mi') {
+          m.distance_mi = Math.round(m.distance_km * 0.621371 * 100) / 100;
+          delete m.distance_km;
+        }
+        // Weight: kg → lb
+        if (m.weight_kg != null && weightUnit === 'lb') {
+          m.weight_lb = Math.round(m.weight_kg * 2.20462 * 10) / 10;
+          delete m.weight_kg;
+        }
+        if (m.muscle_mass_kg != null && weightUnit === 'lb') {
+          m.muscle_mass_lb = Math.round(m.muscle_mass_kg * 2.20462 * 10) / 10;
+          delete m.muscle_mass_kg;
+        }
+        if (m.bone_mass_kg != null && weightUnit === 'lb') {
+          m.bone_mass_lb = Math.round(m.bone_mass_kg * 2.20462 * 100) / 100;
+          delete m.bone_mass_kg;
+        }
+        if (m.lean_mass_kg != null && weightUnit === 'lb') {
+          m.lean_mass_lb = Math.round(m.lean_mass_kg * 2.20462 * 10) / 10;
+          delete m.lean_mass_kg;
+        }
+        if (m.fat_mass_kg != null && weightUnit === 'lb') {
+          m.fat_mass_lb = Math.round(m.fat_mass_kg * 2.20462 * 10) / 10;
+          delete m.fat_mass_kg;
+        }
+        // Skin temp: °C → °F
+        if (m.skin_temp_variation != null && tempUnit === 'F') {
+          m.skin_temp_variation = Math.round(m.skin_temp_variation * 9 / 5 * 100) / 100;
+        }
+        converted[date] = m;
+      }
+      return converted;
+    }
+
     // Register tool handler for AI function calling
     setToolHandler(async (name, args) => {
       switch (name) {
         case 'get_wellness_data': {
-          // Native: read from local SQLite (works offline + local mode)
+          let raw;
           if (isNative) {
             try {
               const { dbGetWellnessGrouped } = await import('../../lib/db-native.js');
-              return await dbGetWellnessGrouped(args.from, args.to, null);
-            } catch {}
+              raw = await dbGetWellnessGrouped(args.from, args.to, null);
+            } catch { raw = {}; }
           }
-          const [fitbit, garmin] = await Promise.allSettled([
-            NtApi.get(`/api/wellness/fitbit/data?from=${args.from}&to=${args.to}`),
-            NtApi.get(`/api/wellness/garmin/data?from=${args.from}&to=${args.to}`),
-          ]);
-          const fb = fitbit.status === 'fulfilled' ? fitbit.value : {};
-          const gm = garmin.status === 'fulfilled' ? garmin.value : {};
-          const merged = {};
-          for (const [d, v] of Object.entries(gm)) merged[d] = { ...v };
-          for (const [d, v] of Object.entries(fb)) merged[d] = { ...(merged[d] || {}), ...v };
-          return merged;
+          if (!raw) {
+            const [fitbit, garmin] = await Promise.allSettled([
+              NtApi.get(`/api/wellness/fitbit/data?from=${args.from}&to=${args.to}`),
+              NtApi.get(`/api/wellness/garmin/data?from=${args.from}&to=${args.to}`),
+            ]);
+            const fb = fitbit.status === 'fulfilled' ? fitbit.value : {};
+            const gm = garmin.status === 'fulfilled' ? garmin.value : {};
+            raw = {};
+            for (const [d, v] of Object.entries(gm)) raw[d] = { ...v };
+            for (const [d, v] of Object.entries(fb)) raw[d] = { ...(raw[d] || {}), ...v };
+          }
+          // Convert units to user preferences before sending to AI
+          return _convertWellnessUnits(raw);
         }
         case 'get_body_composition': {
           try {
             const data = await NtApi.get(`/api/wellness/withings/data?from=${args.from}&to=${args.to}`);
-            return data;
+            return _convertWellnessUnits(data);
           } catch { return {}; }
         }
         case 'get_diary': {
@@ -132,15 +178,28 @@
           } catch { return { date: args.date, error: 'Could not load diary' }; }
         }
         case 'get_workouts': {
+          let workouts;
           if (isNative) {
             try {
               const { dbGetWorkouts } = await import('../../lib/db-native.js');
-              return await dbGetWorkouts(args.from, args.to);
+              workouts = await dbGetWorkouts(args.from, args.to);
             } catch {}
           }
-          try {
-            return await NtApi.get(`/api/wellness/fitbit/workouts?from=${args.from}&to=${args.to}`);
-          } catch { return []; }
+          if (!workouts) {
+            try { workouts = await NtApi.get(`/api/wellness/fitbit/workouts?from=${args.from}&to=${args.to}`); }
+            catch { workouts = []; }
+          }
+          // Convert distance to user's preferred unit
+          const distUnit = DB.getSetting('distUnit', 'km');
+          if (distUnit === 'mi') {
+            for (const w of workouts) {
+              if (w.distance_km != null) {
+                w.distance_mi = Math.round(w.distance_km * 0.621371 * 100) / 100;
+                delete w.distance_km;
+              }
+            }
+          }
+          return workouts;
         }
         case 'get_goals': {
           const g = goals.get();
