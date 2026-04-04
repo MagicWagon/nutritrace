@@ -188,6 +188,44 @@ async function _tick() {
   }
 }
 
+/** Force sync all connected services for a user — bypasses schedule check */
+export async function forceSync(userId) {
+  logger.info(`[scheduler] forced sync for user ${userId}`);
+  const today = new Date().toISOString().slice(0, 10);
+
+  const hasFitbit = db.prepare('SELECT 1 FROM fitbit_tokens WHERE user_id=?').get(userId);
+  if (hasFitbit) {
+    try {
+      const { syncDate } = await import('../routes/fitbit.js');
+      logger.info(`[scheduler] forced Fitbit sync for user ${userId}`);
+      const { metrics, errors } = await syncDate(userId, today);
+      logger.info(`[scheduler] Fitbit sync done: ${Object.keys(metrics || {}).length} metrics`);
+    } catch (e) { logger.warn(`[scheduler] Fitbit error: ${e.message}`); }
+  }
+
+  const hasWithings = db.prepare('SELECT 1 FROM withings_tokens WHERE user_id=?').get(userId);
+  if (hasWithings) {
+    try {
+      const { syncRange } = await import('../routes/withings.js');
+      logger.info(`[scheduler] forced Withings sync for user ${userId}`);
+      await syncRange(userId, today, today);
+      logger.info(`[scheduler] Withings sync done`);
+    } catch (e) { logger.warn(`[scheduler] Withings error: ${e.message}`); }
+  }
+
+  const hasGarmin = db.prepare('SELECT 1 FROM garmin_tokens WHERE user_id=?').get(userId);
+  if (hasGarmin) {
+    try {
+      const { syncRange } = await import('../routes/garmin.js');
+      logger.info(`[scheduler] forced Garmin sync for user ${userId}`);
+      await syncRange(userId, today, today);
+      logger.info(`[scheduler] Garmin sync done`);
+    } catch (e) { logger.warn(`[scheduler] Garmin error: ${e.message}`); }
+  }
+
+  return { fitbit: !!hasFitbit, withings: !!hasWithings, garmin: !!hasGarmin };
+}
+
 /** Start the scheduler — call once at server startup */
 export function startScheduler() {
   logger.info('[scheduler] started (15-minute interval)');

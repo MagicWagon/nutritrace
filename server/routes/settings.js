@@ -99,4 +99,12 @@ async function _pushTestHandler(req, res) {
   }
 }
 
+// POST /api/settings/force-sync — admin: trigger scheduled sync immediately
+router.post('/force-sync', wrap(async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: 'Not logged in' });
+  const { forceSync } = await import('../lib/scheduler.js');
+  const result = await forceSync(req.user.id);
+  res.json({ ok: true, ...result });
+}));
+
 export default router;
