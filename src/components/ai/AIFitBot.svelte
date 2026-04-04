@@ -146,9 +146,7 @@
             for (const [d, v] of Object.entries(fb)) raw[d] = { ...(raw[d] || {}), ...v };
           }
           // Convert units to user preferences before sending to AI
-          const result = _convertWellnessUnits(raw);
-          console.log('[fitbot] wellness data after conversion:', JSON.stringify(Object.keys(Object.values(result)[0] || {})));
-          return result;
+          return _convertWellnessUnits(raw);
         }
         case 'get_body_composition': {
           try {

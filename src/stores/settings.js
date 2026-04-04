@@ -265,7 +265,7 @@ export const statsTrendLine = createSettingStore('statsTrendLine', true);
 export const weightUnit = createSettingStore('weightUnit', 'lb');
 export const heightUnit = createSettingStore('heightUnit', 'ft');
 export const lengthUnit = createSettingStore('lengthUnit', 'in');
-export const distUnit   = createSettingStore('distUnit',   'km');
+export const distUnit   = createSettingStore('distUnit',   'mi');
 export const tempUnit   = createSettingStore('tempUnit',   'F');  // 'F' | 'C'
 
 // Water
