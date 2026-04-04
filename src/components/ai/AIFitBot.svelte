@@ -333,7 +333,10 @@
         if (fd.active_zone_minutes != null)   parts.push(`Active zone min: ${Math.round(fd.active_zone_minutes)}`);
         if (fd.calories_out != null)          parts.push(`Calories burned: ${Math.round(fd.calories_out)}`);
         if (fd.floors != null)                parts.push(`Floors: ${Math.round(fd.floors)}`);
-        if (fd.distance_km != null)           parts.push(`Distance: ${fd.distance_km.toFixed(2)} km`);
+        if (fd.distance_km != null) {
+          const _du = DB.getSetting('distUnit', 'km');
+          parts.push(`Distance: ${_du === 'mi' ? (fd.distance_km * 0.621371).toFixed(2) + ' mi' : fd.distance_km.toFixed(2) + ' km'}`);
+        }
         if (fd.sleep_duration_min != null)    { const h = Math.floor(fd.sleep_duration_min/60); parts.push(`Sleep: ${h}h ${Math.round(fd.sleep_duration_min%60)}m`); }
         if (fd.sleep_efficiency != null)      parts.push(`Sleep efficiency: ${fd.sleep_efficiency.toFixed(0)}%`);
         if (fd.sleep_score != null)           parts.push(`Sleep score: ${Math.round(fd.sleep_score)}/100`);
@@ -364,7 +367,10 @@
           let s = w.activity_name;
           const details = [];
           if (w.duration_ms) details.push(`${Math.round(w.duration_ms/60000)} min`);
-          if (w.distance_km) details.push(`${w.distance_km.toFixed(2)} km`);
+          if (w.distance_km) {
+            const _du = DB.getSetting('distUnit', 'km');
+            details.push(`${_du === 'mi' ? (w.distance_km * 0.621371).toFixed(2) + ' mi' : w.distance_km.toFixed(2) + ' km'}`);
+          }
           if (w.calories) details.push(`${w.calories} kcal`);
           if (w.avg_hr) details.push(`avg HR ${w.avg_hr} bpm`);
           if (w.max_hr) details.push(`max HR ${w.max_hr} bpm`);
@@ -384,7 +390,10 @@
         if (gd.steps != null)                parts.push(`Steps: ${Math.round(gd.steps).toLocaleString()}`);
         if (gd.active_minutes != null)        parts.push(`Active minutes: ${Math.round(gd.active_minutes)}`);
         if (gd.calories_out != null)          parts.push(`Calories burned: ${Math.round(gd.calories_out)}`);
-        if (gd.distance_km != null)           parts.push(`Distance: ${gd.distance_km.toFixed(2)} km`);
+        if (gd.distance_km != null) {
+          const _du = DB.getSetting('distUnit', 'km');
+          parts.push(`Distance: ${_du === 'mi' ? (gd.distance_km * 0.621371).toFixed(2) + ' mi' : gd.distance_km.toFixed(2) + ' km'}`);
+        }
         if (gd.sleep_duration_min != null)    { const h = Math.floor(gd.sleep_duration_min/60); parts.push(`Sleep: ${h}h ${Math.round(gd.sleep_duration_min%60)}m`); }
         if (gd.sleep_score != null)           parts.push(`Sleep score: ${Math.round(gd.sleep_score)}/100`);
         if (gd.resting_hr != null)            parts.push(`Resting HR: ${Math.round(gd.resting_hr)} bpm`);
@@ -407,16 +416,19 @@
       const wd = withingsRes[today];
       if (wd) {
         const parts = [];
-        if (wd.weight_kg?.value != null)      parts.push(`Weight: ${wd.weight_kg.value.toFixed(1)} kg`);
+        const _wu = DB.getSetting('weightUnit', 'lb');
+        const _wFmt = (kg) => _wu === 'lb' ? (kg * 2.20462).toFixed(1) + ' lbs' : kg.toFixed(1) + ' kg';
+        if (wd.weight_kg?.value != null)      parts.push(`Weight: ${_wFmt(wd.weight_kg.value)}`);
         if (wd.body_fat_pct?.value != null)    parts.push(`Body fat: ${wd.body_fat_pct.value.toFixed(1)}%`);
-        if (wd.muscle_mass_kg?.value != null)  parts.push(`Muscle mass: ${wd.muscle_mass_kg.value.toFixed(1)} kg`);
-        if (wd.bone_mass_kg?.value != null)    parts.push(`Bone mass: ${wd.bone_mass_kg.value.toFixed(2)} kg`);
+        if (wd.muscle_mass_kg?.value != null)  parts.push(`Muscle mass: ${_wFmt(wd.muscle_mass_kg.value)}`);
+        if (wd.bone_mass_kg?.value != null)    parts.push(`Bone mass: ${_wu === 'lb' ? (wd.bone_mass_kg.value * 2.20462).toFixed(2) + ' lbs' : wd.bone_mass_kg.value.toFixed(2) + ' kg'}`);
         if (wd.body_water_pct?.value != null)  parts.push(`Body water: ${wd.body_water_pct.value.toFixed(1)}%`);
         if (wd.visceral_fat?.value != null)    parts.push(`Visceral fat: ${wd.visceral_fat.value.toFixed(1)}`);
         if (wd.vascular_age?.value != null)    parts.push(`Vascular age: ${Math.round(wd.vascular_age.value)} yrs`);
         if (wd.metabolic_age?.value != null)   parts.push(`Metabolic age: ${Math.round(wd.metabolic_age.value)} yrs`);
-        if (wd.lean_mass_kg?.value != null)   parts.push(`Lean mass: ${wd.lean_mass_kg.value.toFixed(1)} kg`);
-        if (wd.fat_mass_kg?.value != null)    parts.push(`Fat mass: ${wd.fat_mass_kg.value.toFixed(1)} kg`);
+        if (wd.lean_mass_kg?.value != null)   parts.push(`Lean mass: ${_wFmt(wd.lean_mass_kg.value)}`);
+        if (wd.fat_mass_kg?.value != null)    parts.push(`Fat mass: ${_wFmt(wd.fat_mass_kg.value)}`);
+
         if (wd.basal_metabolic_rate?.value != null) parts.push(`BMR: ${Math.round(wd.basal_metabolic_rate.value)} kcal/day`);
         if (wd.nerve_health_score?.value != null) parts.push(`Nerve health: ${Math.round(wd.nerve_health_score.value)}`);
         if (wd.pulse_wave_velocity?.value != null) parts.push(`Pulse wave velocity: ${wd.pulse_wave_velocity.value.toFixed(1)} m/s`);
