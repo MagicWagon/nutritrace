@@ -47,10 +47,23 @@ export async function requestPermissions() {
   const hc = _getPlugin();
   if (!hc) return { read: [], write: [] };
   try {
-    return await hc.requestPermissions({
+    const result = await hc.requestPermissions({
       read: ['Steps', 'Weight', 'SleepSession', 'RestingHeartRate', 'ActivitySession'],
       write: [],
     });
+    // Check if permissions were actually granted (singleTask launch mode can cause
+    // the permission dialog to close immediately without user interaction)
+    if (result.read?.length === 0) {
+      // Fallback: open Health Connect app so user can grant permissions manually
+      console.warn('[health-connect] Permission dialog failed — opening Health Connect app');
+      try {
+        const { App: CapApp } = await import('@capacitor/app');
+        // Open Health Connect's permission management for our app
+        window.open('market://details?id=com.google.android.apps.healthdata', '_system');
+      } catch {}
+      return { read: [], write: [] };
+    }
+    return result;
   } catch (e) {
     console.error('[health-connect] Permission request failed:', e);
     return { read: [], write: [] };

@@ -491,6 +491,7 @@
   let _notifWaterInt = DB.getSetting('notifWaterInterval',   120);
   let _notifMeals    = DB.getSetting('notifMealReminders',   false);
   let _notifMealTimes = DB.getSetting('notifMealTimes', ['08:00','12:00','18:00']);
+  function _defaultMealTime(i) { return ['08:00','12:00','18:00','15:00','10:00','20:00'][i] || '12:00'; }
   let _notifGoals    = DB.getSetting('notifGoalCelebrations', false);
   let _notifSteps    = DB.getSetting('notifStepGoal',        false);
   let _notifWeighIn  = DB.getSetting('notifWeighIn',         false);
@@ -2399,11 +2400,17 @@
             </div>
             {#if _notifMeals}
               {@const mealNames = DB.getSetting('mealNames', ['Breakfast','Lunch','Dinner','Snacks'])}
-              {#each _notifMealTimes as time, i}
+              {#each mealNames as name, i}
                 <div class="setting-divider"></div>
                 <div class="setting-row">
-                  <span class="setting-label">{mealNames[i] || `Meal ${i+1}`}</span>
-                  <TimePicker value={time} on:change={e => { _notifMealTimes[i] = e.detail; _notifMealTimes = _notifMealTimes; set('notifMealTimes', _notifMealTimes); _scheduleMeals(); }} />
+                  <span class="setting-label">{name}</span>
+                  <TimePicker value={_notifMealTimes[i] || _defaultMealTime(i)} on:change={e => {
+                    while (_notifMealTimes.length <= i) _notifMealTimes.push(_defaultMealTime(_notifMealTimes.length));
+                    _notifMealTimes[i] = e.detail;
+                    _notifMealTimes = _notifMealTimes;
+                    set('notifMealTimes', _notifMealTimes);
+                    _scheduleMeals();
+                  }} />
                 </div>
               {/each}
             {/if}
