@@ -18,16 +18,11 @@
  */
 
 import { isNative } from './platform.js';
+import { HealthConnect } from '@devmaxime/capacitor-health-connect';
 
-let _plugin = null;
-
-async function _getPlugin() {
+function _getPlugin() {
   if (!isNative) return null;
-  if (!_plugin) {
-    const { HealthConnect } = await import('@devmaxime/capacitor-health-connect');
-    _plugin = HealthConnect;
-  }
-  return _plugin;
+  return HealthConnect;
 }
 
 /**
@@ -35,7 +30,7 @@ async function _getPlugin() {
  * Returns 'Available' | 'NotSupported' | 'NotInstalled'
  */
 export async function checkAvailability() {
-  const hc = await _getPlugin();
+  const hc = _getPlugin();
   if (!hc) return 'NotSupported';
   try {
     const { availability } = await hc.checkAvailability();
@@ -49,7 +44,7 @@ export async function checkAvailability() {
  * Request read/write permissions from Health Connect.
  */
 export async function requestPermissions() {
-  const hc = await _getPlugin();
+  const hc = _getPlugin();
   if (!hc) return { read: [], write: [] };
   try {
     return await hc.requestPermissions({
@@ -66,7 +61,7 @@ export async function requestPermissions() {
  * Check which permissions are currently granted.
  */
 export async function getGrantedPermissions() {
-  const hc = await _getPlugin();
+  const hc = _getPlugin();
   if (!hc) return { read: [], write: [] };
   try {
     return await hc.getGrantedPermissions();
@@ -80,7 +75,7 @@ export async function getGrantedPermissions() {
  * Returns an object of wellness_data-compatible metrics.
  */
 export async function readTodayData() {
-  const hc = await _getPlugin();
+  const hc = _getPlugin();
   if (!hc) return {};
 
   const now = new Date();
@@ -216,7 +211,7 @@ export async function readTodayData() {
  * Read a date range of health data. Returns { [date]: { metrics } }.
  */
 export async function readDateRange(startDate, endDate) {
-  const hc = await _getPlugin();
+  const hc = _getPlugin();
   if (!hc) return {};
 
   const start = new Date(startDate + 'T00:00:00').toISOString();
