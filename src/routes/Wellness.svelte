@@ -68,7 +68,7 @@
     const all = [
       ...ALL_METRICS.map(m => m.id),
       'weight_kg','body_fat_pct','muscle_mass_kg','bone_mass_kg','body_water_pct','lean_mass_kg','fat_mass_kg','visceral_fat','visceral_fat_index','extracellular_water_kg','intracellular_water_kg',
-      'vascular_age','metabolic_age','basal_metabolic_rate','nerve_health_score','eda_feet','pulse_wave_velocity','ecg_heart_rate','ecg_afib',
+      'vascular_age','metabolic_age','basal_metabolic_rate','nerve_health_score','pulse_wave_velocity','ecg_heart_rate','ecg_afib',
       'body_battery_high','body_battery_low','stress_avg',
       'segmental_analysis',
     ];
@@ -188,8 +188,7 @@
     { id: 'vascular_age',       label: 'Vascular Age',     unit: 'yrs',  icon: 'cardiology',   fmt: v => Math.round(v), desc: 'Estimated age of your arteries based on pulse wave velocity. Lower than your actual age indicates healthier blood vessels.' },
     { id: 'metabolic_age',      label: 'Metabolic Age',    unit: 'yrs',  icon: 'trending_up',  fmt: v => Math.round(v), desc: 'Your body\'s metabolic efficiency compared to age norms. Lower than your actual age means your metabolism is performing well.' },
     { id: 'basal_metabolic_rate', label: 'Basal Metabolic Rate', unit: 'kcal/day', icon: 'local_fire_department', fmt: v => Math.round(v).toLocaleString(), desc: 'Calories your body burns at complete rest over 24 hours. Influenced by muscle mass, age, and body composition.' },
-    { id: 'nerve_health_score', label: 'Nerve Health',     unit: '',     icon: 'neurology',     fmt: v => Math.round(v), desc: 'Measures small nerve fiber activity in your feet via electrodermal response. Early indicator of peripheral neuropathy.' },
-    { id: 'eda_feet',           label: 'EDA Score',        unit: 'µS',   icon: 'neurology',     fmt: v => v.toFixed(1), desc: 'Electrodermal activity — measures sweat gland conductance in your feet. Reflects autonomic nervous system health.' },
+    { id: 'nerve_health_score', label: 'Nerve Health',     unit: '/100', icon: 'neurology',     fmt: v => Math.round(v), desc: 'Nerve health score from your Withings scale. Measures small nerve fiber activity via electrodermal response. Lower scores may indicate early peripheral neuropathy.' },
     { id: 'pulse_wave_velocity',label: 'Pulse Wave Vel.',  unit: 'm/s',  icon: 'show_chart',    fmt: v => v.toFixed(1), desc: 'Speed of blood pressure pulse along arteries. Lower values indicate more elastic, healthier blood vessels.' },
     { id: 'ecg_heart_rate',     label: 'Heart Rate',       unit: 'bpm',  icon: 'ecg_heart',     fmt: v => Math.round(v), desc: 'Heart rate measured during ECG recording on your scale. More accurate than optical wrist sensors.' },
     { id: 'ecg_afib',           label: 'AFib Detection',   unit: '',     icon: 'ecg',           fmt: v => v === 1 ? 'Detected' : 'Normal', desc: 'Atrial fibrillation screening from ECG recording. "Normal" means no irregular rhythm detected during this reading.' },
