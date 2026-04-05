@@ -47,24 +47,20 @@ export async function requestPermissions() {
   const hc = _getPlugin();
   if (!hc) return { read: [], write: [] };
   try {
-    // Request permissions — try full set, fall back to basics if Health Connect crashes
+    // First check if permissions are already granted (avoids triggering crash-prone dialog)
+    const existing = await getGrantedPermissions();
+    if (existing.read?.length > 0) return existing;
+
+    // Request permissions via Health Connect dialog
     let result;
     try {
       result = await hc.requestPermissions({
         read: ['Steps', 'Weight', 'SleepSession', 'HeartRate', 'ExerciseSession'],
         write: [],
       });
-    } catch {
-      // Some Health Connect versions crash on certain types — try minimal set
-      try {
-        result = await hc.requestPermissions({
-          read: ['Steps', 'Weight'],
-          write: [],
-        });
-      } catch (e2) {
-        console.error('[health-connect] Permission request failed even with minimal set:', e2);
-        return { read: [], write: [] };
-      }
+    } catch (e) {
+      console.warn('[health-connect] Permission dialog failed:', e.message);
+      result = { read: [], write: [] };
     }
     // Check if permissions were actually granted (singleTask launch mode can cause
     // the permission dialog to close immediately without user interaction)

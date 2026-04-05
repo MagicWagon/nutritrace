@@ -853,8 +853,8 @@
               const { requestPermissions } = await import('../../lib/health-connect.js');
               const perms = await requestPermissions();
               if (perms.read.length === 0) {
-                showError('No permissions granted');
-                return;
+                showError('Permissions not granted. Try opening Health Connect app → App permissions → NutriTrace and enable manually.');
+                // Still enable the setting — user can grant manually later
               }
               healthConnectPermissions = perms;
               showSuccess(`Health Connect enabled (${perms.read.length} data types)`);
