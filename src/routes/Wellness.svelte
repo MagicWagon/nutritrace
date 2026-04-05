@@ -1945,7 +1945,7 @@
                 <span class="sleep-stages-title">Segmental Analysis</span>
               </div>
               <p style="font-size:0.75rem;color:var(--text-3);margin:0 0 12px;line-height:1.4">
-                <strong>Muscle</strong> = contractile muscle tissue. <strong>Lean</strong> = all non-fat tissue (muscle + bone + water). Lean is always higher than muscle. These values are absolute weights — percentages shown in the Withings app use a different calculation and will not match.
+                <strong>Muscle</strong> = contractile muscle tissue. <strong>Lean</strong> = all non-fat tissue (muscle + bone + water). Lean is always higher than muscle. These values are absolute weights — percentages in device apps may use a different calculation.
               </p>
               <div class="segmental-table">
                 <div class="seg-header">
@@ -1974,11 +1974,11 @@
             </div>
           {/if}
 
-          {#if !loadingData && Object.keys(withingsData).length === 0}
+          {#if !loadingData && Object.keys(withingsData).length === 0 && !BODY_METRICS.some(m => data[m.id] != null)}
             <div class="empty-state">
               <span class="material-symbols-rounded" style="font-size:48px;opacity:0.18">scale</span>
-              <p>No Withings data for {isToday ? 'today' : fmtDate(dateStr)}.</p>
-              <p class="text-3 text-sm">Tap <strong>Sync</strong> to pull from Withings.</p>
+              <p>No body composition data for {isToday ? 'today' : fmtDate(dateStr)}.</p>
+              <p class="text-3 text-sm">Sync your scale or fitness tracker to see body stats here.</p>
             </div>
           {/if}
 

@@ -55,7 +55,7 @@ export async function requestPermissions() {
     let result;
     try {
       result = await hc.requestPermissions({
-        read: ['Steps', 'Weight', 'SleepSession', 'HeartRate', 'ExerciseSession'],
+        read: ['Steps', 'Weight', 'SleepSession', 'HeartRate', 'ExerciseSession', 'BloodPressure', 'OxygenSaturation', 'BodyFat', 'RespiratoryRate', 'FloorsClimbed', 'Hydration'],
         write: [],
       });
     } catch (e) {
@@ -230,6 +230,73 @@ export async function readTodayData() {
       }
       if (totalMin > 0) metrics.active_minutes = totalMin;
     }
+  } catch {}
+
+  // Blood pressure
+  try {
+    const { records } = await hc.readRecords({
+      start: todayStart, end: todayEnd,
+      type: 'BloodPressure',
+    });
+    if (records.length > 0) {
+      const latest = records[records.length - 1];
+      if (latest.systolic?.inMillimetersOfMercury) metrics.blood_pressure_systolic = Math.round(latest.systolic.inMillimetersOfMercury);
+      if (latest.diastolic?.inMillimetersOfMercury) metrics.blood_pressure_diastolic = Math.round(latest.diastolic.inMillimetersOfMercury);
+    }
+  } catch {}
+
+  // Oxygen saturation (SpO2)
+  try {
+    const { records } = await hc.readRecords({
+      start: todayStart, end: todayEnd,
+      type: 'OxygenSaturation',
+    });
+    if (records.length > 0) {
+      const latest = records[records.length - 1];
+      metrics.spo2_avg = latest.percentage?.value || latest.value;
+    }
+  } catch {}
+
+  // Body fat percentage
+  try {
+    const { records } = await hc.readRecords({
+      start: todayStart, end: todayEnd,
+      type: 'BodyFat',
+    });
+    if (records.length > 0) {
+      const latest = records[records.length - 1];
+      metrics.body_fat_pct = +(latest.percentage?.value || latest.value || 0).toFixed(1);
+    }
+  } catch {}
+
+  // Respiratory rate
+  try {
+    const { records } = await hc.readRecords({
+      start: todayStart, end: todayEnd,
+      type: 'RespiratoryRate',
+    });
+    if (records.length > 0) {
+      const latest = records[records.length - 1];
+      metrics.respiratory_rate = +(latest.rate || latest.value || 0).toFixed(1);
+    }
+  } catch {}
+
+  // Floors climbed
+  try {
+    const { aggregates } = await hc.aggregateRecords({
+      start: todayStart, end: todayEnd,
+      type: 'FloorsClimbed', groupBy: 'day',
+    });
+    if (aggregates.length > 0) metrics.floors = Math.round(aggregates[0].value);
+  } catch {}
+
+  // Hydration
+  try {
+    const { aggregates } = await hc.aggregateRecords({
+      start: todayStart, end: todayEnd,
+      type: 'Hydration', groupBy: 'day',
+    });
+    if (aggregates.length > 0) metrics.water_ml = Math.round(aggregates[0].value * 1000); // liters to ml
   } catch {}
 
   return metrics;
