@@ -79,11 +79,15 @@
   function saveTemplate() {
     const name = templateName.trim();
     if (!name) return;
+    const goalCount = Object.keys($goals).filter(k => $goals[k]?.min != null || $goals[k]?.max != null).length
+      + ($waterGoalMl > 0 ? 1 : 0);
     const tpl = {
       id:        Date.now(),
       name,
       createdAt: new Date().toISOString(),
       goals:     { ...$goals },
+      waterGoalMl: $waterGoalMl,
+      goalCount,
     };
     goalTemplates.update(list => [...list, tpl]);
     showSaveSheet = false;
@@ -92,6 +96,7 @@
 
   function applyTemplate(tpl) {
     goals.set({ ...tpl.goals });
+    if (tpl.waterGoalMl != null) waterGoalMl.set(tpl.waterGoalMl);
     showApplyConfirm = null;
     activeTab = 'yours';
     showSuccess(`"${tpl.name}" applied`);
@@ -534,7 +539,7 @@
             <div class="tpl-row">
               <div class="tpl-info">
                 <span class="font-medium">{tpl.name}</span>
-                <span class="text-3 text-sm">{formatDate(tpl.createdAt)} · {Object.keys(tpl.goals).length} goals</span>
+                <span class="text-3 text-sm">{formatDate(tpl.createdAt)} · {tpl.goalCount || Object.keys(tpl.goals).filter(k => tpl.goals[k]?.min != null || tpl.goals[k]?.max != null).length + (tpl.waterGoalMl > 0 ? 1 : 0)} goals</span>
               </div>
               <div class="tpl-actions">
                 <button class="btn btn-ghost tpl-btn" on:click={() => showApplyConfirm = tpl}>
