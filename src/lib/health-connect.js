@@ -176,8 +176,8 @@ export async function readTodayData() {
     console.log(`[health-connect] Weight: ${records.length} records`);
     if (records.length > 0) {
       const latest = records[records.length - 1];
-      console.log(`[health-connect] Weight record:`, JSON.stringify(latest).slice(0, 200));
-      metrics.weight_kg = +(latest.weight?.inKilograms || latest.mass?.inKilograms || latest.value || 0).toFixed(1);
+      console.log(`[health-connect] Weight record FULL:`, JSON.stringify(latest).slice(0, 500));
+      metrics.weight_kg = +(latest.weight?.inKilograms || latest.mass?.inKilograms || latest.weight || latest.value || 0).toFixed(1);
     }
   } catch (e) { console.warn('[health-connect] Weight error:', e.message); }
 
@@ -240,8 +240,15 @@ export async function readTodayData() {
     });
     if (records.length > 0) {
       const latest = records[records.length - 1];
-      if (latest.systolic?.inMillimetersOfMercury) metrics.blood_pressure_systolic = Math.round(latest.systolic.inMillimetersOfMercury);
-      if (latest.diastolic?.inMillimetersOfMercury) metrics.blood_pressure_diastolic = Math.round(latest.diastolic.inMillimetersOfMercury);
+      if (typeof latest === 'string') {
+        const sys = latest.match(/systolic=([\d.]+)/);
+        const dia = latest.match(/diastolic=([\d.]+)/);
+        if (sys) metrics.blood_pressure_systolic = Math.round(parseFloat(sys[1]));
+        if (dia) metrics.blood_pressure_diastolic = Math.round(parseFloat(dia[1]));
+      } else {
+        if (latest.systolic?.inMillimetersOfMercury) metrics.blood_pressure_systolic = Math.round(latest.systolic.inMillimetersOfMercury);
+        if (latest.diastolic?.inMillimetersOfMercury) metrics.blood_pressure_diastolic = Math.round(latest.diastolic.inMillimetersOfMercury);
+      }
     }
   } catch {}
 
@@ -253,7 +260,12 @@ export async function readTodayData() {
     });
     if (records.length > 0) {
       const latest = records[records.length - 1];
-      metrics.spo2_avg = latest.percentage?.value || latest.value;
+      if (typeof latest === 'string') {
+        const match = latest.match(/percentage=([\d.]+)%/);
+        if (match) metrics.spo2_avg = parseFloat(match[1]);
+      } else {
+        metrics.spo2_avg = latest.percentage?.value || latest.percentage || latest.value;
+      }
     }
   } catch {}
 
@@ -265,9 +277,19 @@ export async function readTodayData() {
     });
     if (records.length > 0) {
       const latest = records[records.length - 1];
-      metrics.body_fat_pct = +(latest.percentage?.value || latest.value || 0).toFixed(1);
+      console.log('[health-connect] BodyFat record:', JSON.stringify(latest).slice(0, 300));
+      let pct = 0;
+      if (typeof latest === 'string') {
+        // Plugin returns raw Kotlin toString() — parse percentage from it
+        const match = latest.match(/percentage=([\d.]+)%/);
+        if (match) pct = parseFloat(match[1]);
+      } else {
+        pct = latest.percentage?.value ?? latest.percentage ?? latest.value ?? 0;
+        if (typeof pct === 'object') pct = 0;
+      }
+      if (pct > 0) metrics.body_fat_pct = +pct.toFixed(1);
     }
-  } catch {}
+  } catch (e) { console.warn('[health-connect] BodyFat error:', e.message); }
 
   // Respiratory rate
   try {
