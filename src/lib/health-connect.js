@@ -167,11 +167,10 @@ export async function readTodayData() {
     }
   } catch {}
 
-  // Weight (look back 7 days for most recent reading)
+  // Weight
   try {
-    const weightStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
     const { records } = await hc.readRecords({
-      start: weightStart, end: todayEnd,
+      start: todayStart, end: todayEnd,
       type: 'Weight',
     });
     console.log(`[health-connect] Weight: ${records.length} records`);
