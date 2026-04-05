@@ -195,7 +195,8 @@ async function _pushReminders(userId) {
       const uArgs = userId === 0 ? [today] : [today, userId];
       const row = db.prepare(`SELECT items FROM diary WHERE date = ? AND ${uCond} AND deleted_at IS NULL`).get(...uArgs);
       if (row?.items) diaryItems = JSON.parse(row.items);
-    } catch {}
+      logger.debug(`[scheduler] meal check: user=${userId} date=${today} items=${diaryItems.length} meals=${diaryItems.map(i => i.meal ?? 0)}`);
+    } catch (e) { logger.debug(`[scheduler] meal diary check error: ${e.message}`); }
 
     times.forEach((time, i) => {
       const [th, tm] = time.split(':').map(Number);
