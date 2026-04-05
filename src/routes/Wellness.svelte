@@ -1892,7 +1892,7 @@
         {#if withingsStatus.connected || $healthConnectEnabled || (isNative && _hasLocalData)}
           <div class="metric-grid">
             {#each BODY_METRICS.filter(m => isVisible(m.id)) as m}
-              {@const raw = withingsData[m.id]}
+              {@const raw = withingsData[m.id] ?? data[m.id] ?? null}
               {@const formatted = fmtBodyMetric(m, raw)}
               <div class="metric-card" class:no-data={formatted == null && !loadingData} class:celebrating={_celebratingMetrics.has(m.id)} title={m.desc}>
                 <div class="metric-icon-wrap">
@@ -1912,7 +1912,7 @@
             {/each}
           </div>
 
-          {#if BODY_SCORE_METRICS.filter(m => isVisible(m.id)).some(m => withingsData[m.id] != null)}
+          {#if BODY_SCORE_METRICS.filter(m => isVisible(m.id)).some(m => (withingsData[m.id] ?? data[m.id]) != null)}
             <div class="card" style="margin-top:12px;padding:16px">
               <div class="sleep-stages-header" style="margin-bottom:12px">
                 <span class="material-symbols-rounded" style="color:var(--accent)">biotech</span>
@@ -1920,7 +1920,7 @@
               </div>
               <div class="metric-grid">
                 {#each BODY_SCORE_METRICS.filter(m => isVisible(m.id)) as m}
-                  {@const raw = withingsData[m.id]}
+                  {@const raw = withingsData[m.id] ?? data[m.id] ?? null}
                   {#if raw != null}
                     <div class="metric-card" title={m.desc}>
                       <div class="metric-icon-wrap">
@@ -1938,7 +1938,7 @@
           {/if}
 
           <!-- Segmental analysis (Body Scan) -->
-          {#if isVisible('segmental_analysis') && ['muscle_mass_torso_kg','muscle_mass_left_leg_kg','muscle_mass_left_arm_kg','muscle_mass_right_leg_kg','muscle_mass_right_arm_kg','lean_mass_torso_kg','lean_mass_left_leg_kg','lean_mass_left_arm_kg','lean_mass_right_leg_kg','lean_mass_right_arm_kg'].some(k => withingsData[k] != null)}
+          {#if isVisible('segmental_analysis') && ['muscle_mass_torso_kg','muscle_mass_left_leg_kg','muscle_mass_left_arm_kg','muscle_mass_right_leg_kg','muscle_mass_right_arm_kg','lean_mass_torso_kg','lean_mass_left_leg_kg','lean_mass_left_arm_kg','lean_mass_right_leg_kg','lean_mass_right_arm_kg'].some(k => (withingsData[k] ?? data[k]) != null)}
             <div class="card" style="margin-top:12px;padding:16px">
               <div class="sleep-stages-header" style="margin-bottom:4px">
                 <span class="material-symbols-rounded" style="color:var(--accent)">accessibility_new</span>
@@ -1960,9 +1960,9 @@
                   { label: 'Left Leg',  muscle: 'muscle_mass_left_leg_kg',  lean: 'lean_mass_left_leg_kg'  },
                   { label: 'Right Leg', muscle: 'muscle_mass_right_leg_kg', lean: 'lean_mass_right_leg_kg' },
                 ] as seg}
-                  {#if withingsData[seg.muscle] != null || withingsData[seg.lean] != null}
-                    {@const mKg = withingsData[seg.muscle]}
-                    {@const lKg = withingsData[seg.lean]}
+                  {#if (withingsData[seg.muscle] ?? data[seg.muscle]) != null || (withingsData[seg.lean] ?? data[seg.lean]) != null}
+                    {@const mKg = withingsData[seg.muscle] ?? data[seg.muscle]}
+                    {@const lKg = withingsData[seg.lean] ?? data[seg.lean]}
                     <div class="seg-row">
                       <span class="seg-label">{seg.label}</span>
                       <span class="seg-val">{mKg != null ? fmtWeight(mKg).value + ' ' + fmtWeight(mKg).unit : '—'}</span>

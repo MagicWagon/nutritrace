@@ -189,6 +189,7 @@ export async function readTodayData() {
       start: sleepStart, end: todayEnd,
       type: 'SleepSession',
     });
+    console.log(`[health-connect] Sleep: ${records.length} records`);
     if (records.length > 0) {
       const sleep = records[records.length - 1]; // Most recent session
       if (sleep.startTime && sleep.endTime) {
