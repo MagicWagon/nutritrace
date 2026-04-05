@@ -48,16 +48,16 @@ function restoreFromZip(zip) {
     for (const u of data.users || []) insUser.run(u);
 
     const insFood = db.prepare(`
-      INSERT OR IGNORE INTO foods (id, user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, visibility, source_id, created_at)
-      VALUES (@id, @user_id, @name, @brand, @nutrition, @portion, @unit, @img_url, @notes, @category, @barcode, @visibility, @source_id, @created_at)
+      INSERT OR IGNORE INTO foods (id, user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, visibility, source_id, created_at, updated_at, deleted_at)
+      VALUES (@id, @user_id, @name, @brand, @nutrition, @portion, @unit, @img_url, @notes, @category, @barcode, @visibility, @source_id, @created_at, @updated_at, @deleted_at)
     `);
-    for (const f of data.foods || []) insFood.run({ visibility: 'private', source_id: null, ...f });
+    for (const f of data.foods || []) insFood.run({ visibility: 'private', source_id: null, updated_at: null, deleted_at: null, ...f });
 
     const insMeal = db.prepare(`
-      INSERT OR IGNORE INTO meals (id, user_id, name, nutrition, items, img_url, notes, is_recipe, portion, unit, visibility, source_id, created_at)
-      VALUES (@id, @user_id, @name, @nutrition, @items, @img_url, @notes, @is_recipe, @portion, @unit, @visibility, @source_id, @created_at)
+      INSERT OR IGNORE INTO meals (id, user_id, name, nutrition, items, img_url, notes, is_recipe, portion, unit, visibility, source_id, created_at, updated_at, deleted_at)
+      VALUES (@id, @user_id, @name, @nutrition, @items, @img_url, @notes, @is_recipe, @portion, @unit, @visibility, @source_id, @created_at, @updated_at, @deleted_at)
     `);
-    for (const m of data.meals || []) insMeal.run({ visibility: 'private', source_id: null, ...m });
+    for (const m of data.meals || []) insMeal.run({ visibility: 'private', source_id: null, updated_at: null, deleted_at: null, ...m });
 
     const insFoodShare = db.prepare(`INSERT OR IGNORE INTO food_shares (food_id, user_id) VALUES (@food_id, @user_id)`);
     for (const fs of data.food_shares || []) insFoodShare.run(fs);
@@ -66,15 +66,15 @@ function restoreFromZip(zip) {
     for (const ms of data.meal_shares || []) insMealShare.run(ms);
 
     const insDiary = db.prepare(`
-      INSERT OR IGNORE INTO diary (id, user_id, date, items, body_stats, water, updated_at)
-      VALUES (@id, @user_id, @date, @items, @body_stats, @water, @updated_at)
+      INSERT OR IGNORE INTO diary (id, user_id, date, items, body_stats, water, updated_at, deleted_at)
+      VALUES (@id, @user_id, @date, @items, @body_stats, @water, @updated_at, @deleted_at)
     `);
-    for (const d of data.diary || []) insDiary.run(d);
+    for (const d of data.diary || []) insDiary.run({ deleted_at: null, ...d });
 
     const insSettings = db.prepare(`
-      INSERT OR IGNORE INTO user_settings (user_id, key, value) VALUES (@user_id, @key, @value)
+      INSERT OR IGNORE INTO user_settings (user_id, key, value, updated_at, deleted_at) VALUES (@user_id, @key, @value, @updated_at, @deleted_at)
     `);
-    for (const s of data.user_settings || []) insSettings.run(s);
+    for (const s of data.user_settings || []) insSettings.run({ updated_at: null, deleted_at: null, ...s });
 
     const insConfig = db.prepare(`
       INSERT OR REPLACE INTO app_config (key, value) VALUES (@key, @value)
