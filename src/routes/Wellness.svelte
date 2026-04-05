@@ -9,6 +9,7 @@
   import { isNative, getServerUrl } from '../lib/platform.js';
   import { portal } from '../lib/portal.js';
   import FitbitIcon from '../components/icons/FitbitIcon.svelte';
+  import HealthConnectIcon from '../components/icons/HealthConnectIcon.svelte';
   import WithingsIcon from '../components/icons/WithingsIcon.svelte';
   import GarminIcon from '../components/icons/GarminIcon.svelte';
 
@@ -119,6 +120,7 @@
   let garminStatus     = null;
   let garminData       = {};
   let garminSyncing    = false;
+  let hcSyncing        = false;
   let garminConnecting = false;
   // ── Unit helpers ───────────────────────────────────────────────────────────
   $: du = $distUnit || 'km';
@@ -407,6 +409,20 @@
     }
   }
   let _workoutsSyncedOnce = false;
+
+  async function syncHealthConnectManual() {
+    if (!$healthConnectEnabled || hcSyncing) return;
+    hcSyncing = true;
+    try {
+      const { syncHealthConnect } = await import('../lib/health-connect.js');
+      await syncHealthConnect(dateStr);
+      if (isNative) await loadLocalWellnessData();
+      showSuccess('Health Connect synced');
+    } catch (e) {
+      showError('Health Connect sync failed: ' + (e.message || ''));
+    }
+    hcSyncing = false;
+  }
 
   async function syncWorkouts() {
     if (!$workoutsEnabled) { console.log('[wellness] syncWorkouts skipped: not enabled'); return; }
@@ -1350,6 +1366,17 @@
 
   <!-- Fixed sync buttons — portalled to body so position:fixed is viewport-relative -->
   <div class="wl-topbar-actions" use:portal>
+    {#if $healthConnectEnabled && isNative}
+      <button class="wl-sync-icon-btn" class:wl-syncing={hcSyncing}
+        on:click={syncHealthConnectManual} disabled={hcSyncing}
+        title="Sync Health Connect">
+        {#if hcSyncing}
+          <span class="material-symbols-rounded wl-spin-icon">sync</span>
+        {:else}
+          <span class="wl-brand-icon"><HealthConnectIcon /></span>
+        {/if}
+      </button>
+    {/if}
     {#if status?.connected}
       <button class="wl-sync-icon-btn" class:wl-syncing={syncing}
         on:click={() => sync()} disabled={syncing}
