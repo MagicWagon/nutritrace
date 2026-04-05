@@ -53,6 +53,8 @@
   // Returns true if at least one of this metric's source integrations is enabled
   function isSourceEnabled(m) {
     if (!m.sources) return true;
+    // Health Connect provides data for fitbit/garmin metric types too
+    if ($healthConnectEnabled) return true;
     return m.sources.some(s =>
       (s === 'fitbit'   && $fitbitEnabled)  ||
       (s === 'garmin'   && $garminEnabled)  ||
