@@ -199,6 +199,29 @@ export const NtApiNative = {
       throw new Error('Image upload failed');
     }
   },
+
+  // ── Pass-through stubs for server-only routes ────────────────────────
+  async get(path)  { console.warn(`[NtApiNative] GET ${path} — not available in local mode`); return {}; },
+  async post(path) { console.warn(`[NtApiNative] POST ${path} — not available in local mode`); return {}; },
+  async put(path)  { console.warn(`[NtApiNative] PUT ${path} — not available in local mode`); return {}; },
+  async patch(path){ console.warn(`[NtApiNative] PATCH ${path} — not available in local mode`); return {}; },
+  async del(path)  {
+    // Handle clear all data locally
+    if (path === '/api/data') {
+      const { getDb } = await import('./db-native.js');
+      const db = await getDb();
+      await db.run('DELETE FROM foods WHERE user_id = 1');
+      await db.run('DELETE FROM meals WHERE user_id = 1');
+      await db.run('DELETE FROM diary WHERE user_id = 1');
+      await db.run('DELETE FROM wellness_data WHERE user_id = 1');
+      await db.run('DELETE FROM workouts WHERE user_id = 1');
+      await db.run('DELETE FROM user_settings WHERE user_id = 1');
+      await db.run('DELETE FROM sync_meta');
+      return { ok: true };
+    }
+    console.warn(`[NtApiNative] DELETE ${path} — not available in local mode`);
+    return {};
+  },
 };
 
 function _fileToBase64(file) {

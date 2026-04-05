@@ -15,10 +15,16 @@ router.delete('/', wrap((req, res) => {
     db.prepare(`UPDATE foods SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE deleted_at IS NULL`).run();
     db.prepare(`UPDATE meals SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE deleted_at IS NULL`).run();
     db.prepare(`UPDATE diary SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE deleted_at IS NULL`).run();
+    db.prepare(`DELETE FROM wellness_data`).run();
+    db.prepare(`DELETE FROM workouts`).run();
+    db.prepare(`DELETE FROM ai_chat_history`).run();
   } else {
     db.prepare(`UPDATE foods SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE user_id = ? AND deleted_at IS NULL`).run(u);
     db.prepare(`UPDATE meals SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE user_id = ? AND deleted_at IS NULL`).run(u);
     db.prepare(`UPDATE diary SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE user_id = ? AND deleted_at IS NULL`).run(u);
+    db.prepare(`DELETE FROM wellness_data WHERE user_id = ?`).run(u);
+    db.prepare(`DELETE FROM workouts WHERE user_id = ?`).run(u);
+    db.prepare(`DELETE FROM ai_chat_history WHERE user_id = ?`).run(u);
   }
   res.json({ ok: true });
 }));
