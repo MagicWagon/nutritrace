@@ -1455,7 +1455,7 @@
       <!-- ── Fitbit tabs (Movement / Sleep / Heart) ── -->
       {#if activeTab === 'movement' || activeTab === 'sleep' || activeTab === 'heart'}
 
-        {#if !status.connected && !(isNative && _hasLocalData)}
+        {#if !status.connected && !garminStatus?.connected && !$healthConnectEnabled && !(isNative && _hasLocalData)}
           <!-- Fitbit configured but not yet connected -->
           {#if !status.configured}
             <div class="connect-card">
@@ -1860,7 +1860,7 @@
 
       <!-- ── Body tab (Withings) ── -->
       {:else if activeTab === 'body'}
-        {#if withingsStatus.connected || (isNative && _hasLocalData)}
+        {#if withingsStatus.connected || $healthConnectEnabled || (isNative && _hasLocalData)}
           <div class="metric-grid">
             {#each BODY_METRICS.filter(m => isVisible(m.id)) as m}
               {@const raw = withingsData[m.id]}
