@@ -96,7 +96,7 @@ async function _syncWellness(userId) {
 
   // Import and run Fitbit sync
   try {
-    const today = now.toISOString().slice(0, 10);
+    const today = local.dateStr;
 
     // Fitbit sync
     const hasFitbit = db.prepare('SELECT 1 FROM fitbit_tokens WHERE user_id=?').get(userId);
