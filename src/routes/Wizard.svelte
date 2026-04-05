@@ -13,7 +13,7 @@
   const _isNativeLocal = isNative && !getServerUrl();
 
   // Steps: usermgmt (optional), welcome, units, gender, dob, height, weight, target, activity, integrations, summary
-  const BASE_STEPS = ['welcome','units','gender','dob','height','weight','target','activity','integrations','summary'];
+  const BASE_STEPS = ['welcome','units','gender','dob','height','weight','target','activity','integrations','notifications','summary'];
   const ALL_STEPS  = _isNativeLocal ? BASE_STEPS : ['usermgmt', ...BASE_STEPS];
 
   let step = 0;
@@ -73,6 +73,13 @@
 
   // Which cards are collapsed/skipped
   let intSkipped = { off: false, usda: false, mealie: false, ai: false };
+
+  // ── Notifications step ────────────────────────────────────────────────────
+  let notifEnabled   = false;
+  let notifWater     = false;
+  let notifMeals     = false;
+  let notifGoals     = false;
+  let notifWellness  = false;
   let intAILocked  = false;
   let intStatusLoaded = false;
 
@@ -208,6 +215,9 @@
     if (currentStepName === 'integrations') {
       await _saveIntegrations();
     }
+    if (currentStepName === 'notifications') {
+      await _saveNotifications();
+    }
 
     dir = 1;
     step++;
@@ -257,6 +267,44 @@
         _putConfig('ai_provider', intAIProvider),
         _putConfig('ai_enabled',  'true'),
       ]);
+    }
+  }
+
+  async function _saveNotifications() {
+    if (notifEnabled) {
+      // Request permission
+      try {
+        const { requestPermission } = await import('../lib/notifications.js');
+        await requestPermission();
+      } catch {}
+      // Save settings
+      DB.setSetting('notifLocalEnabled', true);
+      scheduleSave('notifLocalEnabled', true);
+      if (notifWater) {
+        DB.setSetting('notifWaterReminders', true);
+        scheduleSave('notifWaterReminders', true);
+        try {
+          const { scheduleWaterReminders } = await import('../lib/notifications.js');
+          await scheduleWaterReminders(120);
+        } catch {}
+      }
+      if (notifMeals) {
+        DB.setSetting('notifMealReminders', true);
+        scheduleSave('notifMealReminders', true);
+        try {
+          const { scheduleMealReminders } = await import('../lib/notifications.js');
+          const names = DB.getSetting('mealNames', ['Breakfast','Lunch','Dinner','Snacks']);
+          await scheduleMealReminders(['08:00','12:00','18:00','15:00'], names);
+        } catch {}
+      }
+      if (notifGoals) {
+        DB.setSetting('notifGoalCelebrations', true);
+        scheduleSave('notifGoalCelebrations', true);
+      }
+      if (notifWellness) {
+        DB.setSetting('notifWellnessAlerts', true);
+        scheduleSave('notifWellnessAlerts', true);
+      }
     }
   }
 
@@ -608,6 +656,78 @@
             </div>
           {/if}
 
+        </div>
+
+      <!-- ── Notifications ── -->
+      {:else if currentStepName === 'notifications'}
+        <div class="step-hero compact">
+          <span class="material-symbols-rounded hero-icon">notifications</span>
+          <h1 class="step-title">Stay on Track</h1>
+          <p class="step-desc">Get helpful reminders and celebrate your wins. You can customize all of these later in Settings.</p>
+        </div>
+
+        <div class="int-cards">
+          <div class="int-card" class:int-card-skipped={!notifEnabled}>
+            <div class="int-card-head">
+              <div class="int-card-icon">🔔</div>
+              <div class="int-card-info">
+                <div class="int-card-title">Enable Notifications</div>
+                <div class="int-card-sub">Reminders, goal celebrations, and health alerts</div>
+              </div>
+              <button class="int-skip-btn" style="background:{notifEnabled ? 'var(--accent)' : 'var(--surface-2)'};color:{notifEnabled ? 'var(--accent-text)' : 'var(--text-3)'}"
+                on:click={() => notifEnabled = !notifEnabled}>{notifEnabled ? 'On' : 'Off'}</button>
+            </div>
+          </div>
+
+          {#if notifEnabled}
+            <div class="int-card">
+              <div class="int-card-head">
+                <div class="int-card-icon">💧</div>
+                <div class="int-card-info">
+                  <div class="int-card-title">Hydration Reminders</div>
+                  <div class="int-card-sub">Periodic reminders to drink water (8am–10pm)</div>
+                </div>
+                <button class="int-skip-btn" style="background:{notifWater ? 'var(--accent)' : 'var(--surface-2)'};color:{notifWater ? 'var(--accent-text)' : 'var(--text-3)'}"
+                  on:click={() => notifWater = !notifWater}>{notifWater ? 'On' : 'Off'}</button>
+              </div>
+            </div>
+
+            <div class="int-card">
+              <div class="int-card-head">
+                <div class="int-card-icon">🍽️</div>
+                <div class="int-card-info">
+                  <div class="int-card-title">Meal Reminders</div>
+                  <div class="int-card-sub">Daily reminders to log breakfast, lunch, and dinner</div>
+                </div>
+                <button class="int-skip-btn" style="background:{notifMeals ? 'var(--accent)' : 'var(--surface-2)'};color:{notifMeals ? 'var(--accent-text)' : 'var(--text-3)'}"
+                  on:click={() => notifMeals = !notifMeals}>{notifMeals ? 'On' : 'Off'}</button>
+              </div>
+            </div>
+
+            <div class="int-card">
+              <div class="int-card-head">
+                <div class="int-card-icon">🎯</div>
+                <div class="int-card-info">
+                  <div class="int-card-title">Goal Celebrations</div>
+                  <div class="int-card-sub">Celebrate when you hit your daily nutrition, water, or step goals</div>
+                </div>
+                <button class="int-skip-btn" style="background:{notifGoals ? 'var(--accent)' : 'var(--surface-2)'};color:{notifGoals ? 'var(--accent-text)' : 'var(--text-3)'}"
+                  on:click={() => notifGoals = !notifGoals}>{notifGoals ? 'On' : 'Off'}</button>
+              </div>
+            </div>
+
+            <div class="int-card">
+              <div class="int-card-head">
+                <div class="int-card-icon">⚠️</div>
+                <div class="int-card-info">
+                  <div class="int-card-title">Wellness Alerts</div>
+                  <div class="int-card-sub">Alerts when HRV drops, sleep declines, or heart rate spikes</div>
+                </div>
+                <button class="int-skip-btn" style="background:{notifWellness ? 'var(--accent)' : 'var(--surface-2)'};color:{notifWellness ? 'var(--accent-text)' : 'var(--text-3)'}"
+                  on:click={() => notifWellness = !notifWellness}>{notifWellness ? 'On' : 'Off'}</button>
+              </div>
+            </div>
+          {/if}
         </div>
 
       <!-- ── Summary ── -->
