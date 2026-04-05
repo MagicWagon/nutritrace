@@ -1461,7 +1461,7 @@
       <div class="tab-bar-wrap" class:has-banner={$pageBanners}>
       <div class="tab-bar" bind:this={_tabBarEl}>
         <div class="tab-pill" style="left:{_wlPillLeft};width:{_wlPillWidth}"></div>
-        {#if fitbitAvailable}
+        {#if fitbitAvailable || garminAvailable || healthConnectAvailable}
           <button class="tab-btn" class:active={activeTab === 'movement'} on:click={() => activeTab = 'movement'}>
             <span class="material-symbols-rounded tab-icon">directions_walk</span> Movement
           </button>
@@ -1472,7 +1472,7 @@
             <span class="material-symbols-rounded tab-icon">favorite</span> Heart
           </button>
         {/if}
-        {#if withingsAvailable}
+        {#if withingsAvailable || healthConnectAvailable}
           <button class="tab-btn" class:active={activeTab === 'body'} on:click={() => activeTab = 'body'}>
             <span class="material-symbols-rounded tab-icon">monitor_weight</span> Body
           </button>
