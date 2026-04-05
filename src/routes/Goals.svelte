@@ -674,7 +674,7 @@
         <input class="input" placeholder="e.g. Cut — Summer 2025" bind:value={templateName}
           on:keydown={e => e.key === 'Enter' && saveTemplate()} />
         <p class="text-3 text-sm" style="margin-top:4px">
-          Saves a snapshot of all {Object.keys($goals).length} current goals.
+          Saves a snapshot of all {Object.keys($goals).filter(k => $goals[k]?.min != null || $goals[k]?.max != null).length + ($waterGoalMl > 0 ? 1 : 0)} current goals.
         </p>
       </div>
       <div class="sheet-footer">
@@ -694,7 +694,7 @@
       <div class="sheet-header"><h3 class="sheet-title">Apply Template</h3></div>
       <div class="sheet-body">
         <p>Apply <strong>{showApplyConfirm.name}</strong>?</p>
-        <p class="text-3 text-sm">This will replace your current goals with the {Object.keys(showApplyConfirm.goals).length} goals saved in this template.</p>
+        <p class="text-3 text-sm">This will replace your current goals with the {showApplyConfirm.goalCount || Object.keys(showApplyConfirm.goals).filter(k => showApplyConfirm.goals[k]?.min != null || showApplyConfirm.goals[k]?.max != null).length + (showApplyConfirm.waterGoalMl > 0 ? 1 : 0)} goals saved in this template.</p>
       </div>
       <div class="sheet-footer" style="display:flex;flex-direction:column;gap:8px">
         <button class="btn btn-primary w-full" on:click={() => applyTemplate(showApplyConfirm)}>Apply</button>
