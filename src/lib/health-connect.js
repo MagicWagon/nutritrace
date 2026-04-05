@@ -55,7 +55,7 @@ export async function requestPermissions() {
     let result;
     try {
       result = await hc.requestPermissions({
-        read: ['Steps', 'Weight', 'SleepSession', 'HeartRate', 'ExerciseSession', 'BloodPressure', 'OxygenSaturation', 'BodyFat', 'RespiratoryRate', 'FloorsClimbed', 'Hydration'],
+        read: ['Steps', 'Weight', 'SleepSession', 'HeartRate', 'ExerciseSession', 'BloodPressure', 'OxygenSaturation', 'BodyFat', 'RespiratoryRate', 'FloorsClimbed', 'Hydration', 'BoneMass', 'LeanBodyMass', 'BodyTemperature', 'BasalMetabolicRate', 'Vo2Max'],
         write: [],
       });
     } catch (e) {
@@ -297,6 +297,51 @@ export async function readTodayData() {
       type: 'Hydration', groupBy: 'day',
     });
     if (aggregates.length > 0) metrics.water_ml = Math.round(aggregates[0].value * 1000); // liters to ml
+  } catch {}
+
+  // Bone mass
+  try {
+    const { records } = await hc.readRecords({ start: todayStart, end: todayEnd, type: 'BoneMass' });
+    if (records.length > 0) {
+      const latest = records[records.length - 1];
+      metrics.bone_mass_kg = +(latest.mass?.inKilograms || latest.value || 0).toFixed(2);
+    }
+  } catch {}
+
+  // Lean body mass
+  try {
+    const { records } = await hc.readRecords({ start: todayStart, end: todayEnd, type: 'LeanBodyMass' });
+    if (records.length > 0) {
+      const latest = records[records.length - 1];
+      metrics.lean_mass_kg = +(latest.mass?.inKilograms || latest.value || 0).toFixed(1);
+    }
+  } catch {}
+
+  // Body temperature
+  try {
+    const { records } = await hc.readRecords({ start: todayStart, end: todayEnd, type: 'BodyTemperature' });
+    if (records.length > 0) {
+      const latest = records[records.length - 1];
+      metrics.body_temperature = +(latest.temperature?.inCelsius || latest.value || 0).toFixed(1);
+    }
+  } catch {}
+
+  // Basal metabolic rate
+  try {
+    const { records } = await hc.readRecords({ start: todayStart, end: todayEnd, type: 'BasalMetabolicRate' });
+    if (records.length > 0) {
+      const latest = records[records.length - 1];
+      metrics.basal_metabolic_rate = Math.round(latest.basalMetabolicRate?.inKilocaloriesPerDay || latest.value || 0);
+    }
+  } catch {}
+
+  // VO2 Max
+  try {
+    const { records } = await hc.readRecords({ start: todayStart, end: todayEnd, type: 'Vo2Max' });
+    if (records.length > 0) {
+      const latest = records[records.length - 1];
+      metrics.vo2_max = +(latest.vo2MillilitersPerMinuteKilogram || latest.value || 0).toFixed(1);
+    }
   } catch {}
 
   return metrics;
