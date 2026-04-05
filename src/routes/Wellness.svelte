@@ -419,6 +419,7 @@
       const { syncHealthConnect } = await import('../lib/health-connect.js');
       await syncHealthConnect(dateStr);
       if (isNative) await loadLocalWellnessData();
+      console.log('[wellness] HC sync done, data keys:', Object.keys(data), '_hasLocalData:', _hasLocalData, 'displayData keys:', Object.keys(displayData));
       showSuccess('Health Connect synced');
     } catch (e) {
       showError('Health Connect sync failed: ' + (e.message || ''));
@@ -950,8 +951,8 @@
   // Auto-correct activeTab when an integration's availability changes
   $: if (status !== null && withingsStatus !== null && garminStatus !== null) {
     const isActivityTab = activeTab === 'movement' || activeTab === 'sleep' || activeTab === 'heart';
-    if (isActivityTab && !fitbitAvailable && !garminAvailable) activeTab = withingsAvailable ? 'body' : 'movement';
-    if (activeTab === 'body' && !withingsAvailable) activeTab = (fitbitAvailable || garminAvailable) ? 'movement' : 'body';
+    if (isActivityTab && !fitbitAvailable && !garminAvailable && !healthConnectAvailable) activeTab = withingsAvailable ? 'body' : 'movement';
+    if (activeTab === 'body' && !withingsAvailable && !healthConnectAvailable) activeTab = (fitbitAvailable || garminAvailable || healthConnectAvailable) ? 'movement' : 'body';
   }
 
   // ── Date navigation ────────────────────────────────────────────────────────
