@@ -1455,7 +1455,7 @@
       <!-- ── Fitbit tabs (Movement / Sleep / Heart) ── -->
       {#if activeTab === 'movement' || activeTab === 'sleep' || activeTab === 'heart'}
 
-        {#if !status.connected && !garminStatus?.connected && !$healthConnectEnabled && !(isNative && _hasLocalData)}
+        {#if !status.connected && !garminStatus?.connected && !withingsStatus?.connected && !$healthConnectEnabled && !(isNative && _hasLocalData)}
           <!-- Fitbit configured but not yet connected -->
           {#if !status.configured}
             <div class="connect-card">
