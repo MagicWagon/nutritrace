@@ -3092,40 +3092,47 @@
           </div>
           <div class="setting-divider"></div>
           <div class="about-desc">
-            Track every bite, every stat — on your own terms. NutriTrace is a self-hosted nutrition
-            and body stats tracker built for privacy. Your data lives on your server, not in the cloud.
-            Run it solo with no login required, or enable user accounts to support multiple profiles
-            on a shared instance.
+            Trace Every Bite — Personal Nutrition Tracker. NutriTrace is a self-hosted nutrition,
+            wellness, and fitness tracker built for privacy. Your data lives on your server, not
+            in the cloud. Features food diary, wellness integrations (Fitbit, Garmin, Withings,
+            Health Connect), AI assistant, workout GPS maps, goal tracking, and more.
           </div>
           <div class="setting-divider"></div>
           <div class="about-row">
             <span class="material-symbols-rounded about-feat-icon">database</span>
-            <span>Data stored on your own server (SQLite)</span>
+            <span>Self-hosted — your data, your server</span>
           </div>
           <div class="setting-divider"></div>
           <div class="about-row">
-            <span class="material-symbols-rounded about-feat-icon">wifi_off</span>
-            <span>Works offline as a PWA</span>
-          </div>
-          <div class="setting-divider"></div>
-          <div class="about-row">
-            <span class="material-symbols-rounded about-feat-icon">barcode_scanner</span>
-            <span>Barcode lookup via Open Food Facts</span>
+            <span class="material-symbols-rounded about-feat-icon">phone_android</span>
+            <span>PWA + native Android app with offline support</span>
           </div>
           <div class="setting-divider"></div>
           <div class="about-row">
             <span class="material-symbols-rounded about-feat-icon">lock</span>
-            <span>No tracking, no ads, no third parties</span>
+            <span>No tracking, no ads, no third-party analytics</span>
           </div>
           <div class="setting-divider"></div>
           <div class="about-row">
             <span class="material-symbols-rounded about-feat-icon">restaurant_menu</span>
-            <span>Food data from <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener" class="about-link">Open Food Facts</a></span>
+            <span>Food data from <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener" class="about-link">Open Food Facts</a> (ODbL)</span>
+          </div>
+          <div class="setting-divider"></div>
+          <div class="about-row">
+            <span class="material-symbols-rounded about-feat-icon">code</span>
+            <span>Server: <a href="https://github.com/thebigjoe1/nutritrace" target="_blank" rel="noopener" class="about-link">Open source</a> (AGPL-3.0)</span>
           </div>
           <div class="setting-divider"></div>
           <div class="about-row">
             <span class="material-symbols-rounded about-feat-icon">favorite</span>
-            <span>Inspired by <a href="https://github.com/davidhealey/waistline" target="_blank" rel="noopener" class="about-link">Waistline</a> by David Healey and <a href="https://github.com/CodeWithCJ/SparkyFitness" target="_blank" rel="noopener" class="about-link">SparkyFitness</a> by CodeWithCJ</span>
+            <span>Inspired by <a href="https://github.com/davidhealey/waistline" target="_blank" rel="noopener" class="about-link">Waistline</a> and <a href="https://github.com/CodeWithCJ/SparkyFitness" target="_blank" rel="noopener" class="about-link">SparkyFitness</a></span>
+          </div>
+          <div class="setting-divider"></div>
+          <div class="about-desc" style="font-size:11px;color:var(--text-3);line-height:1.5">
+            NutriTrace is not medical software. It does not provide medical advice, diagnosis, or treatment.
+            Wellness scores, readiness, and stress estimates are approximations and should not be used for
+            medical decisions. Always consult a healthcare professional for medical advice. Food nutrition
+            data is sourced from public databases and may contain inaccuracies. Use at your own discretion.
           </div>
         </div>
       </div>
