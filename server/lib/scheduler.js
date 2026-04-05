@@ -154,28 +154,58 @@ async function _pushReminders(userId) {
   const local = _getUserLocalTime(userId);
   const currentMin = local.hour * 60 + local.minute;
 
-  // Water reminders
+  // Water reminders — skip if already hit water goal today
   if (_isEnabled(userId, 'notifWaterReminders')) {
     const interval = _getUserSetting(userId, 'notifWaterInterval') || 120;
     const startMin = 8 * 60, endMin = 22 * 60;
     if (currentMin >= startMin && currentMin < endMin) {
-      // Check if current time falls on an interval boundary (within 15 min window)
       const minSinceStart = currentMin - startMin;
       if (minSinceStart % interval < 15 && !_ranRecently(userId, `water_${Math.floor(minSinceStart / interval)}`, interval * 60 * 1000)) {
-        await pushNotify(userId, 'notifWaterReminders', '💧 Hydration Reminder', 'Time to drink some water! Stay hydrated.', 4);
+        // Check if water goal already met
+        let skipWater = false;
+        try {
+          const waterGoal = _getUserSetting(userId, 'waterGoalMl') || 0;
+          if (waterGoal > 0) {
+            const today = local.dateStr;
+            const uCond = userId === 0 ? '(user_id IS NULL OR user_id = 0)' : 'user_id = ?';
+            const uArgs = userId === 0 ? [today] : [today, userId];
+            const row = db.prepare(`SELECT water FROM diary WHERE date = ? AND ${uCond} AND deleted_at IS NULL`).get(...uArgs);
+            if (row?.water) {
+              const waterTotal = JSON.parse(row.water).reduce((s, l) => s + (l.amount || 0), 0);
+              if (waterTotal >= waterGoal) skipWater = true;
+            }
+          }
+        } catch {}
+        if (!skipWater) {
+          await pushNotify(userId, 'notifWaterReminders', '💧 Hydration Reminder', 'Time to drink some water! Stay hydrated.', 4);
+        }
       }
     }
   }
 
-  // Meal reminders
+  // Meal reminders — only if that meal slot is empty for today
   if (_isEnabled(userId, 'notifMealReminders')) {
     const times = _getUserSetting(userId, 'notifMealTimes') || ['08:00', '12:00', '18:00'];
     const mealNames = _getUserSetting(userId, 'mealNames') || ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
+    const today = local.dateStr;
+    // Check diary for today
+    let diaryItems = [];
+    try {
+      const uCond = userId === 0 ? '(user_id IS NULL OR user_id = 0)' : 'user_id = ?';
+      const uArgs = userId === 0 ? [today] : [today, userId];
+      const row = db.prepare(`SELECT items FROM diary WHERE date = ? AND ${uCond} AND deleted_at IS NULL`).get(...uArgs);
+      if (row?.items) diaryItems = JSON.parse(row.items);
+    } catch {}
+
     times.forEach((time, i) => {
       const [th, tm] = time.split(':').map(Number);
       const targetMin = th * 60 + tm;
       if (currentMin >= targetMin && currentMin < targetMin + 15 && !_ranRecently(userId, `meal_${i}`)) {
-        pushNotify(userId, 'notifMealReminders', '🍽️ Meal Reminder', `Time to log your ${mealNames[i] || 'meal'}!`, 4);
+        // Skip if this meal slot already has items logged
+        const mealHasItems = diaryItems.some(item => (item.meal ?? 0) === i);
+        if (!mealHasItems) {
+          pushNotify(userId, 'notifMealReminders', '🍽️ Meal Reminder', `Time to log your ${mealNames[i] || 'meal'}!`, 4);
+        }
       }
     });
   }
