@@ -114,8 +114,9 @@ export async function readTodayData() {
       start: todayStart, end: todayEnd,
       type: 'Steps', groupBy: 'day',
     });
+    console.log(`[health-connect] Steps aggregates:`, JSON.stringify(aggregates).slice(0, 200));
     if (aggregates.length > 0) metrics.steps = aggregates[0].value;
-  } catch {}
+  } catch (e) { console.warn('[health-connect] Steps error:', e.message); }
 
   // Distance
   try {
@@ -166,17 +167,20 @@ export async function readTodayData() {
     }
   } catch {}
 
-  // Weight
+  // Weight (look back 7 days for most recent reading)
   try {
+    const weightStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
     const { records } = await hc.readRecords({
-      start: todayStart, end: todayEnd,
+      start: weightStart, end: todayEnd,
       type: 'Weight',
     });
+    console.log(`[health-connect] Weight: ${records.length} records`);
     if (records.length > 0) {
       const latest = records[records.length - 1];
-      metrics.weight_kg = +(latest.weight?.inKilograms || latest.value || 0).toFixed(1);
+      console.log(`[health-connect] Weight record:`, JSON.stringify(latest).slice(0, 200));
+      metrics.weight_kg = +(latest.weight?.inKilograms || latest.mass?.inKilograms || latest.value || 0).toFixed(1);
     }
-  } catch {}
+  } catch (e) { console.warn('[health-connect] Weight error:', e.message); }
 
   // Sleep session (look back 24h for last night's sleep)
   try {

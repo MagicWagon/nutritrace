@@ -510,7 +510,7 @@
           {isRecipe ? 'Foods' : 'Foods & Recipes'}
           {#if meal.items.length > 0}
             <span style="font-weight:400;color:var(--accent)">
-              — {Math.round(totals.calories||0)} kcal total
+              — {Math.round(totals.calories||0).toLocaleString()} kcal total
             </span>
           {/if}
         </div>
@@ -551,7 +551,7 @@
                 <span class="ingredient-name">{item.name}</span>
                 <span class="text-3" style="font-size:12px">{item.portion} {item.unit}</span>
               </div>
-              <span class="text-3 text-sm">{Math.round((Nutrition.calculate(item).calories)||0)} kcal</span>
+              <span class="text-3 text-sm">{Math.round((Nutrition.calculate(item).calories)||0).toLocaleString()} kcal</span>
               <button class="btn-icon btn-sm" on:click={() => openEditIngredient(i)}
                 style="color:var(--text-3)" title="Edit ingredient">
                 <span class="material-symbols-rounded" style="font-size:18px">edit</span>
@@ -640,9 +640,9 @@
                 <span class="picker-name">{food.name}</span>
                 {#if food.brand}<span class="text-3" style="font-size:12px">{food.brand}</span>{/if}
                 {#if pickerTab === 0}
-                  <span class="text-3" style="font-size:12px">{food.portion||100}{food.unit||'g'} · {Math.round(food.nutrition?.calories||0)} kcal</span>
+                  <span class="text-3" style="font-size:12px">{food.portion||100}{food.unit||'g'} · {Math.round(food.nutrition?.calories||0).toLocaleString()} kcal</span>
                 {:else}
-                  <span class="text-3" style="font-size:12px">{Math.round(food.nutrition?.calories||0)} kcal</span>
+                  <span class="text-3" style="font-size:12px">{Math.round(food.nutrition?.calories||0).toLocaleString()} kcal</span>
                 {/if}
               </div>
               <span class="material-symbols-rounded" style="font-size:18px;color:var(--accent);flex-shrink:0">add_circle</span>
