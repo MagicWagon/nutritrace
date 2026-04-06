@@ -213,7 +213,7 @@ async function _pushReminders(userId) {
           const mealIdx = item.meal != null ? Number(item.meal) : 0;
           return mealIdx === i;
         });
-        logger.info(`[scheduler] meal ${i} (${mealNames[i]}): hasItems=${mealHasItems}, time=${time}, currentMin=${currentMin}, reminderAt=${reminderMin}`);
+        logger.info(`[scheduler] meal ${i} (${mealNames[i]}): hasItems=${mealHasItems}, time=${time}, currentMin=${currentMin}, targetMin=${targetMin}`);
         if (!mealHasItems) {
           pushNotify(userId, 'notifMealReminders', '🍽️ Meal Reminder', `Time to log your ${mealNames[i] || 'meal'}!`, 4);
         } else {
