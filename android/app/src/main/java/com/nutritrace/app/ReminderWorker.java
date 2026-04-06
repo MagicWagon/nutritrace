@@ -61,6 +61,9 @@ public class ReminderWorker extends Worker {
             } finally {
                 db.close();
             }
+            // Re-evaluate which workers should be enqueued/cancelled so Settings
+            // toggles (e.g. enabling Health Connect) take effect within 15 min.
+            WorkerScheduler.reschedule(getApplicationContext());
             return Result.success();
         } catch (Exception e) {
             Log.w(TAG, "worker failed: " + e.getMessage());
