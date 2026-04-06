@@ -99,9 +99,15 @@ export async function showNotification(title, body, id = null) {
 
 // ── Water reminders ─────────────────────────────────────────────────────────
 
+// KILL SWITCH: Native WorkManager (ReminderWorker.java) handles meal/water/weigh-in
+// reminders smartly by checking SQLite. Set to false to re-enable the JS-scheduled
+// dumb fallback (fires regardless of diary state). See MEMORY: feedback_workmanager_reminders.
+const _USE_NATIVE_WORKER = true;
+
 /** Schedule repeating water reminders every `intervalMin` minutes, 8am–10pm daily */
 export async function scheduleWaterReminders(intervalMin = 120) {
   if (!isNative) return;
+  if (_USE_NATIVE_WORKER) { await cancelWaterReminders(); return; }
   const LN = _getLN();
   if (!LN) return;
   await cancelWaterReminders();
@@ -145,6 +151,7 @@ export async function cancelWaterReminders() {
 /** Schedule repeating daily meal reminders at specified times */
 export async function scheduleMealReminders(times = ['08:00', '12:00', '18:00'], mealNames = ['Breakfast', 'Lunch', 'Dinner']) {
   if (!isNative) return;
+  if (_USE_NATIVE_WORKER) { await cancelMealReminders(); return; }
   const LN = _getLN();
   if (!LN) return;
   await cancelMealReminders();
@@ -454,6 +461,7 @@ export async function testGotify(url, token) {
 
 export async function scheduleWeighInReminder(timeStr = '07:00') {
   if (!isNative) return;
+  if (_USE_NATIVE_WORKER) { await cancelWeighInReminder(); return; }
   const LN = _getLN();
   if (!LN) return;
   await cancelWeighInReminder();
