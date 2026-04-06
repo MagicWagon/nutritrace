@@ -8,7 +8,8 @@
   import { NUTRIMENTS, Nutrition } from '../lib/nutrition.js';
   import { goals, energyUnit, weightUnit, lengthUnit, statsChartType, statsYZero,
            statsAvgLine, statsGoalLine, statsTrendLine, hiddenBodyStats, dateFormat, pageBanners,
-           fitbitEnabled, garminEnabled, withingsEnabled } from '../stores/settings.js';
+           fitbitEnabled, garminEnabled, withingsEnabled, healthConnectEnabled, wellnessMetrics } from '../stores/settings.js';
+  import { isNative } from '../lib/platform.js';
   import StatsBanner from '../components/banners/StatsBanner.svelte';
   let _waterShowInStats = DB.getSetting('waterShowInStats', true);
   let _waterUnit        = DB.getSetting('waterUnit', 'ml');
@@ -35,16 +36,20 @@
   let _loadVer = 0;   // cancel stale concurrent loadData calls
 
   // Wellness metrics — shown only when relevant integration is enabled
+  $: _hasWellness = $fitbitEnabled || $garminEnabled || $healthConnectEnabled;
+  function _wlVisible(apiField) {
+    return $wellnessMetrics == null || $wellnessMetrics.includes(apiField);
+  }
   $: WELLNESS_METRICS = [
-    ...($fitbitEnabled || $garminEnabled ? [
-      { value: 'wl_steps',  label: 'Steps',        unit: 'steps', apiSource: 'fitgarm', apiField: 'steps' },
-      { value: 'wl_active', label: 'Active Min.',   unit: 'min',   apiSource: 'fitgarm', apiField: 'active_minutes' },
-      { value: 'wl_sleep',  label: 'Sleep',         unit: 'hr',    apiSource: 'fitgarm', apiField: 'sleep_duration_min', fmtVal: v => Math.round(v / 6) / 10 },
-      { value: 'wl_rhr',    label: 'Resting HR',    unit: 'bpm',   apiSource: 'fitgarm', apiField: 'resting_hr' },
-      { value: 'wl_hrv',    label: 'HRV',           unit: 'ms',    apiSource: 'fitgarm', apiField: 'hrv_daily_rmssd' },
-      { value: 'wl_spo2',   label: 'SpO2',          unit: '%',     apiSource: 'fitgarm', apiField: 'spo2_avg' },
+    ...(_hasWellness ? [
+      ...(_wlVisible('steps')             ? [{ value: 'wl_steps',  label: 'Steps',        unit: 'steps', apiSource: 'fitgarm', apiField: 'steps' }] : []),
+      ...(_wlVisible('active_minutes')    ? [{ value: 'wl_active', label: 'Active Min.',   unit: 'min',   apiSource: 'fitgarm', apiField: 'active_minutes' }] : []),
+      ...(_wlVisible('sleep_duration_min')? [{ value: 'wl_sleep',  label: 'Sleep',         unit: 'hr',    apiSource: 'fitgarm', apiField: 'sleep_duration_min', fmtVal: v => Math.round(v / 6) / 10 }] : []),
+      ...(_wlVisible('resting_hr')        ? [{ value: 'wl_rhr',    label: 'Resting HR',    unit: 'bpm',   apiSource: 'fitgarm', apiField: 'resting_hr' }] : []),
+      ...(_wlVisible('hrv_daily_rmssd')   ? [{ value: 'wl_hrv',    label: 'HRV',           unit: 'ms',    apiSource: 'fitgarm', apiField: 'hrv_daily_rmssd' }] : []),
+      ...(_wlVisible('spo2_avg')          ? [{ value: 'wl_spo2',   label: 'SpO2',          unit: '%',     apiSource: 'fitgarm', apiField: 'spo2_avg' }] : []),
     ] : []),
-    ...($withingsEnabled ? [
+    ...(($withingsEnabled || $healthConnectEnabled) && _wlVisible('muscle_mass_kg') ? [
       { value: 'wl_muscle', label: 'Muscle Mass',   unit: '',      apiSource: 'withings', apiField: 'muscle_mass_kg', isWeight: true },
     ] : []),
   ];
@@ -86,7 +91,7 @@
     let fromStr = '', toStr = localDateStr();
 
     const isWellness   = metric.startsWith('wl_');
-    const isBodyDevice = (metric === 'weight' || metric === 'body_fat') && $withingsEnabled;
+    const isBodyDevice = (metric === 'weight' || metric === 'body_fat') && ($withingsEnabled || $healthConnectEnabled);
 
     if (range === 'all' && (isWellness || isBodyDevice)) {
       // Wellness data doesn't come from diary — use last 365 days
@@ -128,29 +133,47 @@
       if (!wlMeta || ver !== _loadVer) { loading = false; return; }
 
       if (wlMeta.apiSource === 'fitgarm') {
-        let fitbitData = {}, garminData = {};
+        let fitbitData = {}, garminData = {}, hcData = {};
         try { if ($fitbitEnabled)  fitbitData  = await NtApi.get(`/api/wellness/fitbit/data?from=${fromStr}&to=${toStr}`); } catch {}
         try { if ($garminEnabled)  garminData  = await NtApi.get(`/api/wellness/garmin/data?from=${fromStr}&to=${toStr}`); } catch {}
+        if ($healthConnectEnabled && isNative) {
+          try {
+            const { dbGetWellnessGrouped } = await import('../lib/db-native.js');
+            hcData = await dbGetWellnessGrouped(fromStr, toStr, 'health_connect');
+          } catch {}
+        }
         rows = dates.map(d => {
-          const raw = garminData[d]?.[wlMeta.apiField] ?? fitbitData[d]?.[wlMeta.apiField] ?? null;
+          const raw = garminData[d]?.[wlMeta.apiField] ?? fitbitData[d]?.[wlMeta.apiField] ?? hcData[d]?.[wlMeta.apiField] ?? null;
           const val = raw != null && wlMeta.fmtVal ? wlMeta.fmtVal(raw) : raw;
           return { date: d, val };
         });
       } else if (wlMeta.apiSource === 'withings') {
-        let withingsData = {};
-        try { withingsData = await NtApi.get(`/api/wellness/withings/data?from=${fromStr}&to=${toStr}`); } catch {}
+        let withingsData = {}, hcData = {};
+        try { if ($withingsEnabled) withingsData = await NtApi.get(`/api/wellness/withings/data?from=${fromStr}&to=${toStr}`); } catch {}
+        if ($healthConnectEnabled && isNative) {
+          try {
+            const { dbGetWellnessGrouped } = await import('../lib/db-native.js');
+            hcData = await dbGetWellnessGrouped(fromStr, toStr, 'health_connect');
+          } catch {}
+        }
         rows = dates.map(d => {
-          const raw = withingsData[d]?.[wlMeta.apiField]?.value ?? null;
+          const raw = withingsData[d]?.[wlMeta.apiField]?.value ?? hcData[d]?.[wlMeta.apiField] ?? null;
           const val = raw != null && wlMeta.isWeight && $weightUnit === 'lb' ? raw * 2.20462 : raw;
           return { date: d, val };
         });
       }
 
     } else {
-      // Load from diary; body comp metrics also check Withings and prefer device data
-      let withingsData = {};
+      // Load from diary; body comp metrics also check device data (Withings, Health Connect)
+      let withingsData = {}, hcBodyData = {};
       if (isBodyDevice) {
-        try { withingsData = await NtApi.get(`/api/wellness/withings/data?from=${fromStr}&to=${toStr}`); } catch {}
+        try { if ($withingsEnabled) withingsData = await NtApi.get(`/api/wellness/withings/data?from=${fromStr}&to=${toStr}`); } catch {}
+        if ($healthConnectEnabled && isNative) {
+          try {
+            const { dbGetWellnessGrouped } = await import('../lib/db-native.js');
+            hcBodyData = await dbGetWellnessGrouped(fromStr, toStr, 'health_connect');
+          } catch {}
+        }
       }
 
       if (ver !== _loadVer) { loading = false; return; }
@@ -162,9 +185,9 @@
         let val = null;
 
         if (isBodyDevice) {
-          // Device-first: Withings wins; fall back to diary if no device reading
+          // Device-first: Withings wins, then HC, then diary fallback
           const apiField = metric === 'weight' ? 'weight_kg' : 'body_fat_pct';
-          const raw = withingsData[date]?.[apiField]?.value ?? null;
+          const raw = withingsData[date]?.[apiField]?.value ?? hcBodyData[date]?.[apiField] ?? null;
           if (raw != null) {
             val = metric === 'weight' && $weightUnit === 'lb' ? raw * 2.20462 : raw;
           } else {

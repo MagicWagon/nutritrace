@@ -176,8 +176,23 @@ export async function readTodayData() {
     console.log(`[health-connect] Weight: ${records.length} records`);
     if (records.length > 0) {
       const latest = records[records.length - 1];
+      console.log(`[health-connect] Weight record type: ${typeof latest}`);
       console.log(`[health-connect] Weight record FULL:`, JSON.stringify(latest).slice(0, 500));
-      metrics.weight_kg = +(latest.weight?.inKilograms || latest.mass?.inKilograms || latest.weight || latest.value || 0).toFixed(1);
+      console.log(`[health-connect] Weight record keys:`, typeof latest === 'object' ? Object.keys(latest) : 'N/A');
+      let wkg = 0;
+      if (typeof latest === 'string') {
+        // Plugin may return Kotlin toString() — parse mass value from it
+        const match = latest.match(/value=([\d.]+)/);
+        if (match) wkg = parseFloat(match[1]);
+        console.log(`[health-connect] Weight parsed from string: ${wkg}`);
+      } else {
+        // Try every possible property path the plugin might use
+        wkg = latest.weight?.inKilograms ?? latest.mass?.inKilograms ?? latest.value ?? 0;
+        if (typeof wkg === 'object') wkg = wkg.inKilograms ?? wkg.value ?? 0;
+        console.log(`[health-connect] Weight from object: ${wkg} (weight=${JSON.stringify(latest.weight)}, mass=${JSON.stringify(latest.mass)}, value=${latest.value})`);
+      }
+      if (wkg > 0) metrics.weight_kg = +wkg.toFixed(1);
+      console.log(`[health-connect] Final weight_kg: ${metrics.weight_kg}`);
     }
   } catch (e) { console.warn('[health-connect] Weight error:', e.message); }
 

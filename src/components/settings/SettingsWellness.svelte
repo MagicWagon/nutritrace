@@ -105,6 +105,33 @@
     { id: 'visceral_fat_index',       label: 'Visceral Fat Index'  },
     { id: 'weight_kg',                label: 'Weight'              },
   ];
+  const HC_METRICS = [
+    { id: 'active_calories',           label: 'Active Calories'     },
+    { id: 'active_minutes',            label: 'Active Min'          },
+    { id: 'avg_heart_rate',            label: 'Avg Heart Rate'      },
+    { id: 'basal_metabolic_rate',      label: 'Basal Metabolic Rate'},
+    { id: 'blood_pressure_systolic',   label: 'Blood Pressure (Sys)'},
+    { id: 'blood_pressure_diastolic',  label: 'Blood Pressure (Dia)'},
+    { id: 'body_fat_pct',             label: 'Body Fat'            },
+    { id: 'body_temperature',          label: 'Body Temperature'    },
+    { id: 'bone_mass_kg',             label: 'Bone Mass'           },
+    { id: 'calories_out',             label: 'Calories'            },
+    { id: 'distance_km',              label: 'Distance'            },
+    { id: 'floors',                   label: 'Floors'              },
+    { id: 'lean_mass_kg',             label: 'Lean Mass'           },
+    { id: 'resting_hr',               label: 'Resting HR'          },
+    { id: 'respiratory_rate',          label: 'Resp. Rate'          },
+    { id: 'sleep_duration_min',        label: 'Sleep Duration'      },
+    { id: 'sleep_deep_min',           label: 'Deep Sleep'          },
+    { id: 'sleep_light_min',          label: 'Light Sleep'         },
+    { id: 'sleep_rem_min',            label: 'REM Sleep'           },
+    { id: 'sleep_awake_min',          label: 'Wake Time'           },
+    { id: 'spo2_avg',                 label: 'SpO2'                },
+    { id: 'steps',                    label: 'Steps'               },
+    { id: 'vo2_max',                  label: 'Cardio Fitness'      },
+    { id: 'water_ml',                 label: 'Hydration'           },
+    { id: 'weight_kg',                label: 'Weight'              },
+  ];
 
   function isWellnessMetricVisible(id) {
     const vis = $wellnessMetrics;
@@ -112,7 +139,7 @@
   }
 
   function toggleWellnessMetric(id) {
-    const allIds = [...new Set([...FITBIT_METRICS, ...GARMIN_METRICS, ...WITHINGS_METRICS].map(m => m.id))];
+    const allIds = [...new Set([...FITBIT_METRICS, ...GARMIN_METRICS, ...WITHINGS_METRICS, ...HC_METRICS].map(m => m.id))];
     const cur = $wellnessMetrics ?? allIds;
     if (cur.includes(id)) {
       wellnessMetrics.set(cur.filter(x => x !== id));
@@ -877,6 +904,16 @@
             {:else}
               <div class="setting-desc" style="color:var(--text-3)">Not supported on this device</div>
             {/if}
+          </div>
+          <div class="setting-divider"></div>
+          <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px">
+            <span class="setting-label">Visible Metrics</span>
+            <div class="chip-group" style="flex-wrap:wrap;gap:6px">
+              {#each HC_METRICS as m}
+                <button class="chip" class:chip-active={$wellnessMetrics == null || $wellnessMetrics.includes(m.id)}
+                  on:click={() => toggleWellnessMetric(m.id)}>{m.label}</button>
+              {/each}
+            </div>
           </div>
         {/if}
       </div>

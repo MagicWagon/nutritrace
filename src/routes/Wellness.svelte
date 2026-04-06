@@ -74,6 +74,7 @@
       'vascular_age','metabolic_age','basal_metabolic_rate','nerve_health_score','eda_feet','pulse_wave_velocity','ecg_heart_rate','ecg_afib',
       'body_battery_high','body_battery_low','stress_avg',
       'segmental_analysis',
+      'active_calories','avg_heart_rate','blood_pressure_systolic','blood_pressure_diastolic','body_temperature','sleep_awake_min','water_ml',
     ];
     const cur = $wellnessMetrics ?? all;
     if (cur.includes(id)) {

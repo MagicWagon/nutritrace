@@ -188,24 +188,36 @@ async function _pushReminders(userId) {
     const times = _getUserSetting(userId, 'notifMealTimes') || ['08:00', '12:00', '18:00'];
     const mealNames = _getUserSetting(userId, 'mealNames') || ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
     const today = local.dateStr;
-    // Check diary for today
+    // Check diary for today — try user-specific first, then fallback to NULL user_id (single-user mode)
     let diaryItems = [];
     try {
-      const uCond = userId === 0 ? '(user_id IS NULL OR user_id = 0)' : 'user_id = ?';
-      const uArgs = userId === 0 ? [today] : [today, userId];
-      const row = db.prepare(`SELECT items FROM diary WHERE date = ? AND ${uCond} AND deleted_at IS NULL`).get(...uArgs);
+      let row;
+      if (userId === 0) {
+        row = db.prepare(`SELECT items FROM diary WHERE date = ? AND (user_id IS NULL OR user_id = 0) AND deleted_at IS NULL`).get(today);
+      } else {
+        row = db.prepare(`SELECT items FROM diary WHERE date = ? AND user_id = ? AND deleted_at IS NULL`).get(today, userId);
+        // Fallback: also check NULL user_id rows (diary created before user management was enabled)
+        if (!row) row = db.prepare(`SELECT items FROM diary WHERE date = ? AND user_id IS NULL AND deleted_at IS NULL`).get(today);
+      }
       if (row?.items) diaryItems = JSON.parse(row.items);
-      logger.debug(`[scheduler] meal check: user=${userId} date=${today} items=${diaryItems.length} meals=${diaryItems.map(i => i.meal ?? 0)}`);
-    } catch (e) { logger.debug(`[scheduler] meal diary check error: ${e.message}`); }
+      logger.info(`[scheduler] meal check: user=${userId} date=${today} items=${diaryItems.length} meals=[${diaryItems.map(i => i.meal ?? 0)}] found=${!!row}`);
+    } catch (e) { logger.info(`[scheduler] meal diary check error: ${e.message}`); }
 
     times.forEach((time, i) => {
       const [th, tm] = time.split(':').map(Number);
       const targetMin = th * 60 + tm;
       if (currentMin >= targetMin && currentMin < targetMin + 15 && !_ranRecently(userId, `meal_${i}`)) {
         // Skip if this meal slot already has items logged
-        const mealHasItems = diaryItems.some(item => (item.meal ?? 0) === i);
+        // Check both numeric meal index AND string (some clients may store as string)
+        const mealHasItems = diaryItems.some(item => {
+          const mealIdx = item.meal != null ? Number(item.meal) : 0;
+          return mealIdx === i;
+        });
+        logger.info(`[scheduler] meal ${i} (${mealNames[i]}): hasItems=${mealHasItems}, time=${time}, currentMin=${currentMin}, reminderAt=${reminderMin}`);
         if (!mealHasItems) {
           pushNotify(userId, 'notifMealReminders', '🍽️ Meal Reminder', `Time to log your ${mealNames[i] || 'meal'}!`, 4);
+        } else {
+          logger.info(`[scheduler] skipping meal ${i} reminder — already logged`);
         }
       }
     });
