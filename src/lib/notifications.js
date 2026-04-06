@@ -217,7 +217,31 @@ export async function notify(settingKey, title, body, priority = 5) {
 // ── Goal checking ───────────────────────────────────────────────────────────
 
 // Track which goals we've already celebrated today to avoid repeats
+// Persisted to localStorage so it survives app reloads/restarts
 const _celebratedToday = new Set();
+
+function _loadCelebrations() {
+  try {
+    const raw = localStorage.getItem('_celebratedToday');
+    if (!raw) return;
+    const obj = JSON.parse(raw);
+    const key = new Date().toLocaleDateString('sv-SE');
+    if (obj._date === key && Array.isArray(obj.keys)) {
+      obj.keys.forEach(k => _celebratedToday.add(k));
+      _celebratedToday._date = key;
+    }
+  } catch {}
+}
+_loadCelebrations();
+
+function _persistCelebrations() {
+  try {
+    localStorage.setItem('_celebratedToday', JSON.stringify({
+      _date: _celebratedToday._date,
+      keys: Array.from(_celebratedToday).filter(k => k !== '_date'),
+    }));
+  } catch {}
+}
 
 /** Reset celebrations at midnight */
 function _resetCelebrations() {
@@ -225,6 +249,7 @@ function _resetCelebrations() {
   if (_celebratedToday._date !== key) {
     _celebratedToday.clear();
     _celebratedToday._date = key;
+    _persistCelebrations();
   }
 }
 
@@ -273,6 +298,7 @@ export async function checkGoals(goals, values) {
     // Goal celebration: hit min target OR reached max target
     if ((goal.min != null && val >= goal.min) || (goal.max != null && val >= goal.max)) {
       _celebratedToday.add(celebKey);
+      _persistCelebrations();
       const label = GOAL_LABELS[key] || key;
       const unit = GOAL_UNITS[key] || '';
       const tgt = goal.min ?? goal.max;
@@ -303,12 +329,14 @@ export async function checkStepGoal(steps, goal) {
 
   if (steps >= goal && !_celebratedToday.has('steps_hit')) {
     _celebratedToday.add('steps_hit');
+    _persistCelebrations();
     await notify('notifStepGoal', '👟 Step Goal Reached!',
       `You've walked ${steps.toLocaleString()} steps — goal was ${goal.toLocaleString()}!`, 5);
   } else if (!_celebratedToday.has('steps_midday')) {
     const hour = new Date().getHours();
     if (hour >= 12 && hour <= 14 && steps < goal * 0.5) {
       _celebratedToday.add('steps_midday');
+      _persistCelebrations();
       const remaining = goal - steps;
       await notify('notifStepGoal', '🚶 Step Goal Progress',
         `You're at ${steps.toLocaleString()} steps — ${remaining.toLocaleString()} to go!`, 4);
