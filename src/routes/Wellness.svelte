@@ -2180,7 +2180,7 @@
         {#if w.max_hr}
           <div class="workout-stat">
             <span class="workout-stat-val">{w.max_hr}</span>
-            <span class="workout-stat-lbl">Max HR</span>
+            <span class="workout-stat-lbl">Peak HR</span>
           </div>
         {/if}
       </div>

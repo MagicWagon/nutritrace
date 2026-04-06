@@ -654,6 +654,8 @@ router.post('/workouts/sync', wrap(async (req, res) => {
       has_gps=excluded.has_gps, updated_at=excluded.updated_at
   `);
 
+  // First pass: upsert workouts with placeholder max_hr, then fetch actual peak HR
+  const workoutRows = [];
   let synced = 0;
   db.transaction(() => {
     for (const a of activities) {
@@ -666,14 +668,34 @@ router.post('/workouts/sync', wrap(async (req, res) => {
       const distanceKm = a.distance != null ? a.distance * (a.distanceUnit === 'Mile' ? 1.60934 : 1) : null;
       const calories = a.calories || 0;
       const avgHr = a.averageHeartRate || null;
-      const maxHr = a.heartRateZones?.reduce((max, z) => Math.max(max, z.max || 0), 0) || null;
       const steps = a.steps || null;
       const hasGps = a.hasGps ? 1 : 0;
 
-      upsert.run(u, logId, date, activityType, activityName, startTime, durationMs, distanceKm, calories, avgHr, maxHr, steps, hasGps);
+      upsert.run(u, logId, date, activityType, activityName, startTime, durationMs, distanceKm, calories, avgHr, null, steps, hasGps);
+      workoutRows.push({ logId, date, startTime, durationMs });
       synced++;
     }
   })();
+
+  // Second pass: fetch actual peak HR from intraday heart rate data per workout
+  const updateMaxHr = db.prepare(`UPDATE workouts SET max_hr = ? WHERE user_id = ? AND source = 'fitbit' AND source_id = ?`);
+  for (const w of workoutRows) {
+    try {
+      // Derive start/end times for the HR intraday window
+      const st = new Date(w.startTime);
+      const et = new Date(st.getTime() + w.durationMs);
+      const startHHMM = st.toTimeString().slice(0, 5);
+      const endHHMM = et.toTimeString().slice(0, 5);
+      const hrData = await _get(u, `/1/user/-/activities/heart/date/${w.date}/1d/1min/time/${startHHMM}/${endHHMM}.json`);
+      const dataset = hrData?.['activities-heart-intraday']?.dataset || [];
+      if (dataset.length > 0) {
+        const peakHr = Math.max(...dataset.map(p => p.value));
+        if (peakHr > 0) updateMaxHr.run(peakHr, u, w.logId);
+      }
+    } catch (e) {
+      logger.debug(`[fitbit] peak HR fetch failed for ${w.logId}: ${e.message}`);
+    }
+  }
 
   logger.info(`[fitbit] synced ${synced} workouts for user ${u} (${afterDate} → ${beforeDate})`);
 
