@@ -681,19 +681,32 @@ router.post('/workouts/sync', wrap(async (req, res) => {
   const updateMaxHr = db.prepare(`UPDATE workouts SET max_hr = ? WHERE user_id = ? AND source = 'fitbit' AND source_id = ?`);
   for (const w of workoutRows) {
     try {
-      // Derive start/end times for the HR intraday window
-      const st = new Date(w.startTime);
-      const et = new Date(st.getTime() + w.durationMs);
-      const startHHMM = st.toTimeString().slice(0, 5);
-      const endHHMM = et.toTimeString().slice(0, 5);
-      const hrData = await _get(u, `/1/user/-/activities/heart/date/${w.date}/1d/1min/time/${startHHMM}/${endHHMM}.json`);
+      // Parse HH:mm directly from ISO string to preserve the activity's local time
+      // (Fitbit's startTime includes timezone offset; the date+time portion IS local)
+      // Format: "2026-04-05T20:57:00.000-04:00" → date=2026-04-05, time=20:57
+      const m = w.startTime.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/);
+      if (!m) { logger.warn(`[fitbit] cannot parse startTime: ${w.startTime}`); continue; }
+      const localDate = m[1];
+      const startMinTotal = parseInt(m[2]) * 60 + parseInt(m[3]);
+      const endMinTotal = startMinTotal + Math.ceil(w.durationMs / 60000);
+      const pad = n => String(n).padStart(2, '0');
+      const startHHMM = `${pad(Math.floor(startMinTotal / 60))}:${pad(startMinTotal % 60)}`;
+      // Cap at 23:59 if activity crosses midnight (rare; intraday endpoint is per-day)
+      const endHour = Math.min(23, Math.floor(endMinTotal / 60));
+      const endMin = endHour === 23 && endMinTotal / 60 > 23 ? 59 : (endMinTotal % 60);
+      const endHHMM = `${pad(endHour)}:${pad(endMin)}`;
+      logger.info(`[fitbit] peak HR fetch: workout ${w.logId} date=${localDate} ${startHHMM}-${endHHMM}`);
+      const hrData = await _get(u, `/1/user/-/activities/heart/date/${localDate}/1d/1min/time/${startHHMM}/${endHHMM}.json`);
       const dataset = hrData?.['activities-heart-intraday']?.dataset || [];
       if (dataset.length > 0) {
         const peakHr = Math.max(...dataset.map(p => p.value));
+        logger.info(`[fitbit] peak HR for ${w.logId}: ${peakHr} bpm (${dataset.length} samples)`);
         if (peakHr > 0) updateMaxHr.run(peakHr, u, w.logId);
+      } else {
+        logger.warn(`[fitbit] no intraday HR data for ${w.logId}`);
       }
     } catch (e) {
-      logger.debug(`[fitbit] peak HR fetch failed for ${w.logId}: ${e.message}`);
+      logger.warn(`[fitbit] peak HR fetch failed for ${w.logId}: ${e.message}`);
     }
   }
 
