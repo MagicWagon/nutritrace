@@ -5,6 +5,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.33.0-beta] — 2026-04-05
+
+### Added
+- **Health Connect → Statistics integration** — all wellness metrics (steps, active min, sleep, resting HR, HRV, SpO2) and body metrics (weight, body fat, muscle mass) from Health Connect now feed into Statistics charts on native, alongside Fitbit/Garmin/Withings sources
+- **Health Connect Visible Metrics filter** — Settings → Wellness → Health Connect now has chip toggles for 25 metrics (steps, distance, sleep stages, HR, weight, body fat, SpO2, BMR, etc.) matching Fitbit/Garmin/Withings sections
+- **Statistics respects visible metrics filter** — hidden wellness metrics (per `wellnessMetrics` setting) no longer appear in the Statistics dropdown, consistent with Wellness page behavior
+- **Workout Peak HR from intraday API** — Fitbit workout sync now fetches actual peak heart rate from the per-minute intraday HR endpoint for each activity's time window, instead of using the heart rate zone ceiling
+- **Health Connect string-record parsing** — plugin returns BodyFat, BloodPressure, and SpO2 as Kotlin `toString()` strings; added regex parsers for each
+- **Health Connect Weight string fallback** — defensive parser for Weight records in case the plugin returns a string instead of an object
+
+### Fixed
+- **Repeat goal celebration notifications** — `_celebratedToday` Set was in-memory only and reset on every app reload, causing repeat celebrations for goals already hit earlier in the day. Now persisted to localStorage with date key. Affects all goals: water, calories, protein, carbs, fat, steps, sleep, etc.
+- **Workout "Max HR" always 220** — was reading `heartRateZones[].max` (the zone boundary, not actual HR; Peak zone always tops at 220). Now uses real intraday HR data; label renamed to "Peak HR"
+- **Peak HR timezone bug** — initial intraday fix used `toTimeString()` which converts to server timezone, fetching the wrong HR window. Now parses HH:mm directly from the activity's ISO startTime to preserve local time
+- **Meal reminder sent even after meal logged** — scheduler diary query now falls back to `user_id IS NULL` rows for users with diary entries created before user management was enabled; explicit `Number()` conversion on meal index comparison
+- **Scheduler `reminderMin is not defined`** — leftover undefined variable from the 30-min delay revert
+- **Statistics: Health Connect data ignored** — Statistics page only queried Fitbit/Garmin/Withings server endpoints; now also reads `health_connect` source from local SQLite on native
+- **Body weight/body fat charts ignored Health Connect** — `isBodyDevice` only checked `withingsEnabled`; now also checks `healthConnectEnabled` and falls back to HC data when no Withings reading is available
+
+### Changed
+- **Wellness `toggleMetric` covers HC metric IDs** — includes `active_calories`, `avg_heart_rate`, `blood_pressure_systolic/diastolic`, `body_temperature`, `sleep_awake_min`, `water_ml` so the visibility toggle properly tracks them
+- **Scheduler logging elevated to info** — meal reminder check now logs at info level so push notification debugging is visible without enabling debug mode
+
+---
+
 ## [0.32.0-beta] — 2026-04-03
 
 ### Added
