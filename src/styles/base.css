@@ -135,12 +135,21 @@ input, select, textarea { font-family: inherit; }
   text-shadow: 0 2px 12px rgba(0,0,0,0.35);
 }
 
-/* Page shell — used by all route pages */
+/* Page shell — used by all route pages.
+   NOTE: padding-top is intentionally 0 here. Pages with a sticky .page-header
+   already account for safe-area-top inside the header's own padding, and
+   adding shell-level padding-top creates a black bar above the header on
+   initial render (before the user scrolls). Editor pages that don't have a
+   .page-header use the .editor-page modifier below to add their own inset. */
 .page-shell {
   display: block;
   min-height: 100dvh;
   padding-bottom: calc(var(--nav-h) + var(--safe-bottom));
-  padding-top: var(--page-top, var(--safe-top));
+}
+/* Editor pages (FoodEditor, MealEditor) use .editor-header, not .page-header,
+   so they need the safe-area inset applied at the shell level. */
+.page-shell.editor-page {
+  padding-top: var(--safe-top);
 }
 
 .page-content {
