@@ -153,13 +153,28 @@
   let wellnessSyncTimeVal     = DB.getSetting('wellnessSyncTime',     '14:00');
   let wellnessSyncRangeVal    = DB.getSetting('wellnessSyncRange',    7);
 
-  const SYNC_RANGE_OPTIONS = [
+  // Recommended range options shown first — safe for any device API
+  const SYNC_RANGE_RECOMMENDED = [
     { value: 1,   label: '1 day'   },
     { value: 7,   label: '1 week'  },
     { value: 30,  label: '1 month' },
     { value: 90,  label: '3 months'},
-    { value: 365, label: '1 year'  },
   ];
+  // Advanced range options — per device, since each API has different limits
+  // Fitbit: 6m + 1y allowed (rate limited but workable)
+  // Garmin: 6m only (API doesn't reliably deliver beyond ~6 months)
+  // Withings: 6m + 1y allowed (most generous historical depth)
+  const SYNC_RANGE_ADVANCED_FITBIT   = [ { value: 180, label: '6 months' }, { value: 365, label: '1 year' } ];
+  const SYNC_RANGE_ADVANCED_GARMIN   = [ { value: 180, label: '6 months' } ];
+  const SYNC_RANGE_ADVANCED_WITHINGS = [ { value: 180, label: '6 months' }, { value: 365, label: '1 year' } ];
+
+  // All known options for "is this a known chip?" check (controls input-active highlight)
+  const SYNC_RANGE_ALL_VALUES = new Set([1, 7, 30, 90, 180, 365]);
+
+  // Custom number input max per device — soft cap, not enforced validation
+  const CUSTOM_MAX_FITBIT   = 365;
+  const CUSTOM_MAX_GARMIN   = 180;
+  const CUSTOM_MAX_WITHINGS = 365;
 
   // ── Fitbit ──────────────────────────────────────────────────────────────────
   let fitbitClientId     = '';
@@ -472,22 +487,30 @@
             <span class="setting-label">Sync Range</span>
             <div class="setting-desc">How far back the manual Sync button fetches. Auto-sync always covers today only.</div>
           </div>
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <div style="display:flex;flex-direction:column;gap:6px">
             <div class="chip-group">
-              {#each SYNC_RANGE_OPTIONS as opt}
+              {#each SYNC_RANGE_RECOMMENDED as opt}
                 <button class="chip" class:chip-active={wellnessSyncRangeVal === opt.value}
                   on:click={() => { wellnessSyncRangeVal = opt.value; wellnessSyncRange.set(opt.value); }}
                 >{opt.label}</button>
               {/each}
             </div>
-            <div style="display:flex;align-items:center;gap:4px">
-              <input class="input" type="number" min="1" max="730" style="width:64px;height:32px;padding:0 8px;font-size:13px;text-align:center"
-                class:input-active={!SYNC_RANGE_OPTIONS.some(o => o.value === wellnessSyncRangeVal)}
-                value={wellnessSyncRangeVal}
-                on:change={e => { const v = Math.max(1, parseInt(e.target.value)||1); wellnessSyncRangeVal = v; wellnessSyncRange.set(v); }}
-                placeholder="days" title="Custom number of days" />
-              <span class="setting-desc" style="margin:0">days</span>
+            <div class="chip-group">
+              {#each SYNC_RANGE_ADVANCED_FITBIT as opt}
+                <button class="chip" class:chip-active={wellnessSyncRangeVal === opt.value}
+                  on:click={() => { wellnessSyncRangeVal = opt.value; wellnessSyncRange.set(opt.value); }}
+                >{opt.label} ⚠</button>
+              {/each}
+              <div style="display:flex;align-items:center;gap:4px;margin-left:4px">
+                <input class="input" type="number" min="1" max={CUSTOM_MAX_FITBIT} style="width:64px;height:32px;padding:0 8px;font-size:13px;text-align:center"
+                  class:input-active={!SYNC_RANGE_ALL_VALUES.has(wellnessSyncRangeVal)}
+                  value={wellnessSyncRangeVal}
+                  on:change={e => { const v = Math.max(1, Math.min(CUSTOM_MAX_FITBIT, parseInt(e.target.value)||1)); wellnessSyncRangeVal = v; wellnessSyncRange.set(v); }}
+                  placeholder="days" title="Custom number of days (max {CUSTOM_MAX_FITBIT})" />
+                <span class="setting-desc" style="margin:0">days</span>
+              </div>
             </div>
+            <div class="setting-desc" style="font-size:11px;opacity:0.75">⚠ Long ranges may take several minutes and approach Fitbit API rate limits.</div>
           </div>
         </div>
         <div class="setting-divider"></div>
@@ -616,22 +639,30 @@
             <span class="setting-label">Sync Range</span>
             <div class="setting-desc">How far back the manual Sync button fetches.</div>
           </div>
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <div style="display:flex;flex-direction:column;gap:6px">
             <div class="chip-group">
-              {#each SYNC_RANGE_OPTIONS as opt}
+              {#each SYNC_RANGE_RECOMMENDED as opt}
                 <button class="chip" class:chip-active={garminSyncRangeVal === opt.value}
                   on:click={() => { garminSyncRangeVal = opt.value; garminSyncRange.set(opt.value); }}
                 >{opt.label}</button>
               {/each}
             </div>
-            <div style="display:flex;align-items:center;gap:4px">
-              <input class="input" type="number" min="1" max="730" style="width:64px;height:32px;padding:0 8px;font-size:13px;text-align:center"
-                class:input-active={!SYNC_RANGE_OPTIONS.some(o => o.value === garminSyncRangeVal)}
-                value={garminSyncRangeVal}
-                on:change={e => { const v = Math.max(1, parseInt(e.target.value)||1); garminSyncRangeVal = v; garminSyncRange.set(v); }}
-                placeholder="days" title="Custom number of days" />
-              <span class="setting-desc" style="margin:0">days</span>
+            <div class="chip-group">
+              {#each SYNC_RANGE_ADVANCED_GARMIN as opt}
+                <button class="chip" class:chip-active={garminSyncRangeVal === opt.value}
+                  on:click={() => { garminSyncRangeVal = opt.value; garminSyncRange.set(opt.value); }}
+                >{opt.label} ⚠</button>
+              {/each}
+              <div style="display:flex;align-items:center;gap:4px;margin-left:4px">
+                <input class="input" type="number" min="1" max={CUSTOM_MAX_GARMIN} style="width:64px;height:32px;padding:0 8px;font-size:13px;text-align:center"
+                  class:input-active={!SYNC_RANGE_ALL_VALUES.has(garminSyncRangeVal)}
+                  value={garminSyncRangeVal}
+                  on:change={e => { const v = Math.max(1, Math.min(CUSTOM_MAX_GARMIN, parseInt(e.target.value)||1)); garminSyncRangeVal = v; garminSyncRange.set(v); }}
+                  placeholder="days" title="Custom number of days (max {CUSTOM_MAX_GARMIN})" />
+                <span class="setting-desc" style="margin:0">days</span>
+              </div>
             </div>
+            <div class="setting-desc" style="font-size:11px;opacity:0.75">⚠ Garmin's API caps reliable historical data near 6 months. Longer ranges may return incomplete results.</div>
           </div>
         </div>
         <div class="setting-divider"></div>
@@ -748,22 +779,30 @@
             <span class="setting-label">Sync Range</span>
             <div class="setting-desc">How far back the manual Sync button fetches.</div>
           </div>
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <div style="display:flex;flex-direction:column;gap:6px">
             <div class="chip-group">
-              {#each SYNC_RANGE_OPTIONS as opt}
+              {#each SYNC_RANGE_RECOMMENDED as opt}
                 <button class="chip" class:chip-active={withingsSyncRangeVal === opt.value}
                   on:click={() => { withingsSyncRangeVal = opt.value; withingsSyncRange.set(opt.value); }}
                 >{opt.label}</button>
               {/each}
             </div>
-            <div style="display:flex;align-items:center;gap:4px">
-              <input class="input" type="number" min="1" max="730" style="width:64px;height:32px;padding:0 8px;font-size:13px;text-align:center"
-                class:input-active={!SYNC_RANGE_OPTIONS.some(o => o.value === withingsSyncRangeVal)}
-                value={withingsSyncRangeVal}
-                on:change={e => { const v = Math.max(1, parseInt(e.target.value)||1); withingsSyncRangeVal = v; withingsSyncRange.set(v); }}
-                placeholder="days" title="Custom number of days" />
+            <div class="chip-group">
+              {#each SYNC_RANGE_ADVANCED_WITHINGS as opt}
+                <button class="chip" class:chip-active={withingsSyncRangeVal === opt.value}
+                  on:click={() => { withingsSyncRangeVal = opt.value; withingsSyncRange.set(opt.value); }}
+                >{opt.label} ⚠</button>
+              {/each}
+              <div style="display:flex;align-items:center;gap:4px;margin-left:4px">
+                <input class="input" type="number" min="1" max={CUSTOM_MAX_WITHINGS} style="width:64px;height:32px;padding:0 8px;font-size:13px;text-align:center"
+                  class:input-active={!SYNC_RANGE_ALL_VALUES.has(withingsSyncRangeVal)}
+                  value={withingsSyncRangeVal}
+                on:change={e => { const v = Math.max(1, Math.min(CUSTOM_MAX_WITHINGS, parseInt(e.target.value)||1)); withingsSyncRangeVal = v; withingsSyncRange.set(v); }}
+                placeholder="days" title="Custom number of days (max {CUSTOM_MAX_WITHINGS})" />
               <span class="setting-desc" style="margin:0">days</span>
             </div>
+            </div>
+            <div class="setting-desc" style="font-size:11px;opacity:0.75">⚠ Long ranges may take several minutes and approach Withings API rate limits.</div>
           </div>
         </div>
         <div class="setting-divider"></div>
