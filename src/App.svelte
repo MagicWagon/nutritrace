@@ -91,12 +91,18 @@
   $: sidebarPinned = _hasSidebar && $sidebarPersistent;
   $: showHamburger = _hasSidebar && !sidebarPinned;
 
-  // Set --page-top so page headers clear the fixed hamburger button
-  // and --sidebar-w so content shifts right when sidebar is persistent
+  // Set --page-top to just the device safe area — hamburger floats OVER the
+  // banner instead of pushing content down. Reclaims ~62px of vertical space
+  // on every page, especially valuable on small phones.
+  // --hamburger-offset gives page headers room to shift their content right
+  // when the hamburger is showing, so H1 text doesn't slide under the button
+  // (relevant when banners are disabled — banners themselves render under it).
+  // Set --sidebar-w so content shifts right when sidebar is persistent.
   $: if (typeof document !== 'undefined') {
+    document.documentElement.style.setProperty('--page-top', 'var(--safe-top)');
     document.documentElement.style.setProperty(
-      '--page-top',
-      showHamburger ? 'calc(var(--safe-top) + 62px)' : 'var(--safe-top)'
+      '--hamburger-offset',
+      showHamburger ? '52px' : '0px'
     );
     document.documentElement.style.setProperty(
       '--sidebar-w',
@@ -377,17 +383,21 @@
     left: 12px;
     width: 40px; height: 40px;
     border-radius: var(--radius-md);
-    background: var(--surface-1);
-    border: 1px solid var(--border);
+    /* Translucent backdrop-blur pill so the button reads cleanly over the
+       banner image AND over plain page background (when banners are off). */
+    background: rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(10px) saturate(160%);
+    -webkit-backdrop-filter: blur(10px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.18);
     display: flex; align-items: center; justify-content: center;
     cursor: pointer;
     z-index: 41;
     pointer-events: all;
-    color: var(--text-1);
-    box-shadow: var(--shadow-sm);
+    color: #ffffff;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
     transition: background var(--dur-fast), transform var(--dur-fast) var(--ease-spring);
   }
-  .hamburger:hover  { background: var(--surface-2); }
+  .hamburger:hover  { background: rgba(0, 0, 0, 0.5); }
   .hamburger:active { transform: scale(0.92); }
 
   .topbar-spacer { flex: 1; }
