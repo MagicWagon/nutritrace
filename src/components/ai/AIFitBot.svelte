@@ -239,6 +239,49 @@
     ? `left:${fabPos.x}px; top:${fabPos.y}px; right:auto; bottom:auto;`
     : '';
 
+  // ── Desktop panel positioning — follows the FAB ────────────────────────────
+  // On desktop (>768px), the chat card pops up next to wherever the FAB sits.
+  // Recomputed each time the panel opens or the window resizes.
+  let panelStyle = '';
+  let _isDesktop = false;
+  function _updatePanelPos() {
+    if (typeof window === 'undefined') return;
+    _isDesktop = window.innerWidth > 768;
+    if (!_isDesktop || !panelOpen) { panelStyle = ''; return; }
+
+    const cardW = 420;
+    const cardH = Math.min(640, window.innerHeight * 0.8);
+    const gap = 16;
+    const margin = 16;
+    const FAB_SIZE = 60;
+
+    // FAB rect — derived from saved pos or the CSS default (bottom-right)
+    const fabLeft = fabPos ? fabPos.x : window.innerWidth - 20 - FAB_SIZE;
+    const fabTop  = fabPos ? fabPos.y : window.innerHeight - 96 - FAB_SIZE;
+    const fabRight  = fabLeft + FAB_SIZE;
+    const fabBottom = fabTop + FAB_SIZE;
+    const fabCenterX = fabLeft + FAB_SIZE / 2;
+    const fabCenterY = fabTop  + FAB_SIZE / 2;
+
+    // Quadrant determines where the card grows from
+    const onRight  = fabCenterX > window.innerWidth  / 2;
+    const onBottom = fabCenterY > window.innerHeight / 2;
+
+    // Card top-left
+    let left = onRight ? (fabRight - cardW) : fabLeft;
+    let top  = onBottom ? (fabTop - cardH - gap) : (fabBottom + gap);
+
+    // Clamp inside viewport
+    left = Math.max(margin, Math.min(window.innerWidth  - cardW - margin, left));
+    top  = Math.max(margin, Math.min(window.innerHeight - cardH - margin, top));
+
+    panelStyle = `left:${left}px; top:${top}px; right:auto; bottom:auto;`;
+  }
+  $: { panelOpen, fabPos; _updatePanelPos(); }
+  if (typeof window !== 'undefined') {
+    window.addEventListener('resize', _updatePanelPos);
+  }
+
   function startDrag(e) {
     hasDragged = false;
     const startX   = e.clientX;
@@ -649,6 +692,7 @@ Water: ${ctx.waterText}`
     <!-- ── Chat Panel ──────────────────────────────────────────────────── -->
     <aside
       class="ai-panel"
+      style={panelStyle}
       transition:fly={{ y: 600, duration: 320, easing: cubicOut }}
       aria-label="AI coach chat"
     >
