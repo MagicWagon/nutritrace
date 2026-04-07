@@ -77,18 +77,19 @@
   $: _isEditorRoute = EDITOR_ROUTES.some(r => $location.startsWith(r));
   $: isEditor      = NAV_HIDDEN.some(p => $location.startsWith(p));
 
-  // Track viewport width — sidebar is force-hidden on narrow screens (small phones)
-  // even if the user's preference allows it. Tablets, foldables, and desktop keep
-  // the option. Threshold 768px = standard tablet breakpoint; phones in landscape
-  // typically still fall under this. Setting itself is preserved.
+  // Track viewport width — only the PERSISTENT/PINNED sidebar mode is gated
+  // by viewport width. The drawer-style sidebar (hamburger + slide-in overlay)
+  // is always available when navStyle allows it, so mobile users still have
+  // access to Goals/Settings/Logout via the hamburger menu.
+  // Threshold 768px = standard tablet breakpoint.
   let _viewportW = typeof window !== 'undefined' ? window.innerWidth : 1024;
   if (typeof window !== 'undefined') {
     window.addEventListener('resize', () => { _viewportW = window.innerWidth; });
   }
-  $: _sidebarAllowed = _viewportW >= 768;
+  $: _persistentAllowed = _viewportW >= 768;
 
-  $: _hasSidebar   = showNav && _sidebarAllowed && ($navStyle === 'sidebar' || $navStyle === 'both');
-  $: sidebarPinned = _hasSidebar && $sidebarPersistent;
+  $: _hasSidebar   = showNav && ($navStyle === 'sidebar' || $navStyle === 'both');
+  $: sidebarPinned = _hasSidebar && _persistentAllowed && $sidebarPersistent;
   $: showHamburger = _hasSidebar && !sidebarPinned;
 
   // Set --page-top to just the device safe area — hamburger floats OVER the

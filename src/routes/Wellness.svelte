@@ -2215,12 +2215,7 @@
   .wl-shell {
     min-height: unset;
   }
-  /* Force h1 to same height as Diary so the sticky date-bar top offset (62px) is accurate. */
-  .wl-shell .page-header h1 {
-    height: 40px;
-    display: flex;
-    align-items: center;
-  }
+  /* H1 height/alignment now lives in base.css .page-header h1 (uniform 40px). */
   /* Content area: explicit bottom padding since shell no longer provides it. */
   .wl-content {
     padding-bottom: calc(var(--nav-h) + var(--safe-bottom) + 16px);

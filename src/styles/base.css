@@ -113,6 +113,12 @@ input, select, textarea { font-family: inherit; }
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  /* Fixed 40px height so the title sits at the same vertical position on every
+     page (matching .btn-icon height used in page-header actions). Sticky sub-bars
+     on Diary/Wellness rely on this exact value for their top offset calculation. */
+  height: 40px;
+  display: flex;
+  align-items: center;
 }
 
 /* Banner variant — taller header with illustrated SVG backdrop */

@@ -1344,13 +1344,7 @@
     pointer-events: all;
   }
 
-  /* Force h1 to 40px — same as btn-icon height used on other pages,
-     so Diary header height exactly matches Foods / Goals / etc. */
-  .diary-header h1 {
-    height: 40px;
-    display: flex;
-    align-items: center;
-  }
+  /* H1 height/alignment now lives in base.css .page-header h1 (uniform 40px). */
 
   /* Sticky date navigation sub-bar — sits directly below the page-header.
      top = page-top + 10px (padding-top adjustment) + 40px (h1) + 12px (padding-bottom)
