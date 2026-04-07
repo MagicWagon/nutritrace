@@ -626,7 +626,24 @@ Water: ${ctx.waterText}`
     {:else if panelOpen}
       <span class="material-symbols-rounded" style="font-size:26px">close</span>
     {:else}
-      <span class="material-symbols-rounded" style="font-size:26px">smart_toy</span>
+      <!-- Animated robot face -->
+      <svg class="fab-robot" viewBox="0 0 56 56" xmlns="http://www.w3.org/2000/svg">
+        <!-- Antenna -->
+        <line class="bot-antenna" x1="28" y1="10" x2="28" y2="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <circle class="bot-antenna-dot" cx="28" cy="9" r="2" fill="currentColor"/>
+        <!-- Head -->
+        <rect class="bot-head" x="13" y="16" width="30" height="26" rx="9" fill="rgba(255,255,255,0.18)" stroke="currentColor" stroke-width="1.5"/>
+        <!-- Cheek lights -->
+        <circle class="bot-cheek bot-cheek-l" cx="16" cy="32" r="1.5" fill="currentColor" opacity="0.6"/>
+        <circle class="bot-cheek bot-cheek-r" cx="40" cy="32" r="1.5" fill="currentColor" opacity="0.6"/>
+        <!-- Eyes (animated via CSS) -->
+        <g class="bot-eyes">
+          <rect class="bot-eye bot-eye-l" x="20" y="24" width="5" height="6" rx="2" fill="currentColor"/>
+          <rect class="bot-eye bot-eye-r" x="31" y="24" width="5" height="6" rx="2" fill="currentColor"/>
+        </g>
+        <!-- Mouth -->
+        <path class="bot-mouth" d="M22 36 Q28 39 34 36" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+      </svg>
     {/if}
     {#if hasUnread && !panelOpen}
       <div class="fab-badge" transition:fade={{ duration: 120 }}></div>
@@ -801,34 +818,130 @@ Water: ${ctx.waterText}`
     position: fixed;
     right: 20px;
     bottom: calc(var(--nav-h) + var(--safe-bottom, 0px) + 20px);
-    width: 56px;
-    height: 56px;
+    width: 60px;
+    height: 60px;
     border-radius: 50%;
-    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    /* Glassmorphism with shifting gradient underneath — uses theme accents */
+    background: linear-gradient(135deg, var(--accent), var(--accent-2), var(--accent), var(--accent-2), var(--accent));
+    background-size: 300% 300%;
     color: var(--accent-text);
-    border: none;
+    border: 1px solid rgba(255,255,255,0.25);
+    backdrop-filter: blur(12px) saturate(180%);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
     cursor: pointer;
     z-index: 400;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.35), 0 0 0 0 transparent;
-    animation: ai-float 3s ease-in-out infinite;
+    box-shadow:
+      0 8px 32px rgba(0,0,0,0.35),
+      inset 0 1px 0 rgba(255,255,255,0.35),
+      inset 0 -2px 6px rgba(0,0,0,0.15);
+    animation:
+      gradient-shift 8s ease-in-out infinite,
+      ring-pulse 2.6s ease-out infinite;
     transition: transform 0.18s ease, box-shadow 0.18s ease;
     touch-action: none;
     user-select: none;
     -webkit-user-select: none;
+    overflow: visible;
+  }
+  /* Inner glass highlight overlay */
+  .ai-fab::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 25%, rgba(255,255,255,0.45), rgba(255,255,255,0) 55%);
+    pointer-events: none;
   }
   .ai-fab:hover {
-    transform: scale(1.1);
-    box-shadow: 0 6px 28px rgba(0,0,0,0.45), 0 0 0 10px var(--accent-dim);
+    transform: scale(1.08);
+    box-shadow:
+      0 12px 36px rgba(0,0,0,0.45),
+      inset 0 1px 0 rgba(255,255,255,0.4),
+      0 0 0 8px var(--accent-dim);
   }
   .ai-fab:active    { transform: scale(0.94); }
-  .ai-fab.panel-open { animation: none; }
+  .ai-fab.panel-open {
+    animation: gradient-shift 8s ease-in-out infinite;
+  }
 
-  @keyframes ai-float {
-    0%, 100% { transform: translateY(0px);   box-shadow: 0 4px 20px rgba(0,0,0,0.35), 0 0 0 0 transparent; }
-    50%       { transform: translateY(-5px);  box-shadow: 0 8px 28px rgba(0,0,0,0.45), 0 0 0 8px var(--accent-dim); }
+  @keyframes gradient-shift {
+    0%, 100% { background-position: 0% 50%; }
+    50%       { background-position: 100% 50%; }
+  }
+  /* Concentric ring pulse — heartbeat outward, color from theme */
+  @keyframes ring-pulse {
+    0%   { box-shadow:
+             0 8px 32px rgba(0,0,0,0.35),
+             inset 0 1px 0 rgba(255,255,255,0.35),
+             inset 0 -2px 6px rgba(0,0,0,0.15),
+             0 0 0 0 var(--accent-dim); }
+    70%  { box-shadow:
+             0 8px 32px rgba(0,0,0,0.35),
+             inset 0 1px 0 rgba(255,255,255,0.35),
+             inset 0 -2px 6px rgba(0,0,0,0.15),
+             0 0 0 16px transparent; }
+    100% { box-shadow:
+             0 8px 32px rgba(0,0,0,0.35),
+             inset 0 1px 0 rgba(255,255,255,0.35),
+             inset 0 -2px 6px rgba(0,0,0,0.15),
+             0 0 0 0 transparent; }
+  }
+
+  /* ── Animated robot face ─────────────────────────────────────────────── */
+  .fab-robot {
+    width: 42px;
+    height: 42px;
+    color: #ffffff;
+    position: relative;
+    z-index: 1;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));
+  }
+  /* Eyes blink — quick close every 4-5s */
+  .bot-eyes {
+    transform-origin: 28px 27px;
+    animation: bot-blink 4.6s ease-in-out infinite;
+  }
+  @keyframes bot-blink {
+    0%, 92%, 100% { transform: scaleY(1); }
+    94%, 96%       { transform: scaleY(0.1); }
+  }
+  /* Eyes also dart left/right occasionally */
+  .bot-eye {
+    animation: bot-eye-dart 7s ease-in-out infinite;
+  }
+  @keyframes bot-eye-dart {
+    0%, 35%, 100% { transform: translateX(0); }
+    40%, 55%       { transform: translateX(-1.2px); }
+    60%, 75%       { transform: translateX(1.2px); }
+    80%             { transform: translateX(0); }
+  }
+  /* Antenna dot pulses softly */
+  .bot-antenna-dot {
+    transform-origin: 28px 9px;
+    animation: bot-antenna 1.8s ease-in-out infinite;
+  }
+  @keyframes bot-antenna {
+    0%, 100% { transform: scale(1);   opacity: 0.7; }
+    50%       { transform: scale(1.4); opacity: 1; }
+  }
+  /* Cheeks twinkle alternately */
+  .bot-cheek-l { animation: bot-cheek 3s ease-in-out infinite; }
+  .bot-cheek-r { animation: bot-cheek 3s ease-in-out infinite 1.5s; }
+  @keyframes bot-cheek {
+    0%, 100% { opacity: 0.4; }
+    50%       { opacity: 1; }
+  }
+  /* Mouth idle smile (subtle bob) */
+  .bot-mouth {
+    transform-origin: 28px 37px;
+    animation: bot-mouth 3.4s ease-in-out infinite;
+  }
+  @keyframes bot-mouth {
+    0%, 100% { transform: scaleY(1); }
+    50%       { transform: scaleY(1.25); }
   }
 
   /* Spinner when loading */
