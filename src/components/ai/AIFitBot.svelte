@@ -636,6 +636,8 @@ Water: ${ctx.waterText}`
 
   <!-- ── Panel Backdrop ─────────────────────────────────────────────────── -->
   {#if panelOpen}
+    <!-- Backdrop only shown on mobile (CSS-gated) for fullscreen bottom-sheet feel.
+         On desktop the panel sits over content like a companion widget. -->
     <!-- svelte-ignore a11y-no-static-element-interactions -->
     <div
       class="ai-backdrop"
@@ -647,9 +649,11 @@ Water: ${ctx.waterText}`
     <!-- ── Chat Panel ──────────────────────────────────────────────────── -->
     <aside
       class="ai-panel"
-      transition:fly={{ x: 440, duration: 300, easing: cubicOut }}
+      transition:fly={{ y: 600, duration: 320, easing: cubicOut }}
       aria-label="AI coach chat"
     >
+      <!-- Drag handle (mobile only) -->
+      <div class="ai-drag-handle" aria-hidden="true"></div>
       <!-- Header -->
       <div class="ai-header">
         <div class="ai-header-brand">
@@ -878,7 +882,7 @@ Water: ${ctx.waterText}`
   .fab-robot-wrap {
     position: relative;
     z-index: 1;
-    color: #ffffff;
+    color: var(--accent-text);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -910,6 +914,8 @@ Water: ${ctx.waterText}`
   }
 
   /* ── Backdrop ─────────────────────────────────────────────────────────── */
+  /* Mobile: dimmed backdrop for full-attention bottom sheet feel.
+     Desktop: hidden — chat is a companion widget over content. */
   .ai-backdrop {
     position: fixed; inset: 0;
     background: var(--overlay);
@@ -917,20 +923,55 @@ Water: ${ctx.waterText}`
     -webkit-backdrop-filter: var(--backdrop-blur);
     z-index: 440;
   }
+  @media (min-width: 769px) {
+    .ai-backdrop { display: none; }
+  }
 
-  /* ── Chat Panel ───────────────────────────────────────────────────────── */
+  /* ── Chat Panel — Mobile (bottom sheet) ────────────────────────────── */
   .ai-panel {
     position: fixed;
-    top: 0; right: 0; bottom: 0;
-    width: min(420px, 100vw);
+    left: 0; right: 0; bottom: 0;
+    top: auto;
+    width: 100%;
+    height: 88vh;
+    max-height: 88vh;
     background: var(--surface-1);
-    border-left: 1px solid var(--border);
+    border-top: 1px solid var(--border);
+    border-radius: 20px 20px 0 0;
     z-index: 450;
     display: flex;
     flex-direction: column;
-    box-shadow: var(--shadow-lg);
-    padding-top: var(--safe-top, 0px);
+    box-shadow: 0 -8px 40px rgba(0,0,0,0.4);
     padding-bottom: var(--safe-bottom, 0px);
+    overflow: hidden;
+  }
+
+  /* Drag handle indicator (mobile only) */
+  .ai-drag-handle {
+    width: 40px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--text-3);
+    opacity: 0.4;
+    margin: 8px auto 4px;
+    flex-shrink: 0;
+  }
+
+  /* ── Chat Panel — Desktop (floating card anchored bottom-right) ───── */
+  @media (min-width: 769px) {
+    .ai-panel {
+      left: auto;
+      right: 24px;
+      bottom: calc(var(--nav-h, 0px) + var(--safe-bottom, 0px) + 96px);
+      top: auto;
+      width: 420px;
+      height: min(640px, 80vh);
+      max-height: 80vh;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: 0 12px 48px rgba(0,0,0,0.45);
+    }
+    .ai-drag-handle { display: none; }
   }
 
   /* Header */
