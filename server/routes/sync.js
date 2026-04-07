@@ -13,6 +13,7 @@ import db from '../db.js';
 import { wrap } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
 import { logger } from '../logger.js';
+import { isServerOnlyKey } from '../lib/server-only-keys.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -57,6 +58,7 @@ router.get('/pull', wrap((req, res) => {
 
   const settings = u != null
     ? db.prepare('SELECT * FROM user_settings WHERE updated_at > ? AND user_id = ? ORDER BY updated_at').all(sinceSql, u)
+        .filter(s => !isServerOnlyKey(s.key)) // SECURITY: never push admin keys to clients
     : [];
 
   // Wellness data — pull only (server-generated from Fitbit/Withings/Garmin syncs)
@@ -172,8 +174,10 @@ router.post('/push', wrap((req, res) => {
     }
 
     // ── Settings (keyed by key, not ID) ──────────────────────────────────
+    // SECURITY: server-only keys are rejected — clients can't overwrite admin config.
     if (u != null) {
       for (const s of settings) {
+        if (isServerOnlyKey(s.key)) continue; // silently skip; don't tell client what's protected
         if (s.deleted_at) {
           db.prepare(`UPDATE user_settings SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE user_id = ? AND key = ?`)
             .run(u, s.key);

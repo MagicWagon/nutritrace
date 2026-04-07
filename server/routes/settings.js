@@ -2,26 +2,31 @@ import { Router } from 'express';
 import db from '../db.js';
 import { wrap } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
+import { isServerOnlyKey } from '../lib/server-only-keys.js';
 
 const router = Router();
 router.use(requireAuth);
 
 // GET /api/settings — return all user settings (empty object in single-user mode)
+// SECURITY: server-only keys (OAuth secrets, admin config) are filtered out.
 router.get('/', wrap((req, res) => {
   if (!userMgmtActive() || !req.user) return res.json({});
   const rows = db.prepare('SELECT key, value FROM user_settings WHERE user_id = ? AND deleted_at IS NULL').all(req.user.id);
   const out = {};
   for (const { key, value } of rows) {
+    if (isServerOnlyKey(key)) continue; // never expose admin keys to clients
     try { out[key] = JSON.parse(value); } catch { out[key] = value; }
   }
   res.json(out);
 }));
 
 // PUT /api/settings — upsert one setting
+// SECURITY: rejects writes to server-only keys (OAuth secrets etc.).
 router.put('/', wrap((req, res) => {
   if (!userMgmtActive() || !req.user) return res.json({ ok: true });
   const { key, value } = req.body;
   if (!key) return res.status(400).json({ error: 'key required' });
+  if (isServerOnlyKey(key)) return res.status(403).json({ error: 'forbidden key' });
   db.prepare(`INSERT INTO user_settings (user_id, key, value, updated_at) VALUES (?, ?, ?, datetime('now'))
     ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value, updated_at = datetime('now'), deleted_at = NULL`)
     .run(req.user.id, key, JSON.stringify(value));
