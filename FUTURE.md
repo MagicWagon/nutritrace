@@ -181,4 +181,21 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
 
 ---
 
-*Last updated: 2026-04-01*
+## Repo Split — Public Server / Private Android (deferred)
+
+Strategy (Option 2 from 2026-04-06 discussion):
+1. Create `thebigjoe1/nutritrace-server` as a **new private** repo with server + PWA only, single fresh commit at current version (no monorepo history). Review privately as long as needed, then flip to public via GitHub visibility toggle when ready.
+2. Create `thebigjoe1/nutritrace-android` as a new **private** repo with the Android shell + Capacitor config + native Java/Kotlin only.
+3. Original `thebigjoe1/nutritrace` stays private forever as the full historical monorepo (archive but never delete).
+
+Pre-flight before pushing public:
+- Scrub for personal URLs, secrets, `.env` artifacts
+- Scrub for personal references in comments
+- Decide whether to mention the Android app in the public README + add a "Get on Play Store" link
+- Confirm AGPL-3.0 license file is present
+
+Sync model going forward: develop in the (private) monorepo as today, then ship release snapshots to the public server repo. Each public release is a clean snapshot, not a daily commit log — CHANGELOG carries the version history.
+
+---
+
+*Last updated: 2026-04-06*
