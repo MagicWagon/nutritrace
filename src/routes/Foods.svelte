@@ -849,15 +849,17 @@
 <style>
   .foods-sticky-bar {
     position: sticky;
-    top: calc(var(--page-top, var(--safe-top)) + 46px);
+    /* page-top + 10 (header padding-top) + 40 (h1) + 12 (header padding-bottom) = +62 */
+    top: calc(var(--page-top, var(--safe-top)) + 62px);
     z-index: 20;
     background: var(--glass-surface);
     backdrop-filter: blur(20px) saturate(180%);
     -webkit-backdrop-filter: blur(20px) saturate(180%);
     border-bottom: 1px solid var(--border);
   }
+  /* With banner: header padding-bottom is 72 (base.css), so total = 10+40+72 = +122 */
   :global(.page-header.has-banner) ~ .foods-sticky-bar {
-    top: calc(var(--page-top, var(--safe-top)) + 86px);
+    top: calc(var(--page-top, var(--safe-top)) + 122px);
   }
   .foods-tabs { padding: 12px var(--page-px) 12px; }
   .foods-search {

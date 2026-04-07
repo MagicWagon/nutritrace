@@ -3340,7 +3340,8 @@
   /* Settings search bar */
   .settings-search-bar {
     position: sticky;
-    top: calc(var(--page-top, var(--safe-top)) + 46px);
+    /* page-top + 10 (header padding-top) + 40 (h1) + 12 (header padding-bottom) = +62 */
+    top: calc(var(--page-top, var(--safe-top)) + 62px);
     z-index: 20;
     display: flex;
     align-items: center;
@@ -3351,8 +3352,9 @@
     -webkit-backdrop-filter: blur(20px) saturate(180%);
     border-bottom: 1px solid var(--border);
   }
+  /* With banner: header padding-bottom is 72 (base.css), so total = 10+40+72 = +122 */
   :global(.page-header.has-banner) + .settings-search-bar {
-    top: calc(var(--page-top, var(--safe-top)) + 86px);
+    top: calc(var(--page-top, var(--safe-top)) + 122px);
   }
   .settings-search-icon { font-size: 20px; color: var(--text-3); flex-shrink: 0; }
   .settings-search-input {

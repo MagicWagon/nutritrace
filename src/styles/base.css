@@ -125,7 +125,7 @@ input, select, textarea { font-family: inherit; }
 .page-header.has-banner {
   clip-path: inset(0);       /* clip the SVG to the header bounds — avoids iOS Safari
                                  bug where overflow:hidden on sticky stops child animations */
-  padding-bottom: 52px;      /* extend downward to give the illustration room */
+  padding-bottom: 72px;      /* extend downward to give the illustration room */
   align-items: flex-end;     /* push h1 (and any action buttons) to the bottom */
 }
 /* Ensure h1 gradient text is legible over the illustration */

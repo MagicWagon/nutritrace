@@ -2236,7 +2236,7 @@
     padding: 8px var(--page-px);
   }
   .wl-date-bar.has-banner {
-    top: calc(var(--page-top, var(--safe-top)) + 102px);
+    top: calc(var(--page-top, var(--safe-top)) + 122px);
   }
   .date-btn {
     flex: 1;
@@ -2433,7 +2433,7 @@
     padding: 12px var(--page-px, 16px) 12px;
   }
   .tab-bar-wrap.has-banner {
-    top: calc(var(--page-top, var(--safe-top)) + 102px + 52px);
+    top: calc(var(--page-top, var(--safe-top)) + 122px + 52px);
   }
   .tab-bar {
     display: flex;
