@@ -5,6 +5,33 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.35.0-beta] — 2026-04-07
+
+### Security
+- **Server-only setting keys filtered from client responses** — OAuth app credentials (`withings_client_secret`, `fitbit_client_secret`, etc.) were being returned by `GET /api/settings` and the differential sync pull endpoint. Added shared module `server/lib/server-only-keys.js` with explicit allowlist + regex pattern fallback (`_client_secret$`, `_consumer_secret$`, `_redirect_uri$`, `_client_id$`, `_api_secret$`). Filter applied at every read/write boundary: GET/PUT `/api/settings`, GET/POST `/api/sync` settings filter, server-side rejection on PUT with 403.
+
+### Settings sync overhaul (root-cause fix for the missing-mealNames bug)
+- **Split `SERVER_SETTINGS` into `USER_PREFS` and `DEVICE_PREFS`** in `src/stores/settings.js`. USER_PREFS travel across devices (nutrition, units, integrations, notifications, behavioral prefs). DEVICE_PREFS stay local: `appearance`, `navStyle`, `sidebarPersistent`, `disableAnimations`, `barcodeFlashlight` — these depend on form factor / device hardware and shouldn't be forced to match across phone + desktop.
+- **`loadServerSettings()` now mirrors all server settings into native SQLite** `user_settings` on Android, marking them `synced` so the differential sync engine doesn't re-push. Background workers (ReminderWorker, HealthConnectSyncWorker) now read fresh values. Phone went from 60 → 86 settings after the first cold-start with this fix.
+- **Global `wl:setting` listener** in `src/stores/settings.js` catches direct `DB.setSetting()` writes (16+ legacy bypass call sites) and triggers `scheduleSave` + native SQLite mirror for `USER_PREFS` keys. Fixes the entire bypass class without touching individual call sites.
+- **`DB.setSetting` short-circuits** if value is unchanged — prevents listener floods on mount and avoids double-firing the server push.
+
+### Added
+- **Sidebar viewport gate** — sidebar nav style is force-hidden on screens < 768px (small phones in any orientation) regardless of user preference. Tablets, foldables, and desktop keep the option. The setting itself is preserved across rotations/resizes. Settings UI now also uses the width gate instead of `!isNative` so the persistent-sidebar toggle appears on tablet/foldable native installs.
+- **Per-device sync range tiers** in Settings → Wellness — replaces single `SYNC_RANGE_OPTIONS` with Recommended (1d/1w/1m/3m for all devices) + Advanced ⚠ tier per device: Fitbit 6m/1y, Garmin 6m only, Withings 6m/1y. Custom day input clamped per device (Garmin 180, Fitbit/Withings 365). Each device gets a one-line warning under Advanced explaining why longer ranges may fail or be slow.
+
+### FitBot redesign
+- **Animated robot face SVG** (FitBotFace.svelte) replaces the `smart_toy` Material icon in all 5 places FitBot is shown (FAB, header, welcome screen, message avatar, typing indicator). Pure-CSS animations: blinking eyes, eye-darting, pulsing antenna, twinkling cheek lights, breathing mouth.
+- **FAB visual upgrade** — glassmorphism (backdrop-filter blur+saturate, white border, inner radial highlight, depth shadows), theme-aware animated gradient (shifts between `--accent` and `--accent-2`, never hardcoded colors), concentric heartbeat ring pulse using `--accent-dim` (replaces vertical bobbing).
+- **Responsive panel layout** — replaces right-side slide-in with: bottom sheet on mobile (88vh, drag handle, dimmed backdrop) / floating card on desktop (420×640, no backdrop, anchored to FAB position). Card pops up next to wherever the user dragged the FAB (4-quadrant logic clamped to viewport).
+
+### Fixed
+- **Meal reminder labels** — both ReminderWorker.java and server scheduler had a bug where missing/short `mealNames` fell back to hardcoded defaults `['Breakfast','Lunch','Dinner','Snacks']` and would fire wrong labels like "Time to log your Dinner!" at 1pm. Now: if mealNames is missing or shorter than `notifMealTimes`, unmatched indices show generic "Time to log your meal!" instead of impersonating a wrong slot.
+- **BarcodeScanner double-submit** — `onCode()` checked `detected` flag at the top but never set it, so rapid camera detections (multiple frames or two engines firing for the same barcode) could both dispatch scan events. `doManual()` had no guard at all. Both now set `detected=true` on entry; continuous mode resets after 1.5s cooldown.
+- **Workout list "max" → "peak" HR** — compact workout list said "94 avg · 154 max bpm" while the expanded detail card said "Peak HR" for the same value. Now consistent.
+
+---
+
 ## [0.34.0-beta] — 2026-04-06
 
 ### Added
