@@ -2,6 +2,7 @@
   import { onMount, tick } from 'svelte';
   import { fly, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
+  import FitBotFace from './FitBotFace.svelte';
   import { NtApi }     from '../../lib/api.js';
   import { DB, localDateStr } from '../../lib/db.js';
   import { Nutrition } from '../../lib/nutrition.js';
@@ -626,24 +627,7 @@ Water: ${ctx.waterText}`
     {:else if panelOpen}
       <span class="material-symbols-rounded" style="font-size:26px">close</span>
     {:else}
-      <!-- Animated robot face -->
-      <svg class="fab-robot" viewBox="0 0 56 56" xmlns="http://www.w3.org/2000/svg">
-        <!-- Antenna -->
-        <line class="bot-antenna" x1="28" y1="10" x2="28" y2="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        <circle class="bot-antenna-dot" cx="28" cy="9" r="2" fill="currentColor"/>
-        <!-- Head -->
-        <rect class="bot-head" x="13" y="16" width="30" height="26" rx="9" fill="rgba(255,255,255,0.18)" stroke="currentColor" stroke-width="1.5"/>
-        <!-- Cheek lights -->
-        <circle class="bot-cheek bot-cheek-l" cx="16" cy="32" r="1.5" fill="currentColor" opacity="0.6"/>
-        <circle class="bot-cheek bot-cheek-r" cx="40" cy="32" r="1.5" fill="currentColor" opacity="0.6"/>
-        <!-- Eyes (animated via CSS) -->
-        <g class="bot-eyes">
-          <rect class="bot-eye bot-eye-l" x="20" y="24" width="5" height="6" rx="2" fill="currentColor"/>
-          <rect class="bot-eye bot-eye-r" x="31" y="24" width="5" height="6" rx="2" fill="currentColor"/>
-        </g>
-        <!-- Mouth -->
-        <path class="bot-mouth" d="M22 36 Q28 39 34 36" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/>
-      </svg>
+      <div class="fab-robot-wrap"><FitBotFace size={42} /></div>
     {/if}
     {#if hasUnread && !panelOpen}
       <div class="fab-badge" transition:fade={{ duration: 120 }}></div>
@@ -670,7 +654,7 @@ Water: ${ctx.waterText}`
       <div class="ai-header">
         <div class="ai-header-brand">
           <div class="ai-avatar">
-            <span class="material-symbols-rounded">smart_toy</span>
+            <FitBotFace size={32} />
           </div>
           <div>
             <div class="ai-header-name">{assistantName}</div>
@@ -705,7 +689,7 @@ Water: ${ctx.waterText}`
           <!-- Welcome screen -->
           <div class="ai-welcome">
             <div class="ai-welcome-avatar">
-              <span class="material-symbols-rounded">smart_toy</span>
+              <FitBotFace size={48} />
             </div>
             <p class="ai-welcome-name">Hi, I'm {assistantName}!</p>
             <p class="ai-welcome-desc">Ask me anything — nutrition, sleep, activity, recovery, hydration, body composition. I have access to all your data from today.</p>
@@ -731,7 +715,7 @@ Water: ${ctx.waterText}`
             <div class="ai-msg" class:user={msg.role === 'user'}>
               {#if msg.role === 'assistant'}
                 <div class="ai-msg-avatar">
-                  <span class="material-symbols-rounded">smart_toy</span>
+                  <FitBotFace size={24} />
                 </div>
               {/if}
               <div class="ai-msg-body">
@@ -751,7 +735,7 @@ Water: ${ctx.waterText}`
         {#if loading}
           <div class="ai-msg">
             <div class="ai-msg-avatar">
-              <span class="material-symbols-rounded">smart_toy</span>
+              <FitBotFace size={24} />
             </div>
             <div class="ai-msg-body">
               <div class="ai-bubble ai-typing">
@@ -890,58 +874,14 @@ Water: ${ctx.waterText}`
              0 0 0 0 transparent; }
   }
 
-  /* ── Animated robot face ─────────────────────────────────────────────── */
-  .fab-robot {
-    width: 42px;
-    height: 42px;
-    color: #ffffff;
+  /* Robot face wrapper inside the FAB — sits above the gradient + glass overlay */
+  .fab-robot-wrap {
     position: relative;
     z-index: 1;
-    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));
-  }
-  /* Eyes blink — quick close every 4-5s */
-  .bot-eyes {
-    transform-origin: 28px 27px;
-    animation: bot-blink 4.6s ease-in-out infinite;
-  }
-  @keyframes bot-blink {
-    0%, 92%, 100% { transform: scaleY(1); }
-    94%, 96%       { transform: scaleY(0.1); }
-  }
-  /* Eyes also dart left/right occasionally */
-  .bot-eye {
-    animation: bot-eye-dart 7s ease-in-out infinite;
-  }
-  @keyframes bot-eye-dart {
-    0%, 35%, 100% { transform: translateX(0); }
-    40%, 55%       { transform: translateX(-1.2px); }
-    60%, 75%       { transform: translateX(1.2px); }
-    80%             { transform: translateX(0); }
-  }
-  /* Antenna dot pulses softly */
-  .bot-antenna-dot {
-    transform-origin: 28px 9px;
-    animation: bot-antenna 1.8s ease-in-out infinite;
-  }
-  @keyframes bot-antenna {
-    0%, 100% { transform: scale(1);   opacity: 0.7; }
-    50%       { transform: scale(1.4); opacity: 1; }
-  }
-  /* Cheeks twinkle alternately */
-  .bot-cheek-l { animation: bot-cheek 3s ease-in-out infinite; }
-  .bot-cheek-r { animation: bot-cheek 3s ease-in-out infinite 1.5s; }
-  @keyframes bot-cheek {
-    0%, 100% { opacity: 0.4; }
-    50%       { opacity: 1; }
-  }
-  /* Mouth idle smile (subtle bob) */
-  .bot-mouth {
-    transform-origin: 28px 37px;
-    animation: bot-mouth 3.4s ease-in-out infinite;
-  }
-  @keyframes bot-mouth {
-    0%, 100% { transform: scaleY(1); }
-    50%       { transform: scaleY(1.25); }
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   /* Spinner when loading */
@@ -1012,7 +952,6 @@ Water: ${ctx.waterText}`
     color: var(--accent-text);
     flex-shrink: 0;
   }
-  .ai-avatar .material-symbols-rounded { font-size: 22px; }
   .ai-header-name { font-size: 15px; font-weight: 700; color: var(--text-1); }
   .ai-header-sub  { font-size: 11px; color: var(--text-3); margin-top: 1px; }
   .ai-header-actions { display: flex; gap: 4px; }
@@ -1052,7 +991,6 @@ Water: ${ctx.waterText}`
     color: var(--accent-text);
     margin-bottom: 4px;
   }
-  .ai-welcome-avatar .material-symbols-rounded { font-size: 32px; }
   .ai-welcome-name { font-size: 18px; font-weight: 700; color: var(--text-1); }
   .ai-welcome-desc { font-size: 13px; color: var(--text-2); line-height: 1.6; max-width: 280px; }
   .ai-quick-chips {
@@ -1086,14 +1024,13 @@ Water: ${ctx.waterText}`
     flex-direction: row-reverse;
   }
   .ai-msg-avatar {
-    width: 28px; height: 28px;
+    width: 32px; height: 32px;
     border-radius: 50%;
     background: var(--accent-dim);
     color: var(--accent);
     display: flex; align-items: center; justify-content: center;
     flex-shrink: 0;
   }
-  .ai-msg-avatar .material-symbols-rounded { font-size: 16px; }
   .ai-msg-body {
     display: flex; flex-direction: column; gap: 3px;
     max-width: calc(100% - 40px);
