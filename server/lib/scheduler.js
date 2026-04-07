@@ -185,8 +185,12 @@ async function _pushReminders(userId) {
 
   // Meal reminders — only if that meal slot is empty for today
   if (_isEnabled(userId, 'notifMealReminders')) {
-    const times = _getUserSetting(userId, 'notifMealTimes') || ['08:00', '12:00', '18:00'];
-    const mealNames = _getUserSetting(userId, 'mealNames') || ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
+    const times = _getUserSetting(userId, 'notifMealTimes');
+    // mealNames is OPTIONAL — if missing/shorter than times, fall back to generic
+    // "meal" rather than lying with stale defaults like "Dinner" when the user has
+    // restructured their meal slots.
+    const mealNames = _getUserSetting(userId, 'mealNames') || [];
+   if (times && times.length > 0) {
     const today = local.dateStr;
     // Check diary for today — try user-specific first, then fallback to NULL user_id (single-user mode)
     let diaryItems = [];
@@ -213,14 +217,16 @@ async function _pushReminders(userId) {
           const mealIdx = item.meal != null ? Number(item.meal) : 0;
           return mealIdx === i;
         });
-        logger.info(`[scheduler] meal ${i} (${mealNames[i]}): hasItems=${mealHasItems}, time=${time}, currentMin=${currentMin}, targetMin=${targetMin}`);
+        const mealLabel = mealNames[i] || 'meal';
+        logger.info(`[scheduler] meal ${i} (${mealLabel}): hasItems=${mealHasItems}, time=${time}, currentMin=${currentMin}, targetMin=${targetMin}`);
         if (!mealHasItems) {
-          pushNotify(userId, 'notifMealReminders', '🍽️ Meal Reminder', `Time to log your ${mealNames[i] || 'meal'}!`, 4);
+          pushNotify(userId, 'notifMealReminders', '🍽️ Meal Reminder', `Time to log your ${mealLabel}!`, 4);
         } else {
           logger.info(`[scheduler] skipping meal ${i} reminder — already logged`);
         }
       }
     });
+   } // end if (times && times.length > 0)
   }
 
   // Weigh-in reminder

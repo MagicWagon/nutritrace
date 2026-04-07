@@ -96,17 +96,11 @@ public class ReminderWorker extends Worker {
     // ── Meal reminders ─────────────────────────────────────────────────────
     private void checkMealReminders(SQLiteDatabase db, int currentMin, String today) {
         JSONArray times = getArraySetting(db, "notifMealTimes");
-        if (times == null) {
-            try {
-                times = new JSONArray("[\"08:00\",\"12:00\",\"18:00\"]");
-            } catch (Exception e) { return; }
-        }
+        if (times == null || times.length() == 0) return; // no times configured → nothing to do
+        // mealNames is OPTIONAL — if missing or shorter than times, fall back to a
+        // generic "meal" label rather than lying with stale defaults like "Dinner"
+        // when the user has restructured their meal slots.
         JSONArray names = getArraySetting(db, "mealNames");
-        if (names == null) {
-            try {
-                names = new JSONArray("[\"Breakfast\",\"Lunch\",\"Dinner\",\"Snacks\"]");
-            } catch (Exception e) { return; }
-        }
 
         Set<Integer> loggedSlots = getLoggedMealSlots(db, today);
 
@@ -122,7 +116,8 @@ public class ReminderWorker extends Worker {
                     Log.d(TAG, "skipping meal " + i + " — already logged");
                     continue;
                 }
-                String mealName = i < names.length() ? names.getString(i) : "meal";
+                // Use the user's meal name if available at this index, else generic
+                String mealName = (names != null && i < names.length()) ? names.getString(i) : "meal";
                 postNotification(2000 + i, "🍽️ Meal Reminder",
                     "Time to log your " + mealName + "!");
             } catch (Exception e) {
