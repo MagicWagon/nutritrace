@@ -87,6 +87,7 @@
 
   async function onCode(code) {
     if (detected) return;
+    detected = true;
     if ($barcodeBeep) playBeep();
     scanlineVisible = true;
     setTimeout(() => scanlineVisible = false, 500);
@@ -95,6 +96,8 @@
       dispatch('scan', { code });
     } else {
       dispatch('scan', { code });
+      // Allow another scan in continuous mode after a short cooldown
+      setTimeout(() => { detected = false; }, 1500);
     }
   }
 
@@ -290,8 +293,10 @@
   }
 
   async function doManual() {
+    if (detected) return;
     const code = manualCode.trim();
     if (!code) return;
+    detected = true;
     await close();
     dispatch('scan', { code });
   }
