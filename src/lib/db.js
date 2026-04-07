@@ -141,7 +141,13 @@ const DB = (() => {
       try { return JSON.parse(raw); } catch(e) { return raw; }
     },
     setSetting(key, value) {
-      localStorage.setItem(this._settingKey(key), JSON.stringify(value));
+      const fullKey = this._settingKey(key);
+      const next = JSON.stringify(value);
+      // Early-exit if unchanged — prevents listener floods on mount and avoids
+      // double-firing the server push from store.set() + global wl:setting listener
+      const prev = localStorage.getItem(fullKey);
+      if (prev === next) return;
+      localStorage.setItem(fullKey, next);
       window.dispatchEvent(new CustomEvent('wl:setting', { detail: { key } }));
     },
     getAllSettings() {

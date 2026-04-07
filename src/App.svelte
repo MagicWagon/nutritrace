@@ -77,7 +77,17 @@
   $: _isEditorRoute = EDITOR_ROUTES.some(r => $location.startsWith(r));
   $: isEditor      = NAV_HIDDEN.some(p => $location.startsWith(p));
 
-  $: _hasSidebar   = showNav && ($navStyle === 'sidebar' || $navStyle === 'both');
+  // Track viewport width — sidebar is force-hidden on narrow screens (small phones)
+  // even if the user's preference allows it. Tablets, foldables, and desktop keep
+  // the option. Threshold 768px = standard tablet breakpoint; phones in landscape
+  // typically still fall under this. Setting itself is preserved.
+  let _viewportW = typeof window !== 'undefined' ? window.innerWidth : 1024;
+  if (typeof window !== 'undefined') {
+    window.addEventListener('resize', () => { _viewportW = window.innerWidth; });
+  }
+  $: _sidebarAllowed = _viewportW >= 768;
+
+  $: _hasSidebar   = showNav && _sidebarAllowed && ($navStyle === 'sidebar' || $navStyle === 'both');
   $: sidebarPinned = _hasSidebar && $sidebarPersistent;
   $: showHamburger = _hasSidebar && !sidebarPinned;
 

@@ -1,10 +1,20 @@
 import { writable, get } from 'svelte/store';
 import { DB } from '../lib/db.js';
 
-// ── Server-side settings sync ──────────────────────────────────────────────
-// Keys in this set are synced to the server when user management is active.
-// Browser-only keys (appearance, nav style, etc.) are NOT in this set.
-const SERVER_SETTINGS = new Set([
+// ── Settings categorization ────────────────────────────────────────────────
+//
+// USER_PREFS — synced to server, travel with the user across devices.
+//   Includes nutrition prefs, units, integrations (creds), notifications.
+//
+// DEVICE_PREFS — local-only, never synced. Each device chooses its own value.
+//   Reasons: form factor (sidebar vs bottom nav), screen lighting (dark/light
+//   theme), performance (animations on/off per device), or device-specific
+//   hardware (camera flashlight is meaningless on desktop).
+//
+// SERVER_ADMIN — server-only, never reach clients (filtered in
+//   server/lib/server-only-keys.js). OAuth app credentials etc.
+//
+const USER_PREFS = new Set([
   'energyUnit','mealNames','goals','goalTemplates',
   'visibleNutriments','nutrimentsOrder','customNutriments',
   'bodyStatsOrder','hiddenBodyStats','foodCategories',
@@ -14,7 +24,7 @@ const SERVER_SETTINGS = new Set([
   'diaryPromptQuantity','diaryShowPortionSize',
   'foodsShowCategories','foodsShowLabels','foodsShowNotes','foodsShowThumbnails',
   'foodsShowYesterdayMeals','foodsSort',
-  'barcodeBeep','barcodeFlashlight','cropPhotos',
+  'barcodeBeep','cropPhotos',
   'offSearchLanguage','offSearchCountry','offUploadCountry',
   'weightUnit','heightUnit','lengthUnit','distUnit','tempUnit',
   'waterGoalMl','waterUnit','waterContainers','waterShowInStats','waterShowInDiary',
@@ -35,10 +45,22 @@ const SERVER_SETTINGS = new Set([
   'notifWeighIn','notifWeighInTime','notifWeeklySummary',
   'notifWellnessAlerts','notifWorkoutSummary','notifSyncFailures',
   'appriseUrl','appriseTag','gotifyUrl','gotifyToken','ntfyUrl','ntfyTopic','ntfyToken',
-  // Appearance / UI prefs — included so full backups restore the full look-and-feel
-  'appearance','accentColor',
-  'navStyle','sidebarPersistent','startPage','disableAnimations','goalCelebrations','pageBanners','loopBannerAnimations',
+  // UI behavior prefs that should match across devices
+  'accentColor','startPage','goalCelebrations','pageBanners','loopBannerAnimations',
 ]);
+
+// DEVICE_PREFS — local-only, never synced.
+const DEVICE_PREFS = new Set([
+  'appearance',         // light/dark — depends on each device's lighting context
+  'navStyle',           // bottom-nav makes no sense on desktop, sidebar makes none on phone
+  'sidebarPersistent',  // form-factor specific
+  'disableAnimations',  // performance pref tied to device speed
+  'barcodeFlashlight',  // hardware-specific (no flashlight on desktop)
+]);
+
+// Backwards-compat alias — keeps existing .has(key) checks working without
+// touching every call site. Equivalent to USER_PREFS.
+const SERVER_SETTINGS = USER_PREFS;
 
 import { isNative, getServerUrl, getAuthToken } from '../lib/platform.js';
 
@@ -110,6 +132,11 @@ export function scheduleSave(key, value) {
 /**
  * Called after login/auth-check. Fetches all server settings and populates
  * localStorage + notifies all stores via wl:setting events.
+ *
+ * On native, ALSO writes each setting to the native SQLite user_settings
+ * table so background workers (ReminderWorker, etc.) read fresh values.
+ * Without this, WorkManager would see stale or missing settings even after
+ * the JS app pulls everything from the server.
  */
 export async function loadServerSettings() {
   if (!_shouldSyncToServer()) return;
@@ -118,9 +145,29 @@ export async function loadServerSettings() {
     if (!res.ok) return;
     const serverSettings = await res.json();
     _suppressSync = true; // Don't push these back to server
+
+    // Write all to localStorage (PWA + native JS layer)
     for (const [key, value] of Object.entries(serverSettings)) {
       DB.setSetting(key, value);
     }
+
+    // Native: also mirror into the native SQLite user_settings table so the
+    // WorkManager / background workers have access to fresh values. Mark as
+    // 'synced' so the differential sync doesn't try to re-push them.
+    if (isNative) {
+      try {
+        const { dbUpsertSetting, dbMarkSettingsSynced } = await import('../lib/db-native.js');
+        const keys = [];
+        for (const [key, value] of Object.entries(serverSettings)) {
+          await dbUpsertSetting(key, value);
+          keys.push(key);
+        }
+        if (keys.length) await dbMarkSettingsSynced(keys);
+      } catch (e) {
+        console.warn('[settings] native SQLite mirror failed:', e.message);
+      }
+    }
+
     _suppressSync = false;
   } catch { _suppressSync = false; }
 }
@@ -130,6 +177,33 @@ export async function loadServerSettings() {
  * Syncs with the 'wl:setting' window event so changes in one
  * component are immediately reflected everywhere.
  */
+// ── Global wl:setting listener — catches direct DB.setSetting() calls ──────
+// Some legacy code paths write settings via DB.setSetting() directly instead
+// of going through a store's .set(). Without this listener, those writes
+// would never trigger a server push for USER_PREFS keys, leaving the server
+// (and other devices) out of sync. This single listener fixes all bypass
+// call sites at once without touching them individually.
+//
+// The store-based path also fires this listener, but scheduleSave() is
+// debounced (600ms) on a per-key basis, so the duplicate trigger is harmless
+// — only the latest call wins. The early-exit in DB.setSetting() further
+// prevents unnecessary re-entry when the value is unchanged.
+if (typeof window !== 'undefined') {
+  window.addEventListener('wl:setting', (e) => {
+    const key = e.detail?.key;
+    if (!key) return;
+    if (!USER_PREFS.has(key)) return;        // device-only or unknown key — skip
+    if (_suppressSync) return;                // server-sourced update — don't echo
+    const value = DB.getSetting(key, undefined);
+    _recentlyChanged.set(key, Date.now());
+    // Native: write to local SQLite immediately (marks as pending for sync protection)
+    if (isNative) {
+      import('../lib/db-native.js').then(({ dbUpsertSetting }) => dbUpsertSetting(key, value)).catch(() => {});
+    }
+    scheduleSave(key, value);
+  });
+}
+
 function createSettingStore(key, defaultValue) {
   const store = writable(DB.getSetting(key, defaultValue));
 

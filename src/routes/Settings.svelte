@@ -1524,12 +1524,12 @@
               </select>
             </div>
           </div>
-          {#if (navStyle === 'sidebar' || navStyle === 'both') && !isNative}
+          {#if (navStyle === 'sidebar' || navStyle === 'both') && (typeof window === 'undefined' || window.innerWidth >= 768)}
             <div class="setting-divider"></div>
             <div class="setting-row">
               <div>
                 <span class="setting-label">Persistent sidebar</span>
-                <div class="setting-desc">Sidebar stays open and shifts page content instead of overlaying it</div>
+                <div class="setting-desc">Sidebar stays open and shifts page content instead of overlaying it. Available on tablets, foldables, and desktop.</div>
               </div>
               <Toggle checked={sidebarPersistentVal} on:change={e => sidebarPersistentVal = e.detail} />
             </div>
