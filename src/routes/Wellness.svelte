@@ -818,7 +818,7 @@
       baselines: { hrvBaseline: Math.round(hrvBaseline * 100) / 100, rhrBaseline: rhrBaseline != null ? Math.round(rhrBaseline * 10) / 10 : null },
       todayRaw: Math.round(todayRaw * 10) / 10,
       smoothedHistory: smoothed != null ? Math.round(smoothed * 10) / 10 : null,
-      formula: smoothed != null ? `0.60×${Math.round(smoothed*10)/10} + 0.40×${Math.round(todayRaw*10)/10} = ${score}` : `raw=${Math.round(todayRaw*10)/10} → ${score}`,
+      formula: smoothed != null ? `0.50×${Math.round(smoothed*10)/10} + 0.50×${Math.round(todayRaw*10)/10} = ${score}` : `raw=${Math.round(todayRaw*10)/10} → ${score}`,
     }, null, 2));
 
     return {

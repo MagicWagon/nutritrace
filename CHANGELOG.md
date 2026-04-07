@@ -5,6 +5,36 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.34.0-beta] — 2026-04-06
+
+### Added
+- **Native Android background reminders via WorkManager** — new Kotlin/Java native worker (`ReminderWorker.java`) runs every 15 min (Android floor) to check SQLite directly and fire meal/water/weigh-in notifications only when warranted. Skips reminders for meals already logged in today's diary, water goals already met, etc. Works even when the app is closed/killed without depending on the JS layer.
+- **Native Health Connect background sync via WorkManager** — new Kotlin `HealthConnectSyncWorker` (CoroutineWorker) reads the androidx Health Connect SDK directly (no JS plugin bridge needed) and writes results into the local SQLite `wellness_data` table under `source='health_connect'`. Reads 13 metric types: steps, distance, total/active calories, avg HR, resting HR, weight, body fat, SpO2, respiratory rate, sleep session with stages, floors, hydration. Runs every hour when the user has Health Connect enabled.
+- **WorkerScheduler.java** — centralized worker enqueue/cancel logic. HC sync worker is only enqueued when `healthConnectEnabled = true` in user_settings; toggling off calls `cancelUniqueWork` so the OS doesn't run anything for HC at all (zero battery cost when disabled). Re-evaluation triggers from MainActivity onCreate (app open) and from ReminderWorker every 15 min so Settings toggles take effect within 15 min without a reopen.
+- **Kotlin support added to Android project** — `kotlin-gradle-plugin:2.0.21` + `kotlinx-coroutines-android:1.8.1`, enabling native suspend/coroutine code for the HC SDK (~3x less boilerplate vs Java).
+- **`_USE_NATIVE_WORKER` kill switch** in `src/lib/notifications.js` — when `true` (default), the JS-side `LocalNotifications` scheduling for water/meal/weigh-in early-returns after cancelling any pending OS notifications, making WorkManager the sole source of local reminders. JS code preserved for fallback testing.
+
+### Battery-conscious worker design
+- `NetworkType.NOT_REQUIRED` — never wakes the radio
+- `setRequiresBatteryNotLow(true)` — skips when battery < 15%
+- Read-only SQLite where possible; HC writes use WAL-friendly transactions
+- Single ReminderWorker handles all reminder types (3x fewer wake-ups vs separate workers)
+- `ExistingPeriodicWorkPolicy.KEEP` — survives app restarts without re-enqueueing
+- Permission gate: HC worker bails immediately if no HC permissions granted
+- No exact alarms, no wake locks, no foreground service
+- Each invocation: ~50ms SQLite read + (optionally) ~50ms HC reads + ~20ms write
+
+### Fixed
+- **Fitbit workout Peak HR was always 220** — `heartRateZones[].max` is the zone boundary (Peak zone always tops at 220), not actual HR. Now fetches per-minute intraday HR data from `/1/user/-/activities/heart/date/.../1d/1min/time/.../...` for each activity's time window and stores the actual highest recorded heart rate. Label renamed to "Peak HR".
+- **Peak HR timezone bug** — initial intraday fix used `toTimeString()` which converts to server timezone, fetching the wrong HR window (often resting hours). Now parses HH:mm directly from the activity's ISO startTime to preserve the user's local time.
+- **Goal celebration repeats across app reloads** — `_celebratedToday` Set was in-memory only and reset on every reload, causing repeat celebrations for goals already hit earlier in the day. Now persisted to localStorage with date key. Affects all goals: water, calories, protein, carbs, fat, steps, sleep, etc.
+- **Stress score formula display string** — debug/info text said `0.60×... + 0.40×...` but actual code uses `0.50/0.50` smoothing since v0.30.0. Display now matches the math.
+
+### Changed
+- **Fitbit score calibration data collection** — `reference_fitbit_scores.md` now tracks readiness/stress formula output alongside actuals (not just sleep). User pastes `[readiness]` and `[stress]` console JSON blocks daily; all components, baselines, inputs are logged for retroactive refit.
+
+---
+
 ## [0.33.0-beta] — 2026-04-05
 
 ### Added
