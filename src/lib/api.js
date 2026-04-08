@@ -306,6 +306,12 @@ const _NtApiHttp = {
       if (token) headers['Authorization'] = `Bearer ${token}`;
     }
 
+    // PWA cookie-based auth: add CSRF token for state-changing requests
+    if (!isNative && !['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+      const csrf = localStorage.getItem('nt:csrf');
+      if (csrf) headers['X-CSRF-Token'] = csrf;
+    }
+
     const res = await fetch(base + path, {
       method,
       headers,

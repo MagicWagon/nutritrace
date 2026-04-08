@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import db from '../db.js';
 
@@ -19,7 +20,7 @@ export function signToken(user) {
   const hours = cfg?.value != null && cfg.value !== '' ? parseInt(cfg.value) : 720;
   const opts = hours > 0 ? { expiresIn: `${hours}h` } : {};
   return jwt.sign(
-    { id: user.id, username: user.username, role: user.role },
+    { id: user.id, username: user.username, role: user.role, csrf: crypto.randomBytes(16).toString('hex') },
     JWT_SECRET,
     opts
   );

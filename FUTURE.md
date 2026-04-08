@@ -87,10 +87,7 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
 
 ### ~~Meal-level macro summary~~ *(done — per-meal P/C/F bar + text)*
 
-### Quick-log (voice / text)
-- Natural language food entry: "2 eggs and a slice of toast"
-- Uses FitBot AI backend (already multi-provider); returns structured nutrition data
-- Confirmation sheet before adding
+### ~~Quick-log (voice / text)~~ *(done — Smart Log v3, hold FitBot button)*
 
 ### Dynamic Calorie Goal
 - **Fixed** (current, default) vs **Dynamic** (device calories_out × factor)
@@ -114,9 +111,6 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
 
 ### Recipe scaling from servings count
 - Input "I want 6 servings" → auto-scale all ingredient quantities
-
-### Barcode history
-- Recent scans list; re-add without re-scanning
 
 ---
 
@@ -172,12 +166,12 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
 - Optional Prometheus endpoint (`/api/metrics`): request count, DB query times, sync success/fail
 - Admin-only; opt-in via env var
 
-### ~~Security hardening~~ *(done — v0.27.0)*
+### ~~Security hardening~~ *(done)*
 - ~~Rate limiting on auth endpoints (10/15min)~~
 - ~~CORS middleware with allowed origins + Authorization header~~
 - ~~Password complexity (8+ chars, uppercase/lowercase/number/special)~~
 - ~~JWT_SECRET startup warning~~
-- CSRF protection
+- ~~CSRF protection — synchronizer token in JWT; enforced on cookie-based sessions; Bearer token requests exempt~~
 
 ---
 

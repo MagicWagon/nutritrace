@@ -22,6 +22,7 @@ import garminRoutes     from './routes/garmin.js';
 import syncRoutes       from './routes/sync.js';
 import { logger }   from './logger.js';
 import { authenticate } from './middleware/auth.js';
+import { csrfProtect } from './middleware/csrf.js';
 import { seedSmtpFromEnv } from './email.js';
 import { seedAiFromEnv } from './ai.js';
 
@@ -51,7 +52,7 @@ app.use((req, res, next) => {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Credentials', 'true');
       res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-CSRF-Token');
       if (req.method === 'OPTIONS') return res.sendStatus(204);
     }
   }
@@ -69,7 +70,8 @@ app.use('/uploads', express.static(uploadsPath, {
 // (DuckDuckGo, Walmart, etc. block direct WebView requests)
 app.use('/api/proxy', proxyRoutes);
 
-app.use(authenticate); // attach req.user on every request
+app.use(authenticate);   // attach req.user on every request
+app.use(csrfProtect);   // CSRF protection for cookie-based sessions
 
 // ── Request logging ────────────────────────────────────────────────────────
 app.use((req, res, next) => {

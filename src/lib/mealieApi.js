@@ -17,12 +17,14 @@ function _cfg() {
 async function _proxy(path) {
   const { baseUrl, token } = _cfg();
   if (!baseUrl || !token) return null;
+  const csrf = !isNative ? localStorage.getItem('nt:csrf') : null;
   const res = await fetch(apiUrl('/api/mealie/proxy'), {
     method: 'POST',
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
       ...(isNative && getServerUrl() && getAuthToken() ? { 'Authorization': `Bearer ${getAuthToken()}` } : {}),
+      ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
     },
     body: JSON.stringify({ baseUrl, token, path }),
   });

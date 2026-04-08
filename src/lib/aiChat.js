@@ -83,10 +83,11 @@ export async function callAI({ provider, apiKey, model, messages, systemPrompt, 
  */
 export async function callAIProxy({ messages, systemPrompt }) {
   const { apiUrl } = await import('./platform.js');
+  const csrf = localStorage.getItem('nt:csrf');
   const res = await fetch(apiUrl('/api/ai/chat'), {
     method: 'POST',
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(csrf ? { 'X-CSRF-Token': csrf } : {}) },
     body: JSON.stringify({ messages, systemPrompt }),
   });
   const data = await res.json();

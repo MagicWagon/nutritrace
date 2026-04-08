@@ -41,6 +41,9 @@
     if (isNative && getServerUrl()) {
       const t = getAuthToken();
       if (t) h['Authorization'] = `Bearer ${t}`;
+    } else {
+      const csrf = localStorage.getItem('nt:csrf');
+      if (csrf) h['X-CSRF-Token'] = csrf;
     }
     return { credentials: 'include', headers: h };
   }

@@ -196,14 +196,20 @@ On first launch, a setup wizard walks you through enabling user management and c
 | `DATA_DB_PATH` | Yes | — | Host path for the SQLite database directory |
 | `DATA_UPLOADS_PATH` | Yes | — | Host path for uploaded images and backups |
 | `JWT_SECRET` | If using users | — | Secret key for signing auth tokens. Use a long random string. |
+| `RECOVERY_TOKEN` | No | — | Passphrase required to disable user management from the login page (lockout recovery). Without this the recovery endpoint is disabled. |
+| `LOG_LEVEL` | No | `info` | Log verbosity: `error` \| `warn` \| `info` \| `debug`. Use `debug` for detailed Fitbit/Withings sync output. |
 | `SMTP_HOST` | No | — | SMTP server hostname (for password reset & invites) |
 | `SMTP_PORT` | No | `587` | SMTP port |
 | `SMTP_SECURE` | No | `false` | `true` for SSL (port 465), `false` for STARTTLS |
 | `SMTP_USER` | No | — | SMTP username |
 | `SMTP_PASS` | No | — | SMTP password |
 | `SMTP_FROM` | No | — | From address, e.g. `NutriTrace <noreply@example.com>` |
+| `AI_PROVIDER` | No | — | Lock FitBot to a specific provider for all users: `claude` \| `openai` \| `gemini` |
+| `AI_API_KEY` | No | — | Shared AI API key. Key is server-side only — never sent to the browser. |
+| `AI_MODEL` | No | provider default | Override the AI model (e.g. `claude-haiku-4-5-20251001`) |
+| `AI_ENABLED` | No | — | Set to `true` to auto-enable FitBot for all users |
 
-SMTP can also be configured (and tested) in the Settings UI. Environment variables take priority over UI-configured values.
+SMTP and AI settings can also be configured in the Settings UI. Environment variables take priority over UI values and lock those fields for all users.
 
 ---
 
@@ -238,6 +244,29 @@ The database schema migrates automatically on startup.
 | Auth | JWT (httpOnly cookie), bcryptjs |
 | Container | Docker, multi-stage Dockerfile |
 | CI/CD | GitHub Actions → GitHub Container Registry |
+
+---
+
+## Wellness Integrations
+
+NutriTrace can sync data from Fitbit, Withings, and Garmin. Each requires registering a free OAuth application with the respective service and entering the credentials in **Settings → Wellness**.
+
+### Fitbit
+1. Go to [dev.fitbit.com](https://dev.fitbit.com) → **Register an App**
+2. Application type: **Personal**
+3. OAuth 2.0 Application Type: **Personal**
+4. Callback URL: `https://your-nutritrace-domain.com/api/wellness/fitbit/callback`
+5. Copy the **Client ID** and **Client Secret** into Settings → Wellness → Fitbit
+
+### Withings
+1. Go to [developer.withings.com](https://developer.withings.com) → create a developer account → **New Application**
+2. Callback URL: `https://your-nutritrace-domain.com/api/wellness/withings/callback`
+3. Copy **Client ID** and **Client Secret** into Settings → Wellness → Withings
+
+### Garmin
+Garmin Health API requires a partnership approval (not a free developer program). If you have access, set the callback URL to `https://your-nutritrace-domain.com/api/wellness/garmin/callback`.
+
+> **Note:** The callback URLs must use your public domain (not `localhost`). Both Fitbit and Withings require HTTPS.
 
 ---
 

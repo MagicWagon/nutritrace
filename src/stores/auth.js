@@ -80,6 +80,8 @@ async function _fetchAuthFromServer() {
     currentUser.set(user);
     if (user) localStorage.setItem('wl:userId', String(user.id));
     else       localStorage.removeItem('wl:userId');
+    if (meData.csrf) localStorage.setItem('nt:csrf', meData.csrf);
+    else             localStorage.removeItem('nt:csrf');
     // Cache for offline fallback
     if (user) {
       localStorage.setItem('nt:cachedUser', JSON.stringify(user));
@@ -120,6 +122,7 @@ export async function logout() {
   localStorage.removeItem('wl:userId');
   localStorage.removeItem('nt:cachedUser');
   localStorage.removeItem('nt:cachedUserMgmt');
+  localStorage.removeItem('nt:csrf');
   currentUser.set(null);
   userMgmtActive.set(false);
 }

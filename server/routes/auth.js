@@ -57,9 +57,9 @@ router.get('/status', wrap((req, res) => {
 
 // ── Who am I? ─────────────────────────────────────────────────────────────
 router.get('/me', wrap((req, res) => {
-  if (!req.user) return res.json({ user: null });
+  if (!req.user) return res.json({ user: null, csrf: null });
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
-  res.json({ user: user ? safeUser(user) : null });
+  res.json({ user: user ? safeUser(user) : null, csrf: req.user.csrf || null });
 }));
 
 // ── Login ──────────────────────────────────────────────────────────────────

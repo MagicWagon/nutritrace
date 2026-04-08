@@ -388,10 +388,11 @@ export async function sendNtfy(url, topic, token, title, message, priority = 5) 
     if (resp.status < 200 || resp.status >= 300) throw new Error(`ntfy ${resp.status}`);
   } else {
     const { apiUrl } = await import('./platform.js');
+    const csrf = localStorage.getItem('nt:csrf');
     // Proxy through server on PWA
     const res = await fetch(apiUrl('/api/settings/push-test'), {
       method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(csrf ? { 'X-CSRF-Token': csrf } : {}) },
       body: JSON.stringify({ service: 'ntfy', title, message, priority }),
     });
     if (!res.ok) throw new Error(`ntfy proxy ${res.status}`);
@@ -410,9 +411,10 @@ export async function sendApprise(url, tag, title, message, priority = 5) {
     if (resp.status < 200 || resp.status >= 300) throw new Error(`Apprise ${resp.status}`);
   } else {
     const { apiUrl } = await import('./platform.js');
+    const csrf = localStorage.getItem('nt:csrf');
     const res = await fetch(apiUrl('/api/settings/push-test'), {
       method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(csrf ? { 'X-CSRF-Token': csrf } : {}) },
       body: JSON.stringify({ service: 'apprise', title, message, priority }),
     });
     if (!res.ok) throw new Error(`Apprise proxy ${res.status}`);
@@ -437,10 +439,11 @@ export async function sendGotify(url, token, title, message, priority = 5) {
   } else {
     // PWA: use server proxy to avoid CORS
     const { apiUrl } = await import('./platform.js');
+    const csrf = localStorage.getItem('nt:csrf');
     const res = await fetch(apiUrl('/api/settings/push-test'), {
       method: 'POST',
       credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(csrf ? { 'X-CSRF-Token': csrf } : {}) },
       body: JSON.stringify({ service: 'gotify', title, message, priority }),
     });
     if (!res.ok) throw new Error(`Gotify proxy ${res.status}`);

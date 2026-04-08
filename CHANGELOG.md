@@ -5,6 +5,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.38.0-beta] — 2026-04-08
+
+### Security
+- **CSRF protection** — synchronizer token pattern. A random 16-byte hex token is embedded in the JWT at issue time. The server verifies the `X-CSRF-Token` request header against the decoded token on all state-changing requests (POST/PUT/PATCH/DELETE). Bearer token requests (native app) are exempt — they're inherently CSRF-safe. Single-user mode and legacy tokens (issued before this version) are also exempt for a seamless migration window. New sessions are fully protected.
+- Token added to JWT in `server/middleware/auth.js` (`signToken`); returned from `/api/auth/me`; verified in new `server/middleware/csrf.js`.
+- `X-CSRF-Token` added to CORS `Access-Control-Allow-Headers`.
+- Client injects header in `_NtApiHttp._fetch` (covers all NtApi calls), `Settings._fetchOpts` (backup/restore/full-backup), `aiChat.callAIProxy`, `notifications` push-test calls, and `mealieApi` proxy calls.
+
+### Docs
+- **README: Environment variables** — added `RECOVERY_TOKEN`, `LOG_LEVEL`, `AI_PROVIDER`, `AI_API_KEY`, `AI_MODEL`, `AI_ENABLED` to the env vars reference table.
+- **README: Wellness Integrations** — step-by-step Fitbit and Withings OAuth app registration with exact callback URL format; Garmin note about partnership requirement.
+
+---
+
 ## [0.37.0-beta] — 2026-04-08
 
 ### Smart Log v3.2 — meals, recipes, yesterday
