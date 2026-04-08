@@ -95,15 +95,16 @@
   // Set --page-top to just the device safe area — hamburger floats OVER the
   // banner instead of pushing content down. Reclaims ~62px of vertical space
   // on every page, especially valuable on small phones.
-  // --hamburger-offset gives page headers room to shift their content right
-  // when the hamburger is showing, so H1 text doesn't slide under the button
-  // (relevant when banners are disabled — banners themselves render under it).
+  // --hamburger-offset positions the page header H1 so its first letter sits
+  // directly under the hamburger button's centerline (viewport x = 32px:
+  // hamburger left=12 + width 40/2 = 32). When the hamburger is hidden the
+  // offset is 0 and the header uses normal --page-px padding.
   // Set --sidebar-w so content shifts right when sidebar is persistent.
   $: if (typeof document !== 'undefined') {
     document.documentElement.style.setProperty('--page-top', 'var(--safe-top)');
     document.documentElement.style.setProperty(
       '--hamburger-offset',
-      showHamburger ? '52px' : '0px'
+      showHamburger ? '32px' : '0px'
     );
     document.documentElement.style.setProperty(
       '--sidebar-w',
