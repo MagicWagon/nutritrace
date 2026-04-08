@@ -1,6 +1,6 @@
 {
   "name": "nutritrace",
-  "version": "0.36.1-beta",
+  "version": "0.36.2-beta",
   "private": true,
   "type": "module",
   "scripts": {
@@ -24,6 +24,7 @@
     "@capacitor/camera": "^8.0.2",
     "@capacitor/core": "^8.3.0",
     "@capacitor/filesystem": "^8.1.2",
+    "@capacitor/haptics": "^8.0.2",
     "@capacitor/keyboard": "^8.0.2",
     "@capacitor/local-notifications": "^8.0.2",
     "@capacitor/share": "^8.0.1",

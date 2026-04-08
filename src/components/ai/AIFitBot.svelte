@@ -7,7 +7,8 @@
   import { DB, localDateStr } from '../../lib/db.js';
   import { Nutrition } from '../../lib/nutrition.js';
   import { callAI, callAIProxy, TOOLS, setToolHandler } from '../../lib/aiChat.js';
-  import { aiEnabled, aiAssistantName, aiApiKey, aiProvider, aiModel, goals, mealNames, energyUnit, dateFormat, tempUnit } from '../../stores/settings.js';
+  import { aiEnabled, aiAssistantName, aiApiKey, aiProvider, aiModel, goals, mealNames, energyUnit, dateFormat, tempUnit, quickLogEnabled } from '../../stores/settings.js';
+  import SmartLogModal from '../diary/SmartLogModal.svelte';
   import { showError } from '../../stores/toast.js';
   import { isNative } from '../../lib/platform.js';
 
@@ -282,18 +283,163 @@
     window.addEventListener('resize', _updatePanelPos);
   }
 
+  // ── Hold-to-record (Smart Log via FitBot FAB) ──────────────────────────────
+  // Press the FAB and hold for 400ms → robot face morphs to mic, native
+  // speech recognition starts, release ends recording and runs Smart Log.
+  // Move finger before 400ms → drag mode (existing behavior).
+  // Move finger off the FAB while recording → cancel.
+  let recordingMode = false;       // true while holding past 400ms threshold
+  let recordingStartedAt = 0;
+  const HOLD_THRESHOLD_MS = 400;
+  let holdTimer = null;
+  // Smart Log modal state — mounted globally from this component when a hold
+  // recording produces parsed items. Lives here so the gesture works on every
+  // page (not just Diary).
+  let showSmartLog = false;
+  let smartLogPreParsed = null;     // [{ item, candidates, best, source }, ...]
+  let smartLogMeal = null;
+  let smartLogText = '';
+
+  async function _hapticBuzz(style = 'medium') {
+    if (!isNative) return;
+    try {
+      const { Haptics, ImpactStyle } = await import('@capacitor/haptics');
+      const map = { light: ImpactStyle.Light, medium: ImpactStyle.Medium, heavy: ImpactStyle.Heavy };
+      await Haptics.impact({ style: map[style] || ImpactStyle.Medium });
+    } catch {}
+  }
+
+  async function _startRecording() {
+    if (!$quickLogEnabled) return;
+    recordingMode = true;
+    recordingStartedAt = Date.now();
+    _hapticBuzz('medium');
+    if (isNative) {
+      try {
+        const { SpeechRecognition } = await import('@capacitor-community/speech-recognition');
+        const perm = await SpeechRecognition.checkPermissions();
+        if (perm.speechRecognition !== 'granted') {
+          const req = await SpeechRecognition.requestPermissions();
+          if (req.speechRecognition !== 'granted') {
+            recordingMode = false;
+            return;
+          }
+        }
+        // Note: native plugin's start() is blocking until the user stops
+        // speaking OR we call stop(). We don't await it here — we kick it off
+        // and let the pointerup handler stop it and process the result.
+        SpeechRecognition.start({
+          language: navigator.language || 'en-US',
+          maxResults: 1,
+          partialResults: false,
+          popup: false,
+          prompt: 'Tell me what you ate',
+        }).then(async (result) => {
+          // Result returns when stop() is called OR speech ends naturally
+          const transcript = (result?.matches && result.matches[0]) || '';
+          if (transcript) await _processTranscript(transcript);
+        }).catch((e) => {
+          console.warn('[fitbot-hold] native voice failed:', e?.message);
+        });
+      } catch (e) {
+        console.warn('[fitbot-hold] plugin unavailable:', e?.message);
+        recordingMode = false;
+      }
+    } else {
+      // PWA: Web Speech API
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SR) { recordingMode = false; return; }
+      try {
+        const rec = new SR();
+        rec.continuous = false;
+        rec.interimResults = false;
+        rec.lang = navigator.language || 'en-US';
+        rec.onresult = async (e) => {
+          const transcript = e.results[0]?.[0]?.transcript || '';
+          if (transcript) await _processTranscript(transcript);
+        };
+        rec.onerror = (e) => { console.warn('[fitbot-hold] web voice error:', e.error); };
+        window.__fitbotHoldRec = rec;
+        rec.start();
+      } catch (e) {
+        console.warn('[fitbot-hold] web speech start failed:', e.message);
+        recordingMode = false;
+      }
+    }
+  }
+
+  async function _stopRecording(commit) {
+    if (!recordingMode) return;
+    const heldFor = Date.now() - recordingStartedAt;
+    recordingMode = false;
+    _hapticBuzz('light');
+    if (isNative) {
+      try {
+        const { SpeechRecognition } = await import('@capacitor-community/speech-recognition');
+        await SpeechRecognition.stop();
+      } catch {}
+    } else if (window.__fitbotHoldRec) {
+      try { commit ? window.__fitbotHoldRec.stop() : window.__fitbotHoldRec.abort(); } catch {}
+      window.__fitbotHoldRec = null;
+    }
+    // If the user released too quickly (under 600ms total), treat as a cancel.
+    // The transcript handler still runs but ignores tiny utterances.
+    if (!commit || heldFor < 600) {
+      // Cancelled — no further processing
+    }
+  }
+
+  async function _processTranscript(text) {
+    if (!text || text.trim().length < 2) return;
+    smartLogText = text;
+    try {
+      const { parseInput, matchItems } = await import('../../lib/quick-log.js');
+      const userMealNames = (await import('../../stores/settings.js')).mealNames;
+      let names;
+      userMealNames.subscribe(v => names = v)();
+      const parsed = await parseInput(text, names || ['Breakfast','Lunch','Dinner','Snacks']);
+      if (!parsed.items || parsed.items.length === 0) {
+        console.warn('[fitbot-hold] no items parsed from:', text);
+        return;
+      }
+      const matches = await matchItems(parsed.items);
+      smartLogPreParsed = matches;
+      smartLogMeal = parsed.meal;
+      showSmartLog = true;
+    } catch (e) {
+      console.error('[fitbot-hold] parse failed:', e);
+    }
+  }
+
+  // ── Drag (existing behavior, plus hold detection) ──────────────────────────
   function startDrag(e) {
     hasDragged = false;
     const startX   = e.clientX;
     const startY   = e.clientY;
-    // Compute current absolute position (default bottom-right when no saved pos)
     const baseX = fabPos ? fabPos.x : window.innerWidth  - 76;
     const baseY = fabPos ? fabPos.y : window.innerHeight - 160;
+
+    // Start hold-to-record timer in parallel with drag detection.
+    // Only if Smart Log is enabled — otherwise the FAB is tap-only + drag.
+    if ($quickLogEnabled && $aiEnabled) {
+      holdTimer = setTimeout(() => {
+        // 400ms passed without significant movement → enter recording mode
+        if (!hasDragged) {
+          _startRecording();
+        }
+      }, HOLD_THRESHOLD_MS);
+    }
 
     function move(ev) {
       const dx = ev.clientX - startX;
       const dy = ev.clientY - startY;
-      if (!hasDragged && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) hasDragged = true;
+      if (!hasDragged && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) {
+        hasDragged = true;
+        // Cancel pending hold-to-record — user is dragging
+        if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+        // If recording already started, cancel it (rare but possible)
+        if (recordingMode) _stopRecording(false);
+      }
       if (hasDragged) {
         fabPos = {
           x: Math.max(8, Math.min(window.innerWidth  - 64, baseX + dx)),
@@ -304,14 +450,34 @@
     function up() {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup',   up);
-      if (hasDragged) localStorage.setItem('wl:aiFabPos', JSON.stringify(fabPos));
+      window.removeEventListener('pointercancel', cancel);
+      if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+      if (hasDragged) {
+        localStorage.setItem('wl:aiFabPos', JSON.stringify(fabPos));
+      } else if (recordingMode) {
+        _stopRecording(true); // commit recording
+      }
+    }
+    function cancel() {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup',   up);
+      window.removeEventListener('pointercancel', cancel);
+      if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+      if (recordingMode) _stopRecording(false);
     }
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup',   up);
+    window.addEventListener('pointercancel', cancel);
   }
 
   function handleFabClick() {
-    if (!hasDragged) panelOpen = !panelOpen;
+    // Tap = open chat panel. If a recording fired (hasDragged is false but
+    // recordingMode was true at any point during this gesture), the panel
+    // does NOT open — the click event still fires after pointerup but we
+    // suppress it via recordingMode check at click time.
+    if (hasDragged) return;
+    if (recordingMode) return; // shouldn't happen — recordingMode is reset in _stopRecording
+    panelOpen = !panelOpen;
   }
 
   // ── Chat ───────────────────────────────────────────────────────────────────
@@ -656,19 +822,22 @@ Water: ${ctx.waterText}`
     class="ai-fab"
     class:panel-open={panelOpen}
     class:has-unread={hasUnread}
+    class:recording={recordingMode}
     style={fabStyle}
     on:pointerdown={startDrag}
     on:click={handleFabClick}
     on:keydown={e => e.key === 'Enter' && handleFabClick()}
     role="button"
     tabindex="0"
-    aria-label="Open AI coach"
-    title="FitBot AI"
+    aria-label={recordingMode ? 'Recording — release to log' : 'Open AI coach (hold to dictate food)'}
+    title={$quickLogEnabled ? 'Tap to chat · hold to log food by voice' : 'FitBot AI'}
   >
     {#if loading}
       <div class="fab-spinner"></div>
     {:else if panelOpen}
       <span class="material-symbols-rounded" style="font-size:26px">close</span>
+    {:else if recordingMode}
+      <span class="material-symbols-rounded fab-mic" style="font-size:30px">mic</span>
     {:else}
       <div class="fab-robot-wrap"><FitBotFace size={42} /></div>
     {/if}
@@ -842,6 +1011,20 @@ Water: ${ctx.waterText}`
       <input type="file" accept="image/*" capture="environment" bind:this={_cameraInput} on:change={_onFileSelected} style="display:none" />
     </aside>
   {/if}
+
+  <!-- ── Smart Log modal — global mount, opens after a hold-to-record gesture ── -->
+  {#if showSmartLog && smartLogPreParsed}
+    <SmartLogModal
+      date={localDateStr()}
+      defaultMealSlot={0}
+      openMode="preParsed"
+      preParsedMatches={smartLogPreParsed}
+      preParsedMeal={smartLogMeal}
+      preParsedSourceText={smartLogText}
+      on:close={() => { showSmartLog = false; smartLogPreParsed = null; }}
+      on:saved={() => { showSmartLog = false; smartLogPreParsed = null; }}
+    />
+  {/if}
 {/if}
 
 <style>
@@ -897,6 +1080,43 @@ Water: ${ctx.waterText}`
   .ai-fab:active    { transform: scale(0.94); }
   .ai-fab.panel-open {
     animation: gradient-shift 8s ease-in-out infinite;
+  }
+  /* Recording state — robot face has morphed to a mic icon. Stronger ring
+     pulse + slight scale bump to give clear visual feedback that the FAB
+     is "live" capturing voice. */
+  .ai-fab.recording {
+    transform: scale(1.08);
+    animation:
+      gradient-shift 4s ease-in-out infinite,
+      ring-pulse-strong 1.1s ease-out infinite;
+  }
+  .fab-mic {
+    color: var(--accent-text);
+    position: relative;
+    z-index: 1;
+    filter: drop-shadow(0 1px 3px rgba(0,0,0,0.4));
+    animation: mic-pulse 0.9s ease-in-out infinite;
+  }
+  @keyframes mic-pulse {
+    0%, 100% { transform: scale(1); }
+    50%       { transform: scale(1.12); }
+  }
+  @keyframes ring-pulse-strong {
+    0%   { box-shadow:
+             0 8px 32px rgba(0,0,0,0.35),
+             inset 0 1px 0 rgba(255,255,255,0.35),
+             inset 0 -2px 6px rgba(0,0,0,0.15),
+             0 0 0 0   color-mix(in srgb, var(--accent) 60%, transparent); }
+    70%  { box-shadow:
+             0 8px 32px rgba(0,0,0,0.35),
+             inset 0 1px 0 rgba(255,255,255,0.35),
+             inset 0 -2px 6px rgba(0,0,0,0.15),
+             0 0 0 22px transparent; }
+    100% { box-shadow:
+             0 8px 32px rgba(0,0,0,0.35),
+             inset 0 1px 0 rgba(255,255,255,0.35),
+             inset 0 -2px 6px rgba(0,0,0,0.15),
+             0 0 0 0 transparent; }
   }
 
   @keyframes gradient-shift {

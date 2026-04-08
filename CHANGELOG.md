@@ -5,6 +5,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.36.2-beta] — 2026-04-07
+
+### Smart Log v3 — hold-to-record on the FitBot button
+- **Removed the dedicated mic FAB**. Smart Log voice is now triggered by **press-and-hold on the FitBot floating button** instead. Single global entry point that works on every page.
+- **400ms hold threshold** — tap = open chat (existing behavior), hold past 400ms = enter recording mode. Drag still works (movement before threshold cancels the hold timer and resumes drag).
+- **Visual morph** — robot face fades out, microphone icon fades in, and a stronger heartbeat ring pulse surrounds the FAB. The FAB scales up 8% during recording for clear feedback.
+- **Haptic feedback** via `@capacitor/haptics`: medium impact when recording starts (crossing the 400ms threshold), light impact on release. Tactile confirmation without needing to look at the screen.
+- **Native Android voice** via the existing `@capacitor-community/speech-recognition` plugin (uses the OS speech recognizer through an Android intent — no Web Speech API quirks). PWA still uses Web Speech API.
+- **Auto-jump to review phase** — the AI parses + matches the transcript before the modal opens, so the user goes directly from "release the button" to "review and confirm" with no input/parsing screen in between. New `openMode="preParsed"` mode in the Smart Log modal.
+- **Globally available** — the modal is mounted from inside `AIFitBot.svelte` so the gesture works on every page (Statistics, Foods, Wellness, etc.), not just Diary. Diary's local Smart Log state was removed entirely.
+- **Renamed `QuickLogModal.svelte` → `SmartLogModal.svelte`** to match the user-facing name (setting key `quickLogEnabled` is unchanged for backwards compat).
+- **Settings help text** — when Smart Log is enabled in Settings → AI Assistant, an expanded help section appears below the toggle explaining the hold gesture, drag-vs-hold disambiguation, custom meal name support, and the privacy story (audio stays on-device; transcript goes to user's configured AI provider; food matching is local-first).
+
+### Build infra
+- **Added `@capacitor/haptics` dependency** for tactile feedback on the hold gesture. Graceful fallback to no haptic if unavailable.
+
+---
+
 ## [0.36.1-beta] — 2026-04-07
 
 ### Quick Log → Smart Log v2 (rebranded + native voice + custom meal support)

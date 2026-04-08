@@ -18,7 +18,13 @@
 
   export let date;                  // 'YYYY-MM-DD'
   export let defaultMealSlot = 0;   // index into mealNames (used if AI can't infer)
-  export let openMode = 'text';     // 'text' | 'voice' — auto-start mic if 'voice'
+  export let openMode = 'text';     // 'text' | 'voice' | 'preParsed'
+  // When openMode === 'preParsed', the caller has already run parseInput and
+  // matched items via the AIFitBot hold-to-record path. We skip the input/
+  // parsing phases entirely and jump straight to the review modal.
+  export let preParsedMatches = null;  // [{ item, candidates, best, source }, ...]
+  export let preParsedMeal = null;     // string | null — AI-inferred meal name
+  export let preParsedSourceText = ''; // for showing what the user said
 
   const dispatch = createEventDispatcher();
 
@@ -35,6 +41,23 @@
   $: meals = $mealNames || ['Breakfast','Lunch','Dinner','Snacks'];
 
   onMount(async () => {
+    // Pre-parsed mode: caller already ran parseInput + matchItems via the
+    // AIFitBot hold-to-record gesture. Jump straight to review.
+    if (openMode === 'preParsed' && preParsedMatches && preParsedMatches.length > 0) {
+      parsedMeal = preParsedMeal;
+      inputText = preParsedSourceText || '';
+      const resolvedSlot = resolveMealSlot(parsedMeal, meals);
+      const slot = resolvedSlot != null ? resolvedSlot : defaultMealSlot;
+      matchedItems = preParsedMatches.map(m => ({
+        ...m,
+        food: m.best || null,
+        quantity: _defaultPortionFor(m),
+        mealSlot: slot,
+      }));
+      phase = 'review';
+      return;
+    }
+
     setTimeout(() => inputEl?.focus(), 80);
 
     // Init voice input — native plugin first, then web fallback

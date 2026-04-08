@@ -2407,10 +2407,40 @@
                   Smart Log
                   <span class="labs-badge" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);vertical-align:middle">Experimental</span>
                 </span>
-                <div class="setting-desc">Tap the floating mic on the Diary page and say what you ate — "for breakfast I had 2 eggs and toast". The AI parses the items AND figures out which meal slot, then your food database fills in the nutrition. Voice on Android uses the system speech recognizer; PWA uses the browser's Web Speech API.</div>
+                <div class="setting-desc">Press and hold the FitBot button on any page, then say what you ate — "for breakfast I had 2 eggs and toast". When you release, the AI parses the items AND figures out which meal slot, your food database fills in the nutrition, and a confirmation modal lets you review before saving.</div>
               </div>
               <Toggle checked={quickLogEnabledVal} on:change={e => quickLogEnabledVal = e.detail} />
             </div>
+            {#if quickLogEnabledVal}
+              <div class="setting-divider"></div>
+              <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px">
+                <div class="setting-desc" style="line-height:1.55">
+                  <strong style="color:var(--text-2)">How it works</strong>
+                  <div style="margin-top:6px">
+                    1. <strong>Press and hold</strong> the FitBot button (any page) for ~½ second.<br/>
+                    2. The robot face morphs into a microphone — start speaking.<br/>
+                    3. <strong>Release</strong> when you're done. The AI parses your sentence into food items and matches them to your library.<br/>
+                    4. Review the items in the modal — edit quantities, swap matches, change meal slot — then tap <em>Add to Diary</em>.
+                  </div>
+                  <div style="margin-top:10px">
+                    <strong style="color:var(--text-2)">Tips</strong>
+                    <div style="margin-top:6px">
+                      • Mention the meal: "<em>for lunch I had a chicken salad</em>" → goes to Lunch automatically.<br/>
+                      • Use your custom meal names: "<em>for my pre-workout I had a banana</em>" → matches your Pre-workout slot.<br/>
+                      • Multi-item works: "<em>2 eggs, toast, and a coffee</em>" parses three items at once.<br/>
+                      • <strong>Tap</strong> FitBot (don't hold) to open the chat panel as usual.<br/>
+                      • <strong>Drag</strong> to move the FitBot button — drag is detected by movement, so as long as you don't slide your finger, hold = mic.
+                    </div>
+                  </div>
+                  <div style="margin-top:10px">
+                    <strong style="color:var(--text-2)">Privacy</strong>
+                    <div style="margin-top:6px">
+                      Voice is recognized by your device (Android system recognizer or your browser's Web Speech API) — the audio itself stays on-device. The resulting transcript is sent to your configured AI provider (Claude/OpenAI/Gemini) for parsing. Food matching happens locally first, then falls back to Open Food Facts. None of this data is sent to NutriTrace servers.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            {/if}
 
             {#if !envLocks.ai}
               <div class="setting-divider"></div>
