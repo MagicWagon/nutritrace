@@ -206,6 +206,13 @@
     if (!food) return 100;
     const basePortion = Number(food.portion) > 0 ? Number(food.portion) : 100;
     const qty = Number(m.item.quantity) > 0 ? Number(m.item.quantity) : 1;
+    // If the AI parsed an explicit weight/volume unit (e.g. "100g", "250 ml"),
+    // the quantity IS the portion size in grams. Use it directly. Otherwise
+    // (no unit, "serving", "piece", "cup", etc.) the quantity is a count of
+    // servings — multiply by the food's base portion.
+    const unit = m.item.unit ? String(m.item.unit).toLowerCase().trim() : null;
+    const isWeightOrVolume = unit === 'g' || unit === 'ml' || unit === 'gram' || unit === 'grams';
+    if (isWeightOrVolume) return qty;
     return basePortion * qty;
   }
 
