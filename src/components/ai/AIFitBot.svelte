@@ -366,6 +366,7 @@
           const req = await SpeechRecognition.requestPermissions();
           if (req.speechRecognition !== 'granted') {
             recordingMode = false;
+            showError('Microphone permission denied — Smart Log voice needs mic access');
             return;
           }
         }
@@ -383,18 +384,28 @@
           // Skip processing if the user cancelled by sliding off the FAB.
           if (!_commitNextTranscript) return;
           const transcript = (result?.matches && result.matches[0]) || '';
-          if (transcript) await _processTranscript(transcript);
+          if (transcript) {
+            await _processTranscript(transcript);
+          } else {
+            showError("Didn't catch that — try again");
+          }
         }).catch((e) => {
           console.warn('[fitbot-hold] native voice failed:', e?.message);
+          showError('Voice recognition failed: ' + (e?.message || 'unknown error'));
         });
       } catch (e) {
         console.warn('[fitbot-hold] plugin unavailable:', e?.message);
         recordingMode = false;
+        showError('Voice plugin unavailable');
       }
     } else {
       // PWA: Web Speech API
       const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SR) { recordingMode = false; return; }
+      if (!SR) {
+        recordingMode = false;
+        showError('Voice input not supported in this browser');
+        return;
+      }
       try {
         const rec = new SR();
         rec.continuous = false;
@@ -403,30 +414,47 @@
         rec.onresult = async (e) => {
           if (!_commitNextTranscript) return;
           const transcript = e.results[0]?.[0]?.transcript || '';
-          if (transcript) await _processTranscript(transcript);
+          if (transcript) {
+            await _processTranscript(transcript);
+          } else {
+            showError("Didn't catch that — try again");
+          }
         };
-        rec.onerror = (e) => { console.warn('[fitbot-hold] web voice error:', e.error); };
+        rec.onerror = (e) => {
+          console.warn('[fitbot-hold] web voice error:', e.error);
+          if (_commitNextTranscript) showError('Voice error: ' + (e.error || 'unknown'));
+        };
+        rec.onend = () => {
+          // Fired even on success — but if we never got a result and
+          // commit was expected, surface the silent failure.
+          if (_commitNextTranscript && !recordingMode) {
+            // recordingMode is already false at this point if user released;
+            // a separate flag would be needed to detect "no result fired"
+            // — leaving this as a hook for future refinement.
+          }
+        };
         window.__fitbotHoldRec = rec;
         rec.start();
       } catch (e) {
         console.warn('[fitbot-hold] web speech start failed:', e.message);
         recordingMode = false;
+        showError('Could not start mic: ' + e.message);
       }
     }
   }
 
   async function _stopRecording(commit) {
     if (!recordingMode) return;
-    const heldFor = Date.now() - recordingStartedAt;
     recordingMode = false;
     cancelPreview = false;
-    // If the user cancelled (slid off, or pointer cancel) we mark the
-    // transcript handler to skip its result before stopping the recognizer.
-    if (!commit || heldFor < 600) {
+    // Removed the heldFor < 600ms cancel rule — it was hostile to fast
+    // utterances ("eggs" said in 400ms got dropped). Cancel only if the
+    // user explicitly slid off the FAB before releasing.
+    if (!commit) {
       _commitNextTranscript = false;
     }
     _hapticBuzz('light');
-    _beep(commit && _commitNextTranscript ? 600 : 350, 80); // end beep — lower if commit, lowest if cancel
+    _beep(commit ? 600 : 350, 80); // end beep — lower for commit, lowest for cancel
     if (isNative) {
       try {
         const { SpeechRecognition } = await import('@capacitor-community/speech-recognition');
@@ -439,7 +467,10 @@
   }
 
   async function _processTranscript(text) {
-    if (!text || text.trim().length < 2) return;
+    if (!text || !text.trim()) {
+      showError("Didn't catch that — try again");
+      return;
+    }
     smartLogText = text;
     try {
       const { parseInput, matchItems } = await import('../../lib/quick-log.js');
@@ -449,6 +480,7 @@
       const parsed = await parseInput(text, names || ['Breakfast','Lunch','Dinner','Snacks']);
       if (!parsed.items || parsed.items.length === 0) {
         console.warn('[fitbot-hold] no items parsed from:', text);
+        showError(`Couldn't find any food in "${text}"`);
         return;
       }
       const matches = await matchItems(parsed.items);
@@ -457,6 +489,7 @@
       showSmartLog = true;
     } catch (e) {
       console.error('[fitbot-hold] parse failed:', e);
+      showError('Smart Log parse failed: ' + (e.message || 'unknown error'));
     }
   }
 

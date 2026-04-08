@@ -432,10 +432,30 @@ export async function saveItems(matchedList, { date, defaultMealSlot = 0 }) {
       }
     }
 
+    // Match Foods.svelte behavior (confirmQtyPrompt): scale the nutrition
+    // object by (newPortion / originalPortion) so the diary item carries
+    // PRE-SCALED nutrition values. Diary's Nutrition.calculate then
+    // multiplies by quantity=1 → correct totals.
+    //
+    // Why: nutrition values are stored "per food.portion grams" (typically
+    // per 100g). If the user wants to log 250g of a recipe whose portion
+    // is 100g, we need to multiply nutrition by 2.5 BEFORE writing the
+    // diary entry — diary doesn't do this conversion automatically.
+    const newPortion = Number(m.quantity) > 0 ? Number(m.quantity) : (food.portion || 100);
+    const origPortion = Number(food.portion) > 0 ? Number(food.portion) : 100;
+    const portionFactor = newPortion / origPortion;
+    const scaledNutrition = food.nutrition && portionFactor !== 1
+      ? Object.fromEntries(
+          Object.entries(food.nutrition).map(([k, v]) => [k, (parseFloat(v) || 0) * portionFactor])
+        )
+      : food.nutrition;
+
     const item = {
       ...food,
-      portion: m.quantity || food.portion || 100,
+      portion: newPortion,
       unit: food.unit || 'g',
+      nutrition: scaledNutrition,
+      quantity: 1,
       meal: slot,
     };
     try {
