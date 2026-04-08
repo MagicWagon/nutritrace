@@ -378,13 +378,15 @@ async function _matchYesterday(parsedItem) {
  * Save the user's confirmed items to the diary for the given date + meal slot.
  *
  * Handles four item kinds based on the matched record's `source`:
- *   - 'local' / 'off' / 'unknown' (single food) → 1 diary entry
- *   - 'meal' / 'recipe' (saved meal/recipe)     → expand meal.items[] into N diary entries
+ *   - 'local' / 'off' / 'unknown' (single food) → 1 diary entry, m.quantity is grams
+ *   - 'recipe' (saved recipe)                   → 1 diary entry treating the recipe
+ *                                                  as a single food, m.quantity is grams
+ *   - 'meal' (saved meal)                       → expand meal.items[] into N diary entries
  *   - 'yesterday' (synthetic from yesterday)    → copy items[] from yesterday into N diary entries
  *
  * Each "matched item" should have:
  *   - food: the matched record
- *   - quantity: portion size (grams) for single foods, or scale factor for meals
+ *   - quantity: portion size in grams (foods + recipes)
  *   - mealSlot: 0..n meal index
  */
 export async function saveItems(matchedList, { date, defaultMealSlot = 0 }) {
@@ -396,8 +398,10 @@ export async function saveItems(matchedList, { date, defaultMealSlot = 0 }) {
     if (!m || !m.food) continue;
     const slot = m.mealSlot != null ? Number(m.mealSlot) : defaultMealSlot;
 
-    // ── Meal / Recipe / Yesterday: expand .items[] into multiple diary entries ──
-    if ((m.source === 'meal' || m.source === 'recipe' || m.source === 'yesterday') &&
+    // ── Meal / Yesterday: expand .items[] into multiple diary entries ──
+    // (Recipes are explicitly NOT in this branch — they're added as a
+    // single diary entry below, just like a regular food.)
+    if ((m.source === 'meal' || m.source === 'yesterday') &&
         Array.isArray(m.food.items)) {
       for (const sub of m.food.items) {
         try {
@@ -414,7 +418,7 @@ export async function saveItems(matchedList, { date, defaultMealSlot = 0 }) {
       continue;
     }
 
-    // ── Single food (local / off / unknown) ──────────────────────────────
+    // ── Single food / recipe (local / off / unknown / recipe) ────────────
     let food = m.food;
 
     // If the food came from OFF, persist it to the local foods table first so

@@ -318,7 +318,7 @@
       </div>
       <div class="ql-list">
         {#each matchedItems as m, i}
-          {@const isExpansion = (m.source === 'meal' || m.source === 'recipe' || m.source === 'yesterday') && m.food && Array.isArray(m.food.items)}
+          {@const isExpansion = (m.source === 'meal' || m.source === 'yesterday') && m.food && Array.isArray(m.food.items)}
           <div class="ql-row" class:unmatched={!m.food}>
             <div class="ql-row-main">
               <div class="ql-row-name">
