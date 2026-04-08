@@ -2,6 +2,10 @@
 FROM node:20-alpine AS build
 WORKDIR /app
 COPY package*.json ./
+# scripts/postinstall.cjs is referenced by the "postinstall" npm hook, so it
+# must exist before npm install runs. Copy it explicitly here so we don't
+# bust the rest of the source-code Docker layer cache on every change.
+COPY scripts/ ./scripts/
 RUN npm install
 COPY . .
 RUN npm run build
