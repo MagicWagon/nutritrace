@@ -5,6 +5,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.35.1-beta] — 2026-04-07
+
+### Header layout polish
+- **Hamburger floats over the banner** — reclaim ~62px of vertical space on every page. The 62px gap above the banner was wasted real estate (especially on mobile, where it ate ~27% of the viewport along with the safe-area inset). Hamburger button restyled as a translucent backdrop-blur dark pill (rgba(0,0,0,0.35), 10px blur, 160% saturate, white text+border) so it reads cleanly over both banner imagery AND plain page background.
+- **Removed double safe-top padding** that caused a black bar above the banner on initial render — `.page-shell` no longer applies `padding-top` because its child `.page-header` already accounts for safe-area-top. Editor pages (FoodEditor, MealEditor) get the inset restored via a new `.page-shell.editor-page` selector since they use `.editor-header` instead.
+- **Banner header thickness +20px** (`padding-bottom: 52 → 72px`) for more breathing room. All sticky sub-bars (Diary date, Wellness date+tabs, Foods sticky, Settings search) updated +48 to compensate for the additional `--hamburger-row` height.
+- **Uniform H1 alignment** — all 6 page headers (Diary, Foods, Goals, Statistics, Wellness, Settings) now share a single `.page-header h1` rule in `base.css` (28px / 800 / 1.1 / -0.02em letter-spacing / forced 40px height). Removed the redundant per-page overrides in Diary.svelte and Wellness.svelte that previously caused a ~9px vertical offset.
+- **Title sits below the hamburger in its own row** — added `--hamburger-row` CSS variable (48px = 40px hamburger + 8px gap) to `.page-header` top padding when the hamburger is visible. Title's left edge aligns with the hamburger button's left edge (viewport x=12) for a clean vertical line.
+
+### Sidebar drawer
+- **Heavier dark frosted-glass scrim** behind the slide-in sidebar — 55% black + 28px blur + 180% saturate (was using generic `--overlay`/`--backdrop-blur` tokens). Page content behind the sidebar reads as quiet background texture so the nav items pop.
+- **Mobile hamburger access restored** — the previous viewport gate I added inadvertently hid the hamburger entirely on small phones. Now only `sidebarPinned` (the persistent/desktop-style mode) is gated to ≥768px. The drawer-style hamburger + slide-in overlay is always available whenever `navStyle` includes 'sidebar'. Tablets and desktop still get the option to pin it open.
+
+---
+
 ## [0.35.0-beta] — 2026-04-07
 
 ### Security
