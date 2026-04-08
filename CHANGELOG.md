@@ -5,6 +5,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.36.3-beta] — 2026-04-08
+
+### Smart Log v3.1 — recording polish
+- **Red FAB during recording** — the FitBot button now turns red (universal recording color) when hold-to-record activates. Stronger heartbeat ring pulse uses red instead of accent color so it's unambiguous. Reverts to the normal accent gradient when recording stops.
+- **Audio beeps on start/end** via Web Audio API — short 80ms tone at 1000Hz when recording starts, lower 600Hz tone on commit, lowest 350Hz tone on cancel. Generated in-browser, no asset files. Gated by the existing `barcodeBeep` setting (users who muted barcode scans probably don't want voice beeps either).
+- **Hold threshold 400ms → 700ms** — old 400ms threshold was too close to the natural "hold to drag" intent. 700ms is far enough above the 6px drag threshold that drag-then-release reliably wins, while still feeling deliberate. The haptic buzz at threshold is the "go" signal so the user knows recording started.
+- **Slide-off-to-cancel** — finger > 100px from FAB center while recording → cancel preview activates: FAB greys out, recording hint changes to "✕ Release to cancel", light haptic confirms threshold crossed. Releasing in cancel state aborts the recording instead of committing. Same gesture pattern as iOS voice memos and WhatsApp voice messages.
+- **Recording hint tooltip** — small floating pill above the FAB during recording. Shows "● Listening… release to log" in normal state, "✕ Release to cancel" in cancel-preview state. Backdrop-blurred dark pill, follows the FAB if user has dragged it.
+
+### Build infra
+- **Dockerfile fix** (committed yesterday) — `scripts/postinstall.cjs` is now copied before `npm install` so the postinstall hook can find it during CI builds.
+
+---
+
 ## [0.36.2-beta] — 2026-04-07
 
 ### Smart Log v3 — hold-to-record on the FitBot button

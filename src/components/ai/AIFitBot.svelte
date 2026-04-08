@@ -284,14 +284,20 @@
   }
 
   // ── Hold-to-record (Smart Log via FitBot FAB) ──────────────────────────────
-  // Press the FAB and hold for 400ms → robot face morphs to mic, native
-  // speech recognition starts, release ends recording and runs Smart Log.
-  // Move finger before 400ms → drag mode (existing behavior).
-  // Move finger off the FAB while recording → cancel.
-  let recordingMode = false;       // true while holding past 400ms threshold
+  // Press the FAB and hold for 700ms → robot face morphs to mic, FAB turns
+  // red, beep + haptic fire, native speech recognition starts. Release ends
+  // recording and runs Smart Log. Move finger before 700ms → drag mode
+  // (existing behavior). Slide finger > CANCEL_RADIUS_PX away from the FAB
+  // while recording → cancel preview (FAB greys out). Release in cancel
+  // preview = abort. Release on FAB = commit.
+  let recordingMode = false;       // true while holding past threshold
+  let cancelPreview = false;       // true if finger has slid off the button
   let recordingStartedAt = 0;
-  const HOLD_THRESHOLD_MS = 400;
+  const HOLD_THRESHOLD_MS = 700;   // bumped from 400 — well above natural hold-to-drag
+  const CANCEL_RADIUS_PX = 100;    // slide further than this from FAB center to cancel
   let holdTimer = null;
+  let _fabCenterX = 0;             // captured at pointerdown for cancel-preview math
+  let _fabCenterY = 0;
   // Smart Log modal state — mounted globally from this component when a hold
   // recording produces parsed items. Lives here so the gesture works on every
   // page (not just Diary).
@@ -309,11 +315,49 @@
     } catch {}
   }
 
+  // ── Web Audio beep generator (gated by barcodeBeep setting) ───────────
+  // Generates a short tone via the AudioContext API — no asset files needed.
+  // Reuses the barcodeBeep setting since it's the same "audio confirmation"
+  // category; users who muted barcode scans usually don't want voice beeps.
+  let _audioCtx = null;
+  function _beep(frequency, durationMs) {
+    try {
+      if (!DB.getSetting('barcodeBeep', true)) return;
+      if (!_audioCtx) {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return;
+        _audioCtx = new Ctx();
+      }
+      const ctx = _audioCtx;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.frequency.value = frequency;
+      osc.type = 'sine';
+      // Quick attack/decay envelope to avoid clicks
+      const now = ctx.currentTime;
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.18, now + 0.012);
+      gain.gain.linearRampToValueAtTime(0, now + (durationMs / 1000));
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + (durationMs / 1000) + 0.02);
+    } catch {}
+  }
+
+  // Track whether the user actually wants the transcript processed.
+  // _stopRecording sets this to false on cancel; the speech result handlers
+  // check it before running the parser.
+  let _commitNextTranscript = false;
+
   async function _startRecording() {
     if (!$quickLogEnabled) return;
     recordingMode = true;
+    cancelPreview = false;
     recordingStartedAt = Date.now();
+    _commitNextTranscript = true;
     _hapticBuzz('medium');
+    _beep(1000, 80); // start beep — high tone
     if (isNative) {
       try {
         const { SpeechRecognition } = await import('@capacitor-community/speech-recognition');
@@ -335,7 +379,9 @@
           popup: false,
           prompt: 'Tell me what you ate',
         }).then(async (result) => {
-          // Result returns when stop() is called OR speech ends naturally
+          // Result returns when stop() is called OR speech ends naturally.
+          // Skip processing if the user cancelled by sliding off the FAB.
+          if (!_commitNextTranscript) return;
           const transcript = (result?.matches && result.matches[0]) || '';
           if (transcript) await _processTranscript(transcript);
         }).catch((e) => {
@@ -355,6 +401,7 @@
         rec.interimResults = false;
         rec.lang = navigator.language || 'en-US';
         rec.onresult = async (e) => {
+          if (!_commitNextTranscript) return;
           const transcript = e.results[0]?.[0]?.transcript || '';
           if (transcript) await _processTranscript(transcript);
         };
@@ -372,7 +419,14 @@
     if (!recordingMode) return;
     const heldFor = Date.now() - recordingStartedAt;
     recordingMode = false;
+    cancelPreview = false;
+    // If the user cancelled (slid off, or pointer cancel) we mark the
+    // transcript handler to skip its result before stopping the recognizer.
+    if (!commit || heldFor < 600) {
+      _commitNextTranscript = false;
+    }
     _hapticBuzz('light');
+    _beep(commit && _commitNextTranscript ? 600 : 350, 80); // end beep — lower if commit, lowest if cancel
     if (isNative) {
       try {
         const { SpeechRecognition } = await import('@capacitor-community/speech-recognition');
@@ -381,11 +435,6 @@
     } else if (window.__fitbotHoldRec) {
       try { commit ? window.__fitbotHoldRec.stop() : window.__fitbotHoldRec.abort(); } catch {}
       window.__fitbotHoldRec = null;
-    }
-    // If the user released too quickly (under 600ms total), treat as a cancel.
-    // The transcript handler still runs but ignores tiny utterances.
-    if (!commit || heldFor < 600) {
-      // Cancelled — no further processing
     }
   }
 
@@ -411,7 +460,7 @@
     }
   }
 
-  // ── Drag (existing behavior, plus hold detection) ──────────────────────────
+  // ── Drag (existing behavior, plus hold detection + slide-off cancel) ──────
   function startDrag(e) {
     hasDragged = false;
     const startX   = e.clientX;
@@ -419,11 +468,21 @@
     const baseX = fabPos ? fabPos.x : window.innerWidth  - 76;
     const baseY = fabPos ? fabPos.y : window.innerHeight - 160;
 
+    // Capture FAB center for cancel-preview math (used when recording).
+    // The current target is the .ai-fab div; getBoundingClientRect gives us
+    // the live rect even if the FAB has moved via drag.
+    const fabEl = e.currentTarget;
+    if (fabEl && fabEl.getBoundingClientRect) {
+      const r = fabEl.getBoundingClientRect();
+      _fabCenterX = r.left + r.width / 2;
+      _fabCenterY = r.top + r.height / 2;
+    }
+
     // Start hold-to-record timer in parallel with drag detection.
     // Only if Smart Log is enabled — otherwise the FAB is tap-only + drag.
     if ($quickLogEnabled && $aiEnabled) {
       holdTimer = setTimeout(() => {
-        // 400ms passed without significant movement → enter recording mode
+        // Threshold passed without significant movement → enter recording mode
         if (!hasDragged) {
           _startRecording();
         }
@@ -433,18 +492,30 @@
     function move(ev) {
       const dx = ev.clientX - startX;
       const dy = ev.clientY - startY;
-      if (!hasDragged && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) {
+      // Only enter drag mode if the user moved BEFORE recording started.
+      // Once recording is active, finger movement is for cancel-preview, not drag.
+      if (!recordingMode && !hasDragged && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) {
         hasDragged = true;
         // Cancel pending hold-to-record — user is dragging
         if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
-        // If recording already started, cancel it (rare but possible)
-        if (recordingMode) _stopRecording(false);
       }
       if (hasDragged) {
         fabPos = {
           x: Math.max(8, Math.min(window.innerWidth  - 64, baseX + dx)),
           y: Math.max(8, Math.min(window.innerHeight - 64, baseY + dy)),
         };
+        return;
+      }
+      // While recording, check distance from FAB center to detect cancel preview
+      if (recordingMode) {
+        const fdx = ev.clientX - _fabCenterX;
+        const fdy = ev.clientY - _fabCenterY;
+        const dist = Math.sqrt(fdx * fdx + fdy * fdy);
+        const shouldCancel = dist > CANCEL_RADIUS_PX;
+        if (shouldCancel !== cancelPreview) {
+          cancelPreview = shouldCancel;
+          if (shouldCancel) _hapticBuzz('light');
+        }
       }
     }
     function up() {
@@ -455,7 +526,8 @@
       if (hasDragged) {
         localStorage.setItem('wl:aiFabPos', JSON.stringify(fabPos));
       } else if (recordingMode) {
-        _stopRecording(true); // commit recording
+        // Commit unless the finger is currently in cancel-preview territory
+        _stopRecording(!cancelPreview);
       }
     }
     function cancel() {
@@ -823,13 +895,14 @@ Water: ${ctx.waterText}`
     class:panel-open={panelOpen}
     class:has-unread={hasUnread}
     class:recording={recordingMode}
+    class:cancel-preview={cancelPreview}
     style={fabStyle}
     on:pointerdown={startDrag}
     on:click={handleFabClick}
     on:keydown={e => e.key === 'Enter' && handleFabClick()}
     role="button"
     tabindex="0"
-    aria-label={recordingMode ? 'Recording — release to log' : 'Open AI coach (hold to dictate food)'}
+    aria-label={recordingMode ? (cancelPreview ? 'Release to cancel' : 'Recording — release to log') : 'Open AI coach (hold to dictate food)'}
     title={$quickLogEnabled ? 'Tap to chat · hold to log food by voice' : 'FitBot AI'}
   >
     {#if loading}
@@ -845,6 +918,17 @@ Water: ${ctx.waterText}`
       <div class="fab-badge" transition:fade={{ duration: 120 }}></div>
     {/if}
   </div>
+
+  <!-- Recording hint tooltip — appears above the FAB while recording -->
+  {#if recordingMode}
+    <div class="fab-record-hint" style={fabStyle ? `left:${(fabPos?.x || 0) - 60}px; top:${(fabPos?.y || 0) - 44}px;` : ''}>
+      {#if cancelPreview}
+        <span style="color:#fca5a5">✕ Release to cancel</span>
+      {:else}
+        <span style="color:#fff">● Listening… release to log</span>
+      {/if}
+    </div>
+  {/if}
 
   <!-- ── Panel Backdrop ─────────────────────────────────────────────────── -->
   {#if panelOpen}
@@ -1081,14 +1165,26 @@ Water: ${ctx.waterText}`
   .ai-fab.panel-open {
     animation: gradient-shift 8s ease-in-out infinite;
   }
-  /* Recording state — robot face has morphed to a mic icon. Stronger ring
-     pulse + slight scale bump to give clear visual feedback that the FAB
-     is "live" capturing voice. */
+  /* Recording state — robot face morphs to mic icon. The FAB turns RED
+     (universal "recording" color), gets a strong heartbeat ring, and
+     scales up 8% so the user has unambiguous "live" feedback. */
   .ai-fab.recording {
     transform: scale(1.08);
+    background: linear-gradient(135deg, #ef4444, #b91c1c, #ef4444, #dc2626, #ef4444);
+    background-size: 300% 300%;
+    border-color: rgba(255, 200, 200, 0.45);
     animation:
       gradient-shift 4s ease-in-out infinite,
-      ring-pulse-strong 1.1s ease-out infinite;
+      ring-pulse-record 1.1s ease-out infinite;
+  }
+  /* Cancel-preview state — finger has slid > CANCEL_RADIUS_PX from the FAB.
+     Greys out so the user knows releasing now will abort instead of commit. */
+  .ai-fab.recording.cancel-preview {
+    background: linear-gradient(135deg, #6b7280, #374151);
+    border-color: rgba(255, 255, 255, 0.18);
+    animation: gradient-shift 4s ease-in-out infinite;
+    transform: scale(1.0);
+    opacity: 0.85;
   }
   .fab-mic {
     color: var(--accent-text);
@@ -1117,6 +1213,50 @@ Water: ${ctx.waterText}`
              inset 0 1px 0 rgba(255,255,255,0.35),
              inset 0 -2px 6px rgba(0,0,0,0.15),
              0 0 0 0 transparent; }
+  }
+  /* Red recording ring pulse — same heartbeat but red instead of accent */
+  @keyframes ring-pulse-record {
+    0%   { box-shadow:
+             0 8px 32px rgba(0,0,0,0.4),
+             inset 0 1px 0 rgba(255,255,255,0.35),
+             inset 0 -2px 6px rgba(0,0,0,0.2),
+             0 0 0 0 rgba(239, 68, 68, 0.55); }
+    70%  { box-shadow:
+             0 8px 32px rgba(0,0,0,0.4),
+             inset 0 1px 0 rgba(255,255,255,0.35),
+             inset 0 -2px 6px rgba(0,0,0,0.2),
+             0 0 0 22px rgba(239, 68, 68, 0); }
+    100% { box-shadow:
+             0 8px 32px rgba(0,0,0,0.4),
+             inset 0 1px 0 rgba(255,255,255,0.35),
+             inset 0 -2px 6px rgba(0,0,0,0.2),
+             0 0 0 0 rgba(239, 68, 68, 0); }
+  }
+  /* Recording hint tooltip — sits above the FAB during recording.
+     Default position uses fixed bottom-right like the FAB; if the user has
+     dragged the FAB, the inline style overrides position to follow it. */
+  .fab-record-hint {
+    position: fixed;
+    right: 20px;
+    bottom: calc(var(--nav-h) + var(--safe-bottom, 0px) + 92px);
+    padding: 6px 12px;
+    border-radius: 14px;
+    background: rgba(0, 0, 0, 0.78);
+    backdrop-filter: blur(10px) saturate(180%);
+    -webkit-backdrop-filter: blur(10px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+    z-index: 401;
+    pointer-events: none;
+    white-space: nowrap;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    animation: fab-hint-fade 0.18s ease-out;
+  }
+  @keyframes fab-hint-fade {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
 
   @keyframes gradient-shift {
