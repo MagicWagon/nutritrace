@@ -5,6 +5,37 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.37.0-beta] — 2026-04-08
+
+### Smart Log v3.2 — meals, recipes, yesterday
+Smart Log can now match against three new record types in addition to individual foods:
+
+- **Saved meals** — say *"my X meal"*, *"the X meal"*, or *"for lunch I had my morning bowl meal"* and the AI tags the item as kind=meal. Smart Log searches `getMeals()`, picks the best name match, and **expands the meal into individual diary entries** when added (same as the Foods page meal-add flow). Each ingredient becomes its own diary item.
+- **Saved recipes** — same as meals but uses `getRecipes()` (the `is_recipe=1` subset). Trigger words: *"my X recipe"*, *"made the X recipe"*, *"from my X recipe"*. Same expansion behavior.
+- **Yesterday's diary** — say *"same as yesterday for lunch"*, *"yesterday's breakfast"*, or *"repeat yesterday's dinner"*. The AI tags it as kind=yesterday with the meal slot name. Smart Log fetches yesterday's diary, filters items in that slot, and copies them to today as new entries.
+
+#### How the dispatch works
+- Parser prompt now extracts a `kind` field per item: `food` (default), `meal`, `recipe`, or `yesterday`
+- `matchItem` is now a router that dispatches to `_matchFood` (existing), `_matchMeal`, or `_matchYesterday`
+- `_matchMeal(parsedItem, isRecipe)` searches meals or recipes by name with token + fuzzy substring fallback
+- `_matchYesterday(parsedItem)` resolves the slot name to an index, fetches yesterday's diary, returns a synthetic meal-like record with `_yesterdaySlot` and `_yesterdayDate` metadata
+- `saveItems` detects expansion-type matches (meal/recipe/yesterday with `food.items[]`) and writes each sub-item as its own diary entry instead of one combined entry
+
+#### Modal updates
+- New badge colors in SmartLogModal: **Meal** (purple), **Recipe** (pink), **Yesterday** (green) alongside the existing **Local** and **OFF**
+- Expansion-type rows show "Expands to N items" + a "Show items" details disclosure listing each ingredient
+- Quantity field is hidden for expansion-type rows since the meal already has its own portions baked in
+
+### Documentation
+- **New "Smart Log" section in README** with the full feature description, all four matchable source types, trigger words, meal slot detection rules, what it can/can't do, privacy story, and cost. ~80 lines of user-facing docs replacing the inline help block.
+- **Settings help text trimmed** to a brief quick-start + the three main trigger words + a link to the README section. Used to be ~30 lines, now ~10.
+
+### Fixed
+- **Recording pillbox text centering** — the floating "● Listening… release to log" pill above the FitBot button when recording was off-center because the inline-style positioning shifted by `-60px` (a fixed offset that didn't account for the pill's actual width). Now uses `transform: translateX(-50%)` (or `translateX(50%)` for the default `right:50px` anchor) so the pill always centers on the FAB regardless of text length. Padding bumped to 8/16, font-size to 13, line-height to 1.2 to prevent descender clipping.
+- **Cancel-state pill color** — the cancel-preview text used inline `color:#fca5a5` which fought the parent `color:#fff`. Now applied via `.cancel` class on the pill itself with a matching border color tint.
+
+---
+
 ## [0.36.3-beta] — 2026-04-08
 
 ### Smart Log v3.1 — recording polish

@@ -57,8 +57,70 @@ NutriTrace runs entirely in a single Docker container on your own hardware. No a
 - Download backups to your device or restore from a previously saved backup
 - Upload and restore from a backup file taken on another instance
 - Portable JSON export/import (foods, meals, diary, settings — no images)
+- Local Full Backup (Android local-only mode): self-contained `.zip` with embedded image files for phone-to-phone transfer without a server
 - CSV diary export
 - Import from Waistline (Android nutrition app)
+
+---
+
+## Smart Log — voice + AI food logging
+
+Smart Log is an experimental feature that lets you log food by **pressing and holding the FitBot button** on any page and saying what you ate. The AI parses your sentence and matches each item against your saved foods, meals, recipes, or yesterday's diary.
+
+### Setup
+1. Settings → AI Assistant → enable **FitBot AI** and configure a provider key (Claude, OpenAI, or Gemini).
+2. In the same section, enable the **Smart Log** toggle (Experimental).
+3. Grant microphone permission the first time you use it.
+
+### How to use it
+- **Press and hold** the FitBot floating button (any page) for ~½ second.
+- The robot face morphs to a microphone, the FAB turns red, you'll hear a short beep and feel a haptic buzz.
+- **Speak** what you ate.
+- **Release** the button to commit. Slide your finger off the FAB before releasing to **cancel**.
+- The Smart Log review modal opens with the parsed items already matched. Edit quantities, swap matches, change meal slots, then tap **Add to Diary**.
+
+### What Smart Log can match
+
+| Source | What it matches | Example phrases |
+|---|---|---|
+| **Foods** (default) | Single foods from your library, then Open Food Facts | "2 eggs", "a slice of toast", "Greek yogurt" |
+| **Saved Meals** | Multi-ingredient meals you've built in MealEditor | "my **chicken caesar salad meal**", "the **pasta carbonara meal**", "for lunch I had my **morning bowl meal**" |
+| **Saved Recipes** | Recipes you've saved (with `is_recipe: 1`) | "my **chicken stir fry recipe**", "made the **pasta carbonara recipe**", "from my **lasagna recipe**" |
+| **Yesterday's diary** | Copy items from yesterday's matching meal slot | "**same as yesterday for lunch**", "**yesterday's breakfast**", "**repeat yesterday's dinner**", "**what I had for breakfast yesterday**" |
+
+The trigger words **"meal"**, **"recipe"**, and **"yesterday"** are how you tell the AI which kind of record to look for. Without those keywords, Smart Log defaults to searching individual foods.
+
+### Meal slot detection
+You can mention the meal in your sentence and Smart Log will route the items there automatically:
+
+- *"for breakfast I had..."* → Breakfast
+- *"snacking on..."* → first Snacks slot
+- *"for my pre-workout..."* → matches a custom slot named Pre-workout
+- *"snack 2 was a banana"* → Snack 2 (exact slot match)
+
+Smart Log uses your **actual configured meal slot names** (visible in the AI prompt), so custom slots like "Snack 1 / 2 / 3", "Brunch", or "Late Night" all work. It also handles renamed defaults — if you renamed "Breakfast" to "Morning Bowl", saying "for breakfast" still routes there via fuzzy matching.
+
+### What Smart Log does NOT do (yet)
+- It does **not** log water intake — say it via the diary water section instead
+- It does **not** log body stats (weight, measurements, etc.)
+- It does **not** support multi-day patterns ("yesterday and today" — yesterday only works for the prior calendar day)
+- It does **not** modify or delete existing diary entries — only adds new ones
+- It does **not** know about diary entries older than yesterday
+
+### Privacy
+- **Audio is recognized on-device.** Android uses the system speech recognizer; the PWA uses your browser's Web Speech API. The audio itself never leaves your device.
+- **The text transcript** is sent to your configured AI provider (Claude/OpenAI/Gemini) for parsing. This is the only network call to a third-party service.
+- **Food matching is local-first.** Your saved foods, meals, recipes, and diary are searched on your own server first. Open Food Facts is only queried as a fallback for foods not in your library.
+- **Nothing is sent to NutriTrace servers.** There are no NutriTrace servers — this is self-hosted.
+
+### Cost
+Smart Log uses a tightly-constrained prompt (~150 tokens in, ~50 out) so it's cheap. On GPT-4o mini or Claude Haiku, logging six meals a day for a year costs roughly **\$0.10 USD**. Gemini's free tier covers it entirely.
+
+### Tips
+- Mention the meal *and* the food in one sentence: "for breakfast I had 2 eggs and toast" → fewer modal corrections.
+- Use the words **"meal"** and **"recipe"** explicitly when you want one of those records — otherwise the AI will look for individual foods first.
+- The first time Smart Log fires on Android, you'll see a permission prompt for the microphone. Grant it.
+- If voice recognition picks up the wrong words, just type into the text input on the modal (after the parser opens) — same matching pipeline runs.
 
 ---
 

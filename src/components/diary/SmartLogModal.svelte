@@ -318,22 +318,41 @@
       </div>
       <div class="ql-list">
         {#each matchedItems as m, i}
+          {@const isExpansion = (m.source === 'meal' || m.source === 'recipe' || m.source === 'yesterday') && m.food && Array.isArray(m.food.items)}
           <div class="ql-row" class:unmatched={!m.food}>
             <div class="ql-row-main">
               <div class="ql-row-name">
                 {m.food?.name || m.item.name}
                 {#if m.source === 'local'}<span class="ql-badge ql-badge-local">Local</span>{/if}
                 {#if m.source === 'off'}<span class="ql-badge ql-badge-off">OFF</span>{/if}
+                {#if m.source === 'meal'}<span class="ql-badge ql-badge-meal">Meal</span>{/if}
+                {#if m.source === 'recipe'}<span class="ql-badge ql-badge-recipe">Recipe</span>{/if}
+                {#if m.source === 'yesterday'}<span class="ql-badge ql-badge-yesterday">Yesterday</span>{/if}
                 {#if !m.food}<span class="ql-badge ql-badge-warn">Not found</span>{/if}
               </div>
-              {#if m.food}
+              {#if m.food && isExpansion}
+                <div class="ql-row-meta">
+                  Expands to {m.food.items.length} item{m.food.items.length === 1 ? '' : 's'}
+                  {#if m.food.nutrition?.calories}
+                    · ~{Math.round(m.food.nutrition.calories)} kcal total
+                  {/if}
+                </div>
+                <details class="ql-swap">
+                  <summary>Show items ({m.food.items.length})</summary>
+                  <div class="ql-candidates">
+                    {#each m.food.items as sub}
+                      <div class="ql-subitem">{sub.name}{sub.brand ? ' · ' + sub.brand : ''}</div>
+                    {/each}
+                  </div>
+                </details>
+              {:else if m.food}
                 <div class="ql-row-meta">
                   {Math.round((m.food.nutrition?.calories || 0) * (m.quantity / 100))} kcal · {m.quantity}{m.food.unit || 'g'}
                 </div>
               {:else}
                 <div class="ql-row-meta">No nutrition data — remove or add manually</div>
               {/if}
-              {#if m.candidates && m.candidates.length > 1}
+              {#if m.candidates && m.candidates.length > 1 && !isExpansion}
                 <details class="ql-swap">
                   <summary>Swap match ({m.candidates.length})</summary>
                   <div class="ql-candidates">
@@ -352,7 +371,9 @@
                   <option value={idx}>{name}</option>
                 {/each}
               </select>
-              <input type="number" class="input ql-qty" min="1" bind:value={m.quantity} />
+              {#if !isExpansion}
+                <input type="number" class="input ql-qty" min="1" bind:value={m.quantity} />
+              {/if}
               <button class="btn-icon" style="color:var(--danger)" on:click={() => removeRow(i)} aria-label="Remove">
                 <span class="material-symbols-rounded" style="font-size:18px">close</span>
               </button>
@@ -555,9 +576,17 @@
     border-radius: 4px;
     letter-spacing: 0.04em;
   }
-  .ql-badge-local { background: var(--accent-dim); color: var(--accent); }
-  .ql-badge-off   { background: color-mix(in srgb, #3b82f6 20%, transparent); color: #60a5fa; }
-  .ql-badge-warn  { background: color-mix(in srgb, var(--warning, #f59e0b) 20%, transparent); color: var(--warning, #f59e0b); }
+  .ql-badge-local     { background: var(--accent-dim); color: var(--accent); }
+  .ql-badge-off       { background: color-mix(in srgb, #3b82f6 20%, transparent); color: #60a5fa; }
+  .ql-badge-meal      { background: color-mix(in srgb, #a855f7 20%, transparent); color: #c084fc; }
+  .ql-badge-recipe    { background: color-mix(in srgb, #ec4899 20%, transparent); color: #f472b6; }
+  .ql-badge-yesterday { background: color-mix(in srgb, #10b981 20%, transparent); color: #34d399; }
+  .ql-badge-warn      { background: color-mix(in srgb, var(--warning, #f59e0b) 20%, transparent); color: var(--warning, #f59e0b); }
+  .ql-subitem {
+    font-size: 12px;
+    color: var(--text-2);
+    padding: 3px 8px;
+  }
 
   .ql-swap summary {
     font-size: 11px;

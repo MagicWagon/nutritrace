@@ -919,13 +919,20 @@ Water: ${ctx.waterText}`
     {/if}
   </div>
 
-  <!-- Recording hint tooltip — appears above the FAB while recording -->
+  <!-- Recording hint tooltip — centered above the FAB while recording.
+       Uses transform: translateX(-50%) so the pill stays centered on the FAB
+       regardless of how wide the text inside is. Position is based on the
+       FAB's center x-coordinate (FAB width = 60px → center = pos.x + 30). -->
   {#if recordingMode}
-    <div class="fab-record-hint" style={fabStyle ? `left:${(fabPos?.x || 0) - 60}px; top:${(fabPos?.y || 0) - 44}px;` : ''}>
+    <div
+      class="fab-record-hint"
+      class:cancel={cancelPreview}
+      style={fabPos ? `left:${fabPos.x + 30}px; top:${fabPos.y - 44}px; right:auto; transform:translateX(-50%);` : ''}
+    >
       {#if cancelPreview}
-        <span style="color:#fca5a5">✕ Release to cancel</span>
+        ✕ Release to cancel
       {:else}
-        <span style="color:#fff">● Listening… release to log</span>
+        ● Listening… release to log
       {/if}
     </div>
   {/if}
@@ -1232,31 +1239,42 @@ Water: ${ctx.waterText}`
              inset 0 -2px 6px rgba(0,0,0,0.2),
              0 0 0 0 rgba(239, 68, 68, 0); }
   }
-  /* Recording hint tooltip — sits above the FAB during recording.
-     Default position uses fixed bottom-right like the FAB; if the user has
-     dragged the FAB, the inline style overrides position to follow it. */
+  /* Recording hint tooltip — centered above the FAB during recording.
+     Default position: FAB sits at right:20px width:60px so its center is at
+     50px from the right edge. Pill uses right:50px + translateX(50%) so the
+     pill's own center lines up with the FAB's center. When the user has
+     dragged the FAB, the inline style overrides with absolute left + a
+     translateX(-50%). Padding and line-height tuned so single-line text
+     stays vertically centered without descender clipping. */
   .fab-record-hint {
     position: fixed;
-    right: 20px;
+    right: 50px;
+    transform: translateX(50%);
     bottom: calc(var(--nav-h) + var(--safe-bottom, 0px) + 92px);
-    padding: 6px 12px;
-    border-radius: 14px;
-    background: rgba(0, 0, 0, 0.78);
+    padding: 8px 16px;
+    border-radius: 16px;
+    background: rgba(0, 0, 0, 0.82);
     backdrop-filter: blur(10px) saturate(180%);
     -webkit-backdrop-filter: blur(10px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    font-size: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    font-size: 13px;
     font-weight: 600;
-    color: #fff;
+    line-height: 1.2;
+    color: #ffffff;
     z-index: 401;
     pointer-events: none;
     white-space: nowrap;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    text-align: center;
+    box-shadow: 0 4px 18px rgba(0,0,0,0.45);
     animation: fab-hint-fade 0.18s ease-out;
   }
+  .fab-record-hint.cancel {
+    color: #fca5a5;
+    border-color: rgba(252, 165, 165, 0.35);
+  }
   @keyframes fab-hint-fade {
-    from { opacity: 0; transform: translateY(4px); }
-    to   { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; }
+    to   { opacity: 1; }
   }
 
   @keyframes gradient-shift {

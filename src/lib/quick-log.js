@@ -33,22 +33,43 @@ The user's configured meal slots are: [${namesQuoted}]
 
 Rules:
 - Return ONLY valid JSON, no commentary, no markdown fences.
-- Top-level shape: { "meal": <one of the meal slot names exactly as listed above, or null>, "items": [ ... ] }
-- Each item has: name (string), quantity (number, default 1), unit (string or null).
+- Top-level shape: { "meal": <slot name from the list above, or null>, "items": [ ... ] }
+- Each item has: name (string), quantity (number, default 1), unit (string or null), kind ("food" | "meal" | "recipe" | "yesterday").
+
+ITEM KIND — figure out what the user is referring to:
+- "food" (default): a single food, ingredient, or branded product. e.g. "2 eggs", "a slice of toast", "Greek yogurt"
+- "meal": the user references a SAVED MEAL by name. Trigger phrases include "my X meal", "the meal called X", "my saved X", "X meal", "for breakfast I had my morning bowl meal".
+- "recipe": the user references a SAVED RECIPE by name. Trigger phrases include "my X recipe", "the recipe X", "from my X recipe", "recipe called X".
+- "yesterday": the user wants to repeat something from yesterday's diary. Trigger phrases include "same as yesterday", "yesterday's lunch", "what I had for breakfast yesterday", "repeat yesterday's dinner". For these items, set "name" to the meal slot from yesterday they want to repeat (e.g. "Lunch", "Breakfast"), quantity 1, unit null.
+
+Other rules:
 - Use common units: "slice", "cup", "tbsp", "tsp", "oz", "g", "ml", "piece", "bowl", "can", "bottle".
 - If no unit is specified for a countable item (eggs, bananas, apples), set unit to null.
 - Words like "a", "an", "one" mean quantity 1. "couple" or "few" means 2. "some" means 1.
 - Split compound items: "eggs and toast" → two items.
+- The meal slot field at the top level is INDEPENDENT from the item kind. e.g. "for breakfast I had my chicken stir fry recipe" → meal="Breakfast", items=[{kind:"recipe", name:"chicken stir fry"}].
 - For the meal field:
   * Match the user's input to one of their configured meal slots EXACTLY as written above (preserve case).
   * Use common sense: "this morning" / "for breakfast" → the breakfast-like slot. "tonight" / "for dinner" → the dinner-like slot. "as a snack" → the closest snack slot.
-  * If the user says a slot name directly ("for my pre-workout meal"), match it exactly.
-  * If the user has multiple numbered slots (e.g. Snack 1, Snack 2, Snack 3) and the input doesn't say which number, pick the FIRST one in the list. The user can change it later.
-  * The user may have renamed defaults (e.g. no "Breakfast", but a "Morning Bowl" slot) — pick whichever slot best fits the time-of-day cue.
-  * If no meal is mentioned or you can't tell, set meal to null.
+  * If the user has numbered slots (Snack 1/2/3) and doesn't specify, pick the FIRST.
+  * If no meal is mentioned, set meal to null.
 - Ignore filler words: "ate", "had", "I just had".
 
-Example output (for default meals): {"meal":"Breakfast","items":[{"name":"eggs","quantity":2,"unit":null},{"name":"toast","quantity":1,"unit":"slice"}]}`;
+EXAMPLES:
+Input: "for breakfast I had 2 eggs and toast"
+Output: {"meal":"Breakfast","items":[{"name":"eggs","quantity":2,"unit":null,"kind":"food"},{"name":"toast","quantity":1,"unit":"slice","kind":"food"}]}
+
+Input: "for lunch I had my chicken caesar salad meal"
+Output: {"meal":"Lunch","items":[{"name":"chicken caesar salad","quantity":1,"unit":null,"kind":"meal"}]}
+
+Input: "made my pasta carbonara recipe for dinner"
+Output: {"meal":"Dinner","items":[{"name":"pasta carbonara","quantity":1,"unit":null,"kind":"recipe"}]}
+
+Input: "same as yesterday for lunch"
+Output: {"meal":"Lunch","items":[{"name":"Lunch","quantity":1,"unit":null,"kind":"yesterday"}]}
+
+Input: "had my pre-workout meal and a banana"
+Output: {"meal":null,"items":[{"name":"pre-workout","quantity":1,"unit":null,"kind":"meal"},{"name":"banana","quantity":1,"unit":null,"kind":"food"}]}`;
 }
 
 /**
@@ -84,12 +105,14 @@ export async function parseInput(text, userMealNames) {
   try {
     const parsed = JSON.parse(jsonText);
     const rawItems = Array.isArray(parsed.items) ? parsed.items : [];
+    const VALID_KINDS = new Set(['food', 'meal', 'recipe', 'yesterday']);
     const items = rawItems
       .filter(it => it && typeof it === 'object' && it.name)
       .map(it => ({
         name: String(it.name).trim(),
         quantity: Number(it.quantity) > 0 ? Number(it.quantity) : 1,
         unit: it.unit ? String(it.unit).trim() : null,
+        kind: VALID_KINDS.has(it.kind) ? it.kind : 'food',
       }));
     // Meal can be any of the user's slot names (free string, validated downstream)
     const meal = parsed.meal && typeof parsed.meal === 'string' ? parsed.meal.trim() : null;
@@ -174,37 +197,51 @@ export function resolveMealSlot(mealName, mealNames) {
   return null;
 }
 
-// ── Step 2: Match parsed items to real food records ──────────────────────
+// ── Step 2: Match parsed items to real records ────────────────────────────
 
 /**
- * Search local foods + OFF for a single parsed item.
- * Returns { item, candidates: [...], best: <foodRecord|null>, source: 'local'|'off'|'unknown' }.
+ * Match a single parsed item to a real record. Dispatches based on the
+ * `kind` field set by the AI parser:
+ *   - 'food'      → searches local foods, then OFF (existing behavior)
+ *   - 'meal'      → searches saved meals
+ *   - 'recipe'    → searches saved recipes
+ *   - 'yesterday' → pulls items from yesterday's diary for the named meal slot
  *
- * Match strategy:
- *   1. Search local foods by name. If matches: rank by usage frequency in diary, pick most-used.
- *   2. If no local matches: search OFF (handles native via existing CapacitorHttp pipeline).
- *   3. If still nothing: return null + 'unknown' so the modal can show an "Estimate" badge.
+ * Returns { item, candidates, best, source } where:
+ *   - source ∈ 'local' | 'off' | 'meal' | 'recipe' | 'yesterday' | 'unknown'
+ *   - For 'meal' / 'recipe': best is the meal record (with .items[] inside)
+ *   - For 'yesterday': best is a synthetic { name, items: [...yesterday's foods] }
+ *     where the inner items are full food records ready to write to today's diary
  */
 export async function matchItem(parsedItem) {
+  const kind = parsedItem.kind || 'food';
+  if (kind === 'meal') return _matchMeal(parsedItem, false);
+  if (kind === 'recipe') return _matchMeal(parsedItem, true);
+  if (kind === 'yesterday') return _matchYesterday(parsedItem);
+  return _matchFood(parsedItem);
+}
+
+/** Match all parsed items in parallel. */
+export async function matchItems(parsedItems) {
+  return Promise.all(parsedItems.map(matchItem));
+}
+
+// ── _matchFood: existing food search (local + OFF) ────────────────────────
+async function _matchFood(parsedItem) {
   const out = { item: parsedItem, candidates: [], best: null, source: 'unknown' };
   const query = parsedItem.name;
 
   // ── 1. Local foods ──────────────────────────────────────────────────────
-  // NtApi has no server-side text search; we fetch all and filter client-side
-  // (matches the pattern used in Foods.svelte). For typical libraries (<2k items)
-  // this is fine. For huge libraries we could move filtering to a worker.
   try {
     const allFoods = await NtApi.getFoods();
     const ql = query.toLowerCase();
     const matches = (allFoods || []).filter(f => {
       const n = (f.name || '').toLowerCase();
       const b = (f.brand || '').toLowerCase();
-      // Match if any token of the query appears in the name or brand
       return ql.split(/\s+/).every(tok => n.includes(tok) || b.includes(tok));
     });
 
     if (matches.length > 0) {
-      // Frequency-rank: count how many times each food appears in diary entries
       let freqMap = {};
       try {
         const allDiary = await NtApi.getAllDiary();
@@ -215,7 +252,6 @@ export async function matchItem(parsedItem) {
           }
         }
       } catch {}
-      // Sort: by frequency desc, then exact-name match boost, then name length asc
       const ranked = [...matches].sort((a, b) => {
         const fa = freqMap[a.id || a.name] || 0;
         const fb = freqMap[b.id || b.name] || 0;
@@ -231,7 +267,7 @@ export async function matchItem(parsedItem) {
       return out;
     }
   } catch (e) {
-    console.warn('[quick-log] local search failed:', e.message);
+    console.warn('[quick-log] local food search failed:', e.message);
   }
 
   // ── 2. OFF fallback ─────────────────────────────────────────────────────
@@ -247,13 +283,93 @@ export async function matchItem(parsedItem) {
     console.warn('[quick-log] OFF search failed:', e.message);
   }
 
-  // ── 3. Nothing matched ──────────────────────────────────────────────────
   return out;
 }
 
-/** Match all parsed items in parallel. */
-export async function matchItems(parsedItems) {
-  return Promise.all(parsedItems.map(matchItem));
+// ── _matchMeal: search saved meals or recipes ─────────────────────────────
+// `isRecipe` flag distinguishes the two — they share the same data shape but
+// live in separate API endpoints (meals vs meals?recipes=1).
+async function _matchMeal(parsedItem, isRecipe) {
+  const out = { item: parsedItem, candidates: [], best: null, source: isRecipe ? 'recipe' : 'meal' };
+  const query = (parsedItem.name || '').toLowerCase();
+  if (!query) return out;
+
+  try {
+    const all = isRecipe ? await NtApi.getRecipes() : await NtApi.getMeals();
+    const matches = (all || []).filter(m => {
+      const n = (m.name || '').toLowerCase();
+      return query.split(/\s+/).every(tok => n.includes(tok));
+    });
+    if (matches.length === 0) {
+      // No exact-token match — fall back to substring on the full query
+      const fuzzy = (all || []).filter(m => (m.name || '').toLowerCase().includes(query));
+      if (fuzzy.length > 0) {
+        out.candidates = fuzzy.slice(0, 5);
+        out.best = fuzzy[0];
+        return out;
+      }
+      // Still nothing — leave source as meal/recipe but best=null so the
+      // modal shows "not found" and the user can swap or remove
+      return out;
+    }
+    // Sort by exact-name boost, then shortest name (most specific match)
+    const ranked = [...matches].sort((a, b) => {
+      const ea = (a.name || '').toLowerCase() === query ? 1 : 0;
+      const eb = (b.name || '').toLowerCase() === query ? 1 : 0;
+      if (eb !== ea) return eb - ea;
+      return (a.name || '').length - (b.name || '').length;
+    });
+    out.candidates = ranked.slice(0, 5);
+    out.best = ranked[0];
+  } catch (e) {
+    console.warn(`[quick-log] ${isRecipe ? 'recipe' : 'meal'} search failed:`, e.message);
+  }
+  return out;
+}
+
+// ── _matchYesterday: pull items from yesterday's diary ────────────────────
+// The AI sets `name` to the meal slot name they want to repeat (e.g. "Lunch").
+// We resolve that to a slot index, fetch yesterday's diary, and return all
+// items in that slot as a synthetic "meal" so saveItems can expand them.
+async function _matchYesterday(parsedItem) {
+  const out = { item: parsedItem, candidates: [], best: null, source: 'yesterday' };
+  try {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yDateStr = yesterday.toLocaleDateString('sv-SE');
+    const entry = await NtApi.getDiaryDate(yDateStr);
+    if (!entry || !entry.items || entry.items.length === 0) return out;
+
+    // Resolve the requested meal slot from the user's mealNames
+    const { mealNames } = await import('../stores/settings.js');
+    let names = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
+    mealNames.subscribe(v => { if (v) names = v; })();
+    const slot = resolveMealSlot(parsedItem.name, names);
+    if (slot == null) return out;
+
+    // Filter yesterday's items to that meal slot
+    const yesterdayItems = entry.items.filter(it => Number(it.meal ?? 0) === slot);
+    if (yesterdayItems.length === 0) return out;
+
+    // Build a synthetic meal-like record so the modal renders it nicely
+    out.best = {
+      name: `Yesterday's ${names[slot]}`,
+      items: yesterdayItems,
+      _yesterdaySlot: slot,
+      _yesterdayDate: yDateStr,
+      // Aggregated nutrition is informational only — saveItems re-uses the
+      // individual item nutrition when expanding.
+      nutrition: yesterdayItems.reduce((acc, it) => {
+        const n = it.nutrition || {};
+        acc.calories = (acc.calories || 0) + (n.calories || 0) * ((it.quantity || 1));
+        return acc;
+      }, {}),
+    };
+    out.candidates = [out.best];
+  } catch (e) {
+    console.warn('[quick-log] yesterday lookup failed:', e.message);
+  }
+  return out;
 }
 
 // ── Step 3: Save matched items to diary ──────────────────────────────────
@@ -261,11 +377,15 @@ export async function matchItems(parsedItems) {
 /**
  * Save the user's confirmed items to the diary for the given date + meal slot.
  *
+ * Handles four item kinds based on the matched record's `source`:
+ *   - 'local' / 'off' / 'unknown' (single food) → 1 diary entry
+ *   - 'meal' / 'recipe' (saved meal/recipe)     → expand meal.items[] into N diary entries
+ *   - 'yesterday' (synthetic from yesterday)    → copy items[] from yesterday into N diary entries
+ *
  * Each "matched item" should have:
- *   - food: the food record (local or OFF) — added to local Foods if from OFF
- *   - quantity: portion size in the food's base unit (typically grams)
+ *   - food: the matched record
+ *   - quantity: portion size (grams) for single foods, or scale factor for meals
  *   - mealSlot: 0..n meal index
- *   - date: 'YYYY-MM-DD'
  */
 export async function saveItems(matchedList, { date, defaultMealSlot = 0 }) {
   if (!Array.isArray(matchedList) || matchedList.length === 0) return { saved: 0 };
@@ -274,6 +394,27 @@ export async function saveItems(matchedList, { date, defaultMealSlot = 0 }) {
   let saved = 0;
   for (const m of matchedList) {
     if (!m || !m.food) continue;
+    const slot = m.mealSlot != null ? Number(m.mealSlot) : defaultMealSlot;
+
+    // ── Meal / Recipe / Yesterday: expand .items[] into multiple diary entries ──
+    if ((m.source === 'meal' || m.source === 'recipe' || m.source === 'yesterday') &&
+        Array.isArray(m.food.items)) {
+      for (const sub of m.food.items) {
+        try {
+          await addDiaryItem(
+            { ...sub, quantity: sub.quantity || 1 },
+            slot,
+            date
+          );
+          saved++;
+        } catch (e) {
+          console.warn('[quick-log] add expanded meal item failed:', e.message);
+        }
+      }
+      continue;
+    }
+
+    // ── Single food (local / off / unknown) ──────────────────────────────
     let food = m.food;
 
     // If the food came from OFF, persist it to the local foods table first so
@@ -291,7 +432,7 @@ export async function saveItems(matchedList, { date, defaultMealSlot = 0 }) {
       ...food,
       portion: m.quantity || food.portion || 100,
       unit: food.unit || 'g',
-      meal: m.mealSlot != null ? Number(m.mealSlot) : defaultMealSlot,
+      meal: slot,
     };
     try {
       await addDiaryItem(item, item.meal, date);
