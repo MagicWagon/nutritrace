@@ -2224,7 +2224,7 @@
   /* Date sub-bar — same pattern as Diary */
   .wl-date-bar {
     position: sticky;
-    top: calc(var(--page-top, var(--safe-top)) + 62px);
+    top: calc(var(--page-top, var(--safe-top)) + 110px);
     z-index: 9;
     background: var(--glass-surface);
     backdrop-filter: blur(20px) saturate(180%);
@@ -2236,7 +2236,7 @@
     padding: 8px var(--page-px);
   }
   .wl-date-bar.has-banner {
-    top: calc(var(--page-top, var(--safe-top)) + 122px);
+    top: calc(var(--page-top, var(--safe-top)) + 170px);
   }
   .date-btn {
     flex: 1;
@@ -2423,7 +2423,7 @@
   /* Tabs */
   .tab-bar-wrap {
     position: sticky;
-    top: calc(var(--page-top, var(--safe-top)) + 62px + 52px);
+    top: calc(var(--page-top, var(--safe-top)) + 110px + 52px);
     z-index: 8;
     background: var(--glass-surface);
     backdrop-filter: blur(20px) saturate(180%);
@@ -2433,7 +2433,7 @@
     padding: 12px var(--page-px, 16px) 12px;
   }
   .tab-bar-wrap.has-banner {
-    top: calc(var(--page-top, var(--safe-top)) + 122px + 52px);
+    top: calc(var(--page-top, var(--safe-top)) + 170px + 52px);
   }
   .tab-bar {
     display: flex;

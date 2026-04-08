@@ -97,10 +97,14 @@ input, select, textarea { font-family: inherit; }
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: calc(var(--page-top, var(--safe-top)) + 10px) var(--page-px) 12px;
-  /* Align the H1's first letter to the hamburger centerline (viewport x=32).
-     When hamburger is hidden, --hamburger-offset is 0 and we fall back to
-     the normal --page-px padding. */
+  /* Top padding leaves room for the floating hamburger button row above the
+     title. When hamburger is showing: safe-top + 10 (top inset) + 40 (button) +
+     8 (gap) = title row starts well below the hamburger. When hamburger is
+     hidden: just safe-top + 10. */
+  padding: calc(var(--page-top, var(--safe-top)) + 10px + var(--hamburger-row, 0px)) var(--page-px) 12px;
+  /* Align the H1's first letter to the hamburger centerline (viewport x=32)
+     so the title visually anchors to the menu button. When hamburger is
+     hidden, --hamburger-offset is 0 and we fall back to normal --page-px. */
   padding-left: max(var(--page-px), var(--hamburger-offset, 0px));
 }
 .page-header h1 {
