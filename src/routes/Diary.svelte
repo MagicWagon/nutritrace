@@ -22,7 +22,9 @@
            diaryShowTimestamps, diaryShowMacroSummary, diaryPromptQuantity,
            diaryShowPortionSize, diaryShowNutritionBar, diaryTotalsMode,
            diaryShowAllNutrients, diaryShowNutritionUnits, visibleNutriments, hiddenBodyStats,
-           dateFormat, timeFormat, disableAnimations, goalCelebrations, pageBanners } from '../stores/settings.js';
+           dateFormat, timeFormat, disableAnimations, goalCelebrations, pageBanners,
+           aiEnabled, quickLogEnabled } from '../stores/settings.js';
+  import QuickLogModal from '../components/diary/QuickLogModal.svelte';
   import DiaryBanner  from '../components/banners/DiaryBanner.svelte';
   import WaterBanner  from '../components/banners/WaterBanner.svelte';
   import { editorState } from '../stores/editorState.js';
@@ -223,6 +225,18 @@
     const scrollContainer = document.querySelector('.page-transition');
     editorState.diaryScrollY = scrollContainer ? scrollContainer.scrollTop : 0;
     push('/foods?pick=1&meal=' + mealIdx + '&date=' + $currentDate);
+  }
+
+  // ── Quick Log (natural-language entry via AI) ──────────────────────────
+  let showQuickLog = false;
+  let quickLogMealIdx = 0;
+  function openQuickLog(mealIdx) {
+    quickLogMealIdx = mealIdx;
+    showQuickLog = true;
+  }
+  function onQuickLogSaved() {
+    // Refresh diary view after successful save
+    loadEntry($currentDate);
   }
 
   function confirmDelete(idx) {
@@ -658,9 +672,16 @@
               {items.reduce((s,it) => s + formatKcal(it), 0)} kcal
             </span>
           {/if}
-          <button class="btn-icon accent ml-auto" on:click={() => openAddFood(mealIdx)} aria-label="Add food to {meal}" title="Add food to {meal}">
-            <span class="material-symbols-rounded">add</span>
-          </button>
+          <div class="ml-auto" style="display:flex;align-items:center;gap:4px">
+            {#if $aiEnabled && $quickLogEnabled}
+              <button class="btn-icon" on:click={() => openQuickLog(mealIdx)} aria-label="Quick Log to {meal}" title="Quick Log to {meal}">
+                <span class="material-symbols-rounded" style="color:var(--accent)">auto_awesome</span>
+              </button>
+            {/if}
+            <button class="btn-icon accent" on:click={() => openAddFood(mealIdx)} aria-label="Add food to {meal}" title="Add food to {meal}">
+              <span class="material-symbols-rounded">add</span>
+            </button>
+          </div>
         </div>
 
         {#if items.length === 0}
@@ -1029,6 +1050,16 @@
     </div>
   {/if}
 </Sheet>
+
+<!-- Quick Log modal (natural language food entry via AI) -->
+{#if showQuickLog}
+  <QuickLogModal
+    date={$currentDate}
+    defaultMealSlot={quickLogMealIdx}
+    on:close={() => showQuickLog = false}
+    on:saved={onQuickLogSaved}
+  />
+{/if}
 
 <!-- Delete confirm dialog -->
 <Dialog

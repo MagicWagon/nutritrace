@@ -5,6 +5,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.36.0-beta] — 2026-04-07
+
+### Added
+- **Quick Log (experimental)** — natural-language food entry powered by FitBot's AI provider. Type or speak something like "2 eggs and toast" and the AI parses it into structured items, then a deterministic pipeline matches each item against your local food database (frequency-ranked by usage in your diary), falls back to Open Food Facts, then to "not found" so the confirmation modal can flag it. Mic button uses the Web Speech API where available. Confirmation modal lets you swap matches, edit quantities, change meal slots, and remove items before tapping Add.
+  - New module `src/lib/quick-log.js` (parseInput → matchItems → saveItems pipeline)
+  - New component `src/components/diary/QuickLogModal.svelte` (bottom-sheet on mobile, centered card on desktop, input/parsing/review/saving phases)
+  - New `quickLogEnabled` setting in Settings → AI Assistant, gated behind `aiEnabled`
+  - Sparkle icon button (`auto_awesome`) appears next to each meal's `+` button on the Diary page when both AI and Quick Log are enabled
+  - Works in PWA, native + server, and native local-only modes — same paths as FitBot
+- **Donation links** — README has a Support section with GitHub Sponsors and Ko-fi badge placeholders. Settings → About now has a "Support development" row with the same buttons.
+- **`.github/FUNDING.yml`** — GitHub will display a "Sponsor" button on the repo once the placeholders are replaced with real account handles.
+
+### Fixed
+- **README license inconsistency** — said MIT but actual `LICENSE` file is AGPL-3.0. README now correctly says AGPL-3.0 with a note that the Android app is distributed separately on the Play Store.
+
+---
+
 ## [0.35.2-beta] — 2026-04-07
 
 ### Added

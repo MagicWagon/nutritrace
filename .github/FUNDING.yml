@@ -1,0 +1,21 @@
+# NutriTrace funding sources
+# These appear as the "Sponsor" button on the GitHub repo page.
+#
+# TODO: replace YOUR_USERNAME placeholders with actual account handles
+# once GitHub Sponsors is approved and Ko-fi account is created.
+
+github: [YOUR_GITHUB_USERNAME]      # GitHub Sponsors username (after approval)
+ko_fi: YOUR_KOFI_USERNAME           # ko-fi.com/<username>
+
+# Other options not currently used:
+# patreon: USERNAME
+# open_collective: USERNAME
+# tidelift: PLATFORM-NAME/PACKAGE-NAME
+# community_bridge: PROJECT-NAME
+# liberapay: USERNAME
+# issuehunt: USERNAME
+# lfx_crowdfunding: PROJECT-NAME
+# polar: USERNAME
+# buy_me_a_coffee: USERNAME
+# thanks_dev: USERNAME
+# custom: ['https://your-donation-link.com']

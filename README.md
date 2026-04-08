@@ -189,6 +189,15 @@ All external API calls are proxied server-side — no keys are exposed to the br
 
 ---
 
+## Support
+
+NutriTrace is free to self-host and always will be. If it's been useful to you and you'd like to support continued development:
+
+[![GitHub Sponsors](https://img.shields.io/badge/GitHub_Sponsors-❤-EA4AAA?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/YOUR_GITHUB_USERNAME)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-Buy_me_a_coffee-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/YOUR_KOFI_USERNAME)
+
+Or just star the repo — that helps with discoverability and costs nothing.
+
 ## License
 
-MIT
+[AGPL-3.0](LICENSE) — server and PWA. The Android app is distributed separately as a paid release on the Play Store.

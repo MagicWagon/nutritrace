@@ -26,7 +26,7 @@
     bodyStatsOrder, hiddenBodyStats,
     dateFormat, timeFormat,
     sidebarPersistent, goalCelebrations, pageBanners,
-    aiEnabled, aiProvider, aiApiKey, aiModel, aiAssistantName,
+    aiEnabled, aiProvider, aiApiKey, aiModel, aiAssistantName, quickLogEnabled,
     waterGoalMl, waterUnit, waterContainers, waterShowInStats, waterShowInDiary,
   } from '../stores/settings.js';
   import { mealIcon } from '../lib/mealIcon.js';
@@ -480,6 +480,7 @@
   let aiApiKeyVal        = DB.getSetting('aiApiKey',        '');
   let aiModelVal         = DB.getSetting('aiModel',         '');
   let aiAssistantNameVal = DB.getSetting('aiAssistantName', 'FitBot');
+  let quickLogEnabledVal = DB.getSetting('quickLogEnabled', false);
   let aiShowKey          = false;
   // Reset model to provider default when provider changes
   $: if (aiModelVal && !AI_MODELS[aiProviderVal]?.find(m => m.value === aiModelVal)) {
@@ -1609,6 +1610,7 @@
   $: { aiProvider.set(aiProviderVal); }
   $: set('aiModel',         aiModelVal);
   $: set('aiAssistantName', aiAssistantNameVal);
+  $: { quickLogEnabled.set(quickLogEnabledVal); }
 
   // ── Explicit credential saves ──────────────────────────────────────────────
   let usdaSaved   = false;
@@ -2396,6 +2398,18 @@
                   {/each}
                 </select>
               </div>
+            </div>
+
+            <div class="setting-divider"></div>
+            <div class="setting-row">
+              <div>
+                <span class="setting-label">
+                  Quick Log
+                  <span class="labs-badge" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);vertical-align:middle">Experimental</span>
+                </span>
+                <div class="setting-desc">Type or speak "2 eggs and toast" to log meals naturally. The AI parses items and your local food database fills in the nutrition. Adds a Quick Log button to the Diary page.</div>
+              </div>
+              <Toggle checked={quickLogEnabledVal} on:change={e => quickLogEnabledVal = e.detail} />
             </div>
 
             {#if !envLocks.ai}
@@ -3372,6 +3386,22 @@
           <div class="about-row">
             <span class="material-symbols-rounded about-feat-icon">favorite</span>
             <span>Inspired by <a href="https://github.com/davidhealey/waistline" target="_blank" rel="noopener" class="about-link">Waistline</a> and <a href="https://github.com/CodeWithCJ/SparkyFitness" target="_blank" rel="noopener" class="about-link">SparkyFitness</a></span>
+          </div>
+          <div class="setting-divider"></div>
+          <div class="about-row" style="flex-direction:column;align-items:flex-start;gap:8px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span class="material-symbols-rounded about-feat-icon">volunteer_activism</span>
+              <span>Support development</span>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;padding-left:30px">
+              <a href="https://github.com/sponsors/YOUR_GITHUB_USERNAME" target="_blank" rel="noopener" class="btn btn-secondary" style="height:30px;font-size:12px;padding:0 12px">
+                <span class="material-symbols-rounded" style="font-size:14px">favorite</span> GitHub Sponsors
+              </a>
+              <a href="https://ko-fi.com/YOUR_KOFI_USERNAME" target="_blank" rel="noopener" class="btn btn-secondary" style="height:30px;font-size:12px;padding:0 12px">
+                <span class="material-symbols-rounded" style="font-size:14px">coffee</span> Ko-fi
+              </a>
+            </div>
+            <div class="setting-desc" style="padding-left:30px;font-size:11px">NutriTrace is free to self-host. Donations are appreciated but never required.</div>
           </div>
           <div class="setting-divider"></div>
           <div class="about-desc" style="font-size:11px;color:var(--text-3);line-height:1.5">

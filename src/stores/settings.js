@@ -30,7 +30,7 @@ export const USER_PREFS = new Set([
   'waterGoalMl','waterUnit','waterContainers','waterShowInStats','waterShowInDiary',
   'dateFormat','timeFormat','timezone',
   'statsChartType','statsYZero','statsAvgLine','statsGoalLine','statsTrendLine',
-  'aiEnabled','aiProvider','aiApiKey','aiModel','aiAssistantName',
+  'aiEnabled','aiProvider','aiApiKey','aiModel','aiAssistantName','quickLogEnabled',
   'usdaEnabled','usdaApiKey','offUsername','offPassword',
   'mealieEnabled','mealieBaseUrl','mealieApiToken',
   'wellnessEnabled','fitbitEnabled','healthConnectEnabled','wellnessMetrics','workoutsEnabled',
@@ -475,6 +475,9 @@ export const aiProvider      = createSettingStore('aiProvider',      'claude');
 export const aiApiKey        = createSettingStore('aiApiKey',        '');
 export const aiModel         = createSettingStore('aiModel',         '');
 export const aiAssistantName = createSettingStore('aiAssistantName', 'FitBot');
+// Quick Log — natural-language food entry powered by FitBot's AI provider.
+// Off by default (experimental). Only usable when aiEnabled is true.
+export const quickLogEnabled = createSettingStore('quickLogEnabled', false);
 
 // Notifications
 export const notifLocalEnabled     = createSettingStore('notifLocalEnabled',     true);
