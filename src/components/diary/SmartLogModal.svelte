@@ -347,7 +347,7 @@
                 </details>
               {:else if m.food}
                 <div class="ql-row-meta">
-                  {Math.round((m.food.nutrition?.calories || 0) * (m.quantity / 100))} kcal · {m.quantity}{m.food.unit || 'g'}
+                  {Math.round((m.food.nutrition?.calories || 0) * (m.quantity / (m.food.portion || 100)))} kcal · {m.quantity}{m.food.unit || 'g'}
                 </div>
               {:else}
                 <div class="ql-row-meta">No nutrition data — remove or add manually</div>
