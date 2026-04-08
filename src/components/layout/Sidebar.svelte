@@ -142,9 +142,13 @@
 <style>
   .sidebar-backdrop {
     position: fixed; inset: 0;
-    background: var(--overlay);
-    backdrop-filter: var(--backdrop-blur);
-    -webkit-backdrop-filter: var(--backdrop-blur);
+    /* Dark frosted glass scrim — covers everything to the right of the
+       sidebar panel with a heavy blur + saturation boost so the page
+       content reads as background texture rather than competing with
+       the sidebar nav items. */
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
     z-index: 100;
   }
 
