@@ -14,6 +14,7 @@
   import { mealNames } from '../../stores/settings.js';
   import { showError, showSuccess } from '../../stores/toast.js';
   import { parseInput, matchItems, saveItems } from '../../lib/quick-log.js';
+  import { isNative } from '../../lib/platform.js';
 
   export let date;                  // 'YYYY-MM-DD'
   export let defaultMealSlot = 0;   // index into mealNames
@@ -33,7 +34,11 @@
 
   onMount(() => {
     setTimeout(() => inputEl?.focus(), 80);
-    // Init Web Speech API if available
+    // Web Speech API is unreliable in Android WebView (mic permission, Google
+    // cloud dependency, vendor inconsistencies). Only enable it on PWA where
+    // it works in Chrome / Safari / Firefox. Native voice input would need
+    // @capacitor-community/speech-recognition as a future enhancement.
+    if (isNative) return;
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SR) {
       recognition = new SR();
@@ -47,7 +52,11 @@
         }
         listening = false;
       };
-      recognition.onerror = (e) => { listening = false; console.warn('[quick-log] mic error:', e.error); };
+      recognition.onerror = (e) => {
+        listening = false;
+        console.warn('[quick-log] mic error:', e.error);
+        showError('Voice input failed: ' + (e.error || 'unknown error'));
+      };
       recognition.onend = () => { listening = false; };
     }
   });
