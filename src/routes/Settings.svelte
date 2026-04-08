@@ -894,11 +894,40 @@
   }
 
   // ── Local Full Backup (.zip with embedded images) ──────────────────────────
+  // Native local-only mode: backups are written to Capacitor Filesystem
+  // (Documents directory) so the user can list, share, restore, and delete
+  // them. Mirrors the server full-backup UX exactly.
   let localZipBusy = false;
   let localZipStatus = '';
+  let localBackups = []; // [{ filename, createdAt, size }]
+  const LOCAL_BACKUP_DIR = 'nutritrace-backups';
+
+  async function loadLocalBackups() {
+    if (!isNativeLocal) return;
+    try {
+      const { Filesystem, Directory } = await import('@capacitor/filesystem');
+      // Ensure dir exists
+      try {
+        await Filesystem.mkdir({ path: LOCAL_BACKUP_DIR, directory: Directory.Documents, recursive: true });
+      } catch {}
+      const list = await Filesystem.readdir({ path: LOCAL_BACKUP_DIR, directory: Directory.Documents });
+      // list.files is an array of FileInfo: { name, type, size, mtime, uri }
+      localBackups = (list.files || [])
+        .filter(f => f.name && f.name.endsWith('.zip'))
+        .map(f => ({
+          filename: f.name,
+          size: f.size || 0,
+          createdAt: f.mtime ? new Date(f.mtime).toISOString() : new Date().toISOString(),
+        }))
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    } catch (e) {
+      console.warn('[backup] list failed:', e.message);
+      localBackups = [];
+    }
+  }
 
   async function exportLocalZip() {
-    if (localZipBusy) return;
+    if (localZipBusy || !isNativeLocal) return;
     localZipBusy = true;
     localZipStatus = 'Starting…';
     try {
@@ -906,10 +935,26 @@
       const blob = await exportLocalBackup({
         onProgress: (pct, label) => { localZipStatus = `${Math.round(pct)}% — ${label}`; },
       });
-      const filename = `nutritrace-backup-${new Date().toISOString().slice(0,10)}.zip`;
-      _downloadBlob(blob, filename);
+      // Convert blob → base64 → write to Filesystem
+      const filename = `nutritrace-backup-${new Date().toISOString().replace(/[:.]/g,'-').slice(0,19)}.zip`;
+      const arrayBuffer = await blob.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = '';
+      const chunkSize = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+      }
+      const b64 = btoa(binary);
+      const { Filesystem, Directory } = await import('@capacitor/filesystem');
+      await Filesystem.mkdir({ path: LOCAL_BACKUP_DIR, directory: Directory.Documents, recursive: true }).catch(() => {});
+      await Filesystem.writeFile({
+        path: `${LOCAL_BACKUP_DIR}/${filename}`,
+        data: b64,
+        directory: Directory.Documents,
+      });
       localZipStatus = '';
-      showSuccess('Backup downloaded');
+      showSuccess('Backup created');
+      await loadLocalBackups();
     } catch (e) {
       console.error('[backup] export failed:', e);
       localZipStatus = '';
@@ -921,32 +966,109 @@
 
   async function importLocalZip() {
     if (localZipBusy) return;
+    // File picker for the user to select a .zip from anywhere
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.zip,application/zip,application/x-zip-compressed';
     input.onchange = async (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      localZipBusy = true;
-      localZipStatus = 'Reading…';
-      try {
-        const { importLocalBackup } = await import('../lib/local-backup.js');
-        const result = await importLocalBackup(file, {
-          onProgress: (pct, label) => { localZipStatus = `${Math.round(pct)}% — ${label}`; },
-        });
-        const c = result.counts;
-        showSuccess(`Restored ${c.foods} foods · ${c.meals} meals · ${c.recipes} recipes · ${c.diary} days · ${c.wellness} metrics`);
-        localZipStatus = '';
-        setTimeout(() => location.reload(), 1500);
-      } catch (e) {
-        console.error('[backup] import failed:', e);
-        localZipStatus = '';
-        showError('Restore failed: ' + e.message);
-      } finally {
-        localZipBusy = false;
-      }
+      await _runImport(file);
     };
     input.click();
+  }
+
+  async function restoreLocalBackup(filename) {
+    if (localZipBusy) return;
+    const yes = confirm(`Restore "${filename}"? Existing data is merged, not erased.`);
+    if (!yes) return;
+    try {
+      const { Filesystem, Directory } = await import('@capacitor/filesystem');
+      const result = await Filesystem.readFile({
+        path: `${LOCAL_BACKUP_DIR}/${filename}`,
+        directory: Directory.Documents,
+      });
+      // result.data is base64
+      const b64 = typeof result.data === 'string' ? result.data : await _blobToB64(result.data);
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      await _runImport(new Blob([bytes], { type: 'application/zip' }));
+    } catch (e) {
+      console.error('[backup] restore failed:', e);
+      showError('Restore failed: ' + e.message);
+    }
+  }
+
+  async function _blobToB64(blob) {
+    return new Promise((resolve) => {
+      const r = new FileReader();
+      r.onloadend = () => resolve(String(r.result).split(',')[1] || '');
+      r.readAsDataURL(blob);
+    });
+  }
+
+  async function _runImport(file) {
+    localZipBusy = true;
+    localZipStatus = 'Reading…';
+    try {
+      const { importLocalBackup } = await import('../lib/local-backup.js');
+      const result = await importLocalBackup(file, {
+        onProgress: (pct, label) => { localZipStatus = `${Math.round(pct)}% — ${label}`; },
+      });
+      const c = result.counts;
+      showSuccess(`Restored ${c.foods} foods · ${c.meals} meals · ${c.recipes} recipes · ${c.diary} days · ${c.wellness} metrics`);
+      localZipStatus = '';
+      setTimeout(() => location.reload(), 1500);
+    } catch (e) {
+      console.error('[backup] import failed:', e);
+      localZipStatus = '';
+      showError('Restore failed: ' + e.message);
+    } finally {
+      localZipBusy = false;
+    }
+  }
+
+  async function deleteLocalBackup(filename) {
+    const yes = confirm(`Delete "${filename}"? This cannot be undone.`);
+    if (!yes) return;
+    try {
+      const { Filesystem, Directory } = await import('@capacitor/filesystem');
+      await Filesystem.deleteFile({
+        path: `${LOCAL_BACKUP_DIR}/${filename}`,
+        directory: Directory.Documents,
+      });
+      showSuccess('Backup deleted');
+      await loadLocalBackups();
+    } catch (e) {
+      console.error('[backup] delete failed:', e);
+      showError('Delete failed: ' + e.message);
+    }
+  }
+
+  async function shareLocalBackup(filename) {
+    try {
+      const { Filesystem, Directory } = await import('@capacitor/filesystem');
+      const uri = await Filesystem.getUri({
+        path: `${LOCAL_BACKUP_DIR}/${filename}`,
+        directory: Directory.Documents,
+      });
+      // Try the native Share plugin if available, otherwise fall back to copy-to-clipboard of path
+      try {
+        const { Share } = await import('@capacitor/share');
+        await Share.share({
+          title: 'NutriTrace Backup',
+          text: filename,
+          url: uri.uri,
+          dialogTitle: 'Share backup',
+        });
+      } catch {
+        showSuccess(`Saved at: ${uri.uri}`);
+      }
+    } catch (e) {
+      console.error('[backup] share failed:', e);
+      showError('Share failed: ' + e.message);
+    }
   }
 
   async function importBackup() {
@@ -1172,8 +1294,9 @@
     xhr.send(form);
   }
 
-  // Load backup list when section opens (admin only)
-  $: if (openSections.backup && $currentUser?.role === 'admin') loadFullBackups();
+  // Load backup list when section opens
+  $: if (openSections.backup && $currentUser?.role === 'admin' && !isNativeLocal) loadFullBackups();
+  $: if (openSections.backup && isNativeLocal) loadLocalBackups();
 
   // ── Sharing ────────────────────────────────────────────────────────────────
   let adminSharingEnabled = false;
@@ -3000,27 +3123,72 @@
         </div>
         {/if}
 
-        <!-- Local Full Backup ZIP — self-contained with images, for phone-to-phone transfer -->
-        <p class="sub-label">Local Backup</p>
+        {#if isNativeLocal}
+        <p class="sub-label">Full Backup</p>
         <div class="card settings-card">
-          <button class="setting-row setting-action" on:click={exportLocalZip} disabled={localZipBusy}>
-            <span class="material-symbols-rounded si" style="color:var(--accent)">backup</span>
-            <div>
-              <span class="setting-label">Download Full Backup (.zip)</span>
-              <div class="setting-desc">Self-contained ZIP with all your foods, meals, recipes, diary, wellness data, workouts, settings, AND embedded image files. Use this for phone-to-phone transfer without needing a server.{localZipStatus ? ' · ' + localZipStatus : ''}</div>
+          <div style="padding:12px 16px 4px">
+            <p class="setting-desc" style="margin:0 0 12px">A complete snapshot of everything — all foods, meals, recipes, diary, wellness data, workouts, settings, AND embedded image files. Saved to your device's Documents folder, ready for phone-to-phone transfer without needing a server.</p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+              <button class="btn btn-primary" style="height:36px;font-size:13px"
+                on:click={exportLocalZip} disabled={localZipBusy}>
+                {#if localZipBusy}
+                  <span class="material-symbols-rounded spin" style="font-size:16px">autorenew</span> Working…
+                {:else}
+                  <span class="material-symbols-rounded" style="font-size:16px">add_circle</span> Create Backup
+                {/if}
+              </button>
+              <button class="btn btn-secondary" style="height:36px;font-size:13px"
+                on:click={importLocalZip} disabled={localZipBusy}>
+                <span class="material-symbols-rounded" style="font-size:16px">upload</span> Upload &amp; Restore
+              </button>
             </div>
-            <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
-          </button>
-          <div class="setting-divider"></div>
-          <button class="setting-row setting-action" on:click={importLocalZip} disabled={localZipBusy}>
-            <span class="material-symbols-rounded si" style="color:var(--accent)">restore</span>
-            <div>
-              <span class="setting-label">Restore Full Backup (.zip)</span>
-              <div class="setting-desc">Restores from a previously downloaded local backup ZIP. Images are extracted and re-saved to device storage. Existing data is merged, not erased.{localZipStatus ? ' · ' + localZipStatus : ''}</div>
+            {#if localZipStatus}
+              <div class="restore-progress">
+                <div class="restore-progress-label">
+                  <span class="material-symbols-rounded spin" style="font-size:15px;flex-shrink:0">autorenew</span>
+                  {localZipStatus}
+                </div>
+              </div>
+            {/if}
+          </div>
+
+          {#if localBackups.length > 0}
+            <div class="setting-divider"></div>
+            <div class="backup-table-header">
+              <span>Name</span>
+              <span>Created</span>
+              <span>Size</span>
+              <span></span>
             </div>
-            <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
-          </button>
+            <div class="setting-divider"></div>
+            {#each localBackups as bk, i}
+              {#if i > 0}<div class="setting-divider"></div>{/if}
+              <div class="backup-row">
+                <span class="backup-name">{bk.filename}</span>
+                <span class="backup-col-date">{new Date(bk.createdAt).toLocaleDateString()}</span>
+                <span class="backup-col-size">{fmtBytes(bk.size)}</span>
+                <div class="backup-actions">
+                  <button class="btn btn-secondary backup-action-btn"
+                    on:click={() => shareLocalBackup(bk.filename)}>
+                    <span class="material-symbols-rounded" style="font-size:15px">share</span> Share
+                  </button>
+                  <button class="btn btn-secondary backup-action-btn"
+                    on:click={() => restoreLocalBackup(bk.filename)} disabled={localZipBusy}>
+                    <span class="material-symbols-rounded" style="font-size:15px">restore</span> Restore
+                  </button>
+                  <button class="btn-icon" style="color:var(--danger);padding:0 4px"
+                    on:click={() => deleteLocalBackup(bk.filename)} title="Delete backup">
+                    <span class="material-symbols-rounded" style="font-size:20px">delete</span>
+                  </button>
+                </div>
+              </div>
+            {/each}
+          {:else}
+            <div class="setting-divider"></div>
+            <p style="padding:12px 16px;font-size:13px;color:var(--text-3);margin:0">No backups yet — tap Create Backup to get started.</p>
+          {/if}
         </div>
+        {/if}
 
         <!-- Portable JSON export/import (legacy) -->
         <p class="sub-label">Portable JSON Export</p>
