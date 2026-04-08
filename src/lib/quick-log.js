@@ -17,33 +17,51 @@ import { callAI } from './aiChat.js';
 
 // ── Step 1: AI parses the input string into structured items ──────────────
 
-const PARSE_SYSTEM_PROMPT = `You are a food parser for a nutrition tracking app. Extract food items from the user's input and return them as JSON.
+/**
+ * Build the parser prompt dynamically with the user's actual meal names so
+ * the AI can target custom slots like "Pre-workout", "Snack 1", "Late Snack",
+ * not just the default Breakfast/Lunch/Dinner/Snacks.
+ */
+function _buildParsePrompt(userMealNames) {
+  const names = Array.isArray(userMealNames) && userMealNames.length > 0
+    ? userMealNames
+    : ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
+  const namesQuoted = names.map(n => '"' + n + '"').join(', ');
+  return `You are a food parser for a nutrition tracking app. Extract food items AND the target meal from the user's input and return them as JSON.
+
+The user's configured meal slots are: [${namesQuoted}]
 
 Rules:
 - Return ONLY valid JSON, no commentary, no markdown fences.
+- Top-level shape: { "meal": <one of the meal slot names exactly as listed above, or null>, "items": [ ... ] }
 - Each item has: name (string), quantity (number, default 1), unit (string or null).
 - Use common units: "slice", "cup", "tbsp", "tsp", "oz", "g", "ml", "piece", "bowl", "can", "bottle".
 - If no unit is specified for a countable item (eggs, bananas, apples), set unit to null.
 - Words like "a", "an", "one" mean quantity 1. "couple" or "few" means 2. "some" means 1.
 - Split compound items: "eggs and toast" → two items.
-- Ignore filler words: "ate", "had", "for breakfast", "this morning".
+- For the meal field:
+  * Match the user's input to one of their configured meal slots EXACTLY as written above (preserve case).
+  * Use common sense: "this morning" / "for breakfast" → the breakfast-like slot. "tonight" / "for dinner" → the dinner-like slot. "as a snack" → the closest snack slot.
+  * If the user says a slot name directly ("for my pre-workout meal"), match it exactly.
+  * If the user has multiple numbered slots (e.g. Snack 1, Snack 2, Snack 3) and the input doesn't say which number, pick the FIRST one in the list. The user can change it later.
+  * The user may have renamed defaults (e.g. no "Breakfast", but a "Morning Bowl" slot) — pick whichever slot best fits the time-of-day cue.
+  * If no meal is mentioned or you can't tell, set meal to null.
+- Ignore filler words: "ate", "had", "I just had".
 
-Examples:
-Input: "2 eggs and toast"
-Output: {"items":[{"name":"eggs","quantity":2,"unit":null},{"name":"toast","quantity":1,"unit":"slice"}]}
-
-Input: "a cup of coffee and a banana"
-Output: {"items":[{"name":"coffee","quantity":1,"unit":"cup"},{"name":"banana","quantity":1,"unit":null}]}
-
-Input: "had a bowl of oatmeal with blueberries and a glass of milk"
-Output: {"items":[{"name":"oatmeal","quantity":1,"unit":"bowl"},{"name":"blueberries","quantity":1,"unit":null},{"name":"milk","quantity":1,"unit":"cup"}]}`;
+Example output (for default meals): {"meal":"Breakfast","items":[{"name":"eggs","quantity":2,"unit":null},{"name":"toast","quantity":1,"unit":"slice"}]}`;
+}
 
 /**
- * Parse a free-form input string into structured food items via AI.
- * Returns an array of { name, quantity, unit }.
+ * Parse a free-form input string into structured food items + a target meal name.
+ * The meal returned is one of the user's configured meal slot names (case-preserved),
+ * not a generic canonical name — so custom meal slots like "Pre-workout" work.
+ *
+ * @param {string} text — user input
+ * @param {string[]} userMealNames — current user's mealNames array
+ * @returns {{ meal: string|null, items: [{name, quantity, unit}, ...] }}
  */
-export async function parseInput(text) {
-  if (!text || !text.trim()) return [];
+export async function parseInput(text, userMealNames) {
+  if (!text || !text.trim()) return { meal: null, items: [] };
   const provider = DB.getSetting('aiProvider', 'claude');
   const apiKey   = DB.getSetting('aiApiKey', '');
   const model    = DB.getSetting('aiModel', '');
@@ -54,31 +72,106 @@ export async function parseInput(text) {
     apiKey,
     model,
     messages: [{ role: 'user', content: text.trim() }],
-    systemPrompt: PARSE_SYSTEM_PROMPT,
-    tools: [], // no tools — just want a structured text response
+    systemPrompt: _buildParsePrompt(userMealNames),
+    tools: [],
   });
 
-  // The AI should return JSON. Be defensive about markdown fences.
+  // Defensive JSON parse — strip markdown fences if the model added them
   let jsonText = String(reply || '').trim();
-  // Strip ```json ... ``` fences if present
   const fenceMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
   if (fenceMatch) jsonText = fenceMatch[1].trim();
 
   try {
     const parsed = JSON.parse(jsonText);
-    const items = Array.isArray(parsed.items) ? parsed.items : [];
-    // Normalize and validate
-    return items
+    const rawItems = Array.isArray(parsed.items) ? parsed.items : [];
+    const items = rawItems
       .filter(it => it && typeof it === 'object' && it.name)
       .map(it => ({
         name: String(it.name).trim(),
         quantity: Number(it.quantity) > 0 ? Number(it.quantity) : 1,
         unit: it.unit ? String(it.unit).trim() : null,
       }));
+    // Meal can be any of the user's slot names (free string, validated downstream)
+    const meal = parsed.meal && typeof parsed.meal === 'string' ? parsed.meal.trim() : null;
+    return { meal, items };
   } catch (e) {
     console.warn('[quick-log] AI returned non-JSON:', jsonText.slice(0, 200));
     throw new Error('AI parser returned invalid JSON. Try rephrasing your input.');
   }
+}
+
+/**
+ * Resolve a meal name string from the AI to an index in the user's configured
+ * mealNames array.
+ *
+ * The user may have:
+ *   - Custom slot names ("Pre-workout", "Late Snack", "Brunch")
+ *   - Numbered duplicates ("Snack 1", "Snack 2", "Snack 3")
+ *   - Renamed defaults ("Morning Bowl" instead of "Breakfast")
+ *   - Removed defaults entirely (no "Snacks" slot at all)
+ *
+ * Strategy (in priority order):
+ *   1. EXACT case-insensitive match against the user's configured names.
+ *      The AI is told to use the user's exact slot names, so this is the
+ *      common case.
+ *   2. Substring match where one fully contains the other. Prefers shorter
+ *      user slot names so "Pre-workout meal" → "Pre-workout".
+ *   3. Canonical-word alias: if the AI returned a generic word like
+ *      "breakfast" / "snack", find the FIRST user slot whose name contains
+ *      one of the canonical aliases. Numbered duplicates like "Snack 1, 2, 3"
+ *      will pick "Snack 1" — the user can change it in the review modal.
+ *   4. If nothing matches, return null and the caller falls back to its
+ *      default meal slot.
+ */
+export function resolveMealSlot(mealName, mealNames) {
+  if (!mealName || !Array.isArray(mealNames) || mealNames.length === 0) return null;
+  const target = String(mealName).toLowerCase().trim();
+  if (!target) return null;
+
+  // 1. Exact case-insensitive match
+  const direct = mealNames.findIndex(n => String(n).toLowerCase() === target);
+  if (direct >= 0) return direct;
+
+  // 2. Substring match — prefer the SHORTEST matching slot name to avoid
+  //    "Pre-workout snack" matching "Snack 1" when "Pre-workout" exists.
+  let bestSubstr = -1;
+  let bestSubstrLen = Infinity;
+  for (let i = 0; i < mealNames.length; i++) {
+    const ln = String(mealNames[i]).toLowerCase();
+    if (ln === target) return i; // double-check exact (shouldn't reach here but safe)
+    if (ln.includes(target) || target.includes(ln)) {
+      if (ln.length < bestSubstrLen) {
+        bestSubstr = i;
+        bestSubstrLen = ln.length;
+      }
+    }
+  }
+  if (bestSubstr >= 0) return bestSubstr;
+
+  // 3. Canonical-word fuzzy fallback
+  const aliases = {
+    breakfast: ['breakfast', 'morning', 'am', 'wake', 'first'],
+    lunch:     ['lunch', 'noon', 'midday'],
+    dinner:    ['dinner', 'supper', 'evening', 'night'],
+    snack:     ['snack', 'snacks'],
+  };
+  const aliasList = aliases[target] || [];
+  if (aliasList.length > 0) {
+    // First pass: find a slot whose lowercase name STARTS WITH any alias
+    // (handles "Snack 1" picking up "snack" as a prefix). Returns the first
+    // such slot which is typically the user's "first" snack.
+    for (let i = 0; i < mealNames.length; i++) {
+      const ln = String(mealNames[i]).toLowerCase();
+      if (aliasList.some(a => ln.startsWith(a))) return i;
+    }
+    // Second pass: any substring match (e.g. "Mid-afternoon Snack")
+    for (let i = 0; i < mealNames.length; i++) {
+      const ln = String(mealNames[i]).toLowerCase();
+      if (aliasList.some(a => ln.includes(a))) return i;
+    }
+  }
+
+  return null;
 }
 
 // ── Step 2: Match parsed items to real food records ──────────────────────

@@ -5,6 +5,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.36.1-beta] — 2026-04-07
+
+### Quick Log → Smart Log v2 (rebranded + native voice + custom meal support)
+- **Renamed Quick Log → Smart Log** in Settings UI label and modal title. The setting key (`quickLogEnabled`) is unchanged so existing user preferences carry over.
+- **Native voice input on Android** via `@capacitor-community/speech-recognition` plugin (uses Android's system speech recognizer through OS-level intent — no Google cloud dependency, no Web Speech API quirks). Requests RECORD_AUDIO permission on first use. Works offline if the user has on-device recognition available.
+- **Floating mic FAB on the Diary page** — replaces the per-meal sparkle button. Single 56px circle bottom-right (above the FitBot FAB), tap to open Smart Log in voice mode and start listening immediately.
+- **AI parses the target meal slot from natural language** — say "for breakfast I had 2 eggs and toast" and the AI returns both the items AND the meal slot. The parser prompt now includes the user's actual configured meal names verbatim, so custom meal slots like "Pre-workout", "Snack 1/2/3", or renamed defaults ("Morning Bowl") all work.
+- **Robust meal slot resolution** in `quick-log.js`: exact case-insensitive match → shortest substring match → canonical-word fuzzy fallback (breakfast/lunch/dinner/snack with prefix-priority for numbered duplicates).
+- **Auto-submit on voice input** — when the native plugin returns a transcript, Smart Log immediately parses without requiring a separate tap.
+- **Clear listening state** — pulsing mic button + "Listening… speak now" banner during voice capture.
+
+### Build infra
+- **Postinstall script extracted to `scripts/postinstall.cjs`** — replaces the inline `node -e` one-liner. Patches both `@devmaxime/capacitor-health-connect` (Health Connect SDK version + proguard) and `@capacitor-community/speech-recognition` (proguard) in-place after `npm install`. Adding more plugin patches is now a 5-line addition instead of an unreadable one-liner.
+- **AndroidManifest** — added `RECORD_AUDIO` permission and the standard `<queries>` entry filter for `android.speech.RecognitionService` so the OS exposes the speech recognizer to the app.
+
+---
+
 ## [0.36.0-beta] — 2026-04-07
 
 ### Added

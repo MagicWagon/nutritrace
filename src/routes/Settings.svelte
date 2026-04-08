@@ -2404,10 +2404,10 @@
             <div class="setting-row">
               <div>
                 <span class="setting-label">
-                  Quick Log
+                  Smart Log
                   <span class="labs-badge" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);vertical-align:middle">Experimental</span>
                 </span>
-                <div class="setting-desc">Type or speak "2 eggs and toast" to log meals naturally. The AI parses items and your local food database fills in the nutrition. Adds a Quick Log button to the Diary page.</div>
+                <div class="setting-desc">Tap the floating mic on the Diary page and say what you ate — "for breakfast I had 2 eggs and toast". The AI parses the items AND figures out which meal slot, then your food database fills in the nutrition. Voice on Android uses the system speech recognizer; PWA uses the browser's Web Speech API.</div>
               </div>
               <Toggle checked={quickLogEnabledVal} on:change={e => quickLogEnabledVal = e.detail} />
             </div>

@@ -1,6 +1,6 @@
 {
   "name": "nutritrace",
-  "version": "0.36.0-beta",
+  "version": "0.36.1-beta",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,9 +12,10 @@
     "android:run": "npx cap run android",
     "cap:sync": "npm run build && npx cap sync",
     "cap:add:android": "npx cap add android",
-    "postinstall": "node -e \"try{const f='node_modules/@devmaxime/capacitor-health-connect/android/build.gradle';let s=require('fs').readFileSync(f,'utf8');s=s.replace('1.1.0-alpha11','1.1.0');s=s.replace(\\\"getDefaultProguardFile('proguard-android.txt')\\\",\\\"getDefaultProguardFile('proguard-android-optimize.txt')\\\");require('fs').writeFileSync(f,s)}catch(e){}\""
+    "postinstall": "node scripts/postinstall.cjs"
   },
   "dependencies": {
+    "@capacitor-community/speech-recognition": "^7.0.1",
     "@capacitor-community/sqlite": "^8.1.0",
     "@capacitor-mlkit/barcode-scanning": "^8.0.1",
     "@capacitor/android": "^8.3.0",

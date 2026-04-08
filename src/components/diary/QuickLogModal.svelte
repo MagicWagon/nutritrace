@@ -1,23 +1,24 @@
 <!--
-  QuickLogModal — natural-language food logging via FitBot AI.
+  Smart Log modal — natural-language food logging via FitBot AI.
 
-  Two phases:
-    1. Input phase: text field + mic button. User types or speaks their meal.
-    2. Review phase: list of parsed/matched items with edit/swap/remove +
-       meal-slot picker, then "Add All" to write to diary.
+  Voice input:
+    - Native (Capacitor): @capacitor-community/speech-recognition (Android system recognizer)
+    - PWA: Web Speech API (window.webkitSpeechRecognition)
 
-  Used from Diary.svelte. Requires aiEnabled + quickLogEnabled.
+  The user can also type. The AI parses both items AND the target meal slot
+  ("for breakfast I had..."), so the user doesn't need to pick the meal manually.
 -->
 <script>
   import { createEventDispatcher, onMount, onDestroy } from 'svelte';
   import { fly, fade } from 'svelte/transition';
   import { mealNames } from '../../stores/settings.js';
   import { showError, showSuccess } from '../../stores/toast.js';
-  import { parseInput, matchItems, saveItems } from '../../lib/quick-log.js';
+  import { parseInput, matchItems, saveItems, resolveMealSlot } from '../../lib/quick-log.js';
   import { isNative } from '../../lib/platform.js';
 
   export let date;                  // 'YYYY-MM-DD'
-  export let defaultMealSlot = 0;   // index into mealNames
+  export let defaultMealSlot = 0;   // index into mealNames (used if AI can't infer)
+  export let openMode = 'text';     // 'text' | 'voice' — auto-start mic if 'voice'
 
   const dispatch = createEventDispatcher();
 
@@ -25,59 +26,109 @@
   let inputText = '';
   let inputEl;
   let listening = false;
-  let recognition = null;
-  let parsedItems = [];             // raw AI output
-  let matchedItems = [];            // [{ item, candidates, best, source, food, quantity, mealSlot }]
+  let voiceAvailable = false;       // true if voice can work in this environment
+  let webRecognition = null;        // PWA fallback
+  let parsedMeal = null;
+  let matchedItems = [];
   let errorMsg = '';
 
   $: meals = $mealNames || ['Breakfast','Lunch','Dinner','Snacks'];
 
-  onMount(() => {
+  onMount(async () => {
     setTimeout(() => inputEl?.focus(), 80);
-    // Web Speech API is unreliable in Android WebView (mic permission, Google
-    // cloud dependency, vendor inconsistencies). Only enable it on PWA where
-    // it works in Chrome / Safari / Firefox. Native voice input would need
-    // @capacitor-community/speech-recognition as a future enhancement.
-    if (isNative) return;
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SR) {
-      recognition = new SR();
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.lang = navigator.language || 'en-US';
-      recognition.onresult = (e) => {
-        const transcript = e.results[0]?.[0]?.transcript || '';
-        if (transcript) {
-          inputText = (inputText ? inputText + ' ' : '') + transcript;
-        }
-        listening = false;
-      };
-      recognition.onerror = (e) => {
-        listening = false;
-        console.warn('[quick-log] mic error:', e.error);
-        showError('Voice input failed: ' + (e.error || 'unknown error'));
-      };
-      recognition.onend = () => { listening = false; };
+
+    // Init voice input — native plugin first, then web fallback
+    if (isNative) {
+      try {
+        const { SpeechRecognition } = await import('@capacitor-community/speech-recognition');
+        const { available } = await SpeechRecognition.available();
+        voiceAvailable = !!available;
+      } catch (e) {
+        console.warn('[smart-log] native speech plugin unavailable:', e.message);
+      }
+    } else {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SR) {
+        webRecognition = new SR();
+        webRecognition.continuous = false;
+        webRecognition.interimResults = false;
+        webRecognition.lang = navigator.language || 'en-US';
+        webRecognition.onresult = (e) => {
+          const transcript = e.results[0]?.[0]?.transcript || '';
+          if (transcript) inputText = (inputText ? inputText + ' ' : '') + transcript;
+          listening = false;
+        };
+        webRecognition.onerror = (e) => {
+          listening = false;
+          showError('Voice input failed: ' + (e.error || 'unknown error'));
+        };
+        webRecognition.onend = () => { listening = false; };
+        voiceAvailable = true;
+      }
+    }
+
+    // Auto-start mic if user opened in voice mode AND voice is available
+    if (openMode === 'voice' && voiceAvailable) {
+      setTimeout(() => toggleMic(), 150);
     }
   });
 
-  onDestroy(() => {
-    if (recognition) try { recognition.abort(); } catch {}
+  onDestroy(async () => {
+    // Make sure we don't leave the mic on
+    if (listening) await stopListening();
+    if (webRecognition) try { webRecognition.abort(); } catch {}
   });
 
   function close() { dispatch('close'); }
 
-  function toggleMic() {
-    if (!recognition) {
-      showError('Voice input not supported on this device.');
+  async function toggleMic() {
+    if (listening) {
+      await stopListening();
+    } else {
+      await startListening();
+    }
+  }
+
+  async function startListening() {
+    if (!voiceAvailable) {
+      showError('Voice input not available on this device.');
       return;
     }
-    if (listening) {
-      try { recognition.stop(); } catch {}
-      listening = false;
-    } else {
+    if (isNative) {
       try {
-        recognition.start();
+        const { SpeechRecognition } = await import('@capacitor-community/speech-recognition');
+        // Check + request mic permission
+        const perm = await SpeechRecognition.checkPermissions();
+        if (perm.speechRecognition !== 'granted') {
+          const req = await SpeechRecognition.requestPermissions();
+          if (req.speechRecognition !== 'granted') {
+            showError('Microphone permission denied.');
+            return;
+          }
+        }
+        listening = true;
+        const result = await SpeechRecognition.start({
+          language: navigator.language || 'en-US',
+          maxResults: 1,
+          prompt: 'Tell me what you ate',
+          partialResults: false,
+          popup: false,
+        });
+        listening = false;
+        const transcript = (result?.matches && result.matches[0]) || '';
+        if (transcript) {
+          inputText = (inputText ? inputText + ' ' : '') + transcript;
+          // Auto-submit when voice input completes — that's the whole point
+          await runParse();
+        }
+      } catch (e) {
+        listening = false;
+        console.error('[smart-log] native voice failed:', e);
+        showError('Voice input failed: ' + (e.message || 'unknown error'));
+      }
+    } else if (webRecognition) {
+      try {
+        webRecognition.start();
         listening = true;
       } catch (e) {
         showError('Could not start mic: ' + e.message);
@@ -85,35 +136,49 @@
     }
   }
 
+  async function stopListening() {
+    if (isNative) {
+      try {
+        const { SpeechRecognition } = await import('@capacitor-community/speech-recognition');
+        await SpeechRecognition.stop();
+      } catch {}
+    } else if (webRecognition) {
+      try { webRecognition.stop(); } catch {}
+    }
+    listening = false;
+  }
+
   async function runParse() {
     errorMsg = '';
     if (!inputText.trim()) return;
     phase = 'parsing';
     try {
-      parsedItems = await parseInput(inputText);
-      if (parsedItems.length === 0) {
+      const parsed = await parseInput(inputText, meals);
+      parsedMeal = parsed.meal;
+      if (!parsed.items || parsed.items.length === 0) {
         errorMsg = 'No food items found. Try rephrasing.';
         phase = 'input';
         return;
       }
-      const matches = await matchItems(parsedItems);
-      // Materialize each match into an editable row
+      const matches = await matchItems(parsed.items);
+      // Resolve the meal slot from the AI's interpretation, falling back to default
+      const resolvedSlot = resolveMealSlot(parsedMeal, meals);
+      const slot = resolvedSlot != null ? resolvedSlot : defaultMealSlot;
       matchedItems = matches.map(m => ({
         ...m,
-        food: m.best || null,                    // currently selected food record
-        quantity: _defaultPortionFor(m),         // grams or units
-        mealSlot: defaultMealSlot,
+        food: m.best || null,
+        quantity: _defaultPortionFor(m),
+        mealSlot: slot,
       }));
       phase = 'review';
     } catch (e) {
-      console.error('[quick-log] parse failed:', e);
+      console.error('[smart-log] parse failed:', e);
       errorMsg = e.message || 'Parse failed.';
       phase = 'input';
     }
   }
 
   function _defaultPortionFor(m) {
-    // If the food has a portion size set (e.g. "1 slice = 30g"), use quantity * portion
     const food = m.best;
     if (!food) return 100;
     const basePortion = Number(food.portion) > 0 ? Number(food.portion) : 100;
@@ -123,10 +188,7 @@
 
   function removeRow(i) {
     matchedItems = matchedItems.filter((_, idx) => idx !== i);
-    if (matchedItems.length === 0) {
-      // Nothing left — back to input
-      phase = 'input';
-    }
+    if (matchedItems.length === 0) phase = 'input';
   }
 
   function swapCandidate(i, candidate) {
@@ -148,7 +210,7 @@
         phase = 'review';
       }
     } catch (e) {
-      console.error('[quick-log] save failed:', e);
+      console.error('[smart-log] save failed:', e);
       errorMsg = 'Save failed: ' + e.message;
       phase = 'review';
     }
@@ -157,7 +219,7 @@
   function backToInput() {
     phase = 'input';
     matchedItems = [];
-    parsedItems = [];
+    parsedMeal = null;
     setTimeout(() => inputEl?.focus(), 80);
   }
 </script>
@@ -167,7 +229,7 @@
   <div class="ql-handle"></div>
   <div class="ql-header">
     <span class="material-symbols-rounded" style="color:var(--accent)">auto_awesome</span>
-    <span class="ql-title">Quick Log</span>
+    <span class="ql-title">Smart Log</span>
     <span class="labs-badge" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">Experimental</span>
     <button class="btn-icon" on:click={close} aria-label="Close" style="margin-left:auto">
       <span class="material-symbols-rounded">close</span>
@@ -176,22 +238,28 @@
 
   {#if phase === 'input'}
     <div class="ql-body">
-      <p class="ql-hint">Type or speak what you ate. The AI will parse and match it to your foods.</p>
+      <p class="ql-hint">Type or speak what you ate. Mention the meal too — "for breakfast I had…"</p>
       <div class="ql-input-row">
         <input
           bind:this={inputEl}
           bind:value={inputText}
           on:keydown={(e) => e.key === 'Enter' && runParse()}
           class="input ql-input"
-          placeholder="2 eggs and toast"
+          placeholder="for breakfast I had 2 eggs and toast"
           autocomplete="off"
         />
-        {#if recognition}
+        {#if voiceAvailable}
           <button class="btn-icon ql-mic" class:listening on:click={toggleMic} title={listening ? 'Stop' : 'Voice input'}>
             <span class="material-symbols-rounded">{listening ? 'stop_circle' : 'mic'}</span>
           </button>
         {/if}
       </div>
+      {#if listening}
+        <div class="ql-listening-banner">
+          <span class="material-symbols-rounded ql-pulse-icon">graphic_eq</span>
+          Listening… speak now
+        </div>
+      {/if}
       {#if errorMsg}
         <div class="ql-error">{errorMsg}</div>
       {/if}
@@ -202,9 +270,9 @@
       </div>
       <div class="ql-examples">
         <div class="ql-example-label">Examples:</div>
-        <button class="ql-example" on:click={() => { inputText = '2 eggs and a slice of toast'; }}>2 eggs and a slice of toast</button>
-        <button class="ql-example" on:click={() => { inputText = 'a banana and a cup of coffee'; }}>a banana and a cup of coffee</button>
-        <button class="ql-example" on:click={() => { inputText = 'bowl of oatmeal with blueberries'; }}>bowl of oatmeal with blueberries</button>
+        <button class="ql-example" on:click={() => { inputText = 'for breakfast I had 2 eggs and a slice of toast'; }}>"for breakfast I had 2 eggs and a slice of toast"</button>
+        <button class="ql-example" on:click={() => { inputText = 'lunch was a chicken caesar salad and a coke'; }}>"lunch was a chicken caesar salad and a coke"</button>
+        <button class="ql-example" on:click={() => { inputText = 'snacking on some almonds and a banana'; }}>"snacking on some almonds and a banana"</button>
       </div>
     </div>
 
@@ -220,7 +288,10 @@
         <button class="btn btn-secondary btn-sm" on:click={backToInput}>
           <span class="material-symbols-rounded" style="font-size:14px">arrow_back</span> Edit
         </button>
-        <span class="ql-review-count">{matchedItems.length} item{matchedItems.length === 1 ? '' : 's'}</span>
+        <span class="ql-review-count">
+          {matchedItems.length} item{matchedItems.length === 1 ? '' : 's'}
+          {#if parsedMeal}· detected: <strong>{parsedMeal}</strong>{/if}
+        </span>
       </div>
       <div class="ql-list">
         {#each matchedItems as m, i}
@@ -361,6 +432,19 @@
     50% { transform: scale(1.08); }
   }
 
+  .ql-listening-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--accent-dim);
+    color: var(--accent);
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .ql-pulse-icon { animation: ql-pulse 0.9s ease-in-out infinite; }
+
   .ql-error {
     color: var(--danger);
     font-size: 13px;
@@ -395,6 +479,7 @@
     border-radius: 14px;
     font-size: 12px;
     cursor: pointer;
+    text-align: left;
   }
   .ql-example:hover { background: var(--accent-dim); color: var(--accent); }
 
@@ -411,6 +496,8 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
   }
   .ql-review-count { font-size: 13px; color: var(--text-3); }
 

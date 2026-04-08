@@ -227,15 +227,21 @@
     push('/foods?pick=1&meal=' + mealIdx + '&date=' + $currentDate);
   }
 
-  // ── Quick Log (natural-language entry via AI) ──────────────────────────
+  // ── Smart Log (natural-language entry via AI) ──────────────────────────
   let showQuickLog = false;
   let quickLogMealIdx = 0;
-  function openQuickLog(mealIdx) {
-    quickLogMealIdx = mealIdx;
+  let quickLogOpenMode = 'text';   // 'text' | 'voice' — controls if mic auto-starts
+  function openSmartLogVoice() {
+    quickLogMealIdx = 0;            // AI will infer the actual meal from speech
+    quickLogOpenMode = 'voice';
+    showQuickLog = true;
+  }
+  function openSmartLogText() {
+    quickLogMealIdx = 0;
+    quickLogOpenMode = 'text';
     showQuickLog = true;
   }
   function onQuickLogSaved() {
-    // Refresh diary view after successful save
     loadEntry($currentDate);
   }
 
@@ -672,16 +678,9 @@
               {items.reduce((s,it) => s + formatKcal(it), 0)} kcal
             </span>
           {/if}
-          <div class="ml-auto" style="display:flex;align-items:center;gap:4px">
-            {#if $aiEnabled && $quickLogEnabled}
-              <button class="btn-icon" on:click={() => openQuickLog(mealIdx)} aria-label="Quick Log to {meal}" title="Quick Log to {meal}">
-                <span class="material-symbols-rounded" style="color:var(--accent)">auto_awesome</span>
-              </button>
-            {/if}
-            <button class="btn-icon accent" on:click={() => openAddFood(mealIdx)} aria-label="Add food to {meal}" title="Add food to {meal}">
-              <span class="material-symbols-rounded">add</span>
-            </button>
-          </div>
+          <button class="btn-icon accent ml-auto" on:click={() => openAddFood(mealIdx)} aria-label="Add food to {meal}" title="Add food to {meal}">
+            <span class="material-symbols-rounded">add</span>
+          </button>
         </div>
 
         {#if items.length === 0}
@@ -1051,11 +1050,19 @@
   {/if}
 </Sheet>
 
-<!-- Quick Log modal (natural language food entry via AI) -->
+<!-- Smart Log floating mic FAB — only when AI + Smart Log are enabled -->
+{#if $aiEnabled && $quickLogEnabled}
+  <button class="smartlog-fab" on:click={openSmartLogVoice} aria-label="Smart Log voice input" title="Smart Log — tap to speak">
+    <span class="material-symbols-rounded smartlog-fab-icon">mic</span>
+  </button>
+{/if}
+
+<!-- Smart Log modal (natural language food entry via AI) -->
 {#if showQuickLog}
   <QuickLogModal
     date={$currentDate}
     defaultMealSlot={quickLogMealIdx}
+    openMode={quickLogOpenMode}
     on:close={() => showQuickLog = false}
     on:saved={onQuickLogSaved}
   />
@@ -1899,5 +1906,39 @@
     gap: 10px;
     padding: 4px 14px 10px;
   }
+
+  /* ── Smart Log floating mic FAB ─────────────────────────────────────── */
+  /* Positioned above the FitBot FAB (which is at bottom: nav+safe+20, height 60).
+     Smart Log sits at bottom: nav+safe+20+60+12 = nav+safe+92, so the two
+     stack vertically without overlap. 56px circle with mic icon. */
+  .smartlog-fab {
+    position: fixed;
+    right: 22px;
+    bottom: calc(var(--nav-h) + var(--safe-bottom, 0px) + 92px);
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    border: 1px solid rgba(255,255,255,0.18);
+    color: var(--accent-text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 380;
+    box-shadow:
+      0 6px 24px rgba(0,0,0,0.35),
+      inset 0 1px 0 rgba(255,255,255,0.3);
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+  }
+  .smartlog-fab:hover {
+    transform: scale(1.08);
+    box-shadow:
+      0 10px 28px rgba(0,0,0,0.45),
+      inset 0 1px 0 rgba(255,255,255,0.4),
+      0 0 0 8px var(--accent-dim);
+  }
+  .smartlog-fab:active { transform: scale(0.94); }
+  .smartlog-fab-icon { font-size: 26px; }
 
 </style>
