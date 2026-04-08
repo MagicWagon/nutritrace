@@ -5,6 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.35.2-beta] — 2026-04-07
+
+### Added
+- **Local Full Backup (.zip)** — new `src/lib/local-backup.js` module produces a self-contained ZIP archive with all foods, meals, recipes, diary, wellness data, workouts, settings, AND embedded image binaries. Designed for true phone-to-phone transfer without needing a server. Restore extracts the ZIP, writes images back to Capacitor Filesystem on native (or re-encodes as data: URLs on PWA), then upserts everything into the local database. Manifest version 1, DEFLATE compressed level 6, JSZip 3.10.1 dependency added. Settings → Data → Local Backup.
+- **`bulkSet({...})` settings helper** — single-API-call bulk write for onboarding flows. Wizard's `_saveIntegrations`, `_saveNotifications`, `finish`, and `skip` functions now batch their writes (~15 keys) into one PUT `/api/settings/bulk` request instead of firing 15 separate debounced pushes. New server endpoint `PUT /api/settings/bulk` accepts `{ settings: { key: value, ... } }`, runs the upserts in a single transaction, applies the same `isServerOnlyKey` security filter as the per-key endpoint.
+- **`USER_PREFS` and `DEVICE_PREFS` exported** from `src/stores/settings.js` so other modules (local-backup) can introspect which settings should be included in portable exports vs left local.
+
+### Cleanup
+- **Defunct `notifGotifyEnabled` setting cleanup migration** — server's `db.js` now runs an idempotent startup cleanup that drops orphan rows for keys that no longer have any code reading them. Currently just `notifGotifyEnabled` (replaced by `notifPushService` dropdown in v0.32.0). Easy to extend with future deprecations via the `DEFUNCT_KEYS` array.
+
+---
+
 ## [0.35.1-beta] — 2026-04-07
 
 ### Header layout polish

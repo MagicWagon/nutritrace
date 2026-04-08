@@ -309,4 +309,17 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_diary_deleted ON diary(deleted_at);
 `);
 
+// ── Defunct setting key cleanup ──────────────────────────────────────────────
+// Drop orphan rows for keys that no longer have any code reading them.
+// Safe to delete on every startup — idempotent.
+const DEFUNCT_KEYS = [
+  'notifGotifyEnabled', // replaced by notifPushService dropdown in v0.32.0
+];
+for (const key of DEFUNCT_KEYS) {
+  try {
+    const r = db.prepare('DELETE FROM user_settings WHERE key = ?').run(key);
+    if (r.changes > 0) console.log(`[db] cleaned ${r.changes} defunct ${key} row(s)`);
+  } catch {}
+}
+
 export default db;

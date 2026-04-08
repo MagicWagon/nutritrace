@@ -68,7 +68,7 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
 - ~~**Offline cache in server mode** — mirror server data in local SQLite so the app works when server is down; sync diff when back online~~
 - **Health Connect integration** — read steps, sleep, HR, body comp directly from Android Health Connect API via Capacitor plugin; unifies all Android wearable data
 - **Background sync** — periodic background task (via @capacitor/background-runner or WorkManager bridge) to sync diary/foods/wellness with server when connected
-- **Local full backup (ZIP)** — create full backup on device (JSZip) including images, for phone-to-phone transfer without a server
+- ~~**Local full backup (ZIP)** — create full backup on device (JSZip) including images, for phone-to-phone transfer without a server~~ *(done — v0.35.2-beta)*
 - **iOS app** — Capacitor already supports iOS; need HealthKit integration + App Store setup
 
 ---

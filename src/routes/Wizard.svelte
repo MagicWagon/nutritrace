@@ -4,7 +4,7 @@
   import { cubicOut } from 'svelte/easing';
   import { DB, localDateStr } from '../lib/db.js';
   import { Nutrition } from '../lib/nutrition.js';
-  import { mealNames, energyUnit, goals, weightUnit, heightUnit, scheduleSave } from '../stores/settings.js';
+  import { mealNames, energyUnit, goals, weightUnit, heightUnit, bulkSet } from '../stores/settings.js';
   import { currentUser, userMgmtActive, loadAuthState } from '../stores/auth.js';
   import { showError } from '../stores/toast.js';
   import { isNative, getServerUrl } from '../lib/platform.js';
@@ -231,31 +231,28 @@
   }
 
   function skip() {
-    DB.setSetting('setupComplete', true);
+    bulkSet({ setupComplete: true });
     push('/');
   }
 
   async function _saveIntegrations() {
+    const batch = {};
     if (!intSkipped.off && (intOFFUser.trim() || intOFFPass.trim())) {
-      DB.setSetting('offUsername', intOFFUser.trim());
-      DB.setSetting('offPassword', intOFFPass.trim());
-      scheduleSave('offUsername', intOFFUser.trim());
-      scheduleSave('offPassword', intOFFPass.trim());
+      batch.offUsername = intOFFUser.trim();
+      batch.offPassword = intOFFPass.trim();
     }
     if (!intSkipped.usda && intUSDARKey.trim()) {
-      DB.setSetting('usdaApiKey',  intUSDARKey.trim());
-      DB.setSetting('usdaEnabled', true);
-      scheduleSave('usdaApiKey',  intUSDARKey.trim());
-      scheduleSave('usdaEnabled', true);
+      batch.usdaApiKey = intUSDARKey.trim();
+      batch.usdaEnabled = true;
     }
     if (!intSkipped.mealie && (intMealieUrl.trim() || intMealieToken.trim())) {
-      DB.setSetting('mealieBaseUrl',   intMealieUrl.trim());
-      DB.setSetting('mealieApiToken',  intMealieToken.trim());
-      DB.setSetting('mealieEnabled',   true);
-      scheduleSave('mealieBaseUrl',   intMealieUrl.trim());
-      scheduleSave('mealieApiToken',  intMealieToken.trim());
-      scheduleSave('mealieEnabled',   true);
+      batch.mealieBaseUrl = intMealieUrl.trim();
+      batch.mealieApiToken = intMealieToken.trim();
+      batch.mealieEnabled = true;
     }
+    if (Object.keys(batch).length) await bulkSet(batch);
+
+    // AI is admin-side: writes to app_config, not user_settings
     if (!intSkipped.ai && !intAILocked && intAIKey.trim()) {
       const _putConfig = (key, value) => fetch('/api/app-config', {
         method: 'PUT', credentials: 'include',
@@ -271,60 +268,65 @@
   }
 
   async function _saveNotifications() {
-    if (notifEnabled) {
-      // Request permission
+    if (!notifEnabled) return;
+
+    // Request permission
+    try {
+      const { requestPermission } = await import('../lib/notifications.js');
+      await requestPermission();
+    } catch {}
+
+    // Build batch of settings to save in one shot
+    const batch = { notifLocalEnabled: true };
+    if (notifWater)    batch.notifWaterReminders = true;
+    if (notifMeals)    batch.notifMealReminders = true;
+    if (notifGoals)    batch.notifGoalCelebrations = true;
+    if (notifWellness) batch.notifWellnessAlerts = true;
+    await bulkSet(batch);
+
+    // Side-effect: schedule the actual reminders after settings are saved
+    if (notifWater) {
       try {
-        const { requestPermission } = await import('../lib/notifications.js');
-        await requestPermission();
+        const { scheduleWaterReminders } = await import('../lib/notifications.js');
+        await scheduleWaterReminders(120);
       } catch {}
-      // Save settings
-      DB.setSetting('notifLocalEnabled', true);
-      scheduleSave('notifLocalEnabled', true);
-      if (notifWater) {
-        DB.setSetting('notifWaterReminders', true);
-        scheduleSave('notifWaterReminders', true);
-        try {
-          const { scheduleWaterReminders } = await import('../lib/notifications.js');
-          await scheduleWaterReminders(120);
-        } catch {}
-      }
-      if (notifMeals) {
-        DB.setSetting('notifMealReminders', true);
-        scheduleSave('notifMealReminders', true);
-        try {
-          const { scheduleMealReminders } = await import('../lib/notifications.js');
-          const names = DB.getSetting('mealNames', ['Breakfast','Lunch','Dinner','Snacks']);
-          await scheduleMealReminders(['08:00','12:00','18:00','15:00'], names);
-        } catch {}
-      }
-      if (notifGoals) {
-        DB.setSetting('notifGoalCelebrations', true);
-        scheduleSave('notifGoalCelebrations', true);
-      }
-      if (notifWellness) {
-        DB.setSetting('notifWellnessAlerts', true);
-        scheduleSave('notifWellnessAlerts', true);
-      }
+    }
+    if (notifMeals) {
+      try {
+        const { scheduleMealReminders } = await import('../lib/notifications.js');
+        const names = DB.getSetting('mealNames', ['Breakfast','Lunch','Dinner','Snacks']);
+        await scheduleMealReminders(['08:00','12:00','18:00','15:00'], names);
+      } catch {}
     }
   }
 
-  function finish() {
+  async function finish() {
     const wKg = toKg(weight);
     const tKg = toKg(targetW);
     const hCm = getHeightCm();
-    DB.setSetting('gender', gender || 'male');
-    DB.setSetting('dob', dob);
-    DB.setSetting('height_cm', hCm);
-    DB.setSetting('weight_kg', wKg);
-    DB.setSetting('target_weight', tKg);
-    DB.setSetting('activity', activity || 'sedentary');
-    DB.setSetting('tdee', tdee || 2000);
+
+    // Set goals via the store (uses createSettingStore.set which goes through
+    // the global listener — single push debounced). Goals is a complex merge
+    // so it stays separate from the bulk batch.
     if (goalKcal) {
       const current = DB.getSetting('goals', {});
       goals.set({ ...current, calories: { max: goalKcal, sharedGoal: true, isMin: false, showInDiary: true, showInStats: true, days: Array(7).fill(goalKcal) } });
     }
-    if (waterGoal) DB.setSetting('waterGoalMl', waterGoal);
-    DB.setSetting('setupComplete', true);
+
+    // Bulk-set everything else in one API call
+    const batch = {
+      gender: gender || 'male',
+      dob,
+      height_cm: hCm,
+      weight_kg: wKg,
+      target_weight: tKg,
+      activity: activity || 'sedentary',
+      tdee: tdee || 2000,
+      setupComplete: true,
+    };
+    if (waterGoal) batch.waterGoalMl = waterGoal;
+    await bulkSet(batch);
+
     push('/');
   }
 </script>

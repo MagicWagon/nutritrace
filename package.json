@@ -1,6 +1,6 @@
 {
   "name": "nutritrace",
-  "version": "0.35.1-beta",
+  "version": "0.35.2-beta",
   "private": true,
   "type": "module",
   "scripts": {
@@ -30,6 +30,7 @@
     "@devmaxime/capacitor-health-connect": "^1.1.0",
     "chart.js": "^4.4.0",
     "emoji-picker-element": "^1.29.1",
+    "jszip": "^3.10.1",
     "nodemailer": "^8.0.3",
     "svelte-spa-router": "^4.0.1"
   },

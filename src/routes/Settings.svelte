@@ -893,6 +893,62 @@
     } catch(e) { showError('Export failed: ' + e.message); }
   }
 
+  // ── Local Full Backup (.zip with embedded images) ──────────────────────────
+  let localZipBusy = false;
+  let localZipStatus = '';
+
+  async function exportLocalZip() {
+    if (localZipBusy) return;
+    localZipBusy = true;
+    localZipStatus = 'Starting…';
+    try {
+      const { exportLocalBackup } = await import('../lib/local-backup.js');
+      const blob = await exportLocalBackup({
+        onProgress: (pct, label) => { localZipStatus = `${Math.round(pct)}% — ${label}`; },
+      });
+      const filename = `nutritrace-backup-${new Date().toISOString().slice(0,10)}.zip`;
+      _downloadBlob(blob, filename);
+      localZipStatus = '';
+      showSuccess('Backup downloaded');
+    } catch (e) {
+      console.error('[backup] export failed:', e);
+      localZipStatus = '';
+      showError('Backup failed: ' + e.message);
+    } finally {
+      localZipBusy = false;
+    }
+  }
+
+  async function importLocalZip() {
+    if (localZipBusy) return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.zip,application/zip,application/x-zip-compressed';
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      localZipBusy = true;
+      localZipStatus = 'Reading…';
+      try {
+        const { importLocalBackup } = await import('../lib/local-backup.js');
+        const result = await importLocalBackup(file, {
+          onProgress: (pct, label) => { localZipStatus = `${Math.round(pct)}% — ${label}`; },
+        });
+        const c = result.counts;
+        showSuccess(`Restored ${c.foods} foods · ${c.meals} meals · ${c.recipes} recipes · ${c.diary} days · ${c.wellness} metrics`);
+        localZipStatus = '';
+        setTimeout(() => location.reload(), 1500);
+      } catch (e) {
+        console.error('[backup] import failed:', e);
+        localZipStatus = '';
+        showError('Restore failed: ' + e.message);
+      } finally {
+        localZipBusy = false;
+      }
+    };
+    input.click();
+  }
+
   async function importBackup() {
     const input = document.createElement('input');
     input.type = 'file'; input.accept = '.json';
@@ -2944,14 +3000,36 @@
         </div>
         {/if}
 
-        <!-- Portable JSON export/import -->
-        <p class="sub-label">Portable Export</p>
+        <!-- Local Full Backup ZIP — self-contained with images, for phone-to-phone transfer -->
+        <p class="sub-label">Local Backup</p>
+        <div class="card settings-card">
+          <button class="setting-row setting-action" on:click={exportLocalZip} disabled={localZipBusy}>
+            <span class="material-symbols-rounded si" style="color:var(--accent)">backup</span>
+            <div>
+              <span class="setting-label">Download Full Backup (.zip)</span>
+              <div class="setting-desc">Self-contained ZIP with all your foods, meals, recipes, diary, wellness data, workouts, settings, AND embedded image files. Use this for phone-to-phone transfer without needing a server.{localZipStatus ? ' · ' + localZipStatus : ''}</div>
+            </div>
+            <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
+          </button>
+          <div class="setting-divider"></div>
+          <button class="setting-row setting-action" on:click={importLocalZip} disabled={localZipBusy}>
+            <span class="material-symbols-rounded si" style="color:var(--accent)">restore</span>
+            <div>
+              <span class="setting-label">Restore Full Backup (.zip)</span>
+              <div class="setting-desc">Restores from a previously downloaded local backup ZIP. Images are extracted and re-saved to device storage. Existing data is merged, not erased.{localZipStatus ? ' · ' + localZipStatus : ''}</div>
+            </div>
+            <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
+          </button>
+        </div>
+
+        <!-- Portable JSON export/import (legacy) -->
+        <p class="sub-label">Portable JSON Export</p>
         <div class="card settings-card">
           <button class="setting-row setting-action" on:click={exportBackup}>
             <span class="material-symbols-rounded si" style="color:var(--accent)">download</span>
             <div>
               <span class="setting-label">Export JSON</span>
-              <div class="setting-desc">Downloads your foods, meals, recipes, diary, and all settings as a JSON file. In single-user mode this is the recommended way to back up settings (the full ZIP backup only captures settings when user management is enabled). Note: server-hosted images will need to be re-uploaded separately.</div>
+              <div class="setting-desc">Lighter format — JSON only, no images. Useful for sharing data between accounts or quick text-based exports.</div>
             </div>
             <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
           </button>
@@ -2960,7 +3038,7 @@
             <span class="material-symbols-rounded si" style="color:var(--accent)">upload</span>
             <div>
               <span class="setting-label">Import JSON</span>
-              <div class="setting-desc">Restores from a previously exported JSON file. Merges with existing data — does not erase what's already here. Note: server-hosted images will need to be re-uploaded separately.</div>
+              <div class="setting-desc">Restores from a previously exported JSON file. Merges with existing data — does not erase what's already here.</div>
             </div>
             <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
           </button>

@@ -14,7 +14,7 @@ import { DB } from '../lib/db.js';
 // SERVER_ADMIN — server-only, never reach clients (filtered in
 //   server/lib/server-only-keys.js). OAuth app credentials etc.
 //
-const USER_PREFS = new Set([
+export const USER_PREFS = new Set([
   'energyUnit','mealNames','goals','goalTemplates',
   'visibleNutriments','nutrimentsOrder','customNutriments',
   'bodyStatsOrder','hiddenBodyStats','foodCategories',
@@ -50,7 +50,7 @@ const USER_PREFS = new Set([
 ]);
 
 // DEVICE_PREFS — local-only, never synced.
-const DEVICE_PREFS = new Set([
+export const DEVICE_PREFS = new Set([
   'appearance',         // light/dark — depends on each device's lighting context
   'navStyle',           // bottom-nav makes no sense on desktop, sidebar makes none on phone
   'sidebarPersistent',  // form-factor specific
@@ -127,6 +127,81 @@ export function scheduleSave(key, value) {
       // Leave as 'pending' in local SQLite — differential sync will push it later
     }
   }, 600);
+}
+
+/**
+ * Bulk-set many settings at once with a SINGLE server push.
+ *
+ * Used by onboarding flows (Wizard) where ~15 settings get written in
+ * sequence. Without this, each individual write would fire the global
+ * wl:setting listener and trigger its own debounced server push,
+ * resulting in 15 separate API calls within a second.
+ *
+ * Behavior:
+ *  - Writes all keys to localStorage (with wl:setting events suppressed
+ *    to avoid the listener echoing them as individual server pushes)
+ *  - Native: writes all keys to local SQLite user_settings as 'pending'
+ *  - Fires a single bulk API call to PUT /api/settings/bulk
+ *  - After the API call, marks all keys as 'synced' in native SQLite
+ *  - DEVICE_PREFS and SERVER_ADMIN keys are silently filtered out
+ */
+export async function bulkSet(settingsObj) {
+  if (!settingsObj || typeof settingsObj !== 'object') return;
+  const entries = Object.entries(settingsObj);
+  if (entries.length === 0) return;
+
+  // Filter to USER_PREFS only
+  const userPrefEntries = entries.filter(([k]) => USER_PREFS.has(k));
+
+  // Step 1: write to localStorage WITH suppressSync so the global listener
+  // doesn't fire individual debounced pushes for each key
+  _suppressSync = true;
+  try {
+    for (const [key, value] of entries) {
+      DB.setSetting(key, value);
+    }
+  } finally {
+    _suppressSync = false;
+  }
+
+  // Step 2: native — write all USER_PREFS to local SQLite as pending
+  if (isNative && userPrefEntries.length > 0) {
+    try {
+      const { dbUpsertSetting } = await import('../lib/db-native.js');
+      for (const [key, value] of userPrefEntries) {
+        await dbUpsertSetting(key, value);
+      }
+    } catch (e) {
+      console.warn('[settings] bulk native upsert failed:', e.message);
+    }
+  }
+
+  // Step 3: single bulk API call (only if we should sync to server)
+  if (!_shouldSyncToServer() || userPrefEntries.length === 0) return;
+  try {
+    const url = _settingsUrl() + '/bulk';
+    const bulkObj = Object.fromEntries(userPrefEntries);
+    console.log(`[settings] bulk pushing ${userPrefEntries.length} keys`);
+    const res = await fetch(url, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: _authHeaders(),
+      body: JSON.stringify({ settings: bulkObj }),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) throw new Error(`Server responded ${res.status}`);
+    console.log(`[settings] bulk pushed ${userPrefEntries.length} keys OK`);
+    // Mark all keys as synced in native SQLite
+    if (isNative) {
+      try {
+        const { dbMarkSettingsSynced } = await import('../lib/db-native.js');
+        await dbMarkSettingsSynced(userPrefEntries.map(([k]) => k));
+      } catch {}
+    }
+  } catch (e) {
+    console.warn('[settings] bulk push failed:', e.message);
+    // Leave as 'pending' in local SQLite — differential sync will push them later
+  }
 }
 
 /**

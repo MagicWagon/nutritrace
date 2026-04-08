@@ -33,6 +33,31 @@ router.put('/', wrap((req, res) => {
   res.json({ ok: true });
 }));
 
+// PUT /api/settings/bulk — upsert many settings in a single request.
+// Used by onboarding flows (Wizard) that set 10-20 keys at once. Avoids
+// firing a separate API call for each key. Same security filter applies.
+// Body: { settings: { key1: value1, key2: value2, ... } }
+router.put('/bulk', wrap((req, res) => {
+  if (!userMgmtActive() || !req.user) return res.json({ ok: true });
+  const { settings } = req.body;
+  if (!settings || typeof settings !== 'object') {
+    return res.status(400).json({ error: 'settings object required' });
+  }
+  const upsert = db.prepare(
+    `INSERT INTO user_settings (user_id, key, value, updated_at) VALUES (?, ?, ?, datetime('now'))
+     ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value, updated_at = datetime('now'), deleted_at = NULL`
+  );
+  let written = 0, skipped = 0;
+  db.transaction(() => {
+    for (const [key, value] of Object.entries(settings)) {
+      if (isServerOnlyKey(key)) { skipped++; continue; }
+      upsert.run(req.user.id, key, JSON.stringify(value));
+      written++;
+    }
+  })();
+  res.json({ ok: true, written, skipped });
+}));
+
 // DELETE /api/settings — clear all settings for the current user
 router.delete('/', wrap((req, res) => {
   if (userMgmtActive() && req.user) {
