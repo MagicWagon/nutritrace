@@ -7,7 +7,7 @@
   import { DB, localDateStr } from '../../lib/db.js';
   import { Nutrition } from '../../lib/nutrition.js';
   import { callAI, callAIProxy, TOOLS, setToolHandler } from '../../lib/aiChat.js';
-  import { aiEnabled, aiAssistantName, aiApiKey, aiProvider, aiModel, goals, mealNames, energyUnit, dateFormat, tempUnit, quickLogEnabled } from '../../stores/settings.js';
+  import { aiEnabled, aiAssistantName, aiApiKey, aiProvider, aiModel, goals, mealNames, energyUnit, dateFormat, tempUnit, quickLogEnabled, aiGoalInsights, healthConnectEnabled } from '../../stores/settings.js';
   import SmartLogModal from '../diary/SmartLogModal.svelte';
   import { showError } from '../../stores/toast.js';
   import { isNative } from '../../lib/platform.js';
@@ -206,6 +206,63 @@
         case 'get_goals': {
           const g = goals.get();
           return g || {};
+        }
+        case 'get_diary_averages': {
+          try {
+            const numDays = Math.min(Math.max(parseInt(args.days) || 28, 1), 90);
+            const today   = localDateStr();
+            const sums    = { calories: 0, proteins: 0, carbohydrates: 0, fat: 0, water_ml: 0 };
+            let daysLogged = 0;
+            let firstWeight = null, lastWeight = null;
+            const dates = [];
+            for (let i = numDays; i >= 1; i--) {
+              const d = new Date(); d.setDate(d.getDate() - i);
+              dates.push(d.toISOString().slice(0, 10));
+            }
+            for (const date of dates) {
+              try {
+                const entry = await NtApi.getDiaryDate(date);
+                if (entry?.items?.length) {
+                  daysLogged++;
+                  const tot = Nutrition.sum(entry.items.map(i => Nutrition.calculate(i)));
+                  sums.calories       += tot.calories       || 0;
+                  sums.proteins       += tot.proteins       || 0;
+                  sums.carbohydrates  += tot.carbohydrates  || 0;
+                  sums.fat            += tot.fat            || 0;
+                  sums.water_ml       += (entry.water || []).reduce((s, l) => s + (l.amount || 0), 0);
+                  const bs = entry.body_stats || entry.bodyStats || {};
+                  const w  = bs.weight ?? null;
+                  if (w != null) { if (firstWeight == null) firstWeight = { date, value: w }; lastWeight = { date, value: w }; }
+                }
+              } catch {}
+            }
+            if (daysLogged === 0) return { error: 'No diary data found for this period.' };
+            const avg = k => Math.round(sums[k] / daysLogged);
+            const result = {
+              period_days: numDays,
+              days_logged: daysLogged,
+              consistency_pct: Math.round(daysLogged / numDays * 100),
+              averages: {
+                calories: avg('calories'),
+                protein_g: avg('proteins'),
+                carbs_g: avg('carbohydrates'),
+                fat_g: avg('fat'),
+                water_ml: avg('water_ml'),
+              },
+            };
+            if (firstWeight && lastWeight && firstWeight.date !== lastWeight.date) {
+              const _wu = DB.getSetting('weightUnit', 'lb');
+              const diff = lastWeight.value - firstWeight.value;
+              result.weight_change = {
+                from_date: firstWeight.date,
+                to_date: lastWeight.date,
+                change_kg: Math.round(diff * 100) / 100,
+                change_lbs: Math.round(diff * 2.20462 * 100) / 100,
+                direction: diff < -0.1 ? 'down' : diff > 0.1 ? 'up' : 'stable',
+              };
+            }
+            return result;
+          } catch { return { error: 'Could not compute diary averages.' }; }
         }
         default:
           return { error: `Unknown tool: ${name}` };
@@ -752,6 +809,30 @@
         if (parts.length) wellnessText += (wellnessText ? '\n' : '') + `Withings: ${parts.join(', ')}`;
       }
     } catch {}
+    // Health Connect (Android local mode)
+    try {
+      if ($healthConnectEnabled && isNative) {
+        const { dbGetWellnessByDate } = await import('../../lib/db-native.js');
+        const hcData = await dbGetWellnessByDate(today, 'health_connect').catch(() => null);
+        if (hcData && Object.keys(hcData).length) {
+          const parts = [];
+          const _du = DB.getSetting('distUnit', 'km');
+          if (hcData.steps != null)          parts.push(`Steps: ${Math.round(hcData.steps).toLocaleString()}`);
+          if (hcData.calories_out != null)   parts.push(`Calories burned: ${Math.round(hcData.calories_out)}`);
+          if (hcData.active_calories != null) parts.push(`Active calories: ${Math.round(hcData.active_calories)}`);
+          if (hcData.distance_km != null)    parts.push(`Distance: ${_du === 'mi' ? (hcData.distance_km * 0.621371).toFixed(2) + ' mi' : hcData.distance_km.toFixed(2) + ' km'}`);
+          if (hcData.sleep_duration_min != null) { const h = Math.floor(hcData.sleep_duration_min/60); parts.push(`Sleep: ${h}h ${Math.round(hcData.sleep_duration_min%60)}m`); }
+          if (hcData.resting_hr != null)     parts.push(`Resting HR: ${Math.round(hcData.resting_hr)} bpm`);
+          if (hcData.avg_heart_rate != null) parts.push(`Avg HR: ${Math.round(hcData.avg_heart_rate)} bpm`);
+          if (hcData.hrv_rmssd != null)      parts.push(`HRV: ${hcData.hrv_rmssd.toFixed(1)} ms`);
+          if (hcData.weight_kg != null) {
+            const _wu = DB.getSetting('weightUnit', 'lb');
+            parts.push(`Weight: ${_wu === 'lb' ? (hcData.weight_kg * 2.20462).toFixed(1) + ' lbs' : hcData.weight_kg.toFixed(1) + ' kg'}`);
+          }
+          if (parts.length) wellnessText += (wellnessText ? '\n' : '') + `Health Connect: ${parts.join(', ')}`;
+        }
+      }
+    } catch {}
 
     return { today, diaryText, goalsText, statsText, wellnessText, waterText,
       weightUnit: DB.getSetting('weightUnit', 'lb'),
@@ -767,13 +848,24 @@
     return `You are ${name}, a friendly and knowledgeable AI nutrition and fitness coach built into NutriTrace.
 
 You have FULL ACCESS to the user's complete health data through tools. ALWAYS use tools to look up data — NEVER guess or make up numbers. Available data:
-- **Food diary**: meals, items, portions, full nutrition (any date)
-- **Wellness metrics**: steps, calories burned, distance, active minutes, sleep (duration, stages, score, efficiency), heart rate (resting HR, HRV, SpO2), respiratory rate, readiness score, stress score, skin temp, VO2 max — from Fitbit, Garmin, Health Connect (any date range)
-- **Body composition**: weight, body fat %, muscle mass, bone mass, body water, lean/fat mass, visceral fat, vascular age, metabolic age, BMR, nerve health, ECG — from Withings (any date range)
-- **Workouts**: recorded exercises with duration, distance, calories, heart rate, steps, GPS (any date range)
-- **Nutrition goals**: calorie and macro targets
+- **Food diary**: meals, items, portions, full nutrition (any date) — use get_diary
+- **Diary averages**: average daily intake over any period + logging consistency + weight trend — use get_diary_averages
+- **Wellness metrics**: steps, calories burned, distance, active minutes, sleep (duration, stages, score, efficiency), heart rate (resting HR, HRV, SpO2), respiratory rate, readiness score, stress score, skin temp, VO2 max — from Fitbit, Garmin, Health Connect (any date range) — use get_wellness_data
+- **Body composition**: weight, body fat %, muscle mass, bone mass, body water, lean/fat mass, visceral fat, vascular age, metabolic age, BMR, nerve health, ECG — from Withings (any date range) — use get_body_composition
+- **Workouts**: recorded exercises with duration, distance, calories, heart rate, steps, GPS (any date range) — use get_workouts
+- **Nutrition goals**: calorie and macro targets — use get_goals
 
-When the user asks about their data (steps, sleep, weight, food log, etc.) for ANY date or date range, USE THE APPROPRIATE TOOL to fetch the real data. Do not estimate or hallucinate numbers.
+When the user asks about their data (steps, sleep, weight, food log, etc.) for ANY date or date range, USE THE APPROPRIATE TOOL to fetch the real data. Do not estimate or hallucinate numbers.`
+         + ($aiGoalInsights ? `
+
+GOAL INSIGHTS MODE IS ENABLED. You have permission to proactively analyze the user's actual intake vs their goals and offer evidence-based suggestions. When relevant:
+- Use get_diary_averages (28 days is a good default) + get_goals to compare actual vs target
+- If intake consistently differs from goals by >10% for 2+ weeks, mention it and offer to suggest an adjustment
+- Consider weight trends from get_body_composition or diary body stats when making calorie goal suggestions
+- Be specific: "You've averaged 1,840 kcal over 28 days vs your 2,100 goal — that's a 260 kcal gap. Want me to suggest a revised goal?"
+- Always ask before changing anything — never modify goals without explicit user confirmation
+- Cover all dimensions: calories, protein, carbs, fat, water — not just calories` : ''
+         ) + `
 
 IMPORTANT — User's preferred units (ALWAYS use these when presenting data):
 - Weight: ${ctx.weightUnit === 'lb' ? 'pounds (lbs)' : 'kilograms (kg)'}

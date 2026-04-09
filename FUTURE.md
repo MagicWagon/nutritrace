@@ -120,9 +120,7 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
 - Option to track goals over a week or month period, not just daily
 - Useful for intermittent fasting or flexible dieting approaches
 
-### AI-suggested goal adjustment
-- Based on X weeks of actual diary data, FitBot suggests goal refinements
-- "You've averaged 1,850 kcal for 4 weeks — your current goal of 2,100 may be too high"
+### ~~AI-suggested goal adjustment~~ *(done — v0.38.4-beta, Goal Insights toggle in Settings → AI Assistant)*
 
 ---
 

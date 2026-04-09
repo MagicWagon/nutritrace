@@ -63,6 +63,17 @@ export const TOOLS = [
     description: 'Get the user\'s nutrition and wellness goals. Returns calorie, macro, and other nutrient targets.',
     parameters: { type: 'object', properties: {} },
   },
+  {
+    name: 'get_diary_averages',
+    description: 'Get the user\'s average daily nutrition intake over the last N days, plus logging consistency. Returns average calories, protein, carbs, fat, water, and other nutrients. Also returns how many days were logged vs total days (consistency %), and weight change over the period if available. Use this to compare actual intake against goals and offer evidence-based goal adjustment suggestions.',
+    parameters: {
+      type: 'object',
+      properties: {
+        days: { type: 'number', description: 'Number of days to average over (7, 14, 28, or 42 recommended)' },
+      },
+      required: ['days'],
+    },
+  },
 ];
 
 // ── Main entry point ─────────────────────────────────────────────────────────

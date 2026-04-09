@@ -30,6 +30,7 @@
     waterGoalMl, waterUnit, waterContainers, waterShowInStats, waterShowInDiary,
     calorieGoalMode, calorieGoalFactor,
     fitbitEnabled, garminEnabled, healthConnectEnabled,
+    aiGoalInsights,
   } from '../stores/settings.js';
   import { mealIcon } from '../lib/mealIcon.js';
   import { DB } from '../lib/db.js';
@@ -2477,6 +2478,17 @@
                 </div>
               </div>
             {/if}
+
+            <div class="setting-divider"></div>
+            <div class="setting-row">
+              <div>
+                <span class="setting-label">Goal Insights
+                  <span class="labs-badge" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);vertical-align:middle">Experimental</span>
+                </span>
+                <div class="setting-desc">FitBot analyzes your actual intake vs goals over the past weeks and proactively offers evidence-based adjustments when patterns are consistent.</div>
+              </div>
+              <Toggle checked={$aiGoalInsights} on:change={e => aiGoalInsights.set(e.detail)} />
+            </div>
 
             {#if !envLocks.ai}
               <div class="setting-divider"></div>

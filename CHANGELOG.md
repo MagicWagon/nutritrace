@@ -5,6 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.38.4-beta] — 2026-04-09
+
+### Added
+- **FitBot Goal Insights** (Experimental) — new `get_diary_averages` tool gives FitBot access to your average daily intake over any period (calories, protein, carbs, fat, water), logging consistency %, and weight trend. When **Goal Insights** is enabled in Settings → AI Assistant, FitBot proactively compares your actual averages against your goals and offers evidence-based adjustments when patterns are consistent (>10% gap, 2+ weeks). Always asks before suggesting changes.
+- **Health Connect in FitBot context** — today's Health Connect data (steps, calories, sleep, HR, HRV, weight) now included in FitBot's daily summary alongside Fitbit/Garmin/Withings.
+- **FitBot tool descriptions improved** — each tool now explicitly states what data it provides and when to use it, reducing hallucination on borderline queries.
+
+---
+
 ## [0.38.3-beta] — 2026-04-09
 
 ### Added
