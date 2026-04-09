@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.38.3-beta] — 2026-04-09
+
+### Added
+- **Dynamic Calorie Goal** (Experimental) — adjusts your daily calorie goal based on yesterday's calories burned from a connected device (Fitbit, Garmin, or Health Connect). Enable in **Settings → Goals**.
+  - Three goal factors: Lose (−20%), Maintain (×1.0), Gain (+20%) applied to yesterday's TDEE.
+  - Falls back to your fixed calorie goal if no device data is available for the prior day.
+  - Diary bottom bar shows a "⚡ Dynamic · X kcal goal" pill when active.
+  - Goals page shows a "⚡ Dynamic" badge on the calories row and the effective goal with "based on X burned" annotation.
+  - New server endpoint `/api/wellness/calories-out` merges calories_out across all sources (priority: Garmin > Health Connect > Fitbit).
+  - Settings section hidden unless at least one device (Fitbit, Garmin, Health Connect) is connected.
+
+---
+
 ## [0.38.2-beta] — 2026-04-08
 
 ### Smart Log — water logging

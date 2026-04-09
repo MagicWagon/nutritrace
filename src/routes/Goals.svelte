@@ -3,7 +3,7 @@
   import { DB, localDateStr } from '../lib/db.js';
   import { NtApi } from '../lib/api.js';
   import { portal } from '../lib/portal.js';
-  import { goals, goalTemplates, energyUnit, weightUnit, heightUnit, lengthUnit, visibleNutriments, hiddenBodyStats, waterGoalMl, waterUnit, pageBanners, wellnessEnabled, fitbitEnabled, garminEnabled } from '../stores/settings.js';
+  import { goals, goalTemplates, energyUnit, weightUnit, heightUnit, lengthUnit, visibleNutriments, hiddenBodyStats, waterGoalMl, waterUnit, pageBanners, wellnessEnabled, fitbitEnabled, garminEnabled, calorieGoalMode, calorieGoalFactor, healthConnectEnabled } from '../stores/settings.js';
   import GoalsBanner from '../components/banners/GoalsBanner.svelte';
   import { NUTRIMENTS, Nutrition } from '../lib/nutrition.js';
   import { loadEntry } from '../stores/diary.js';
@@ -116,6 +116,14 @@
   let todayWellness    = {}; // merged fitbit + garmin for today
   let _wellnessLoaded  = false;
 
+  // Dynamic calorie goal support
+  let _dynamicCaloriesOut = null;
+  $: _hasDevice = $fitbitEnabled || $garminEnabled || $healthConnectEnabled;
+  $: _fixedGoal = $goals.calories?.max ?? $goals.calories?.min ?? 2000;
+  $: _effectiveCalGoal = ($calorieGoalMode === 'dynamic' && _dynamicCaloriesOut != null)
+    ? Math.round(_dynamicCaloriesOut * $calorieGoalFactor)
+    : _fixedGoal;
+
   async function loadWellnessToday() {
     _wellnessLoaded = true;
     let fitbit = {}, garmin = {};
@@ -129,6 +137,12 @@
   $: if (($fitbitEnabled || $garminEnabled) && !_wellnessLoaded) loadWellnessToday();
 
   onMount(async () => {
+    if ($calorieGoalMode === 'dynamic') {
+      try {
+        const r = await NtApi.get(`/api/wellness/calories-out?date=${today}`);
+        _dynamicCaloriesOut = r.calories_out;
+      } catch { _dynamicCaloriesOut = null; }
+    }
     const entry = await NtApi.getDiaryDate(today).catch(() => null);
     if (entry) {
       todayBodyStats = entry.body_stats || entry.bodyStats || {};
@@ -353,11 +367,11 @@
               {#if i > 0}<div class="divider"></div>{/if}
               <button class="goal-row" on:click={() => openEdit(stat)}>
                 <div class="goal-info">
-                  <span class="font-medium">{stat.label}</span>
+                  <span class="font-medium">{stat.label}{#if stat.id === 'calories' && $calorieGoalMode === 'dynamic' && _dynamicCaloriesOut != null} ⚡{/if}</span>
                   {#if getTarget(stat) != null}
-                    {@const pct = getPct(stat, todayTotals, todayBodyStats, todayWellness)}
-                    {@const tgt = getTarget(stat)}
+                    {@const tgt = stat.id === 'calories' && $calorieGoalMode === 'dynamic' ? _effectiveCalGoal : getTarget(stat)}
                     {@const cur = getTodayValue(stat, todayTotals, todayBodyStats, todayWellness)}
+                    {@const pct = tgt > 0 ? Math.min(100, Math.round((cur ?? 0) / tgt * 100)) : 0}
                     {@const isMin = $goals[stat.id]?.isMin}
                     {@const bad = cur != null && tgt != null && (isMin ? cur < tgt : cur > tgt)}
                     <div class="goal-progress-bar">
@@ -744,7 +758,6 @@
     transition: width var(--dur-base) var(--ease-inout);
   }
   .goal-progress-fill.over { background: var(--red, #f44336); }
-
   .empty-state {
     display: flex; flex-direction: column; align-items: center;
     gap: 8px; padding: 48px 16px; text-align: center;

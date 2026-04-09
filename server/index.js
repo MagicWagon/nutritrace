@@ -103,6 +103,30 @@ app.use('/api/full-backup',        fullBackupRoutes);
 app.use('/api/wellness/fitbit',   fitbitRoutes);
 app.use('/api/wellness/withings', withingsRoutes);
 app.use('/api/wellness/garmin',  garminRoutes);
+
+// Cross-source calories_out lookup — for Dynamic Calorie Goal
+// Returns yesterday's merged TDEE from fitbit/garmin/health_connect
+app.get('/api/wellness/calories-out', (req, res) => {
+  const userId = req.user?.id;
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+  const { date } = req.query;
+  // date param = the diary date; we want the day before
+  const base = date ? new Date(date + 'T12:00:00Z') : new Date();
+  base.setUTCDate(base.getUTCDate() - 1);
+  const yesterday = base.toISOString().slice(0, 10);
+  // Priority: garmin > health_connect > fitbit (all provide true TDEE)
+  const PRIORITY = ['garmin', 'health_connect', 'fitbit'];
+  const rows = db.prepare(
+    `SELECT source, value FROM wellness_data
+     WHERE user_id=? AND date=? AND metric_type='calories_out'`
+  ).all(userId, yesterday);
+  let result = null;
+  for (const src of PRIORITY) {
+    const row = rows.find(r => r.source === src);
+    if (row) { result = { calories_out: row.value, source: src, date: yesterday }; break; }
+  }
+  res.json(result || { calories_out: null, source: null, date: yesterday });
+});
 app.use('/api/sync',             syncRoutes);
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 

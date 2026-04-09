@@ -89,13 +89,13 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
 
 ### ~~Quick-log (voice / text)~~ *(done — Smart Log v3, hold FitBot button; water logging added v0.38.2-beta)*
 
-### Dynamic Calorie Goal
-- **Fixed** (current, default) vs **Dynamic** (device calories_out × factor)
-- Gate behind connected Fitbit/Garmin — hidden if no device
-- Factor: 0.80 (lose) / 1.00 (maintain) / 1.20 (gain)
-- Uses yesterday's final burn, falls back to fixed goal if no data
-- Touchpoints: diary bar, goals page (read-only override), statistics goal line, FitBot
-- Experimental badge
+### ~~Dynamic Calorie Goal~~ *(done — v0.38.3-beta, Experimental)*
+- ~~Fixed (current, default) vs Dynamic (device calories_out × factor)~~
+- ~~Gate behind connected Fitbit/Garmin/Health Connect — hidden if no device~~
+- ~~Factor: 0.80 (lose) / 1.00 (maintain) / 1.20 (gain)~~
+- ~~Uses yesterday's final burn, falls back to fixed goal if no data~~
+- ~~Touchpoints: diary bar (dynamic pill), goals page (badge + annotation)~~
+- Statistics goal line integration (uses fixed goal for now — future enhancement)
 
 ### Adaptive TDEE
 - Learn actual TDEE by correlating weight trends with calorie intake over 35+ days

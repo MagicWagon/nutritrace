@@ -15,7 +15,7 @@ import { DB } from '../lib/db.js';
 //   server/lib/server-only-keys.js). OAuth app credentials etc.
 //
 export const USER_PREFS = new Set([
-  'energyUnit','mealNames','goals','goalTemplates',
+  'energyUnit','mealNames','goals','goalTemplates','calorieGoalMode','calorieGoalFactor',
   'visibleNutriments','nutrimentsOrder','customNutriments',
   'bodyStatsOrder','hiddenBodyStats','foodCategories',
   'diaryShowNutritionBar','diaryTotalsMode',
@@ -322,6 +322,8 @@ export const energyUnit        = createSettingStore('energyUnit',       'kcal');
 export const mealNames         = createSettingStore('mealNames',        ['Breakfast','Lunch','Dinner','Snacks']);
 export const goals             = createSettingStore('goals',            {});
 export const goalTemplates     = createSettingStore('goalTemplates',    []);
+export const calorieGoalMode   = createSettingStore('calorieGoalMode',   'fixed');  // 'fixed' | 'dynamic'
+export const calorieGoalFactor = createSettingStore('calorieGoalFactor', 1.0);      // 0.80 | 1.00 | 1.20
 export const visibleNutriments = createSettingStore('visibleNutriments', null);
 export const nutrimentsOrder   = createSettingStore('nutrimentsOrder',  []);
 export const customNutriments  = createSettingStore('customNutriments', []);

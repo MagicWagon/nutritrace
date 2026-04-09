@@ -22,7 +22,8 @@
            diaryShowTimestamps, diaryShowMacroSummary, diaryPromptQuantity,
            diaryShowPortionSize, diaryShowNutritionBar, diaryTotalsMode,
            diaryShowAllNutrients, diaryShowNutritionUnits, visibleNutriments, hiddenBodyStats,
-           dateFormat, timeFormat, disableAnimations, goalCelebrations, pageBanners } from '../stores/settings.js';
+           dateFormat, timeFormat, disableAnimations, goalCelebrations, pageBanners,
+           calorieGoalMode, calorieGoalFactor } from '../stores/settings.js';
   import DiaryBanner  from '../components/banners/DiaryBanner.svelte';
   import WaterBanner  from '../components/banners/WaterBanner.svelte';
   import { editorState } from '../stores/editorState.js';
@@ -112,7 +113,25 @@
     : { items: [], bodyStats: {} };
   $: totals = $diaryTotals || {};
 
-  $: caloriesGoal = ($goals && $goals.calories) ? ($goals.calories.max || $goals.calories.min || 2000) : 2000;
+  // Dynamic calorie goal — fetch yesterday's calories_out when mode = 'dynamic'
+  let _dynamicCaloriesOut = null;   // raw burn from device (yesterday)
+  let _dynamicGoalDate    = null;   // which diary date we fetched for
+  $: _fixedGoal = ($goals && $goals.calories) ? ($goals.calories.max || $goals.calories.min || 2000) : 2000;
+  $: caloriesGoal = ($calorieGoalMode === 'dynamic' && _dynamicCaloriesOut != null)
+    ? Math.round(_dynamicCaloriesOut * $calorieGoalFactor)
+    : _fixedGoal;
+  async function _loadDynamicGoal(date) {
+    if ($calorieGoalMode !== 'dynamic') return;
+    if (_dynamicGoalDate === date) return;
+    _dynamicGoalDate = date;
+    try {
+      const r = await NtApi.get(`/api/wellness/calories-out?date=${date}`);
+      _dynamicCaloriesOut = r.calories_out;
+    } catch { _dynamicCaloriesOut = null; }
+  }
+
+  $: if ($calorieGoalMode === 'dynamic' && $currentDate) _loadDynamicGoal($currentDate);
+
   $: _hasBottomNav = $navStyle === 'bottom' || $navStyle === 'both';
   $: barBottom     = _hasBottomNav ? 'calc(var(--nav-h) + env(safe-area-inset-bottom, 0px))' : 'env(safe-area-inset-bottom, 0px)';
 
@@ -824,10 +843,10 @@
         <div class="dbb-kcal">
           {#if _totalsMode === 'remaining'}
             <span class="dbb-num">{Math.max(0, caloriesGoal - Math.round($_calTween)).toLocaleString()}</span>
-            <span class="dbb-unit">kcal left</span>
+            <span class="dbb-unit">{#if $calorieGoalMode === 'dynamic' && _dynamicCaloriesOut != null}⚡ {/if}kcal left</span>
           {:else}
             <span class="dbb-num">{Math.round($_calTween).toLocaleString()}</span>
-            <span class="dbb-unit">kcal eaten</span>
+            <span class="dbb-unit">{#if $calorieGoalMode === 'dynamic' && _dynamicCaloriesOut != null}⚡ {/if}kcal eaten</span>
           {/if}
         </div>
         <div class="dbb-macros">

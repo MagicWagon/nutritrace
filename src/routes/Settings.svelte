@@ -28,6 +28,8 @@
     sidebarPersistent, goalCelebrations, pageBanners,
     aiEnabled, aiProvider, aiApiKey, aiModel, aiAssistantName, quickLogEnabled,
     waterGoalMl, waterUnit, waterContainers, waterShowInStats, waterShowInDiary,
+    calorieGoalMode, calorieGoalFactor,
+    fitbitEnabled, garminEnabled, healthConnectEnabled,
   } from '../stores/settings.js';
   import { mealIcon } from '../lib/mealIcon.js';
   import { DB } from '../lib/db.js';
@@ -51,7 +53,7 @@
   // ── Collapsible section state ──────────────────────────────────────────────
   $: isDark = $appearance === 'dark' || ($appearance === 'system' && (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches));
   let openSections = { serverConnection: false, appearance: false, regional: false, diary: false, foods: false, water: false,
-                       categories: false, nutrients: false, bodyStats: false, statistics: false,
+                       categories: false, nutrients: false, goals: false, bodyStats: false, statistics: false,
                        connectedServices: false, ai: false, notifications: false, wellness: false, sharing: false,
                        backup: false, email: false, users: false, about: false };
 
@@ -243,6 +245,7 @@
     water:             ['water','display unit','daily goal','containers','bottle','cup','glass'],
     categories:        ['categories','food categories','tags','labels'],
     nutrients:         ['nutrients','nutriments','custom nutrients','vitamins','minerals'],
+    goals:             ['goals','calorie goal','dynamic calorie','tdee','burn','calories out','factor','lose','gain','maintain'],
     bodyStats:         ['body stats','body','weight','measurements','stats'],
     statistics:        ['statistics','chart','y-axis','average','goal line','trend','stats'],
     connectedServices: ['connected services','usda','open food facts','mealie','recipe','search language','country','api key','credentials','username','password'],
@@ -2133,6 +2136,44 @@
       </div>
     {/if}
 
+    <!-- ── Goals ───────────────────────────────────────────────────────────── -->
+    {#if $fitbitEnabled || $garminEnabled || $healthConnectEnabled}
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'goals')} on:click={() => toggleSection('goals')}>
+      <span class="material-symbols-rounded si">flag</span>
+      <span>Goals</span>
+      <span class="material-symbols-rounded chevron" class:rotated={openSections.goals}>expand_more</span>
+    </button>
+    {#if sectionOpen(openSections, settingsQuery, 'goals') && sectionVisible(settingsQuery, 'goals')}
+      <div class="section-body" transition:slide={{ duration: 180 }}>
+        <div class="card settings-card">
+          <div class="setting-row">
+            <div>
+              <span class="setting-label">Dynamic Calorie Goal</span>
+              <span class="labs-badge" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);vertical-align:middle">Experimental</span>
+              <div class="setting-desc">Adjusts your daily calorie goal based on yesterday's calories burned from your connected device</div>
+            </div>
+            <Toggle checked={$calorieGoalMode === 'dynamic'} on:change={e => calorieGoalMode.set(e.detail ? 'dynamic' : 'fixed')} />
+          </div>
+          {#if $calorieGoalMode === 'dynamic'}
+            <div class="setting-divider"></div>
+            <div class="setting-row">
+              <span class="setting-label">Goal Factor</span>
+              <div class="seg-control">
+                <button class="seg-opt" class:seg-active={$calorieGoalFactor === 0.8}  on:click={() => calorieGoalFactor.set(0.8)}>Lose −20%</button>
+                <button class="seg-opt" class:seg-active={$calorieGoalFactor === 1.0}  on:click={() => calorieGoalFactor.set(1.0)}>Maintain</button>
+                <button class="seg-opt" class:seg-active={$calorieGoalFactor === 1.2}  on:click={() => calorieGoalFactor.set(1.2)}>Gain +20%</button>
+              </div>
+            </div>
+            <div class="setting-divider"></div>
+            <p class="setting-desc" style="padding:8px var(--page-px)">
+              Uses yesterday's final calorie burn. Falls back to your fixed calorie goal if no data is available.
+            </p>
+          {/if}
+        </div>
+      </div>
+    {/if}
+    {/if}
+
     <!-- ── Body Stats ──────────────────────────────────────────────────────── -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'bodyStats')} on:click={() => toggleSection('bodyStats')}>
       <span class="material-symbols-rounded si">monitor_weight</span>
@@ -3966,6 +4007,32 @@
     border-radius: 99px;
     margin-left: 6px;
     vertical-align: middle;
+  }
+  .seg-control {
+    display: flex;
+    background: var(--surface-2);
+    border-radius: var(--radius-full);
+    padding: 3px;
+    gap: 2px;
+  }
+  .seg-opt {
+    flex: 1;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-3);
+    background: none;
+    border: none;
+    border-radius: var(--radius-full);
+    cursor: pointer;
+    white-space: nowrap;
+    -webkit-tap-highlight-color: transparent;
+    transition: background var(--dur-fast), color var(--dur-fast);
+  }
+  .seg-opt.seg-active {
+    background: var(--surface-1);
+    color: var(--text-1);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
   }
   .about-hero {
     display: flex; align-items: center; gap: 16px; padding: 16px;
