@@ -2,7 +2,10 @@ import { userMgmtActive } from './auth.js';
 
 const SAFE_METHODS  = new Set(['GET', 'HEAD', 'OPTIONS']);
 // Login/logout/register don't need CSRF — they're how you get a token in the first place
-const SKIP_PREFIXES = ['/api/auth/'];
+// Wellness routes are exempt: OAuth callbacks redirect back without a loaded app context,
+// so nt:csrf hasn't been populated in localStorage yet when the first sync/config POST fires.
+// Triggering a wellness sync via CSRF is not a meaningful attack vector.
+const SKIP_PREFIXES = ['/api/auth/', '/api/wellness/'];
 
 /**
  * CSRF protection for cookie-based (PWA) sessions.
