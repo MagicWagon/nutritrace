@@ -7,7 +7,7 @@
  * Uses server_time from pull response as last_sync_at (avoids clock skew).
  */
 
-import { getServerUrl, getAuthToken, loadImageMap, setImageMap } from './platform.js';
+import { getServerUrl, getAuthToken, loadImageMap } from './platform.js';
 import {
   dbGetPendingChanges, dbMarkSynced, dbSetServerId,
   dbGetSyncMeta, dbSetSyncMeta,

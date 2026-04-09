@@ -5,6 +5,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.38.6-beta] — 2026-04-09
+
+### Changed
+- **Settings UX polish** — Goals section is now always visible; when no device is connected, the Dynamic Calorie Goal toggle is shown in a disabled state with an explanation ("Connect a device in Connected Services to enable"). Previously the entire Goals section was hidden.
+- **Toggle component** — now accepts a `disabled` prop; disabled toggles are visually dimmed and non-interactive.
+- **Notifications descriptions clarified** — "Device Notifications" now reads "Alerts delivered directly to this device — native on Android, browser pop-ups on desktop/PWA"; "Push Service" now reads "Server-relayed alerts via Apprise, Gotify, or ntfy — useful for PWA users or Home Assistant".
+- **Smart Log setting description** — shortened to one line; expanded "Quick start" hint trimmed to trigger words only (removed duplicate how-to text).
+- **Goal Insights description** — shortened from two sentences to one.
+
+### Removed
+- `isAndroid`, `isIos` exports from `platform.js` — were never imported anywhere in the codebase.
+- `isServerConnected()` export from `platform.js` — was never called anywhere in the codebase.
+- `setImageMap` from the import statement in `sync.js` — was imported but never used in that file.
+
+---
+
 ## [0.38.5-beta] — 2026-04-09
 
 ### Added

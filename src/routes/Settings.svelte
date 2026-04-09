@@ -2140,7 +2140,6 @@
     {/if}
 
     <!-- ── Goals ───────────────────────────────────────────────────────────── -->
-    {#if $fitbitEnabled || $garminEnabled || $healthConnectEnabled}
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'goals')} on:click={() => toggleSection('goals')}>
       <span class="material-symbols-rounded si">flag</span>
       <span>Goals</span>
@@ -2149,6 +2148,7 @@
     {#if sectionOpen(openSections, settingsQuery, 'goals') && sectionVisible(settingsQuery, 'goals')}
       <div class="section-body" transition:slide={{ duration: 180 }}>
         <div class="card settings-card">
+          {#if $fitbitEnabled || $garminEnabled || $healthConnectEnabled}
           <div class="setting-row">
             <div>
               <span class="setting-label">Dynamic Calorie Goal</span>
@@ -2172,9 +2172,17 @@
               Uses yesterday's final calorie burn. Falls back to your fixed calorie goal if no data is available.
             </p>
           {/if}
+          {:else}
+          <div class="setting-row">
+            <div>
+              <span class="setting-label">Dynamic Calorie Goal</span>
+              <div class="setting-desc">Connect a device in <strong>Connected Services</strong> to enable goal adjustment based on calories burned</div>
+            </div>
+            <Toggle checked={false} disabled={true} />
+          </div>
+          {/if}
         </div>
       </div>
-    {/if}
     {/if}
 
     <!-- ── Body Stats ──────────────────────────────────────────────────────── -->
@@ -2454,7 +2462,7 @@
                   Smart Log
                   <span class="labs-badge" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);vertical-align:middle">Experimental</span>
                 </span>
-                <div class="setting-desc">Press and hold the FitBot button on any page, then say what you ate — "for breakfast I had 2 eggs and toast". When you release, the AI parses the items AND figures out which meal slot, your food database fills in the nutrition, and a confirmation modal lets you review before saving.</div>
+                <div class="setting-desc">Hold the FitBot button, speak what you ate — AI parses the items and meal slot, matches your food database, then confirms before saving</div>
               </div>
               <Toggle checked={quickLogEnabledVal} on:change={e => quickLogEnabledVal = e.detail} />
             </div>
@@ -2462,20 +2470,14 @@
               <div class="setting-divider"></div>
               <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:6px">
                 <div class="setting-desc" style="line-height:1.55">
-                  <strong style="color:var(--text-2)">Quick start</strong>
+                  <strong style="color:var(--text-2)">Trigger words</strong>
                   <div style="margin-top:4px">
-                    Press and hold the FitBot button on any page, speak what you ate ("<em>for breakfast I had 2 eggs and toast</em>"), release. The AI parses your sentence and matches it against your foods, meals, recipes, and yesterday's diary.
+                    • <em>"my X <strong>meal</strong>"</em> → saved meals<br/>
+                    • <em>"my X <strong>recipe</strong>"</em> → saved recipes<br/>
+                    • <em>"<strong>same as yesterday</strong> for lunch"</em> → copy yesterday's items
                   </div>
                   <div style="margin-top:8px">
-                    <strong style="color:var(--text-2)">Trigger words</strong> for non-food matches:
-                    <div style="margin-top:4px">
-                      • <em>"my X <strong>meal</strong>"</em> → searches your saved meals<br/>
-                      • <em>"my X <strong>recipe</strong>"</em> → searches your saved recipes<br/>
-                      • <em>"<strong>same as yesterday</strong> for lunch"</em> → copies yesterday's items
-                    </div>
-                  </div>
-                  <div style="margin-top:8px">
-                    See the <a href="https://github.com/thebigjoe1/nutritrace#smart-log--voice--ai-food-logging" target="_blank" rel="noopener" class="about-link">Smart Log section in the README</a> for the full list of trigger words, examples, what it can/can't match, and the privacy story.
+                    See the <a href="https://github.com/thebigjoe1/nutritrace#smart-log--voice--ai-food-logging" target="_blank" rel="noopener" class="about-link">Smart Log section in the README</a> for full examples and privacy details.
                   </div>
                 </div>
               </div>
@@ -2487,7 +2489,7 @@
                 <span class="setting-label">Goal Insights
                   <span class="labs-badge" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);vertical-align:middle">Experimental</span>
                 </span>
-                <div class="setting-desc">FitBot analyzes your actual intake vs goals over the past weeks and proactively offers evidence-based adjustments when patterns are consistent.</div>
+                <div class="setting-desc">FitBot analyzes your intake trends and proactively suggests goal adjustments when patterns are consistent</div>
               </div>
               <Toggle checked={$aiGoalInsights} on:change={e => aiGoalInsights.set(e.detail)} />
             </div>
@@ -2545,7 +2547,7 @@
           <div class="setting-row">
             <div>
               <span class="setting-label">Device Notifications</span>
-              <div class="setting-desc">Native push on Android, browser notifications on desktop</div>
+              <div class="setting-desc">Alerts delivered directly to this device — native on Android, browser pop-ups on desktop/PWA</div>
             </div>
             <Toggle checked={_notifLocal} on:change={e => { _notifLocal = e.detail; set('notifLocalEnabled', e.detail); if (e.detail) _requestNotifPermission(); }} />
           </div>
@@ -2553,7 +2555,7 @@
           <div class="setting-row">
             <div>
               <span class="setting-label">Push Service</span>
-              <div class="setting-desc">Self-hosted notification server</div>
+              <div class="setting-desc">Server-relayed alerts via Apprise, Gotify, or ntfy — useful for PWA users or Home Assistant</div>
             </div>
             <div class="select-wrap" style="width:130px">
               <select class="select sel-sm" value={_notifPushService} on:change={e => { _notifPushService = e.target.value; set('notifPushService', e.target.value); }}>
