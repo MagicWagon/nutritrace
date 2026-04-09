@@ -87,7 +87,7 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
 
 ### ~~Meal-level macro summary~~ *(done — per-meal P/C/F bar + text)*
 
-### ~~Quick-log (voice / text)~~ *(done — Smart Log v3, hold FitBot button)*
+### ~~Quick-log (voice / text)~~ *(done — Smart Log v3, hold FitBot button; water logging added v0.38.2-beta)*
 
 ### Dynamic Calorie Goal
 - **Fixed** (current, default) vs **Dynamic** (device calories_out × factor)
@@ -147,8 +147,7 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
 ### Diary loading indicator
 - Subtle spinner or opacity change on date navigation when network is slow
 
-### Water log editing
-- Tap a water log entry to edit volume/time (currently only add/delete)
+### ~~Water log editing~~ *(done — v0.38.1-beta)*
 
 ---
 
