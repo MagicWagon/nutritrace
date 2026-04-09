@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.38.1-beta] — 2026-04-08
+
+### Added
+- **Water log editing** — tap any water log entry to edit the amount inline. Input opens in place with the current value pre-filled in your display unit (ml/oz/L/G). Press Enter or tap ✓ to save, Escape or ✕ to cancel. Delete button still works as before (stopPropagation prevents accidental edit trigger).
+
+---
+
 ## [0.38.0-beta] — 2026-04-08
 
 ### Security
