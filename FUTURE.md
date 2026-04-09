@@ -66,7 +66,7 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
 ### Phase 2 — Sync & platform integrations
 - ~~**Differential sync** — only push/pull changed records since last sync (timestamp-based), instead of full merge on every connect~~
 - ~~**Offline cache in server mode** — mirror server data in local SQLite so the app works when server is down; sync diff when back online~~
-- **Health Connect integration** — read steps, sleep, HR, body comp directly from Android Health Connect API via Capacitor plugin; unifies all Android wearable data
+- **Health Connect integration** — built (v0.35+), needs real-world user testing across different Android wearables and OS versions before removing from backlog
 - **Background sync** — periodic background task (via @capacitor/background-runner or WorkManager bridge) to sync diary/foods/wellness with server when connected
 - ~~**Local full backup (ZIP)** — create full backup on device (JSZip) including images, for phone-to-phone transfer without a server~~ *(done — v0.35.2-beta)*
 - **iOS app** — Capacitor already supports iOS; need HealthKit integration + App Store setup
@@ -129,9 +129,7 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
 ### Body composition chart
 - Weight / body fat % / muscle mass plotted together (Withings data available)
 
-### Weekly summary email
-- Optional digest: calories in/out, steps, sleep averages, goal hit rate
-- Uses existing SMTP / email template infrastructure
+### ~~Weekly summary email~~ *(done — v0.38.5-beta, configurable day/time, push + email)*
 
 ---
 

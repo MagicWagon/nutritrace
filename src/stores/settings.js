@@ -42,7 +42,7 @@ export const USER_PREFS = new Set([
   'notifLocalEnabled','notifPushService',
   'notifWaterReminders','notifWaterInterval','notifMealReminders','notifMealTimes',
   'notifGoalCelebrations','notifCalorieGoal','notifStepGoal',
-  'notifWeighIn','notifWeighInTime','notifWeeklySummary',
+  'notifWeighIn','notifWeighInTime','notifWeeklySummary','weeklySummaryDay','weeklySummaryTime',
   'notifWellnessAlerts','notifWorkoutSummary','notifSyncFailures',
   'appriseUrl','appriseTag','gotifyUrl','gotifyToken','ntfyUrl','ntfyTopic','ntfyToken',
   // UI behavior prefs that should match across devices
@@ -495,6 +495,8 @@ export const notifStepGoal        = createSettingStore('notifStepGoal',        f
 export const notifWeighIn         = createSettingStore('notifWeighIn',         false);
 export const notifWeighInTime     = createSettingStore('notifWeighInTime',     '07:00');
 export const notifWeeklySummary   = createSettingStore('notifWeeklySummary',   false);
+export const weeklySummaryDay     = createSettingStore('weeklySummaryDay',     0);      // 0=Sun … 6=Sat
+export const weeklySummaryTime    = createSettingStore('weeklySummaryTime',    '09:00');
 export const notifWellnessAlerts  = createSettingStore('notifWellnessAlerts',  false);
 export const notifWorkoutSummary  = createSettingStore('notifWorkoutSummary',  false);
 export const notifSyncFailures    = createSettingStore('notifSyncFailures',    false);

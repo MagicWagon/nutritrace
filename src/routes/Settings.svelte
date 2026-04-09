@@ -504,7 +504,9 @@
   let _notifSteps    = DB.getSetting('notifStepGoal',        false);
   let _notifWeighIn  = DB.getSetting('notifWeighIn',         false);
   let _notifWeighInTime = DB.getSetting('notifWeighInTime',  '07:00');
-  let _notifWeekly   = DB.getSetting('notifWeeklySummary',   false);
+  let _notifWeekly      = DB.getSetting('notifWeeklySummary',  false);
+  let _weeklySummaryDay  = DB.getSetting('weeklySummaryDay',   0);
+  let _weeklySummaryTime = DB.getSetting('weeklySummaryTime',  '09:00');
   let _notifWellness = DB.getSetting('notifWellnessAlerts',  false);
   let _notifWorkouts = DB.getSetting('notifWorkoutSummary',  false);
   let _notifSync     = DB.getSetting('notifSyncFailures',    false);
@@ -2739,10 +2741,29 @@
             <div class="setting-row">
               <div>
                 <span class="setting-label">Weekly Summary</span>
-                <div class="setting-desc">Sunday recap with average steps, calories, and sleep for the week</div>
+                <div class="setting-desc">Weekly digest with average calories, protein, steps, sleep, goal hit rate, and weight change — delivered by push notification and email (if configured)</div>
               </div>
               <Toggle checked={_notifWeekly} on:change={e => { _notifWeekly = e.detail; set('notifWeeklySummary', e.detail); }} />
             </div>
+            {#if _notifWeekly}
+              <div class="setting-divider"></div>
+              <div class="setting-row">
+                <span class="setting-label">Delivery Day</span>
+                <div class="seg-control">
+                  {#each ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'] as day, i}
+                    <button class="seg-opt" class:seg-active={_weeklySummaryDay === i}
+                      on:click={() => { _weeklySummaryDay = i; set('weeklySummaryDay', i); }}>
+                      {day}
+                    </button>
+                  {/each}
+                </div>
+              </div>
+              <div class="setting-divider"></div>
+              <div class="setting-row">
+                <span class="setting-label">Delivery Time</span>
+                <TimePicker value={_weeklySummaryTime} on:change={e => { _weeklySummaryTime = e.detail; set('weeklySummaryTime', e.detail); }} />
+              </div>
+            {/if}
             <div class="setting-divider"></div>
             <div class="setting-row">
               <div>

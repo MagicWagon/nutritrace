@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import db from './db.js';
+import { logger } from './logger.js';
 
 /** Seed app_config from env vars at startup (env vars take priority) */
 export function seedSmtpFromEnv() {
@@ -228,4 +229,182 @@ export async function sendInvite(email, inviteUrl, inviterName) {
     html: emailWrapper(origin, body, null),
     text: `${inviterName ? inviterName + ' has invited you' : "You've been invited"} to join NutriTrace.\n\nAccept your invitation:\n${inviteUrl}\n\nThis invite expires in 7 days.`,
   });
+}
+
+// ── Weekly Summary Email ───────────────────────────────────────────────────
+
+function _statRow(label, value, unit = '') {
+  if (value == null) return '';
+  return `
+    <tr>
+      <td style="padding:8px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;color:#8A93A8;border-bottom:1px solid #1E2330;">${label}</td>
+      <td style="padding:8px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;font-weight:600;color:#FFFFFF;text-align:right;border-bottom:1px solid #1E2330;">${value}${unit ? ' ' + unit : ''}</td>
+    </tr>`;
+}
+
+export async function sendWeeklySummaryEmail(userId, origin) {
+  try {
+    // Get user's email
+    const user = db.prepare('SELECT email, full_name, username FROM users WHERE id = ?').get(userId);
+    if (!user?.email) return;
+
+    const toEmail  = user.email;
+    const name     = user.full_name || user.username || 'there';
+
+    // Date range: last 7 days
+    const toDate   = new Date();
+    const fromDate = new Date(toDate); fromDate.setDate(toDate.getDate() - 6);
+    const fromStr  = fromDate.toISOString().slice(0, 10);
+    const toStr    = toDate.toISOString().slice(0, 10);
+
+    // ── Nutrition averages from diary ─────────────────────────────────────
+    const diaryRows = db.prepare(
+      `SELECT data FROM diary WHERE user_id=? AND date >= ? AND date <= ? AND deleted_at IS NULL`
+    ).all(userId, fromStr, toStr);
+
+    let totalCal = 0, totalProt = 0, totalCarb = 0, totalFat = 0, totalWater = 0;
+    let daysLogged = 0, goalsHitCount = 0, daysWithGoal = 0;
+
+    // Get user's calorie goal
+    const goalRow = db.prepare(`SELECT value FROM user_settings WHERE user_id=? AND key='goals'`).get(userId);
+    let calGoal = null;
+    try {
+      const g = JSON.parse(goalRow?.value || '{}');
+      calGoal = g.calories?.max ?? g.calories?.min ?? null;
+    } catch {}
+
+    for (const row of diaryRows) {
+      try {
+        const entry = JSON.parse(row.data);
+        if (!entry.items?.length) continue;
+        daysLogged++;
+        let dayCal = 0, dayProt = 0, dayCarb = 0, dayFat = 0;
+        for (const item of entry.items) {
+          const n = item.nutrition || {};
+          const q = item.quantity || 1;
+          dayCal  += (n.calories       || 0) * q;
+          dayProt += (n.proteins       || 0) * q;
+          dayCarb += (n.carbohydrates  || 0) * q;
+          dayFat  += (n.fat            || 0) * q;
+        }
+        totalCal  += dayCal;
+        totalProt += dayProt;
+        totalCarb += dayCarb;
+        totalFat  += dayFat;
+        totalWater += (entry.water || []).reduce((s, l) => s + (l.amount || 0), 0);
+        if (calGoal != null) {
+          daysWithGoal++;
+          if (dayCal >= calGoal * 0.85 && dayCal <= calGoal * 1.15) goalsHitCount++;
+        }
+      } catch {}
+    }
+
+    const avgCal   = daysLogged > 0 ? Math.round(totalCal / daysLogged)  : null;
+    const avgProt  = daysLogged > 0 ? Math.round(totalProt / daysLogged) : null;
+    const avgCarb  = daysLogged > 0 ? Math.round(totalCarb / daysLogged) : null;
+    const avgFat   = daysLogged > 0 ? Math.round(totalFat / daysLogged)  : null;
+    const avgWaterL = daysLogged > 0 ? (totalWater / daysLogged / 1000).toFixed(1) : null;
+    const goalHitPct = daysWithGoal > 0 ? Math.round(goalsHitCount / daysWithGoal * 100) : null;
+
+    // ── Wellness averages (fitbit + garmin merged) ────────────────────────
+    const wRows = db.prepare(
+      `SELECT metric_type, AVG(value) as avg FROM wellness_data
+       WHERE user_id=? AND date >= ? AND date <= ?
+       AND metric_type IN ('steps','calories_out','sleep_duration_min','resting_hr','readiness_score','stress_score')
+       GROUP BY metric_type`
+    ).all(userId, fromStr, toStr);
+    const w = {};
+    for (const r of wRows) w[r.metric_type] = r.avg;
+
+    // ── Weight change ────────────────────────────────────────────────────
+    const weightRows = db.prepare(
+      `SELECT date, value FROM wellness_data
+       WHERE user_id=? AND metric_type='weight_kg' AND date >= ? AND date <= ?
+       ORDER BY date ASC`
+    ).all(userId, fromStr, toStr);
+    // Also check diary body stats for weight
+    let firstWeight = null, lastWeight = null;
+    for (const row of diaryRows) {
+      try {
+        const entry = JSON.parse(row.data);
+        const w = entry.body_stats?.weight ?? entry.bodyStats?.weight ?? null;
+        if (w != null) { if (firstWeight == null) firstWeight = w; lastWeight = w; }
+      } catch {}
+    }
+    if (weightRows.length >= 2) {
+      firstWeight = weightRows[0].value;
+      lastWeight  = weightRows[weightRows.length - 1].value;
+    }
+    const weightDiff = (firstWeight != null && lastWeight != null) ? lastWeight - firstWeight : null;
+
+    // ── Build email ───────────────────────────────────────────────────────
+    const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const fmtDate = (d) => `${DAYS[d.getDay()]} ${d.toLocaleDateString('en-US', { month:'short', day:'numeric' })}`;
+    const weekRange = `${fmtDate(fromDate)} – ${fmtDate(toDate)}`;
+
+    const nutritionSection = daysLogged > 0 ? `
+      <p style="margin:24px 0 8px;font-size:13px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#4FFFB0;">Nutrition (${daysLogged}/7 days logged)</p>
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+        ${_statRow('Avg Daily Calories', avgCal, 'kcal')}
+        ${calGoal != null ? _statRow('vs Goal', `${avgCal >= calGoal ? '+' : ''}${avgCal - calGoal}`, 'kcal') : ''}
+        ${goalHitPct != null ? _statRow('Goal Hit Rate', goalHitPct, '%') : ''}
+        ${_statRow('Avg Protein', avgProt, 'g')}
+        ${_statRow('Avg Carbs', avgCarb, 'g')}
+        ${_statRow('Avg Fat', avgFat, 'g')}
+        ${_statRow('Avg Water', avgWaterL, 'L')}
+      </table>` : '';
+
+    const avgSteps = w.steps ? Math.round(w.steps).toLocaleString() : null;
+    const avgSleep = w.sleep_duration_min ? (() => { const h = Math.floor(w.sleep_duration_min/60); return `${h}h ${Math.round(w.sleep_duration_min%60)}m`; })() : null;
+    const wellnessSection = (avgSteps || avgSleep || w.resting_hr || w.readiness_score) ? `
+      <p style="margin:24px 0 8px;font-size:13px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#4FFFB0;">Activity & Wellness</p>
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+        ${_statRow('Avg Daily Steps', avgSteps)}
+        ${w.calories_out ? _statRow('Avg Calories Burned', Math.round(w.calories_out), 'kcal') : ''}
+        ${_statRow('Avg Sleep', avgSleep)}
+        ${w.resting_hr ? _statRow('Avg Resting HR', Math.round(w.resting_hr), 'bpm') : ''}
+        ${w.readiness_score ? _statRow('Avg Readiness', Math.round(w.readiness_score), '/ 100') : ''}
+        ${w.stress_score ? _statRow('Avg Stress Mgmt', Math.round(w.stress_score), '/ 100') : ''}
+      </table>` : '';
+
+    const weightSection = (weightDiff != null) ? `
+      <p style="margin:24px 0 8px;font-size:13px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#4FFFB0;">Weight</p>
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+        ${_statRow('Change this week', `${weightDiff >= 0 ? '+' : ''}${weightDiff.toFixed(1)}`, 'kg')}
+      </table>` : '';
+
+    if (!nutritionSection && !wellnessSection) {
+      logger.debug(`[email] weekly summary skipped for user ${userId} — no data`);
+      return;
+    }
+
+    const body = `
+      <p class="nt-title" style="margin:0 0 4px;font-size:22px;font-weight:700;color:#FFFFFF;line-height:1.3;">
+        Your Weekly Summary
+      </p>
+      <p class="nt-body-txt" style="margin:0 0 24px;font-size:14px;color:#5A6278;">${weekRange}</p>
+      ${nutritionSection}
+      ${wellnessSection}
+      ${weightSection}
+      <p style="margin:32px 0 0;font-size:12px;color:#3A4158;text-align:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+        To stop receiving these emails, turn off Weekly Summary in Settings → Notifications.
+      </p>`;
+
+    await sendMail({
+      to: toEmail,
+      subject: `📊 NutriTrace Weekly Summary — ${weekRange}`,
+      html: emailWrapper(origin, body, null),
+      text: `Weekly Summary (${weekRange})\n\n` +
+        (avgCal   ? `Avg calories: ${avgCal} kcal\n` : '') +
+        (avgProt  ? `Avg protein: ${avgProt}g\n` : '') +
+        (avgSteps ? `Avg steps: ${avgSteps}\n` : '') +
+        (avgSleep ? `Avg sleep: ${avgSleep}\n` : '') +
+        (goalHitPct != null ? `Goal hit rate: ${goalHitPct}%\n` : '') +
+        (weightDiff != null ? `Weight change: ${weightDiff >= 0 ? '+' : ''}${weightDiff.toFixed(1)} kg\n` : ''),
+    });
+
+    logger.info(`[email] weekly summary sent to user ${userId} (${toEmail})`);
+  } catch (e) {
+    logger.warn(`[email] weekly summary failed for user ${userId}: ${e.message}`);
+  }
 }

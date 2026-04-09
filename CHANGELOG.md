@@ -5,6 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.38.5-beta] — 2026-04-09
+
+### Added
+- **Weekly Summary Email** — optional digest delivered by both push notification and email (if SMTP is configured). Covers: avg daily calories vs goal, goal hit rate, avg protein/carbs/fat, avg water, avg steps, avg calories burned, avg sleep, avg resting HR, avg readiness/stress scores, and weight change for the week.
+- **User-configurable delivery day and time** — choose any day of the week and exact time in Settings → Notifications → Weekly Summary. Previously hardcoded to Sunday 9am.
+- Settings: `weeklySummaryDay` (0=Sun…6=Sat, default Sun) and `weeklySummaryTime` (HH:MM, default 09:00).
+
+---
+
 ## [0.38.4-beta] — 2026-04-09
 
 ### Added

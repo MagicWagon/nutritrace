@@ -239,10 +239,25 @@ async function _pushReminders(userId) {
     }
   }
 
-  // Weekly summary (Sunday)
-  if (_isEnabled(userId, 'notifWeeklySummary') && local.dayOfWeek === 0 && local.hour >= 9 && local.hour < 10 && !_ranRecently(userId, 'weekly', 6 * 24 * 60 * 60 * 1000)) {
-    const { sendWeeklySummary } = await import('./push-notify.js');
-    await sendWeeklySummary(userId);
+  // Weekly summary — user-configurable day + time
+  if (_isEnabled(userId, 'notifWeeklySummary') && !_ranRecently(userId, 'weekly', 6 * 24 * 60 * 60 * 1000)) {
+    const summaryDay  = _getUserSetting(userId, 'weeklySummaryDay')  ?? 0;    // 0=Sun default
+    const summaryTime = _getUserSetting(userId, 'weeklySummaryTime') ?? '09:00';
+    const [targetHour] = summaryTime.split(':').map(Number);
+    if (local.dayOfWeek === summaryDay && local.hour >= targetHour && local.hour < targetHour + 1) {
+      // Push notification
+      const { sendWeeklySummary } = await import('./push-notify.js');
+      await sendWeeklySummary(userId);
+      // Email digest (if SMTP configured + user has an email on file)
+      try {
+        const { sendWeeklySummaryEmail } = await import('../email.js');
+        const origin = db.prepare(`SELECT value FROM app_config WHERE key='app_url'`).get()?.value
+          || 'http://localhost:3001';
+        await sendWeeklySummaryEmail(userId, origin);
+      } catch (e) {
+        logger.debug(`[scheduler] weekly email skipped for user ${userId}: ${e.message}`);
+      }
+    }
   }
 }
 
