@@ -28,13 +28,14 @@ function _base() {
   return getServerUrl() || '';
 }
 
-async function _serverFetch(method, path, body) {
+async function _serverFetch(method, path, body, timeoutMs = 8000) {
   const res = await fetch(_base() + path, {
     method,
     headers: _headers(),
     credentials: 'include',
     cache: 'no-store',
     body: body != null ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if (!res.ok) throw new Error(`API error ${res.status}`);
   return res.json();

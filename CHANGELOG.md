@@ -5,6 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.38.8-beta] — 2026-04-10
+
+### Fixed
+- **Android: app now works correctly when server is unreachable but phone has internet** — previously the background auth refresh could clear the cached user on server error (e.g., 502 from Cloudflare tunnel), causing the app to show a login screen and preventing cached data from loading. The native auth refresh now never clears `currentUser`; it only updates on a valid server response.
+- **API pass-through timeout** — `NtApiCached` pass-through methods (`get`, `post`, `put`, `del`) now use an 8-second timeout so they fail fast instead of hanging when the server is unreachable.
+
+---
+
 ## [0.38.7-beta] — 2026-04-09
 
 ### Added
