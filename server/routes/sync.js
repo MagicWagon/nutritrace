@@ -73,9 +73,15 @@ router.get('/pull', wrap((req, res) => {
     `SELECT * FROM workouts WHERE updated_at > ? ${u != null ? 'AND user_id = ?' : ''} ORDER BY updated_at`
   ).all(...workoutsParams).map(parse);
 
-  logger.debug(`[sync] pull since=${sinceSql}: foods=${foods.length} meals=${meals.length} diary=${diary.length} settings=${settings.length} wellness=${wellness.length} workouts=${workouts.length}`);
+  // AI chat history — pull only (client posts via /api/ai/history directly)
+  const chatParams = u != null ? [sinceSql, u] : [sinceSql];
+  const chat_history = db.prepare(
+    `SELECT id, role, content, created_at FROM ai_chat_history WHERE created_at > ? ${u != null ? 'AND user_id = ?' : 'AND user_id IS NULL'} ORDER BY created_at`
+  ).all(...chatParams);
 
-  res.json({ foods, meals, diary, settings, wellness, workouts, server_time: serverTime });
+  logger.debug(`[sync] pull since=${sinceSql}: foods=${foods.length} meals=${meals.length} diary=${diary.length} settings=${settings.length} wellness=${wellness.length} workouts=${workouts.length} chat=${chat_history.length}`);
+
+  res.json({ foods, meals, diary, settings, wellness, workouts, chat_history, server_time: serverTime });
 }));
 
 // ── POST /push ───────────────────────────────────────────────────────────────

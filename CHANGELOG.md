@@ -5,6 +5,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.38.7-beta] — 2026-04-09
+
+### Added
+- **Cross-device chat sync** — FitBot chat history is now part of the differential sync pull. Messages sent from one device show up on another on the next sync cycle (30s on native, visibilitychange on PWA). No more refresh-to-see.
+  - Server: `/api/sync/pull` now returns `chat_history` rows newer than `since`.
+  - Client sync engine dispatches `nt:chat-updated` after pulling new rows.
+  - `AIFitBot` listens for `nt:chat-updated`, `nt:sync-complete`, and `visibilitychange` — merging new messages in place (deduped by role+content+time) and surfacing an unread dot if the panel is closed.
+
+### Changed
+- **Sync bar trimmed to errors only** — removed "Syncing…", "Synced", and "Offline — changes saved locally" states. The bar now only appears when there's a real sync error worth the user's attention. Removes the every-30s flash that added visual noise without actionable information.
+- **Connection badge — offline-only** — the cloud badge on the menu button no longer shows a green "online" state. It only surfaces when offline (red `cloud_off`). Follows the "errors are interesting, success is boring" principle; matches conventions used by Gmail, Slack, etc.
+
+---
+
 ## [0.38.6-beta] — 2026-04-09
 
 ### Changed

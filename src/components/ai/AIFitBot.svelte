@@ -1,5 +1,5 @@
 <script>
-  import { onMount, tick } from 'svelte';
+  import { onMount, onDestroy, tick } from 'svelte';
   import { fly, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import FitBotFace from './FitBotFace.svelte';
@@ -268,7 +268,55 @@
           return { error: `Unknown tool: ${name}` };
       }
     });
+
+    // ── Cross-device chat sync ──────────────────────────────────────────────
+    // 1. nt:chat-updated — fired by native sync engine after pull, carries new rows
+    // 2. nt:sync-complete — safety net; full refetch catches deletes or missed rows
+    // 3. visibilitychange — PWA refetches when the tab regains focus
+    window.addEventListener('nt:chat-updated',  _onChatUpdated);
+    window.addEventListener('nt:sync-complete', _refetchChatHistory);
+    document.addEventListener('visibilitychange', _onVisible);
   });
+
+  onDestroy(() => {
+    window.removeEventListener('nt:chat-updated',  _onChatUpdated);
+    window.removeEventListener('nt:sync-complete', _refetchChatHistory);
+    document.removeEventListener('visibilitychange', _onVisible);
+  });
+
+  function _onVisible() {
+    if (document.visibilityState === 'visible') _refetchChatHistory();
+  }
+
+  // Merge incoming rows from sync pull; dedupe by role+content+created_at
+  function _onChatUpdated(e) {
+    const rows = e.detail?.messages || [];
+    if (!rows.length) return;
+    const seen = new Set(messages.map(m => `${m.role}|${m.content}|${m.time}`));
+    const toAdd = rows
+      .map(r => ({ role: r.role, content: r.content, time: _fmtCreatedAt(r.created_at) }))
+      .filter(m => !seen.has(`${m.role}|${m.content}|${m.time}`));
+    if (!toAdd.length) return;
+    messages = [...messages, ...toAdd];
+    if (!panelOpen) hasUnread = true;
+    tick().then(() => _scrollBottom(true));
+  }
+
+  async function _refetchChatHistory() {
+    try {
+      const rows = await NtApi.get('/api/ai/history');
+      if (!Array.isArray(rows)) return;
+      const next = rows.map(r => ({ role: r.role, content: r.content, time: _fmtCreatedAt(r.created_at) }));
+      // Only update if the list actually changed (length or last message differs)
+      const changed = next.length !== messages.length
+        || (next.length && messages.length && next[next.length - 1].content !== messages[messages.length - 1].content);
+      if (!changed) return;
+      const hadMore = next.length > messages.length;
+      messages = next;
+      if (hadMore && !panelOpen) hasUnread = true;
+      tick().then(() => _scrollBottom(true));
+    } catch {}
+  }
 
   function _fmtCreatedAt(iso) {
     if (!iso) return fmtTime();

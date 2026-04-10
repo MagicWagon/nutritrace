@@ -217,13 +217,19 @@ async function pullChanges() {
     await dbUpsertWorkoutFromServer(w);
   }
 
+  // Chat history — pull only, notify the FitBot component via event
+  const newChat = data.chat_history || [];
+  if (newChat.length && typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('nt:chat-updated', { detail: { messages: newChat } }));
+  }
+
   // Save server time as last_sync_at
   if (data.server_time) {
     await dbSetSyncMeta('last_sync_at', data.server_time);
   }
 
-  const totalChanges = (data.foods?.length || 0) + (data.meals?.length || 0) + (data.diary?.length || 0) + (data.wellness?.length || 0) + pulledSettings.length + (data.workouts?.length || 0);
-  console.log(`[sync] pull complete: ${data.foods?.length || 0} foods, ${data.meals?.length || 0} meals, ${data.diary?.length || 0} diary, ${data.wellness?.length || 0} wellness, ${pulledSettings.length} settings, ${data.workouts?.length || 0} workouts`);
+  const totalChanges = (data.foods?.length || 0) + (data.meals?.length || 0) + (data.diary?.length || 0) + (data.wellness?.length || 0) + pulledSettings.length + (data.workouts?.length || 0) + newChat.length;
+  console.log(`[sync] pull complete: ${data.foods?.length || 0} foods, ${data.meals?.length || 0} meals, ${data.diary?.length || 0} diary, ${data.wellness?.length || 0} wellness, ${pulledSettings.length} settings, ${data.workouts?.length || 0} workouts, ${newChat.length} chat`);
   return totalChanges > 0;
 }
 
