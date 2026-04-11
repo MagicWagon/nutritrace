@@ -72,9 +72,14 @@ export function isEmailConfigured() {
 
 // ── Shared template helpers ────────────────────────────────────────────────
 
-function emailWrapper(origin, bodyHtml, footerNote) {
+const _FONT = `-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif`;
+
+function emailWrapper(origin, bodyHtml, footerNote, preheaderText) {
   const logoUrl = `${origin}/icons/logo.png`;
   const year    = new Date().getFullYear();
+  const preheader = preheaderText
+    ? `<div style="display:none;font-size:1px;color:#0A0B0F;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">${preheaderText}</div>`
+    : '';
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -82,7 +87,6 @@ function emailWrapper(origin, bodyHtml, footerNote) {
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <style>
-    /* Light mode overrides — supported by Apple Mail, Outlook macOS, Fastmail, etc. */
     @media (prefers-color-scheme: light) {
       .nt-body     { background-color:#F4F6FA !important; }
       .nt-outer    { background-color:#F4F6FA !important; }
@@ -90,21 +94,25 @@ function emailWrapper(origin, bodyHtml, footerNote) {
       .nt-stripe   { background:#00C47A !important; }
       .nt-card     { background-color:#FFFFFF !important; border-color:#DDE3EE !important; }
       .nt-footer   { background-color:#F0F2F7 !important; border-color:#DDE3EE !important; }
-      .nt-title    { color:#0A1A0E !important; }
+      .nt-heading  { color:#0A1A0E !important; }
       .nt-body-txt { color:#4B5563 !important; }
-      .nt-copy-cr  { color:#9CA3AF !important; }
+      .nt-muted    { color:#9CA3AF !important; }
       .nt-fb-url   { color:#00A85E !important; }
       .nt-expiry   { color:#6B7280 !important; }
       .nt-expiry strong { color:#374151 !important; }
+      .nt-section  { color:#059669 !important; }
+      .nt-stat-lbl { color:#4B5563 !important; }
+      .nt-stat-val { color:#111827 !important; }
+      .nt-stat-div { border-color:#E5E7EB !important; }
     }
   </style>
 </head>
 <body class="nt-body" style="margin:0;padding:0;background-color:#0A0B0F;">
+${preheader}
 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" class="nt-outer" style="background-color:#0A0B0F;">
   <tr>
     <td align="center" style="padding:48px 16px 40px;">
 
-      <!-- Card -->
       <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="520" style="max-width:520px;width:100%;">
 
         <!-- Header -->
@@ -112,10 +120,10 @@ function emailWrapper(origin, bodyHtml, footerNote) {
           <td class="nt-header" align="center" style="background-color:#0D1610;padding:36px 40px 30px;border-radius:16px 16px 0 0;border:1px solid #163324;border-bottom:none;">
             <img src="${logoUrl}" alt="NutriTrace" width="60" height="60"
               style="display:block;margin:0 auto 18px;border-radius:14px;" />
-            <div class="nt-title" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:26px;font-weight:700;color:#FFFFFF;letter-spacing:-0.4px;line-height:1;">
+            <div style="font-family:${_FONT};font-size:26px;font-weight:700;color:#FFFFFF;letter-spacing:-0.4px;line-height:1;">
               NutriTrace
             </div>
-            <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:11px;font-weight:600;color:#00C47A;letter-spacing:0.22em;text-transform:uppercase;margin-top:8px;">
+            <div style="font-family:${_FONT};font-size:11px;font-weight:600;color:#00C47A;letter-spacing:0.22em;text-transform:uppercase;margin-top:8px;">
               Trace Every Bite
             </div>
           </td>
@@ -128,7 +136,7 @@ function emailWrapper(origin, bodyHtml, footerNote) {
 
         <!-- Body -->
         <tr>
-          <td class="nt-card" style="background-color:#111318;padding:36px 40px;border-left:1px solid #1E2330;border-right:1px solid #1E2330;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+          <td class="nt-card" style="background-color:#111318;padding:36px 40px;border-left:1px solid #1E2330;border-right:1px solid #1E2330;font-family:${_FONT};">
             ${bodyHtml}
           </td>
         </tr>
@@ -136,8 +144,8 @@ function emailWrapper(origin, bodyHtml, footerNote) {
         <!-- Footer -->
         <tr>
           <td class="nt-footer" style="background-color:#0D0F14;padding:22px 40px 28px;border-radius:0 0 16px 16px;border:1px solid #1A1F2E;border-top:1px solid #252D3D;">
-            ${footerNote ? `<p style="margin:0 0 10px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:12px;color:#4A5268;text-align:center;line-height:1.6;">${footerNote}</p>` : ''}
-            <p class="nt-copy-cr" style="margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:11px;color:#323850;text-align:center;">
+            ${footerNote ? `<p class="nt-muted" style="margin:0 0 10px;font-family:${_FONT};font-size:12px;color:#4A5268;text-align:center;line-height:1.6;">${footerNote}</p>` : ''}
+            <p class="nt-muted" style="margin:0;font-family:${_FONT};font-size:11px;color:#323850;text-align:center;">
               &copy; ${year} NutriTrace &nbsp;&middot;&nbsp; Self-hosted &nbsp;&middot;&nbsp; Your data, your rules
             </p>
           </td>
@@ -151,13 +159,19 @@ function emailWrapper(origin, bodyHtml, footerNote) {
 </html>`;
 }
 
+function greeting(name) {
+  return `<p class="nt-body-txt" style="margin:0 0 20px;font-size:15px;color:#8A93A8;line-height:1.7;">
+    Hi${name ? ' <strong style="color:#FFFFFF;">' + name + '</strong>' : ''},
+  </p>`;
+}
+
 function ctaButton(href, label) {
   return `
     <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 auto;">
       <tr>
         <td align="center" style="border-radius:10px;background-color:#00C47A;">
           <a href="${href}"
-            style="display:inline-block;padding:14px 36px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;color:#FFFFFF;text-decoration:none;border-radius:10px;letter-spacing:0.01em;">
+            style="display:inline-block;padding:14px 36px;font-family:${_FONT};font-size:15px;font-weight:700;color:#FFFFFF;text-decoration:none;border-radius:10px;letter-spacing:0.01em;">
             ${label}
           </a>
         </td>
@@ -166,7 +180,7 @@ function ctaButton(href, label) {
 }
 
 function fallbackUrl(url) {
-  return `<p class="nt-expiry" style="margin:24px 0 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:12px;color:#4A5268;text-align:center;line-height:1.6;">
+  return `<p class="nt-expiry" style="margin:24px 0 0;font-family:${_FONT};font-size:12px;color:#4A5268;text-align:center;line-height:1.6;">
     Button not working? Copy this link into your browser:<br/>
     <a class="nt-fb-url" href="${url}" style="color:#00C47A;word-break:break-all;font-size:11px;">${url}</a>
   </p>`;
@@ -177,8 +191,9 @@ function fallbackUrl(url) {
 export async function sendPasswordReset(email, resetUrl) {
   const origin = new URL(resetUrl).origin;
   const body = `
-    <p class="nt-title" style="margin:0 0 10px;font-size:22px;font-weight:700;color:#FFFFFF;line-height:1.3;">
-      Password reset requested
+    ${greeting(null)}
+    <p class="nt-heading" style="margin:0 0 10px;font-size:20px;font-weight:700;color:#FFFFFF;line-height:1.3;">
+      Password Reset Requested
     </p>
     <p class="nt-body-txt" style="margin:0 0 28px;font-size:15px;color:#8A93A8;line-height:1.7;">
       We received a request to reset the password for your NutriTrace account.
@@ -186,7 +201,7 @@ export async function sendPasswordReset(email, resetUrl) {
     </p>
     ${ctaButton(resetUrl, 'Reset My Password')}
     <p class="nt-expiry" style="margin:24px 0 0;font-size:13px;color:#5A6278;text-align:center;line-height:1.6;">
-      ⏱ This link expires in <strong style="color:#8A93A8;">1 hour</strong>.
+      This link expires in <strong style="color:#8A93A8;">1 hour</strong>.
       If you didn&rsquo;t request this, you can safely ignore this email.
     </p>
     ${fallbackUrl(resetUrl)}`;
@@ -194,7 +209,7 @@ export async function sendPasswordReset(email, resetUrl) {
   await sendMail({
     to: email,
     subject: 'Reset your NutriTrace password',
-    html: emailWrapper(origin, body, null),
+    html: emailWrapper(origin, body, null, 'Reset your NutriTrace password — this link expires in 1 hour.'),
     text: `Reset your NutriTrace password:\n${resetUrl}\n\nThis link expires in 1 hour. If you didn't request this, ignore this email.`,
   });
 }
@@ -206,8 +221,9 @@ export async function sendInvite(email, inviteUrl, inviterName) {
     : `You&rsquo;ve been invited to join`;
 
   const body = `
-    <p class="nt-title" style="margin:0 0 6px;font-size:22px;font-weight:700;color:#FFFFFF;line-height:1.3;">
-      You&rsquo;re invited! &nbsp;🎉
+    ${greeting(null)}
+    <p class="nt-heading" style="margin:0 0 10px;font-size:20px;font-weight:700;color:#FFFFFF;line-height:1.3;">
+      You&rsquo;re Invited
     </p>
     <p class="nt-body-txt" style="margin:0 0 16px;font-size:15px;color:#8A93A8;line-height:1.7;">
       ${sender} <strong style="color:#FFFFFF;">NutriTrace</strong> &mdash; a personal nutrition
@@ -217,16 +233,16 @@ export async function sendInvite(email, inviteUrl, inviterName) {
       Log meals, hit your macro goals, track your progress, and visualize everything
       &mdash; beautifully and privately.
     </p>
-    ${ctaButton(inviteUrl, 'Accept Invitation &rarr;')}
+    ${ctaButton(inviteUrl, 'Accept Invitation')}
     <p class="nt-expiry" style="margin:24px 0 0;font-size:13px;color:#5A6278;text-align:center;line-height:1.6;">
-      ⏱ This invitation expires in <strong style="color:#8A93A8;">7 days</strong>.
+      This invitation expires in <strong style="color:#8A93A8;">7 days</strong>.
     </p>
     ${fallbackUrl(inviteUrl)}`;
 
   await sendMail({
     to: email,
     subject: `You've been invited to NutriTrace`,
-    html: emailWrapper(origin, body, null),
+    html: emailWrapper(origin, body, null, `${inviterName || 'Someone'} invited you to NutriTrace — accept within 7 days.`),
     text: `${inviterName ? inviterName + ' has invited you' : "You've been invited"} to join NutriTrace.\n\nAccept your invitation:\n${inviteUrl}\n\nThis invite expires in 7 days.`,
   });
 }
@@ -237,9 +253,13 @@ function _statRow(label, value, unit = '') {
   if (value == null) return '';
   return `
     <tr>
-      <td style="padding:8px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;color:#8A93A8;border-bottom:1px solid #1E2330;">${label}</td>
-      <td style="padding:8px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;font-weight:600;color:#FFFFFF;text-align:right;border-bottom:1px solid #1E2330;">${value}${unit ? ' ' + unit : ''}</td>
+      <td class="nt-stat-lbl nt-stat-div" style="padding:8px 0;font-family:${_FONT};font-size:14px;color:#8A93A8;border-bottom:1px solid #1E2330;">${label}</td>
+      <td class="nt-stat-val nt-stat-div" style="padding:8px 0;font-family:${_FONT};font-size:14px;font-weight:600;color:#FFFFFF;text-align:right;border-bottom:1px solid #1E2330;">${value}${unit ? ' <span style="font-weight:400;color:#5A6278;">' + unit + '</span>' : ''}</td>
     </tr>`;
+}
+
+function _sectionHeader(label) {
+  return `<p class="nt-section" style="margin:24px 0 8px;font-family:${_FONT};font-size:13px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#00C47A;">${label}</p>`;
 }
 
 export async function sendWeeklySummaryEmail(userId, origin) {
@@ -343,7 +363,7 @@ export async function sendWeeklySummaryEmail(userId, origin) {
     const weekRange = `${fmtDate(fromDate)} – ${fmtDate(toDate)}`;
 
     const nutritionSection = daysLogged > 0 ? `
-      <p style="margin:24px 0 8px;font-size:13px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#4FFFB0;">Nutrition (${daysLogged}/7 days logged)</p>
+      ${_sectionHeader(`Nutrition (${daysLogged}/7 days logged)`)}
       <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
         ${_statRow('Avg Daily Calories', avgCal, 'kcal')}
         ${calGoal != null ? _statRow('vs Goal', `${avgCal >= calGoal ? '+' : ''}${avgCal - calGoal}`, 'kcal') : ''}
@@ -357,7 +377,7 @@ export async function sendWeeklySummaryEmail(userId, origin) {
     const avgSteps = w.steps ? Math.round(w.steps).toLocaleString() : null;
     const avgSleep = w.sleep_duration_min ? (() => { const h = Math.floor(w.sleep_duration_min/60); return `${h}h ${Math.round(w.sleep_duration_min%60)}m`; })() : null;
     const wellnessSection = (avgSteps || avgSleep || w.resting_hr || w.readiness_score) ? `
-      <p style="margin:24px 0 8px;font-size:13px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#4FFFB0;">Activity & Wellness</p>
+      ${_sectionHeader('Activity & Wellness')}
       <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
         ${_statRow('Avg Daily Steps', avgSteps)}
         ${w.calories_out ? _statRow('Avg Calories Burned', Math.round(w.calories_out), 'kcal') : ''}
@@ -368,7 +388,7 @@ export async function sendWeeklySummaryEmail(userId, origin) {
       </table>` : '';
 
     const weightSection = (weightDiff != null) ? `
-      <p style="margin:24px 0 8px;font-size:13px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#4FFFB0;">Weight</p>
+      ${_sectionHeader('Weight')}
       <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
         ${_statRow('Change this week', `${weightDiff >= 0 ? '+' : ''}${weightDiff.toFixed(1)}`, 'kg')}
       </table>` : '';
@@ -379,21 +399,19 @@ export async function sendWeeklySummaryEmail(userId, origin) {
     }
 
     const body = `
-      <p class="nt-title" style="margin:0 0 4px;font-size:22px;font-weight:700;color:#FFFFFF;line-height:1.3;">
+      ${greeting(name)}
+      <p class="nt-heading" style="margin:0 0 4px;font-size:20px;font-weight:700;color:#FFFFFF;line-height:1.3;">
         Your Weekly Summary
       </p>
       <p class="nt-body-txt" style="margin:0 0 24px;font-size:14px;color:#5A6278;">${weekRange}</p>
       ${nutritionSection}
       ${wellnessSection}
-      ${weightSection}
-      <p style="margin:32px 0 0;font-size:12px;color:#3A4158;text-align:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
-        To stop receiving these emails, turn off Weekly Summary in Settings → Notifications.
-      </p>`;
+      ${weightSection}`;
 
     await sendMail({
       to: toEmail,
-      subject: `📊 NutriTrace Weekly Summary — ${weekRange}`,
-      html: emailWrapper(origin, body, null),
+      subject: `NutriTrace Weekly Summary — ${weekRange}`,
+      html: emailWrapper(origin, body, 'To stop receiving these emails, turn off Weekly Summary in Settings &rarr; Notifications.', `Your NutriTrace week: ${avgCal ? avgCal + ' avg kcal' : ''}${avgSteps ? ', ' + avgSteps + ' avg steps' : ''}`),
       text: `Weekly Summary (${weekRange})\n\n` +
         (avgCal   ? `Avg calories: ${avgCal} kcal\n` : '') +
         (avgProt  ? `Avg protein: ${avgProt}g\n` : '') +
