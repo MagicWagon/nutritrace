@@ -191,12 +191,6 @@
       window.location.hash = '#/wizard';
     }
 
-    // Load cached image map BEFORE any data renders (must await, not fire-and-forget)
-    if (isNative) {
-      const { loadImageMap } = await import('./lib/platform.js');
-      await loadImageMap();
-    }
-
     // Start sync engine in native server-connected mode
     if (isNative && getNativeMode() === 'server') {
       import('./lib/sync.js').then((mod) => {

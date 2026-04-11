@@ -222,7 +222,14 @@
   }
 
   function swapCandidate(i, candidate) {
-    matchedItems[i] = { ...matchedItems[i], food: candidate };
+    const m = matchedItems[i];
+    // Recalculate quantity using the new food's portion size
+    const basePortion = Number(candidate.portion) > 0 ? Number(candidate.portion) : 100;
+    const qty = Number(m.item.quantity) > 0 ? Number(m.item.quantity) : 1;
+    const unit = m.item.unit ? String(m.item.unit).toLowerCase().trim() : null;
+    const isWeightOrVolume = unit === 'g' || unit === 'ml' || unit === 'gram' || unit === 'grams';
+    const newQuantity = isWeightOrVolume ? qty : basePortion * qty;
+    matchedItems[i] = { ...m, food: candidate, quantity: newQuantity };
     matchedItems = matchedItems;
   }
 

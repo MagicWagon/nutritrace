@@ -137,17 +137,18 @@
   $: if (($fitbitEnabled || $garminEnabled) && !_wellnessLoaded) loadWellnessToday();
 
   onMount(async () => {
-    if ($calorieGoalMode === 'dynamic') {
-      try {
-        const r = await NtApi.get(`/api/wellness/calories-out?date=${today}`);
-        _dynamicCaloriesOut = r.calories_out;
-      } catch { _dynamicCaloriesOut = null; }
-    }
+    // Load diary data first — don't block on server calls
     const entry = await NtApi.getDiaryDate(today).catch(() => null);
     if (entry) {
       todayBodyStats = entry.body_stats || entry.bodyStats || {};
       todayTotals = Nutrition.sum((entry.items || []).map(i => Nutrition.calculate(i)));
       todayWaterMl = (entry.water || []).reduce((s, l) => s + (l.amount || 0), 0);
+    }
+    // Dynamic goal from server — non-blocking
+    if ($calorieGoalMode === 'dynamic') {
+      NtApi.get(`/api/wellness/calories-out?date=${today}`)
+        .then(r => { _dynamicCaloriesOut = r.calories_out; })
+        .catch(() => { _dynamicCaloriesOut = null; });
     }
   });
 

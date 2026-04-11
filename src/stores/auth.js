@@ -111,8 +111,8 @@ async function _refreshAuthFromServer() {
   if (isNative) {
     try {
       const [statusRes, meRes] = await Promise.all([
-        fetch(_apiUrl('/api/auth/status'), { credentials: 'include', headers: _authHeaders(), signal: AbortSignal.timeout(5000) }),
-        fetch(_apiUrl('/api/auth/me'),     { credentials: 'include', headers: _authHeaders(), signal: AbortSignal.timeout(5000) }),
+        fetch(_apiUrl('/api/auth/status'), { credentials: 'include', headers: _authHeaders(), signal: AbortSignal.timeout(3000) }),
+        fetch(_apiUrl('/api/auth/me'),     { credentials: 'include', headers: _authHeaders(), signal: AbortSignal.timeout(3000) }),
       ]);
       if (!statusRes.ok || !meRes.ok) return; // server error — keep cached auth
       const { active } = await statusRes.json();

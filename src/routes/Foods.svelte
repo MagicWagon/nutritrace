@@ -495,13 +495,14 @@
       activeTab = editorState.foodsActiveTab;
       editorState.foodsActiveTab = null;
     }
-    try {
-      const s = await NtApi.getSharingStatus();
-      sharingEnabled = s.sharing_enabled === true;
-      sharedCounts = { foods: s.foods || 0, meals: s.meals || 0, recipes: s.recipes || 0 };
-    } catch {}
+    // Load local data FIRST — don't block on server calls
     await load();
     await loadYesterdayMeals();
+    // Sharing status from server — non-blocking, updates UI when ready
+    NtApi.getSharingStatus().then(s => {
+      sharingEnabled = s.sharing_enabled === true;
+      sharedCounts = { foods: s.foods || 0, meals: s.meals || 0, recipes: s.recipes || 0 };
+    }).catch(() => {});
     // Restore scroll position after Svelte has flushed the list to the DOM
     if (editorState.foodsScrollY != null) {
       const sy = editorState.foodsScrollY;

@@ -28,7 +28,7 @@ function _base() {
   return getServerUrl() || '';
 }
 
-async function _serverFetch(method, path, body, timeoutMs = 8000) {
+async function _serverFetch(method, path, body, timeoutMs = 3000) {
   const res = await fetch(_base() + path, {
     method,
     headers: _headers(),

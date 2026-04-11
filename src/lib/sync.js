@@ -48,16 +48,24 @@ function _baseUrl() {
 }
 
 /** Check if the server is reachable */
+let _lastOfflineAt = 0;
 export async function checkOnline() {
+  // If we went offline recently, skip the network check for 15s to avoid slow timeouts
+  if (_lastOfflineAt && Date.now() - _lastOfflineAt < 15000) {
+    return false;
+  }
   try {
     const res = await fetch(`${_baseUrl()}/api/health`, {
       headers: _headers(),
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(3000),
     });
     const online = res.ok;
+    if (!online) _lastOfflineAt = Date.now();
+    else _lastOfflineAt = 0;
     syncState.update(s => ({ ...s, online }));
     return online;
   } catch {
+    _lastOfflineAt = Date.now();
     syncState.update(s => ({ ...s, online: false }));
     return false;
   }

@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.38.9-beta] — 2026-04-11
+
+### Fixed
+- **Smart Log: food swap now recalculates portion size** — switching to an alternate food match was keeping the original food's serving size in grams. Now recalculates based on the new food's base portion, so nutrition values display and save correctly.
+- **Android: instant local data loading when server is down** — Foods page was blocking on a `getSharingStatus()` server call before loading local data. Moved server calls to non-blocking background. Goals page had the same issue with dynamic calorie goal fetch. Both pages now render cached data instantly.
+- **Android: image map loaded before app renders** — moved `loadImageMap()` from App.svelte `onMount` (runs after first render) to main.js boot sequence (runs before App mounts). Diary food images now display on first paint instead of after a delay.
+- **Faster server-down detection** — reduced all network timeouts from 5-8s to 3s. `checkOnline()` now short-circuits for 15s after a failed check, so repeated sync cycles don't stack timeouts.
+- **Settings search: added missing keywords** — Smart Log, Voice, Quick Log, Goal Insights now searchable in AI section. Weekly Summary, Email Summary added to Notifications. Health Connect added to Wellness.
+
+---
+
 ## [0.38.8-beta] — 2026-04-10
 
 ### Fixed

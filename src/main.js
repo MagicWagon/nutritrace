@@ -19,7 +19,14 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e =
 
 // Boot
 DB.init()
-  .then(() => {
+  .then(async () => {
+    // Load cached image map before app renders — ensures resolveAssetUrl() has the map
+    // ready on first paint (local SQLite read, no server dependency, ~5ms)
+    const { isNative } = await import('./lib/platform.js');
+    if (isNative) {
+      const { loadImageMap } = await import('./lib/platform.js');
+      await loadImageMap();
+    }
     new App({ target: document.getElementById('app') });
   })
   .catch(err => {
