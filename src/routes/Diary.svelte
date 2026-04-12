@@ -555,7 +555,8 @@
     if (!ml || ml <= 0) return;
     let ent = null;
     currentEntry.subscribe(v => ent = v)();
-    const log = { amount: ml, time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) };
+    const _use24 = $timeFormat === '24h';
+    const log = { amount: ml, time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: !_use24 }) };
     const updated = { ...ent, water: [...(ent?.water || []), log] };
     await NtApi.saveDiaryDate($currentDate, {
       items: updated.items || [],

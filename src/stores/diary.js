@@ -1,7 +1,7 @@
 import { writable, derived } from 'svelte/store';
 import { NtApi } from '../lib/api.js';
 import { Nutrition } from '../lib/nutrition.js';
-import { localDateStr } from '../lib/db.js';
+import { localDateStr, DB } from '../lib/db.js';
 import { resolveAssetUrl } from '../lib/platform.js';
 
 function todayStr() {
@@ -168,7 +168,8 @@ export async function addWaterLog(amountMl, date) {
   }
   if (!entry) entry = { date: targetDate, items: [], bodyStats: {}, water: [] };
 
-  const log = { amount: Math.round(amountMl), time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) };
+  const use24 = DB.getSetting('timeFormat', '12h') === '24h';
+  const log = { amount: Math.round(amountMl), time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: !use24 }) };
   const updated = { ...entry, water: [...(entry.water || []), log] };
   const saved = await _save(updated);
   if (targetDate === viewDate) currentEntry.set(saved);

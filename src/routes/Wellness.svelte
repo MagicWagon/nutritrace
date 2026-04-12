@@ -1,7 +1,7 @@
 <script>
   import { onMount, onDestroy, tick } from 'svelte';
   import { wellnessMetrics, wellnessSyncMode, wellnessSyncRange, distUnit, tempUnit, pageBanners, dateFormat, withingsSyncRange as withingsSyncRangeSetting, fitbitEnabled, withingsEnabled, garminEnabled, garminSyncRange as garminSyncRangeSetting, weightUnit, goals, goalCelebrations, disableAnimations,
-    fitbitSyncMode, withingsSyncMode, garminSyncMode } from '../stores/settings.js';
+    fitbitSyncMode, withingsSyncMode, garminSyncMode, timeFormat } from '../stores/settings.js';
   import Chart from 'chart.js/auto';
   import WellnessBanner from '../components/banners/WellnessBanner.svelte';
   import { showSuccess, showError } from '../stores/toast.js';
@@ -2096,7 +2096,7 @@
           <div>
             <h3 style="margin:0;font-size:16px;font-weight:600">{w.activity_name}</h3>
             <span class="text-3 text-sm">
-              {w.start_time ? new Date(w.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : dateStr}
+              {w.start_time ? new Date(w.start_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: $timeFormat !== '24h' }) : dateStr}
             </span>
           </div>
         </div>

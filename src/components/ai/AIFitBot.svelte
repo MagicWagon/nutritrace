@@ -7,7 +7,7 @@
   import { DB, localDateStr } from '../../lib/db.js';
   import { Nutrition } from '../../lib/nutrition.js';
   import { callAI, callAIProxy, TOOLS, setToolHandler } from '../../lib/aiChat.js';
-  import { aiEnabled, aiAssistantName, aiApiKey, aiProvider, aiModel, goals, mealNames, energyUnit, dateFormat, tempUnit, quickLogEnabled, aiGoalInsights, healthConnectEnabled } from '../../stores/settings.js';
+  import { aiEnabled, aiAssistantName, aiApiKey, aiProvider, aiModel, goals, mealNames, energyUnit, dateFormat, timeFormat, tempUnit, quickLogEnabled, aiGoalInsights, healthConnectEnabled } from '../../stores/settings.js';
   import SmartLogModal from '../diary/SmartLogModal.svelte';
   import { showError } from '../../stores/toast.js';
   import { isNative } from '../../lib/platform.js';
@@ -329,7 +329,7 @@
   function _fmtCreatedAt(iso) {
     if (!iso) return fmtTime();
     const d       = new Date(iso + 'Z');
-    const timeStr = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    const timeStr = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: $timeFormat !== '24h' });
     // Compare date portion in local time
     const msgDate = d.toLocaleDateString('sv-SE'); // reliable YYYY-MM-DD in local tz
     if (msgDate === localDateStr()) return timeStr;
@@ -944,7 +944,7 @@ Water: ${ctx.waterText}`
   }
 
   function fmtTime() {
-    return new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    return new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: $timeFormat !== '24h' });
   }
 
   async function send() {
