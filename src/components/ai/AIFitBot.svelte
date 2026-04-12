@@ -42,6 +42,8 @@
 
   $: if (panelOpen) {
     hasUnread     = false;
+    // Mark current message count as seen so remounts don't show false unread dot
+    try { localStorage.setItem('nt:chatSeenCount', String(messages.length)); } catch {}
     assistantName = $aiAssistantName;
     apiKey        = $aiApiKey;
     tick().then(() => _scrollBottom(true));
@@ -53,6 +55,9 @@
       const rows = await NtApi.get('/api/ai/history');
       if (rows.length) {
         messages = rows.map(r => ({ role: r.role, content: r.content, time: _fmtCreatedAt(r.created_at) }));
+        // Sync seen count so remounts don't show false unread dot
+        const seenCount = parseInt(localStorage.getItem('nt:chatSeenCount') || '0');
+        if (messages.length <= seenCount) hasUnread = false;
         localStorage.removeItem('wl:aiChatHistory'); // clear migrated local copy
       } else {
         const saved = localStorage.getItem('wl:aiChatHistory');
@@ -311,9 +316,12 @@
       const changed = next.length !== messages.length
         || (next.length && messages.length && next[next.length - 1].content !== messages[messages.length - 1].content);
       if (!changed) return;
-      const hadMore = next.length > messages.length;
+      // Compare against persisted seen count — not in-memory messages.length
+      // (which resets to 0 on component remount, causing false unread dots)
+      const seenCount = parseInt(localStorage.getItem('nt:chatSeenCount') || '0');
+      const hasNew = next.length > seenCount;
       messages = next;
-      if (hadMore && !panelOpen) hasUnread = true;
+      if (hasNew && !panelOpen) hasUnread = true;
       tick().then(() => _scrollBottom(true));
     } catch {}
   }
