@@ -17,17 +17,17 @@
   // sources: which integrations can supply this metric. Used to hide metrics
   // when their only source integration is disabled.
   const ALL_METRICS = [
-    // Movement — both Fitbit and Garmin
-    { id: 'steps',            label: 'Steps',             unit: 'steps', group: 'movement', icon: 'directions_walk',       fmt: v => Math.round(v).toLocaleString(),  sources: ['fitbit','garmin'], desc: 'Total steps taken today.' },
-    { id: 'distance_km',      label: 'Distance',          unit: '',      group: 'movement', icon: 'straighten',            fmt: null,                                  sources: ['fitbit','garmin'], desc: 'Total distance covered today.' },
-    { id: 'floors',           label: 'Floors Climbed',    unit: 'floors',group: 'movement', icon: 'stairs',                fmt: v => Math.round(v),                   sources: ['fitbit','garmin'], desc: 'Floors climbed based on elevation gain detected by your device.' },
-    { id: 'active_minutes',   label: 'Active Minutes',    unit: 'min',   group: 'movement', icon: 'timer',                 fmt: v => Math.round(v),                   sources: ['fitbit','garmin'], desc: 'Time spent at a moderate or higher activity level.' },
-    { id: 'calories_out',     label: 'Calories Burned',   unit: 'kcal',  group: 'movement', icon: 'local_fire_department', fmt: v => Math.round(v).toLocaleString(),  sources: ['fitbit','garmin'], desc: 'Total calories burned including your resting metabolic rate.' },
-    // Movement — Fitbit only
-    { id: 'active_zone_minutes', label: 'Active Zone Min', unit: 'min',  group: 'movement', icon: 'local_fire_department', fmt: v => Math.round(v), sources: ['fitbit'], desc: 'Minutes spent in Fat Burn, Cardio, or Peak heart rate zones — counts double for Cardio and Peak.' },
-    // Movement — Garmin only
-    { id: 'moderate_intensity_min', label: 'Moderate Intensity', unit: 'min', group: 'movement', icon: 'directions_run', fmt: v => Math.round(v), sources: ['garmin'], desc: 'Time at moderate intensity (brisk walking, light cycling). WHO recommends 150–300 min/week.' },
-    { id: 'vigorous_intensity_min', label: 'Vigorous Intensity', unit: 'min', group: 'movement', icon: 'sprint',         fmt: v => Math.round(v), sources: ['garmin'], desc: 'Time at high intensity (running, hard effort). Counts double toward weekly activity targets.' },
+    // Activity — both Fitbit and Garmin
+    { id: 'steps',            label: 'Steps',             unit: 'steps', group: 'activity', icon: 'directions_walk',       fmt: v => Math.round(v).toLocaleString(),  sources: ['fitbit','garmin'], desc: 'Total steps taken today.' },
+    { id: 'distance_km',      label: 'Distance',          unit: '',      group: 'activity', icon: 'straighten',            fmt: null,                                  sources: ['fitbit','garmin'], desc: 'Total distance covered today.' },
+    { id: 'floors',           label: 'Floors Climbed',    unit: 'floors',group: 'activity', icon: 'stairs',                fmt: v => Math.round(v),                   sources: ['fitbit','garmin'], desc: 'Floors climbed based on elevation gain detected by your device.' },
+    { id: 'active_minutes',   label: 'Active Minutes',    unit: 'min',   group: 'activity', icon: 'timer',                 fmt: v => Math.round(v),                   sources: ['fitbit','garmin'], desc: 'Time spent at a moderate or higher activity level.' },
+    { id: 'calories_out',     label: 'Calories Burned',   unit: 'kcal',  group: 'activity', icon: 'local_fire_department', fmt: v => Math.round(v).toLocaleString(),  sources: ['fitbit','garmin'], desc: 'Total calories burned including your resting metabolic rate.' },
+    // Activity — Fitbit only
+    { id: 'active_zone_minutes', label: 'Active Zone Min', unit: 'min',  group: 'activity', icon: 'local_fire_department', fmt: v => Math.round(v), sources: ['fitbit'], desc: 'Minutes spent in Fat Burn, Cardio, or Peak heart rate zones — counts double for Cardio and Peak.' },
+    // Activity — Garmin only
+    { id: 'moderate_intensity_min', label: 'Moderate Intensity', unit: 'min', group: 'activity', icon: 'directions_run', fmt: v => Math.round(v), sources: ['garmin'], desc: 'Time at moderate intensity (brisk walking, light cycling). WHO recommends 150–300 min/week.' },
+    { id: 'vigorous_intensity_min', label: 'Vigorous Intensity', unit: 'min', group: 'activity', icon: 'sprint',         fmt: v => Math.round(v), sources: ['garmin'], desc: 'Time at high intensity (running, hard effort). Counts double toward weekly activity targets.' },
     // Sleep — both
     { id: 'sleep_duration_min', label: 'Sleep Duration', unit: '',     group: 'sleep', icon: 'bedtime',               fmt: null,               sources: ['fitbit','garmin'], desc: 'Total time asleep last night. Adults generally need 7–9 hours.' },
     { id: 'sleep_deep_min',     label: 'Deep Sleep',     unit: 'min',  group: 'sleep', icon: 'nights_stay',           fmt: v => Math.round(v), sources: ['fitbit','garmin'], desc: 'Deep (slow-wave) sleep — the most restorative stage. Critical for physical recovery and immune function.' },
@@ -100,7 +100,7 @@
   }
 
   // ── State ──────────────────────────────────────────────────────────────────
-  let activeTab   = 'movement';
+  let activeTab   = 'activity';
   let dateStr     = localDateStr();
   let status      = null; // { connected, configured, fitbitUserId, expiresAt }
   let data        = {}; // { [metricId]: value }
@@ -925,9 +925,9 @@
   $: anyAvailable      = fitbitAvailable || withingsAvailable || garminAvailable || healthConnectAvailable;
 
   // Sliding pill: ordered list of visible tabs + active index
-  // Garmin contributes to movement/sleep/heart tabs alongside Fitbit
+  // Garmin contributes to activity/sleep/heart tabs alongside Fitbit
   $: _wlTabList = [
-    ...(fitbitAvailable || garminAvailable || healthConnectAvailable ? ['movement', 'sleep', 'heart'] : []),
+    ...(fitbitAvailable || garminAvailable || healthConnectAvailable ? ['activity', 'sleep', 'heart'] : []),
     ...(withingsAvailable ? ['body'] : []),
   ];
   $: _wlActiveIdx  = Math.max(0, _wlTabList.indexOf(activeTab));
@@ -950,9 +950,9 @@
 
   // Auto-correct activeTab when an integration's availability changes
   $: if (status !== null && withingsStatus !== null && garminStatus !== null) {
-    const isActivityTab = activeTab === 'movement' || activeTab === 'sleep' || activeTab === 'heart';
-    if (isActivityTab && !fitbitAvailable && !garminAvailable && !healthConnectAvailable) activeTab = withingsAvailable ? 'body' : 'movement';
-    if (activeTab === 'body' && !withingsAvailable && !healthConnectAvailable) activeTab = (fitbitAvailable || garminAvailable || healthConnectAvailable) ? 'movement' : 'body';
+    const isActivityTab = activeTab === 'activity' || activeTab === 'sleep' || activeTab === 'heart';
+    if (isActivityTab && !fitbitAvailable && !garminAvailable && !healthConnectAvailable) activeTab = withingsAvailable ? 'body' : 'activity';
+    if (activeTab === 'body' && !withingsAvailable && !healthConnectAvailable) activeTab = (fitbitAvailable || garminAvailable || healthConnectAvailable) ? 'activity' : 'body';
   }
 
   // ── Date navigation ────────────────────────────────────────────────────────
@@ -1463,8 +1463,8 @@
       <div class="tab-bar" bind:this={_tabBarEl}>
         <div class="tab-pill" style="left:{_wlPillLeft};width:{_wlPillWidth}"></div>
         {#if fitbitAvailable || garminAvailable || healthConnectAvailable}
-          <button class="tab-btn" class:active={activeTab === 'movement'} on:click={() => activeTab = 'movement'}>
-            <span class="material-symbols-rounded tab-icon">directions_walk</span> Movement
+          <button class="tab-btn" class:active={activeTab === 'activity'} on:click={() => activeTab = 'activity'}>
+            <span class="material-symbols-rounded tab-icon">directions_walk</span> Activity
           </button>
           <button class="tab-btn" class:active={activeTab === 'sleep'} on:click={() => activeTab = 'sleep'}>
             <span class="material-symbols-rounded tab-icon">bedtime</span> Sleep
@@ -1482,8 +1482,8 @@
       </div>
       <div style="height:12px"></div>
 
-      <!-- ── Fitbit tabs (Movement / Sleep / Heart) ── -->
-      {#if activeTab === 'movement' || activeTab === 'sleep' || activeTab === 'heart'}
+      <!-- ── Fitbit tabs (Activity / Sleep / Heart) ── -->
+      {#if activeTab === 'activity' || activeTab === 'sleep' || activeTab === 'heart'}
 
         {#if !status.connected && !garminStatus?.connected && !withingsStatus?.connected && !$healthConnectEnabled && !(isNative && _hasLocalData)}
           <!-- Fitbit configured but not yet connected -->
@@ -1534,10 +1534,10 @@
         {:else}
           <!-- Fitbit connected — metric content -->
 
-          <!-- ── Movement tab ── -->
-          {#if activeTab === 'movement'}
+          <!-- ── Activity tab ── -->
+          {#if activeTab === 'activity'}
             <div class="metric-grid">
-              {#each ALL_METRICS.filter(m => m.group === 'movement' && isVisible(m.id) && isSourceEnabled(m)) as m}
+              {#each ALL_METRICS.filter(m => m.group === 'activity' && isVisible(m.id) && isSourceEnabled(m)) as m}
                 {@const fmt = fmtMetric(m, displayData[m.id])}
                 {@const spark = sparklinePath(_sparklineData[m.id] ?? [])}
                 <div class="metric-card" class:no-data={fmt == null && !loadingData} class:celebrating={_celebratingMetrics.has(m.id)} title={m.desc}>
@@ -1563,7 +1563,7 @@
               {/each}
             </div>
 
-            <!-- ── Workouts section (within Movement tab) ── -->
+            <!-- ── Workouts section (within Activity tab) ── -->
             {#if $workoutsEnabled && _workouts.length > 0}
               <div class="section-title" style="margin-top:20px">
                 <span class="material-symbols-rounded" style="font-size:18px;vertical-align:middle;margin-right:4px">fitness_center</span>
