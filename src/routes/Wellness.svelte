@@ -616,17 +616,16 @@
     const rhrVals     = [...history30d.map(d => d.resting_hr).filter(v => v != null), ...(todayRhr != null ? [todayRhr] : [])];
     const rhrBaseline = rhrVals.length >= 3 ? mean(rhrVals) : null;
 
-    // HRV score (60% weight) — calibrated from ground-truth data.
-    // Below-baseline penalty 250 — Fitbit penalizes even small HRV dips aggressively,
-    // especially for low-HRV users where the ratio swings are small in absolute terms.
+    // HRV score (75% weight) — calibrated from ground-truth data (6 days, MAE 4.5).
+    // Above baseline: concave power curve (pow 0.7) — fast initial gain, gentle top.
+    // Below baseline: sqrt penalty — gentler on big dips, steeper on small ones.
     const hrvRatio = todayHrv / hrvBaseline;
-    // Square-root penalty curve — gentler on big HRV dips, steeper on small ones
     let hrv_score  = hrvRatio >= 1.0
-      ? 65 + (hrvRatio - 1.0) * 100
+      ? 65 + Math.pow(hrvRatio - 1.0, 0.7) * 80
       : 65 - Math.sqrt(1.0 - hrvRatio) * 55;
     hrv_score = _clamp(hrv_score, 0, 100);
 
-    // RHR score (22% weight) — inverse: lower today is better. Neutral at 59.
+    // RHR score (5% weight) — inverse: lower today is better. Neutral at 59.
     let rhr_score = 59; // neutral if no baseline
     if (rhrBaseline != null && todayRhr != null) {
       const rhrRatio = rhrBaseline / todayRhr;
@@ -658,7 +657,7 @@
       activity_penalty = _clamp(activity_penalty, 0, 20);
     }
 
-    let score = (0.58 * hrv_score) + (0.22 * rhr_score) + (0.12 * sleepBase) - activity_penalty - interaction_penalty;
+    let score = (0.75 * hrv_score) + (0.05 * rhr_score) + (0.12 * sleepBase) + 4 - activity_penalty - interaction_penalty;
     score     = Math.min(_clamp(Math.round(score), 1, 100), sleep_cap);
 
     const label = score >= 80 ? 'Optimal' : score >= 65 ? 'Good' : score >= 50 ? 'Fair' : score >= 35 ? 'Low' : 'Poor';
@@ -668,7 +667,7 @@
       inputs: { todayHrv, todayRhr, todaySleepScore, todayCalories, historyDays: history30d.length },
       baselines: { hrvBaseline: Math.round(hrvBaseline * 100) / 100, rhrBaseline: rhrBaseline != null ? Math.round(rhrBaseline * 10) / 10 : null },
       components: { hrvRatio: Math.round(hrvRatio * 1000) / 1000, hrv_score: Math.round(hrv_score * 10) / 10, rhr_score: Math.round(rhr_score * 10) / 10, sleepBase, activity_penalty: Math.round(activity_penalty * 10) / 10, interaction_penalty: Math.round(interaction_penalty * 10) / 10 },
-      formula: `(0.58×${Math.round(hrv_score*10)/10}) + (0.22×${Math.round(rhr_score*10)/10}) + (0.12×${sleepBase}) - ${Math.round(activity_penalty*10)/10} - ${Math.round(interaction_penalty*10)/10} = ${score}`,
+      formula: `(0.75×${Math.round(hrv_score*10)/10}) + (0.05×${Math.round(rhr_score*10)/10}) + (0.12×${sleepBase}) + 4 - ${Math.round(activity_penalty*10)/10} - ${Math.round(interaction_penalty*10)/10} = ${score}`,
     }, null, 2));
 
     return {
@@ -763,9 +762,9 @@
 
   function _rawStressScore(hrv, rhr, sleepScore, hrvBaseline, rhrBaseline) {
     if (hrv == null) return null;
-    // HRV component — symmetric, gentler than readiness (±120 per ratio unit vs ±220/80)
+    // HRV component — very gentle (±40 per ratio unit). Stress is dominated by sleep.
     const hrvRatio = hrv / hrvBaseline;
-    let hrv_s = 75 + (hrvRatio - 1.0) * 120;
+    let hrv_s = 75 + (hrvRatio - 1.0) * 40;
     hrv_s = _clamp(hrv_s, 0, 100);
     // RHR component — mild modifier
     let rhr_s = 75;
@@ -773,9 +772,9 @@
       rhr_s = 75 + (rhrBaseline / rhr - 1.0) * 80;
       rhr_s = _clamp(rhr_s, 0, 100);
     }
-    // Sleep component — stronger weight than readiness (35% vs 15%)
+    // Sleep component — dominant weight (60%). Fitbit stress mgmt correlates heavily with sleep.
     const sleep_s = sleepScore != null ? sleepScore : 75;
-    return (0.35 * hrv_s) + (0.40 * sleep_s) + (0.15 * rhr_s) + 4; // offset 4 — tuned with 11 days of data
+    return (0.15 * hrv_s) + (0.60 * sleep_s) + (0.10 * rhr_s) + 14; // tuned with 6 days of data, MAE 3.17
   }
 
   function _calcStressScore(todayHrv, todayRhr, todaySleepScore, history30d) {
@@ -798,14 +797,14 @@
     for (const d of history30d) {
       const raw = _rawStressScore(d.hrv_daily_rmssd, d.resting_hr, d.sleep_score, hrvBaseline, rhrBaseline);
       if (raw == null) continue;
-      smoothed = smoothed == null ? raw : 0.50 * smoothed + 0.50 * raw;
+      smoothed = smoothed == null ? raw : 0.40 * smoothed + 0.60 * raw;
     }
 
-    // Today's score
+    // Today's score — more responsive to today's raw (60% today, 40% history)
     const todayRaw = _rawStressScore(todayHrv, todayRhr, todaySleepScore, hrvBaseline, rhrBaseline);
     if (todayRaw == null) return null;
     const score = Math.round(_clamp(
-      smoothed != null ? 0.50 * smoothed + 0.50 * todayRaw : todayRaw,
+      smoothed != null ? 0.40 * smoothed + 0.60 * todayRaw : todayRaw,
       1, 100
     ));
 
@@ -818,7 +817,7 @@
       baselines: { hrvBaseline: Math.round(hrvBaseline * 100) / 100, rhrBaseline: rhrBaseline != null ? Math.round(rhrBaseline * 10) / 10 : null },
       todayRaw: Math.round(todayRaw * 10) / 10,
       smoothedHistory: smoothed != null ? Math.round(smoothed * 10) / 10 : null,
-      formula: smoothed != null ? `0.50×${Math.round(smoothed*10)/10} + 0.50×${Math.round(todayRaw*10)/10} = ${score}` : `raw=${Math.round(todayRaw*10)/10} → ${score}`,
+      formula: smoothed != null ? `0.40×${Math.round(smoothed*10)/10} + 0.60×${Math.round(todayRaw*10)/10} = ${score}` : `raw=${Math.round(todayRaw*10)/10} → ${score}`,
     }, null, 2));
 
     return {
