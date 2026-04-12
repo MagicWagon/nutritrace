@@ -2535,7 +2535,7 @@
     <!-- ── Notifications ────────────────────────────────────────────────────── -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'notifications')} on:click={() => toggleSection('notifications')}>
       <span class="material-symbols-rounded si">notifications</span>
-      <span>Notifications <span class="labs-badge" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);vertical-align:middle">Experimental</span></span>
+      <span>Notifications</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.notifications}>expand_more</span>
     </button>
     {#if sectionOpen(openSections, settingsQuery, 'notifications') && sectionVisible(settingsQuery, 'notifications')}
