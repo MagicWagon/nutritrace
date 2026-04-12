@@ -249,12 +249,14 @@ async function _pushReminders(userId) {
     }
   }
 
-  // Weekly summary — user-configurable day + time (persistent dedup survives server restarts)
-  if (_isEnabled(userId, 'notifWeeklySummary') && !_ranRecently(userId, 'weekly', 6 * 24 * 60 * 60 * 1000)) {
+  // Weekly summary — user-configurable day + time
+  // Dedup check is AFTER the day/hour gate so the timestamp only burns when we actually send
+  if (_isEnabled(userId, 'notifWeeklySummary')) {
     const summaryDay  = _getUserSetting(userId, 'weeklySummaryDay')  ?? 0;    // 0=Sun default
     const summaryTime = _getUserSetting(userId, 'weeklySummaryTime') ?? '09:00';
     const [targetHour] = summaryTime.split(':').map(Number);
-    if (local.dayOfWeek === summaryDay && local.hour >= targetHour && local.hour < targetHour + 1) {
+    if (local.dayOfWeek === summaryDay && local.hour >= targetHour && local.hour < targetHour + 1
+        && !_ranRecently(userId, 'weekly', 6 * 24 * 60 * 60 * 1000)) {
       // Push notification
       const { sendWeeklySummary } = await import('./push-notify.js');
       await sendWeeklySummary(userId);
