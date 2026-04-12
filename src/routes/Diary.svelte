@@ -476,10 +476,18 @@
   function onItemAction(e) {
     const val = e.detail?.value;
     if (!actionItem) return;
-    if (val === 'edit')   { openEditItem(actionItem); }
-    if (val === 'delete') { confirmDelete(actionItem._i); }
-    if (val === 'move')   { _lockAndOpen(() => showMoveToMeal = true); }
-    if (val === 'select') { enterSelectMode(actionItem); }
+    if (val === 'edit')    { openEditItem(actionItem); }
+    if (val === 'replace') { replaceItem(actionItem); }
+    if (val === 'move')    { _lockAndOpen(() => showMoveToMeal = true); }
+    if (val === 'select')  { enterSelectMode(actionItem); }
+    if (val === 'delete')  { confirmDelete(actionItem._i); }
+  }
+
+  function replaceItem(item) {
+    // Store the item to replace, then navigate to food picker in pick mode
+    const mealSlot = item.meal != null ? Number(item.meal) : 0;
+    sessionStorage.setItem('nt:replaceItem', JSON.stringify({ index: item._i, meal: mealSlot }));
+    push('/foods?pick=1&meal=' + mealSlot);
   }
   async function moveItemToMeal(e) {
     const mealIdx = e.detail?.value;
@@ -626,6 +634,29 @@
     let storedDate;
     currentDate.subscribe(v => storedDate = v)();
     await loadEntry(storedDate || today);
+
+    // Handle replace flow — food picker added the new item, now delete the old one
+    const replaceData = sessionStorage.getItem('nt:replaceItem');
+    if (replaceData) {
+      sessionStorage.removeItem('nt:replaceItem');
+      try {
+        const { index } = JSON.parse(replaceData);
+        const entry = $currentEntry;
+        if (entry && entry.items && index < entry.items.length) {
+          const updated = { ...entry, items: entry.items.filter((_, i) => i !== index) };
+          await NtApi.saveDiaryDate($currentDate, {
+            items: updated.items,
+            body_stats: updated.bodyStats || updated.body_stats || {},
+            water: updated.water || [],
+          });
+          await loadEntry($currentDate);
+          showSuccess('Item replaced');
+        }
+      } catch (e) {
+        console.warn('[diary] replace cleanup failed:', e.message);
+      }
+    }
+
     window.addEventListener('wl:setting', _reloadWaterSettings);
     // Trigger bar fill-in animation after first paint
     requestAnimationFrame(() => requestAnimationFrame(() => { _barsMounted = true; }));
@@ -1138,10 +1169,11 @@
   bind:open={showItemAction}
   title={actionItem?.name || ''}
   actions={[
-    { label: 'Edit',            icon: 'edit',       value: 'edit'   },
-    { label: 'Move to meal',    icon: 'swap_horiz', value: 'move'   },
-    { label: 'Select multiple', icon: 'checklist',  value: 'select' },
-    { label: 'Delete',          icon: 'delete',     value: 'delete', danger: true },
+    { label: 'Edit',            icon: 'edit',          value: 'edit'    },
+    { label: 'Replace',         icon: 'find_replace',  value: 'replace' },
+    { label: 'Move to meal',    icon: 'swap_horiz',    value: 'move'    },
+    { label: 'Select multiple', icon: 'checklist',     value: 'select'  },
+    { label: 'Delete',          icon: 'delete',        value: 'delete', danger: true },
   ]}
   on:select={onItemAction}
 />
