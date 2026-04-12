@@ -23,11 +23,15 @@ const _dedupCache = {}; // in-memory cache to avoid DB reads on every tick
 function _ranRecently(userId, task, windowMs = 14 * 60 * 1000) {
   const key = `_sched_${userId}_${task}`;
   // Check in-memory cache first
-  if (_dedupCache[key] && Date.now() - _dedupCache[key] < windowMs) return true;
+  if (_dedupCache[key] && Date.now() - _dedupCache[key] < windowMs) {
+    logger.debug(`[scheduler] dedup HIT (memory) for ${key}, last=${new Date(_dedupCache[key]).toISOString()}`);
+    return true;
+  }
   // Check DB (cold start after restart)
   const row = db.prepare('SELECT value FROM app_config WHERE key = ?').get(key);
   const last = row?.value ? parseInt(row.value) : 0;
   if (last && Date.now() - last < windowMs) {
+    logger.debug(`[scheduler] dedup HIT (db) for ${key}, last=${new Date(last).toISOString()}, age=${Math.round((Date.now()-last)/60000)}min`);
     _dedupCache[key] = last;
     return true;
   }
@@ -36,6 +40,7 @@ function _ranRecently(userId, task, windowMs = 14 * 60 * 1000) {
   _dedupCache[key] = now;
   db.prepare('INSERT INTO app_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
     .run(key, String(now));
+  logger.info(`[scheduler] dedup MISS for ${key}, marking run at ${new Date(now).toISOString()}${last ? ', prev=' + new Date(last).toISOString() + ' age=' + Math.round((now-last)/3600000) + 'h' : ' (first run)'}`);
   return false;
 }
 
@@ -280,8 +285,10 @@ async function _pushReminders(userId) {
     const summaryDay  = _getUserSetting(userId, 'weeklySummaryDay')  ?? 0;    // 0=Sun default
     const summaryTime = _getUserSetting(userId, 'weeklySummaryTime') ?? '09:00';
     const [targetHour] = summaryTime.split(':').map(Number);
+    logger.debug(`[scheduler] weekly check: user=${userId} dow=${local.dayOfWeek} target=${summaryDay} hour=${local.hour} targetHour=${targetHour}`);
     if (local.dayOfWeek === summaryDay && local.hour >= targetHour && local.hour < targetHour + 1
         && !_ranRecently(userId, 'weekly', 6 * 24 * 60 * 60 * 1000)) {
+      logger.info(`[scheduler] SENDING weekly summary for user ${userId}`);
       // Push notification
       const { sendWeeklySummary } = await import('./push-notify.js');
       await sendWeeklySummary(userId);
