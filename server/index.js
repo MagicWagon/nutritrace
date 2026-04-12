@@ -21,7 +21,7 @@ import withingsRoutes   from './routes/withings.js';
 import garminRoutes     from './routes/garmin.js';
 import syncRoutes       from './routes/sync.js';
 import { logger }   from './logger.js';
-import { authenticate } from './middleware/auth.js';
+import { authenticate, userMgmtActive } from './middleware/auth.js';
 import { csrfProtect } from './middleware/csrf.js';
 import { seedSmtpFromEnv } from './email.js';
 import { seedAiFromEnv } from './ai.js';
@@ -86,6 +86,14 @@ app.use((req, res, next) => {
 
 // Prevent browser/proxy caching of all API responses
 app.use('/api', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
+
+// Setup enforcement — block data APIs until the first user account is created.
+// Only /api/auth/* is allowed so the client can check status + register the admin.
+app.use('/api', (req, res, next) => {
+  if (req.path.startsWith('/auth')) return next(); // allow auth routes (status, register, login)
+  if (userMgmtActive()) return next();             // users exist — normal operation
+  res.status(503).json({ error: 'Setup required', setup_required: true });
+});
 
 // API routes
 app.use('/api/auth',   authRoutes);

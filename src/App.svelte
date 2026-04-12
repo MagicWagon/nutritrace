@@ -9,7 +9,7 @@
   import Toast     from './components/ui/Toast.svelte';
   import { DB }    from './lib/db.js';
   import { navStyle, applyAccentColor, accentColor, applyAppearance, appearance, disableAnimations, sidebarPersistent } from './stores/settings.js';
-  import { currentUser, userMgmtActive, loadAuthState } from './stores/auth.js';
+  import { currentUser, userMgmtActive, setupRequired, loadAuthState } from './stores/auth.js';
   import { needsNativeSetup, isNative, getNativeMode, getServerUrl } from './lib/platform.js';
   import { writable } from 'svelte/store';
 
@@ -184,10 +184,14 @@
     // Show wizard on first launch:
     // - Native server mode: NEVER show wizard (server is already configured)
     // - Native local mode: show wizard for goals/units/profile setup
+    // - Web + setup_required: force wizard (must create admin account first)
     // - Web: show wizard if no user logged in and no user management
     const _isNativeServer = isNative && getNativeMode() === 'server';
     const _isNativeLocal = isNative && getNativeMode() === 'local';
-    if (!_isNativeServer && !DB.getSetting('setupComplete', false) && (!$currentUser || _isNativeLocal) && !$userMgmtActive) {
+    if (!isNative && $setupRequired) {
+      // PWA: server has no users — force wizard with mandatory account creation
+      window.location.hash = '#/wizard';
+    } else if (!_isNativeServer && !DB.getSetting('setupComplete', false) && (!$currentUser || _isNativeLocal) && !$userMgmtActive) {
       window.location.hash = '#/wizard';
     }
 

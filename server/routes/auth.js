@@ -52,7 +52,8 @@ function safeUser(u) {
 
 // ── Status: is user management active? ────────────────────────────────────
 router.get('/status', wrap((req, res) => {
-  res.json({ active: userMgmtActive() });
+  const active = userMgmtActive();
+  res.json({ active, setup_required: !active });
 }));
 
 // ── Who am I? ─────────────────────────────────────────────────────────────

@@ -5,14 +5,17 @@
   import { DB, localDateStr } from '../lib/db.js';
   import { Nutrition } from '../lib/nutrition.js';
   import { mealNames, energyUnit, goals, weightUnit, heightUnit, bulkSet } from '../stores/settings.js';
-  import { currentUser, userMgmtActive, loadAuthState } from '../stores/auth.js';
+  import { currentUser, userMgmtActive, setupRequired, loadAuthState } from '../stores/auth.js';
   import { showError } from '../stores/toast.js';
   import { isNative, getServerUrl } from '../lib/platform.js';
 
   // In native local mode, skip user management step (single user, no server)
   const _isNativeLocal = isNative && !getServerUrl();
+  // PWA: account creation is mandatory (server must have at least one user)
+  const _isPwa = !isNative;
+  const _forceAccountCreation = _isPwa && $setupRequired;
 
-  // Steps: usermgmt (optional), welcome, units, gender, dob, height, weight, target, activity, integrations, summary
+  // Steps: usermgmt (optional on native, mandatory on PWA), welcome, units, ...
   const BASE_STEPS = ['welcome','units','gender','dob','height','weight','target','activity','integrations','notifications','summary'];
   const ALL_STEPS  = _isNativeLocal ? BASE_STEPS : ['usermgmt', ...BASE_STEPS];
 
@@ -20,7 +23,8 @@
   let dir  = 1;
 
   // ── User management step ─────────────────────────────────────────────────
-  let enableUserMgmt  = false;
+  // On PWA with no users: force account creation (no toggle, can't skip)
+  let enableUserMgmt  = _forceAccountCreation ? true : false;
   let adminUsername   = '';
   let adminPassword   = '';
   let adminConfirm    = '';
@@ -231,6 +235,8 @@
   }
 
   function skip() {
+    // Don't allow skip until account is created when forced
+    if (_forceAccountCreation && !$userMgmtActive) return;
     bulkSet({ setupComplete: true });
     push('/');
   }
@@ -334,7 +340,7 @@
 <div class="wizard-shell">
   <!-- Skip button -->
   <div class="wizard-topbar">
-    {#if step > 0 && step < ALL_STEPS.length - 1}
+    {#if step > 0 && step < ALL_STEPS.length - 1 && !(_forceAccountCreation && !$userMgmtActive)}
       <button class="btn btn-ghost wizard-skip" on:click={skip}>Skip</button>
     {:else}
       <div></div>
@@ -355,21 +361,29 @@
 
       <!-- ── User Management ── -->
       {#if currentStepName === 'usermgmt'}
-        <div class="step-hero compact">
-          <span class="material-symbols-rounded hero-icon">group</span>
-          <h1 class="step-title">Multi-User Support</h1>
-          <p class="step-desc">NutriTrace can run in single-user mode (default) or multi-user mode with separate logins and password resets. You can always enable this later in Settings.</p>
-        </div>
+        {#if _forceAccountCreation}
+          <div class="step-hero compact">
+            <span class="material-symbols-rounded hero-icon">person_add</span>
+            <h1 class="step-title">Create Your Account</h1>
+            <p class="step-desc">Set up your admin account to secure your NutriTrace instance. You can invite other users later from Settings.</p>
+          </div>
+        {:else}
+          <div class="step-hero compact">
+            <span class="material-symbols-rounded hero-icon">group</span>
+            <h1 class="step-title">Multi-User Support</h1>
+            <p class="step-desc">NutriTrace can run in single-user mode (default) or multi-user mode with separate logins and password resets. You can always enable this later in Settings.</p>
+          </div>
 
-        <div class="toggle-row" on:click={() => enableUserMgmt = !enableUserMgmt} role="button" tabindex="0">
-          <div>
-            <div class="toggle-label">Enable user accounts</div>
-            <div class="toggle-hint">Each user gets their own food diary, settings, and profile</div>
+          <div class="toggle-row" on:click={() => enableUserMgmt = !enableUserMgmt} role="button" tabindex="0">
+            <div>
+              <div class="toggle-label">Enable user accounts</div>
+              <div class="toggle-hint">Each user gets their own food diary, settings, and profile</div>
+            </div>
+            <div class="fake-toggle" class:on={enableUserMgmt}>
+              <div class="fake-thumb"></div>
+            </div>
           </div>
-          <div class="fake-toggle" class:on={enableUserMgmt}>
-            <div class="fake-thumb"></div>
-          </div>
-        </div>
+        {/if}
 
         {#if enableUserMgmt}
           <div class="um-form" transition:fly={{ y: 10, duration: 200 }}>
