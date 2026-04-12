@@ -1,6 +1,7 @@
 <script>
   import { onMount, onDestroy, tick } from 'svelte';
-  import { wellnessMetrics, wellnessSyncMode, wellnessSyncRange, distUnit, tempUnit, pageBanners, dateFormat, withingsSyncRange as withingsSyncRangeSetting, fitbitEnabled, withingsEnabled, garminEnabled, garminSyncRange as garminSyncRangeSetting, weightUnit, goals, goalCelebrations, disableAnimations } from '../stores/settings.js';
+  import { wellnessMetrics, wellnessSyncMode, wellnessSyncRange, distUnit, tempUnit, pageBanners, dateFormat, withingsSyncRange as withingsSyncRangeSetting, fitbitEnabled, withingsEnabled, garminEnabled, garminSyncRange as garminSyncRangeSetting, weightUnit, goals, goalCelebrations, disableAnimations,
+    fitbitSyncMode, withingsSyncMode, garminSyncMode } from '../stores/settings.js';
   import Chart from 'chart.js/auto';
   import WellnessBanner from '../components/banners/WellnessBanner.svelte';
   import { showSuccess, showError } from '../stores/toast.js';
@@ -1087,13 +1088,15 @@
 
     if (status.connected || garminStatus?.connected) {
       await loadData(); // loadData already calls loadWorkouts()
-      if ($wellnessSyncMode === 'auto' && isToday) {
+      if (isToday) {
         const key = `wl_wellness_lastSync_${dateStr}`;
         const last = localStorage.getItem(key);
         const cooldownMs = 15 * 60 * 1000;
         if (!last || Date.now() - Number(last) > cooldownMs) {
-          if (status.connected)       { await sync(true); syncWorkouts(); }
-          if (garminStatus?.connected) await syncGarmin(true);
+          const fitbitMode  = $fitbitSyncMode  ?? $wellnessSyncMode;
+          const garminMode_ = $garminSyncMode  ?? $wellnessSyncMode;
+          if (status.connected && fitbitMode === 'auto')        { await sync(true); syncWorkouts(); }
+          if (garminStatus?.connected && garminMode_ === 'auto') await syncGarmin(true);
         }
       }
     } else {
@@ -1113,15 +1116,16 @@
       garminStatus = await NtApi.get('/api/wellness/garmin/status');
     } catch { garminStatus = { connected: false, configured: false }; }
 
-    // Auto-sync if connected and due
-    const anyConnected = status.connected || garminStatus?.connected;
-    if (anyConnected && $wellnessSyncMode === 'auto' && isToday) {
+    // Auto-sync if connected and due (per-device mode, fallback to legacy)
+    if (isToday) {
       const key = `wl_wellness_lastSync_${dateStr}`;
       const last = localStorage.getItem(key);
       const cooldownMs = 15 * 60 * 1000;
       if (!last || Date.now() - Number(last) > cooldownMs) {
-        if (status.connected)       await sync(true);
-        if (garminStatus?.connected) await syncGarmin(true);
+        const fitbitMode  = $fitbitSyncMode  ?? $wellnessSyncMode;
+        const garminMode_ = $garminSyncMode  ?? $wellnessSyncMode;
+        if (status.connected && fitbitMode === 'auto')        await sync(true);
+        if (garminStatus?.connected && garminMode_ === 'auto') await syncGarmin(true);
       }
     }
   }

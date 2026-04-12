@@ -7,8 +7,12 @@
   import {
     wellnessEnabled, fitbitEnabled, healthConnectEnabled, wellnessMetrics, workoutsEnabled,
     wellnessSyncMode, wellnessSyncSchedule, wellnessSyncTime, wellnessSyncRange,
+    fitbitSyncMode, fitbitSyncInterval, fitbitSyncWindowStart, fitbitSyncWindowEnd,
     withingsSyncRange, withingsEnabled,
+    withingsSyncMode, withingsSyncInterval, withingsSyncWindowStart, withingsSyncWindowEnd,
     garminEnabled, garminSyncRange,
+    garminSyncMode, garminSyncInterval, garminSyncWindowStart, garminSyncWindowEnd,
+    healthConnectSyncMode, healthConnectSyncInterval, healthConnectSyncWindowStart, healthConnectSyncWindowEnd,
   } from '../../stores/settings.js';
   import { DB } from '../../lib/db.js';
   import { NtApi } from '../../lib/api.js';
@@ -152,6 +156,42 @@
   let wellnessSyncScheduleVal = DB.getSetting('wellnessSyncSchedule', 'daily');
   let wellnessSyncTimeVal     = DB.getSetting('wellnessSyncTime',     '14:00');
   let wellnessSyncRangeVal    = DB.getSetting('wellnessSyncRange',    7);
+
+  // Per-device sync state — null = use legacy shared value
+  const _legacyMode = wellnessSyncModeVal;
+  // Convert legacy schedule to interval minutes
+  const _legacyInterval = (() => {
+    const s = wellnessSyncScheduleVal;
+    if (s === 'every6h') return 360;
+    if (s === 'every12h') return 720;
+    return 1440; // daily
+  })();
+  let fitbitSyncModeVal         = DB.getSetting('fitbitSyncMode',         null) ?? _legacyMode;
+  let fitbitSyncIntervalVal     = DB.getSetting('fitbitSyncInterval',     null) ?? _legacyInterval;
+  let fitbitSyncWindowStartVal  = DB.getSetting('fitbitSyncWindowStart',  null) ?? '';
+  let fitbitSyncWindowEndVal    = DB.getSetting('fitbitSyncWindowEnd',    null) ?? '';
+  let withingsSyncModeVal       = DB.getSetting('withingsSyncMode',       null) ?? _legacyMode;
+  let withingsSyncIntervalVal   = DB.getSetting('withingsSyncInterval',   null) ?? _legacyInterval;
+  let withingsSyncWindowStartVal= DB.getSetting('withingsSyncWindowStart',null) ?? '';
+  let withingsSyncWindowEndVal  = DB.getSetting('withingsSyncWindowEnd',  null) ?? '';
+  let garminSyncModeVal         = DB.getSetting('garminSyncMode',         null) ?? _legacyMode;
+  let garminSyncIntervalVal     = DB.getSetting('garminSyncInterval',     null) ?? _legacyInterval;
+  let garminSyncWindowStartVal  = DB.getSetting('garminSyncWindowStart',  null) ?? '';
+  let garminSyncWindowEndVal    = DB.getSetting('garminSyncWindowEnd',    null) ?? '';
+  let hcSyncModeVal             = DB.getSetting('healthConnectSyncMode',         null) ?? _legacyMode;
+  let hcSyncIntervalVal         = DB.getSetting('healthConnectSyncInterval',     null) ?? _legacyInterval;
+  let hcSyncWindowStartVal      = DB.getSetting('healthConnectSyncWindowStart',  null) ?? '';
+  let hcSyncWindowEndVal        = DB.getSetting('healthConnectSyncWindowEnd',    null) ?? '';
+
+  const SYNC_INTERVALS = [
+    { value: 30,   label: 'Every 30 min' },
+    { value: 60,   label: 'Every hour' },
+    { value: 120,  label: 'Every 2 hours' },
+    { value: 180,  label: 'Every 3 hours' },
+    { value: 360,  label: 'Every 6 hours' },
+    { value: 720,  label: 'Every 12 hours' },
+    { value: 1440, label: 'Once a day' },
+  ];
 
   // Recommended range options shown first — safe for any device API
   const SYNC_RANGE_RECOMMENDED = [
@@ -421,41 +461,9 @@
       <div class="setting-divider"></div>
       <div class="setting-row">
         <div>
-          <span class="setting-label">Sync Mode</span>
-          <div class="setting-desc">
-            {#if wellnessSyncModeVal === 'auto'}Auto syncs when you open the Wellness page (15 min cooldown).
-            {:else if wellnessSyncModeVal === 'manual'}Sync only when you tap the Sync button.
-            {:else if wellnessSyncModeVal === 'scheduled'}Server syncs automatically on a schedule.
-            {/if}
-          </div>
-        </div>
-        <div class="select-wrap" style="width:150px">
-          <select class="select sel-sm" bind:value={wellnessSyncModeVal} on:change={e => wellnessSyncMode.set(e.target.value)}>
-            <option value="auto">Auto (on open)</option>
-            <option value="manual">Manual only</option>
-            {#if !isNativeLocal}<option value="scheduled">Scheduled</option>{/if}
-          </select>
+          <span class="setting-desc">Sync schedule is configured per device below.</span>
         </div>
       </div>
-      {#if wellnessSyncModeVal === 'scheduled'}
-        <div class="setting-divider"></div>
-        <div class="setting-row">
-          <span class="setting-label">Frequency</span>
-          <div class="select-wrap" style="width:150px">
-            <select class="select sel-sm" bind:value={wellnessSyncScheduleVal} on:change={e => wellnessSyncSchedule.set(e.target.value)}>
-              <option value="every6h">Every 6 hours</option>
-              <option value="every12h">Every 12 hours</option>
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly (Sunday)</option>
-            </select>
-          </div>
-        </div>
-        <div class="setting-divider"></div>
-        <div class="setting-row">
-          <span class="setting-label">Time</span>
-          <TimePicker value={wellnessSyncTimeVal} on:change={e => { wellnessSyncTimeVal = e.detail; wellnessSyncTime.set(e.detail); }} />
-        </div>
-      {/if}
     {/if}
   </div>
 
@@ -513,6 +521,40 @@
             <div class="setting-desc" style="font-size:11px;opacity:0.75">⚠ Long ranges may take several minutes and approach Fitbit API rate limits.</div>
           </div>
         </div>
+        <div class="setting-divider"></div>
+        <div class="setting-row">
+          <span class="setting-label">Sync Mode</span>
+          <div class="select-wrap" style="width:150px">
+            <select class="select sel-sm" bind:value={fitbitSyncModeVal} on:change={e => fitbitSyncMode.set(e.target.value)}>
+              <option value="auto">Auto (on open)</option>
+              <option value="manual">Manual only</option>
+              {#if !isNativeLocal}<option value="scheduled">Scheduled</option>{/if}
+            </select>
+          </div>
+        </div>
+        {#if fitbitSyncModeVal === 'scheduled'}
+          <div class="setting-divider"></div>
+          <div class="setting-row">
+            <span class="setting-label">Interval</span>
+            <div class="select-wrap" style="width:160px">
+              <select class="select sel-sm" bind:value={fitbitSyncIntervalVal} on:change={e => fitbitSyncInterval.set(parseInt(e.target.value))}>
+                {#each SYNC_INTERVALS as opt}<option value={opt.value}>{opt.label}</option>{/each}
+              </select>
+            </div>
+          </div>
+          <div class="setting-divider"></div>
+          <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px">
+            <div>
+              <span class="setting-label">Active Window</span>
+              <div class="setting-desc">Only sync during these hours. Leave blank for all day.</div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <TimePicker value={fitbitSyncWindowStartVal} placeholder="Start" on:change={e => { fitbitSyncWindowStartVal = e.detail; fitbitSyncWindowStart.set(e.detail || null); }} />
+              <span style="color:var(--text-3)">to</span>
+              <TimePicker value={fitbitSyncWindowEndVal} placeholder="End" on:change={e => { fitbitSyncWindowEndVal = e.detail; fitbitSyncWindowEnd.set(e.detail || null); }} />
+            </div>
+          </div>
+        {/if}
         <div class="setting-divider"></div>
         {#if fitbitConnectionStatus === null}
           <div class="setting-row">
@@ -666,6 +708,40 @@
           </div>
         </div>
         <div class="setting-divider"></div>
+        <div class="setting-row">
+          <span class="setting-label">Sync Mode</span>
+          <div class="select-wrap" style="width:150px">
+            <select class="select sel-sm" bind:value={garminSyncModeVal} on:change={e => garminSyncMode.set(e.target.value)}>
+              <option value="auto">Auto (on open)</option>
+              <option value="manual">Manual only</option>
+              {#if !isNativeLocal}<option value="scheduled">Scheduled</option>{/if}
+            </select>
+          </div>
+        </div>
+        {#if garminSyncModeVal === 'scheduled'}
+          <div class="setting-divider"></div>
+          <div class="setting-row">
+            <span class="setting-label">Interval</span>
+            <div class="select-wrap" style="width:160px">
+              <select class="select sel-sm" bind:value={garminSyncIntervalVal} on:change={e => garminSyncInterval.set(parseInt(e.target.value))}>
+                {#each SYNC_INTERVALS as opt}<option value={opt.value}>{opt.label}</option>{/each}
+              </select>
+            </div>
+          </div>
+          <div class="setting-divider"></div>
+          <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px">
+            <div>
+              <span class="setting-label">Active Window</span>
+              <div class="setting-desc">Only sync during these hours. Leave blank for all day.</div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <TimePicker value={garminSyncWindowStartVal} placeholder="Start" on:change={e => { garminSyncWindowStartVal = e.detail; garminSyncWindowStart.set(e.detail || null); }} />
+              <span style="color:var(--text-3)">to</span>
+              <TimePicker value={garminSyncWindowEndVal} placeholder="End" on:change={e => { garminSyncWindowEndVal = e.detail; garminSyncWindowEnd.set(e.detail || null); }} />
+            </div>
+          </div>
+        {/if}
+        <div class="setting-divider"></div>
         {#if garminConnectionStatus === null}
           <div class="setting-row">
             <span class="setting-desc">Loading connection status…</span>
@@ -806,6 +882,40 @@
           </div>
         </div>
         <div class="setting-divider"></div>
+        <div class="setting-row">
+          <span class="setting-label">Sync Mode</span>
+          <div class="select-wrap" style="width:150px">
+            <select class="select sel-sm" bind:value={withingsSyncModeVal} on:change={e => withingsSyncMode.set(e.target.value)}>
+              <option value="auto">Auto (on open)</option>
+              <option value="manual">Manual only</option>
+              {#if !isNativeLocal}<option value="scheduled">Scheduled</option>{/if}
+            </select>
+          </div>
+        </div>
+        {#if withingsSyncModeVal === 'scheduled'}
+          <div class="setting-divider"></div>
+          <div class="setting-row">
+            <span class="setting-label">Interval</span>
+            <div class="select-wrap" style="width:160px">
+              <select class="select sel-sm" bind:value={withingsSyncIntervalVal} on:change={e => withingsSyncInterval.set(parseInt(e.target.value))}>
+                {#each SYNC_INTERVALS as opt}<option value={opt.value}>{opt.label}</option>{/each}
+              </select>
+            </div>
+          </div>
+          <div class="setting-divider"></div>
+          <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px">
+            <div>
+              <span class="setting-label">Active Window</span>
+              <div class="setting-desc">Only sync during these hours. Leave blank for all day.</div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <TimePicker value={withingsSyncWindowStartVal} placeholder="Start" on:change={e => { withingsSyncWindowStartVal = e.detail; withingsSyncWindowStart.set(e.detail || null); }} />
+              <span style="color:var(--text-3)">to</span>
+              <TimePicker value={withingsSyncWindowEndVal} placeholder="End" on:change={e => { withingsSyncWindowEndVal = e.detail; withingsSyncWindowEnd.set(e.detail || null); }} />
+            </div>
+          </div>
+        {/if}
+        <div class="setting-divider"></div>
         {#if withingsConnectionStatus === null}
           <div class="setting-row">
             <span class="setting-desc">Loading connection status…</span>
@@ -944,6 +1054,40 @@
               <div class="setting-desc" style="color:var(--text-3)">Not supported on this device</div>
             {/if}
           </div>
+          <div class="setting-divider"></div>
+          <div class="setting-row">
+            <span class="setting-label">Sync Mode</span>
+            <div class="select-wrap" style="width:150px">
+              <select class="select sel-sm" bind:value={hcSyncModeVal} on:change={e => healthConnectSyncMode.set(e.target.value)}>
+                <option value="auto">Auto (on open)</option>
+                <option value="manual">Manual only</option>
+                <option value="scheduled">Scheduled</option>
+              </select>
+            </div>
+          </div>
+          {#if hcSyncModeVal === 'scheduled'}
+            <div class="setting-divider"></div>
+            <div class="setting-row">
+              <span class="setting-label">Interval</span>
+              <div class="select-wrap" style="width:160px">
+                <select class="select sel-sm" bind:value={hcSyncIntervalVal} on:change={e => healthConnectSyncInterval.set(parseInt(e.target.value))}>
+                  {#each SYNC_INTERVALS as opt}<option value={opt.value}>{opt.label}</option>{/each}
+                </select>
+              </div>
+            </div>
+            <div class="setting-divider"></div>
+            <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px">
+              <div>
+                <span class="setting-label">Active Window</span>
+                <div class="setting-desc">Only sync during these hours. Leave blank for all day.</div>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <TimePicker value={hcSyncWindowStartVal} placeholder="Start" on:change={e => { hcSyncWindowStartVal = e.detail; healthConnectSyncWindowStart.set(e.detail || null); }} />
+                <span style="color:var(--text-3)">to</span>
+                <TimePicker value={hcSyncWindowEndVal} placeholder="End" on:change={e => { hcSyncWindowEndVal = e.detail; healthConnectSyncWindowEnd.set(e.detail || null); }} />
+              </div>
+            </div>
+          {/if}
           <div class="setting-divider"></div>
           <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px">
             <span class="setting-label">Visible Metrics</span>

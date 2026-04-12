@@ -77,80 +77,95 @@ function _isEnabled(userId, key) {
 }
 
 
-// ── Scheduled wellness sync ─────────────────────────────────────────────────
+// ── Scheduled wellness sync (per-device) ────────────────────────────────────
+
+/** Check if a device should sync now based on its per-device settings */
+function _shouldDeviceSync(userId, deviceKey, local) {
+  const mode = _getUserSetting(userId, `${deviceKey}SyncMode`) ?? _getUserSetting(userId, 'wellnessSyncMode');
+  if (mode !== 'scheduled') return false;
+
+  // Active window check — skip if outside the configured hours
+  const winStart = _getUserSetting(userId, `${deviceKey}SyncWindowStart`);
+  const winEnd   = _getUserSetting(userId, `${deviceKey}SyncWindowEnd`);
+  if (winStart && winEnd) {
+    const [sh, sm] = winStart.split(':').map(Number);
+    const [eh, em] = winEnd.split(':').map(Number);
+    const startMin = sh * 60 + sm;
+    const endMin   = eh * 60 + em;
+    const curMin   = local.hour * 60 + local.minute;
+    // Handle overnight windows (e.g., 22:00–06:00)
+    if (startMin < endMin) {
+      if (curMin < startMin || curMin >= endMin) return false;
+    } else {
+      if (curMin < startMin && curMin >= endMin) return false;
+    }
+  }
+
+  // Interval-based: the dedup window handles timing — if we're in the active window
+  // and haven't synced within the interval, sync now.
+  return true;
+}
+
+/** Dedup window = device's sync interval (in ms). Falls back to legacy schedule or 24h. */
+function _dedupWindow(userId, deviceKey) {
+  // Per-device interval in minutes
+  const interval = _getUserSetting(userId, `${deviceKey}SyncInterval`);
+  if (interval && interval > 0) return (interval - 5) * 60 * 1000; // subtract 5min buffer
+
+  // Legacy fallback
+  const schedule = _getUserSetting(userId, 'wellnessSyncSchedule') ?? 'daily';
+  if (schedule === 'every6h')  return 5   * 60 * 60 * 1000;
+  if (schedule === 'every12h') return 11  * 60 * 60 * 1000;
+  return 23 * 60 * 60 * 1000;
+}
 
 async function _syncWellness(userId) {
-  const syncMode = _getUserSetting(userId, 'wellnessSyncMode');
-  if (syncMode !== 'scheduled') return;
-
-  const schedule = _getUserSetting(userId, 'wellnessSyncSchedule') || 'daily';
-  const syncTime = _getUserSetting(userId, 'wellnessSyncTime') || '14:00';
-  const [h, m] = syncTime.split(':').map(Number);
   const local = _getUserLocalTime(userId);
+  const today = local.dateStr;
 
-  // Check if we're within the 15-minute window of the scheduled time (in USER's timezone)
-  const scheduledMin = h * 60 + m;
-  const currentMin = local.hour * 60 + local.minute;
-  const diff = currentMin - scheduledMin;
-
-  let shouldSync = false;
-  if (schedule === 'daily' && diff >= 0 && diff < 15) shouldSync = true;
-  if (schedule === 'every6h' && local.hour % 6 === h % 6 && local.minute < 15) shouldSync = true;
-  if (schedule === 'every12h' && local.hour % 12 === h % 12 && local.minute < 15) shouldSync = true;
-  if (schedule === 'weekly' && local.dayOfWeek === 0 && diff >= 0 && diff < 15) shouldSync = true;
-
-  if (!shouldSync) return;
-  if (_ranRecently(userId, 'wellness_sync', 5 * 60 * 60 * 1000)) return; // 5h dedup for daily
-
-  logger.info(`[scheduler] running scheduled wellness sync for user ${userId}`);
-
-  // Import and run Fitbit sync
-  try {
-    const today = local.dateStr;
-
-    // Fitbit sync
-    const hasFitbit = db.prepare('SELECT 1 FROM fitbit_tokens WHERE user_id=?').get(userId);
-    if (hasFitbit) {
-      try {
-        const { syncDate } = await import('../routes/fitbit.js');
-        logger.info(`[scheduler] Fitbit sync for user ${userId} date ${today}`);
-        const { metrics, errors } = await syncDate(userId, today);
-        logger.info(`[scheduler] Fitbit sync done: ${Object.keys(metrics || {}).length} metrics, ${errors?.length || 0} errors`);
-      } catch (e) {
-        logger.warn(`[scheduler] Fitbit sync error for user ${userId}: ${e.message}`);
-        try { const { alertSyncFailure } = await import('./push-notify.js'); alertSyncFailure(userId, `Scheduled Fitbit sync failed: ${e.message}`); } catch {}
-      }
+  // Fitbit
+  const hasFitbit = db.prepare('SELECT 1 FROM fitbit_tokens WHERE user_id=?').get(userId);
+  if (hasFitbit && _shouldDeviceSync(userId, 'fitbit', local)
+      && !_ranRecently(userId, 'fitbit_sync', _dedupWindow(userId, 'fitbit'))) {
+    try {
+      const { syncDate } = await import('../routes/fitbit.js');
+      logger.info(`[scheduler] Fitbit sync for user ${userId} date ${today}`);
+      const { metrics, errors } = await syncDate(userId, today);
+      logger.info(`[scheduler] Fitbit sync done: ${Object.keys(metrics || {}).length} metrics, ${errors?.length || 0} errors`);
+    } catch (e) {
+      logger.warn(`[scheduler] Fitbit sync error for user ${userId}: ${e.message}`);
+      try { const { alertSyncFailure } = await import('./push-notify.js'); alertSyncFailure(userId, `Scheduled Fitbit sync failed: ${e.message}`); } catch {}
     }
+  }
 
-    // Withings sync
-    const hasWithings = db.prepare('SELECT 1 FROM withings_tokens WHERE user_id=?').get(userId);
-    if (hasWithings) {
-      try {
-        const { syncRange } = await import('../routes/withings.js');
-        logger.info(`[scheduler] Withings sync for user ${userId} date ${today}`);
-        const result = await syncRange(userId, today, today);
-        logger.info(`[scheduler] Withings sync done: ${result?.dates || 0} dates`);
-      } catch (e) {
-        logger.warn(`[scheduler] Withings sync error for user ${userId}: ${e.message}`);
-        try { const { alertSyncFailure } = await import('./push-notify.js'); alertSyncFailure(userId, `Scheduled Withings sync failed: ${e.message}`); } catch {}
-      }
+  // Withings
+  const hasWithings = db.prepare('SELECT 1 FROM withings_tokens WHERE user_id=?').get(userId);
+  if (hasWithings && _shouldDeviceSync(userId, 'withings', local)
+      && !_ranRecently(userId, 'withings_sync', _dedupWindow(userId, 'withings'))) {
+    try {
+      const { syncRange } = await import('../routes/withings.js');
+      logger.info(`[scheduler] Withings sync for user ${userId} date ${today}`);
+      const result = await syncRange(userId, today, today);
+      logger.info(`[scheduler] Withings sync done: ${result?.dates || 0} dates`);
+    } catch (e) {
+      logger.warn(`[scheduler] Withings sync error for user ${userId}: ${e.message}`);
+      try { const { alertSyncFailure } = await import('./push-notify.js'); alertSyncFailure(userId, `Scheduled Withings sync failed: ${e.message}`); } catch {}
     }
+  }
 
-    // Garmin sync
-    const hasGarmin = db.prepare('SELECT 1 FROM garmin_tokens WHERE user_id=?').get(userId);
-    if (hasGarmin) {
-      try {
-        const { syncRange } = await import('../routes/garmin.js');
-        logger.info(`[scheduler] Garmin sync for user ${userId} date ${today}`);
-        const result = await syncRange(userId, today, today);
-        logger.info(`[scheduler] Garmin sync done: ${result?.synced || 0} synced`);
-      } catch (e) {
-        logger.warn(`[scheduler] Garmin sync error for user ${userId}: ${e.message}`);
-        try { const { alertSyncFailure } = await import('./push-notify.js'); alertSyncFailure(userId, `Scheduled Garmin sync failed: ${e.message}`); } catch {}
-      }
+  // Garmin
+  const hasGarmin = db.prepare('SELECT 1 FROM garmin_tokens WHERE user_id=?').get(userId);
+  if (hasGarmin && _shouldDeviceSync(userId, 'garmin', local)
+      && !_ranRecently(userId, 'garmin_sync', _dedupWindow(userId, 'garmin'))) {
+    try {
+      const { syncRange } = await import('../routes/garmin.js');
+      logger.info(`[scheduler] Garmin sync for user ${userId} date ${today}`);
+      const result = await syncRange(userId, today, today);
+      logger.info(`[scheduler] Garmin sync done: ${result?.synced || 0} synced`);
+    } catch (e) {
+      logger.warn(`[scheduler] Garmin sync error for user ${userId}: ${e.message}`);
+      try { const { alertSyncFailure } = await import('./push-notify.js'); alertSyncFailure(userId, `Scheduled Garmin sync failed: ${e.message}`); } catch {}
     }
-  } catch (e) {
-    logger.warn(`[scheduler] wellness sync failed for user ${userId}: ${e.message}`);
   }
 }
 

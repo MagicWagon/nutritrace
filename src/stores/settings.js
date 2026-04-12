@@ -35,8 +35,12 @@ export const USER_PREFS = new Set([
   'mealieEnabled','mealieBaseUrl','mealieApiToken',
   'wellnessEnabled','fitbitEnabled','healthConnectEnabled','wellnessMetrics','workoutsEnabled',
   'wellnessSyncMode','wellnessSyncSchedule','wellnessSyncTime','wellnessSyncRange',
+  'fitbitSyncMode','fitbitSyncInterval','fitbitSyncWindowStart','fitbitSyncWindowEnd',
   'withingsEnabled','withingsSyncRange','withingsDataPriority',
+  'withingsSyncMode','withingsSyncInterval','withingsSyncWindowStart','withingsSyncWindowEnd',
   'garminEnabled','garminSyncRange',
+  'garminSyncMode','garminSyncInterval','garminSyncWindowStart','garminSyncWindowEnd',
+  'healthConnectSyncMode','healthConnectSyncInterval','healthConnectSyncWindowStart','healthConnectSyncWindowEnd',
   'defaultFoodVisibility',
   // Notifications
   'notifLocalEnabled','notifPushService',
@@ -452,21 +456,45 @@ export const fitbitEnabled      = createSettingStore('fitbitEnabled',      false
 export const healthConnectEnabled = createSettingStore('healthConnectEnabled', false);
 export const wellnessMetrics    = createSettingStore('wellnessMetrics',    null); // null = all visible
 export const workoutsEnabled   = createSettingStore('workoutsEnabled',   false); // show workout history + GPS maps in Movement tab
-export const wellnessSyncMode     = createSettingStore('wellnessSyncMode',     'auto'); // 'auto' | 'manual' | 'scheduled'
-export const wellnessSyncSchedule = createSettingStore('wellnessSyncSchedule', 'daily'); // 'every6h' | 'every12h' | 'daily' | 'weekly'
-export const wellnessSyncTime     = createSettingStore('wellnessSyncTime',     '14:00'); // HH:MM for scheduled sync
-export const wellnessSyncRange    = createSettingStore('wellnessSyncRange',    7);    // days: 1|7|30|90|365
+// Legacy shared sync settings (kept for backward compat — new code uses per-device below)
+export const wellnessSyncMode     = createSettingStore('wellnessSyncMode',     'auto');
+export const wellnessSyncSchedule = createSettingStore('wellnessSyncSchedule', 'daily');
+export const wellnessSyncTime     = createSettingStore('wellnessSyncTime',     '14:00');
+export const wellnessSyncRange    = createSettingStore('wellnessSyncRange',    7);
+
+// Per-device sync settings:
+//   mode: 'auto' | 'scheduled' | 'manual'
+//   interval: minutes between syncs (30, 60, 120, 180, 360, 720, 1440)
+//   windowStart / windowEnd: 'HH:MM' — active sync window (null = all day)
+// null values = fall back to legacy wellnessSync* (migration path for existing users)
+export const fitbitSyncMode         = createSettingStore('fitbitSyncMode',         null);
+export const fitbitSyncInterval     = createSettingStore('fitbitSyncInterval',     null); // minutes
+export const fitbitSyncWindowStart  = createSettingStore('fitbitSyncWindowStart',  null); // 'HH:MM' or null
+export const fitbitSyncWindowEnd    = createSettingStore('fitbitSyncWindowEnd',    null);
 
 export const withingsEnabled      = createSettingStore('withingsEnabled',      false);
 export const withingsSyncRange    = createSettingStore('withingsSyncRange',    7);
 export const withingsDataPriority = createSettingStore('withingsDataPriority', {
-  activity: 'fitbit',  // 'fitbit' | 'withings'
+  activity: 'fitbit',
   sleep:    'fitbit',
   heart:    'fitbit',
 });
+export const withingsSyncMode         = createSettingStore('withingsSyncMode',         null);
+export const withingsSyncInterval     = createSettingStore('withingsSyncInterval',     null);
+export const withingsSyncWindowStart  = createSettingStore('withingsSyncWindowStart',  null);
+export const withingsSyncWindowEnd    = createSettingStore('withingsSyncWindowEnd',    null);
 
 export const garminEnabled   = createSettingStore('garminEnabled',   false);
 export const garminSyncRange = createSettingStore('garminSyncRange', 7);
+export const garminSyncMode         = createSettingStore('garminSyncMode',         null);
+export const garminSyncInterval     = createSettingStore('garminSyncInterval',     null);
+export const garminSyncWindowStart  = createSettingStore('garminSyncWindowStart',  null);
+export const garminSyncWindowEnd    = createSettingStore('garminSyncWindowEnd',    null);
+
+export const healthConnectSyncMode         = createSettingStore('healthConnectSyncMode',         null);
+export const healthConnectSyncInterval     = createSettingStore('healthConnectSyncInterval',     null);
+export const healthConnectSyncWindowStart  = createSettingStore('healthConnectSyncWindowStart',  null);
+export const healthConnectSyncWindowEnd    = createSettingStore('healthConnectSyncWindowEnd',    null);
 
 // Sharing
 export const defaultFoodVisibility = createSettingStore('defaultFoodVisibility', 'private'); // 'private' | 'group' | 'specific'
