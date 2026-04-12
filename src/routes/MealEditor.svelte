@@ -657,8 +657,8 @@
 <!-- ── Portion picker sheet ── -->
 {#if portionSheet && portionFood}
   <div use:portal class="overlay-backdrop" role="dialog" aria-modal="true"
-    on:click={() => { if (!_meLock) { portionSheet = false; editingIndex = null; } }} on:keydown={() => {}}>
-    <div class="portion-sheet" on:click|stopPropagation on:keydown={() => {}}>
+    on:keydown={() => {}}>
+    <div class="portion-sheet" on:keydown={() => {}}>
       <div class="portion-header">
         <span style="font-weight:600">{portionFood.name}</span>
         <button class="btn-icon" on:click={() => { portionSheet = false; editingIndex = null; }} title="Close">
@@ -685,8 +685,8 @@
 <!-- ── Multi-ingredient portion sheet ── -->
 {#if showMultiPortionSheet}
   <div use:portal class="overlay-backdrop" role="dialog" aria-modal="true"
-    on:click={() => { showMultiPortionSheet = false; }} on:keydown={() => {}}>
-    <div class="portion-sheet" style="max-height:80vh;display:flex;flex-direction:column" on:click|stopPropagation on:keydown={() => {}}>
+    on:keydown={() => {}}>
+    <div class="portion-sheet" style="max-height:80vh;display:flex;flex-direction:column" on:keydown={() => {}}>
       <div class="portion-header">
         <span style="font-weight:600">Set Portions ({multiPortionItems.length} items)</span>
         <button class="btn-icon" on:click={() => { showMultiPortionSheet = false; }} title="Close">
