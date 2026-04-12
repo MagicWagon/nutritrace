@@ -12,22 +12,30 @@
 import db from '../db.js';
 import { logger } from '../logger.js';
 
-const _lastRun = {}; // userId_task → timestamp (dedup within window, in-memory for fast checks)
-
 function _getUserSetting(userId, key) {
   const row = db.prepare('SELECT value FROM user_settings WHERE user_id = ? AND key = ?').get(userId, key);
   if (!row?.value) return null;
   try { return JSON.parse(row.value); } catch { return row.value; }
 }
 
-// Persistent dedup for infrequent tasks (survives server restarts)
-function _persistentRanRecently(userId, task, windowMs) {
+// Persistent dedup — survives server restarts (stored in app_config)
+const _dedupCache = {}; // in-memory cache to avoid DB reads on every tick
+function _ranRecently(userId, task, windowMs = 14 * 60 * 1000) {
   const key = `_sched_${userId}_${task}`;
+  // Check in-memory cache first
+  if (_dedupCache[key] && Date.now() - _dedupCache[key] < windowMs) return true;
+  // Check DB (cold start after restart)
   const row = db.prepare('SELECT value FROM app_config WHERE key = ?').get(key);
   const last = row?.value ? parseInt(row.value) : 0;
-  if (last && Date.now() - last < windowMs) return true;
+  if (last && Date.now() - last < windowMs) {
+    _dedupCache[key] = last;
+    return true;
+  }
+  // Not recent — mark as run
+  const now = Date.now();
+  _dedupCache[key] = now;
   db.prepare('INSERT INTO app_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
-    .run(key, String(Date.now()));
+    .run(key, String(now));
   return false;
 }
 
@@ -68,15 +76,6 @@ function _isEnabled(userId, key) {
   return val === true || val === 'true';
 }
 
-function _dedupKey(userId, task) { return `${userId}_${task}`; }
-
-function _ranRecently(userId, task, windowMs = 14 * 60 * 1000) {
-  const key = _dedupKey(userId, task);
-  const last = _lastRun[key];
-  if (last && Date.now() - last < windowMs) return true;
-  _lastRun[key] = Date.now();
-  return false;
-}
 
 // ── Scheduled wellness sync ─────────────────────────────────────────────────
 
@@ -101,7 +100,7 @@ async function _syncWellness(userId) {
   if (schedule === 'weekly' && local.dayOfWeek === 0 && diff >= 0 && diff < 15) shouldSync = true;
 
   if (!shouldSync) return;
-  if (_persistentRanRecently(userId, 'wellness_sync', 5 * 60 * 60 * 1000)) return; // 5h dedup for daily
+  if (_ranRecently(userId, 'wellness_sync', 5 * 60 * 60 * 1000)) return; // 5h dedup for daily
 
   logger.info(`[scheduler] running scheduled wellness sync for user ${userId}`);
 
@@ -251,7 +250,7 @@ async function _pushReminders(userId) {
   }
 
   // Weekly summary — user-configurable day + time (persistent dedup survives server restarts)
-  if (_isEnabled(userId, 'notifWeeklySummary') && !_persistentRanRecently(userId, 'weekly', 6 * 24 * 60 * 60 * 1000)) {
+  if (_isEnabled(userId, 'notifWeeklySummary') && !_ranRecently(userId, 'weekly', 6 * 24 * 60 * 60 * 1000)) {
     const summaryDay  = _getUserSetting(userId, 'weeklySummaryDay')  ?? 0;    // 0=Sun default
     const summaryTime = _getUserSetting(userId, 'weeklySummaryTime') ?? '09:00';
     const [targetHour] = summaryTime.split(':').map(Number);
