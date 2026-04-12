@@ -543,17 +543,24 @@
             </div>
           </div>
           <div class="setting-divider"></div>
-          <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px">
-            <div>
-              <span class="setting-label">Active Window</span>
-              <div class="setting-desc">Only sync during these hours. Leave blank for all day.</div>
+          {#if fitbitSyncIntervalVal >= 1440}
+            <div class="setting-row">
+              <span class="setting-label">Sync At</span>
+              <TimePicker value={fitbitSyncWindowStartVal || '14:00'} on:change={e => { fitbitSyncWindowStartVal = e.detail; fitbitSyncWindowStart.set(e.detail); fitbitSyncWindowEnd.set(null); }} />
             </div>
-            <div style="display:flex;gap:8px;align-items:center">
-              <TimePicker value={fitbitSyncWindowStartVal} placeholder="Start" on:change={e => { fitbitSyncWindowStartVal = e.detail; fitbitSyncWindowStart.set(e.detail || null); }} />
-              <span style="color:var(--text-3)">to</span>
-              <TimePicker value={fitbitSyncWindowEndVal} placeholder="End" on:change={e => { fitbitSyncWindowEndVal = e.detail; fitbitSyncWindowEnd.set(e.detail || null); }} />
+          {:else}
+            <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px">
+              <div>
+                <span class="setting-label">Active Window</span>
+                <div class="setting-desc">Only sync during these hours. Leave blank for all day.</div>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <TimePicker value={fitbitSyncWindowStartVal} placeholder="Start" on:change={e => { fitbitSyncWindowStartVal = e.detail; fitbitSyncWindowStart.set(e.detail || null); }} />
+                <span style="color:var(--text-3)">to</span>
+                <TimePicker value={fitbitSyncWindowEndVal} placeholder="End" on:change={e => { fitbitSyncWindowEndVal = e.detail; fitbitSyncWindowEnd.set(e.detail || null); }} />
+              </div>
             </div>
-          </div>
+          {/if}
         {/if}
         <div class="setting-divider"></div>
         {#if fitbitConnectionStatus === null}
@@ -729,17 +736,24 @@
             </div>
           </div>
           <div class="setting-divider"></div>
-          <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px">
-            <div>
-              <span class="setting-label">Active Window</span>
-              <div class="setting-desc">Only sync during these hours. Leave blank for all day.</div>
+          {#if garminSyncIntervalVal >= 1440}
+            <div class="setting-row">
+              <span class="setting-label">Sync At</span>
+              <TimePicker value={garminSyncWindowStartVal || '14:00'} on:change={e => { garminSyncWindowStartVal = e.detail; garminSyncWindowStart.set(e.detail); garminSyncWindowEnd.set(null); }} />
             </div>
-            <div style="display:flex;gap:8px;align-items:center">
-              <TimePicker value={garminSyncWindowStartVal} placeholder="Start" on:change={e => { garminSyncWindowStartVal = e.detail; garminSyncWindowStart.set(e.detail || null); }} />
-              <span style="color:var(--text-3)">to</span>
-              <TimePicker value={garminSyncWindowEndVal} placeholder="End" on:change={e => { garminSyncWindowEndVal = e.detail; garminSyncWindowEnd.set(e.detail || null); }} />
+          {:else}
+            <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px">
+              <div>
+                <span class="setting-label">Active Window</span>
+                <div class="setting-desc">Only sync during these hours. Leave blank for all day.</div>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <TimePicker value={garminSyncWindowStartVal} placeholder="Start" on:change={e => { garminSyncWindowStartVal = e.detail; garminSyncWindowStart.set(e.detail || null); }} />
+                <span style="color:var(--text-3)">to</span>
+                <TimePicker value={garminSyncWindowEndVal} placeholder="End" on:change={e => { garminSyncWindowEndVal = e.detail; garminSyncWindowEnd.set(e.detail || null); }} />
+              </div>
             </div>
-          </div>
+          {/if}
         {/if}
         <div class="setting-divider"></div>
         {#if garminConnectionStatus === null}
@@ -903,17 +917,24 @@
             </div>
           </div>
           <div class="setting-divider"></div>
-          <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px">
-            <div>
-              <span class="setting-label">Active Window</span>
-              <div class="setting-desc">Only sync during these hours. Leave blank for all day.</div>
+          {#if withingsSyncIntervalVal >= 1440}
+            <div class="setting-row">
+              <span class="setting-label">Sync At</span>
+              <TimePicker value={withingsSyncWindowStartVal || '14:00'} on:change={e => { withingsSyncWindowStartVal = e.detail; withingsSyncWindowStart.set(e.detail); withingsSyncWindowEnd.set(null); }} />
             </div>
-            <div style="display:flex;gap:8px;align-items:center">
-              <TimePicker value={withingsSyncWindowStartVal} placeholder="Start" on:change={e => { withingsSyncWindowStartVal = e.detail; withingsSyncWindowStart.set(e.detail || null); }} />
-              <span style="color:var(--text-3)">to</span>
-              <TimePicker value={withingsSyncWindowEndVal} placeholder="End" on:change={e => { withingsSyncWindowEndVal = e.detail; withingsSyncWindowEnd.set(e.detail || null); }} />
+          {:else}
+            <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px">
+              <div>
+                <span class="setting-label">Active Window</span>
+                <div class="setting-desc">Only sync during these hours. Leave blank for all day.</div>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <TimePicker value={withingsSyncWindowStartVal} placeholder="Start" on:change={e => { withingsSyncWindowStartVal = e.detail; withingsSyncWindowStart.set(e.detail || null); }} />
+                <span style="color:var(--text-3)">to</span>
+                <TimePicker value={withingsSyncWindowEndVal} placeholder="End" on:change={e => { withingsSyncWindowEndVal = e.detail; withingsSyncWindowEnd.set(e.detail || null); }} />
+              </div>
             </div>
-          </div>
+          {/if}
         {/if}
         <div class="setting-divider"></div>
         {#if withingsConnectionStatus === null}
@@ -1076,17 +1097,24 @@
               </div>
             </div>
             <div class="setting-divider"></div>
-            <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px">
-              <div>
-                <span class="setting-label">Active Window</span>
-                <div class="setting-desc">Only sync during these hours. Leave blank for all day.</div>
+            {#if hcSyncIntervalVal >= 1440}
+              <div class="setting-row">
+                <span class="setting-label">Sync At</span>
+                <TimePicker value={hcSyncWindowStartVal || '14:00'} on:change={e => { hcSyncWindowStartVal = e.detail; healthConnectSyncWindowStart.set(e.detail); healthConnectSyncWindowEnd.set(null); }} />
               </div>
-              <div style="display:flex;gap:8px;align-items:center">
-                <TimePicker value={hcSyncWindowStartVal} placeholder="Start" on:change={e => { hcSyncWindowStartVal = e.detail; healthConnectSyncWindowStart.set(e.detail || null); }} />
-                <span style="color:var(--text-3)">to</span>
-                <TimePicker value={hcSyncWindowEndVal} placeholder="End" on:change={e => { hcSyncWindowEndVal = e.detail; healthConnectSyncWindowEnd.set(e.detail || null); }} />
+            {:else}
+              <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px">
+                <div>
+                  <span class="setting-label">Active Window</span>
+                  <div class="setting-desc">Only sync during these hours. Leave blank for all day.</div>
+                </div>
+                <div style="display:flex;gap:8px;align-items:center">
+                  <TimePicker value={hcSyncWindowStartVal} placeholder="Start" on:change={e => { hcSyncWindowStartVal = e.detail; healthConnectSyncWindowStart.set(e.detail || null); }} />
+                  <span style="color:var(--text-3)">to</span>
+                  <TimePicker value={hcSyncWindowEndVal} placeholder="End" on:change={e => { hcSyncWindowEndVal = e.detail; healthConnectSyncWindowEnd.set(e.detail || null); }} />
+                </div>
               </div>
-            </div>
+            {/if}
           {/if}
           <div class="setting-divider"></div>
           <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px">

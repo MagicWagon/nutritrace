@@ -84,15 +84,25 @@ function _shouldDeviceSync(userId, deviceKey, local) {
   const mode = _getUserSetting(userId, `${deviceKey}SyncMode`) ?? _getUserSetting(userId, 'wellnessSyncMode');
   if (mode !== 'scheduled') return false;
 
-  // Active window check — skip if outside the configured hours
   const winStart = _getUserSetting(userId, `${deviceKey}SyncWindowStart`);
   const winEnd   = _getUserSetting(userId, `${deviceKey}SyncWindowEnd`);
+  const interval = _getUserSetting(userId, `${deviceKey}SyncInterval`) ?? 1440;
+  const curMin   = local.hour * 60 + local.minute;
+
+  // Daily "Sync At" mode: windowStart set, windowEnd null → sync at a specific time
+  if (interval >= 1440 && winStart && !winEnd) {
+    const [sh, sm] = winStart.split(':').map(Number);
+    const targetMin = sh * 60 + sm;
+    const diff = curMin - targetMin;
+    return diff >= 0 && diff < 15; // within 15-min window of target time
+  }
+
+  // Active window check — skip if outside the configured hours
   if (winStart && winEnd) {
     const [sh, sm] = winStart.split(':').map(Number);
     const [eh, em] = winEnd.split(':').map(Number);
     const startMin = sh * 60 + sm;
     const endMin   = eh * 60 + em;
-    const curMin   = local.hour * 60 + local.minute;
     // Handle overnight windows (e.g., 22:00–06:00)
     if (startMin < endMin) {
       if (curMin < startMin || curMin >= endMin) return false;
