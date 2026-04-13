@@ -75,7 +75,7 @@ export function isEmailConfigured() {
 const _FONT = `-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif`;
 
 function emailWrapper(origin, bodyHtml, footerNote, preheaderText) {
-  const logoUrl = `${origin}/icons/logo.png`;
+  const logoUrl = `${origin}/icons/logo-email.png`;
   const year    = new Date().getFullYear();
   const preheader = preheaderText
     ? `<div style="display:none;font-size:1px;color:#0A0B0F;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">${preheaderText}</div>`

@@ -1575,6 +1575,14 @@
   }
 
   let showClearSettingsDialog = false;
+  let showDeleteAccountDialog = false;
+  async function deleteMyAccount() {
+    try {
+      await fetch(apiUrl('/api/auth/me'), { method: 'DELETE', ..._fetchOpts() });
+      localStorage.clear();
+      window.location.href = '/';
+    } catch (e) { showError(e.message || 'Account deletion failed'); }
+  }
   async function clearAllSettings() {
     try {
       await fetch(apiUrl('/api/settings'), { method: 'DELETE', ..._fetchOpts() });
@@ -3360,6 +3368,17 @@
             </div>
             <span class="material-symbols-rounded" style="font-size:18px;color:var(--danger);flex-shrink:0">chevron_right</span>
           </button>
+          {#if $userMgmtActive && $currentUser}
+            <div class="setting-divider"></div>
+            <button class="setting-row setting-action danger" on:click={() => showDeleteAccountDialog = true}>
+              <span class="material-symbols-rounded si" style="color:var(--danger)">person_remove</span>
+              <div>
+                <span class="setting-label" style="color:var(--danger)">Delete my account</span>
+                <div class="setting-desc">Permanently deletes your account and all associated data. This cannot be undone.</div>
+              </div>
+              <span class="material-symbols-rounded" style="font-size:18px;color:var(--danger);flex-shrink:0">chevron_right</span>
+            </button>
+          {/if}
         </div>
 
       </div>
@@ -3580,6 +3599,15 @@
   cancelText="Cancel"
   dangerous
   on:confirm={clearAllSettings}
+/>
+
+<Dialog bind:open={showDeleteAccountDialog}
+  title="Delete your account?"
+  message="This will permanently delete your account and ALL your data — diary entries, foods, meals, recipes, body stats, wellness data, chat history, and settings. This action cannot be undone."
+  confirmText="Delete my account"
+  cancelText="Cancel"
+  dangerous
+  on:confirm={deleteMyAccount}
 />
 
 <Dialog bind:open={showRestoreDialog}

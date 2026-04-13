@@ -162,6 +162,21 @@ router.get('/users', requireAuth, requireAdmin, wrap((req, res) => {
   res.json(users);
 }));
 
+// ── Self-service: delete own account ───────────────────────────────────────
+router.delete('/me', requireAuth, wrap((req, res) => {
+  const userId = req.user.id;
+  // Prevent the last admin from deleting themselves (would lock out the instance)
+  const admins = db.prepare(`SELECT COUNT(*) as count FROM users WHERE role = 'admin'`).get();
+  const user = db.prepare('SELECT role FROM users WHERE id = ?').get(userId);
+  if (user?.role === 'admin' && admins.count <= 1) {
+    return res.status(400).json({ error: 'Cannot delete the only admin account. Transfer admin to another user first.' });
+  }
+  // CASCADE handles foods, meals, diary, settings, wellness_data, ai_chat_history, etc.
+  db.prepare('DELETE FROM users WHERE id = ?').run(userId);
+  res.clearCookie('nt_token');
+  res.json({ ok: true });
+}));
+
 // ── Admin: delete user ─────────────────────────────────────────────────────
 router.delete('/users/:id', requireAuth, requireAdmin, wrap((req, res) => {
   const id = parseInt(req.params.id);
