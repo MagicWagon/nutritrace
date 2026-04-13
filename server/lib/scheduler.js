@@ -138,19 +138,42 @@ async function _syncWellness(userId) {
   const local = _getUserLocalTime(userId);
   const today = local.dateStr;
 
+  /** Compute the sync "from" date using the user's configured sync range for a device */
+  function _fromDate(deviceKey) {
+    const range = _getUserSetting(userId, `${deviceKey}SyncRange`) ?? _getUserSetting(userId, 'wellnessSyncRange') ?? 7;
+    const d = new Date(); d.setDate(d.getDate() - (range - 1));
+    return d.toISOString().slice(0, 10);
+  }
+
   // Fitbit
   const hasFitbit = db.prepare('SELECT 1 FROM fitbit_tokens WHERE user_id=?').get(userId);
   if (hasFitbit && _shouldDeviceSync(userId, 'fitbit', local)
       && !_ranRecently(userId, 'fitbit_sync', _dedupWindow(userId, 'fitbit'))) {
+    const from = _fromDate('wellness'); // Fitbit uses shared wellnessSyncRange
     try {
       const { syncDate, syncWorkouts } = await import('../routes/fitbit.js');
-      logger.info(`[scheduler] Fitbit sync for user ${userId} date ${today}`);
-      const { metrics, errors } = await syncDate(userId, today);
-      logger.info(`[scheduler] Fitbit sync done: ${Object.keys(metrics || {}).length} metrics, ${errors?.length || 0} errors`);
-      // Also sync workouts (activity logs) — same schedule as metrics
+      logger.info(`[scheduler] Fitbit sync for user ${userId}: ${from} → ${today}`);
+      // Fitbit syncDate is per-day — loop the range
+      const start = new Date(from + 'T12:00:00');
+      const end   = new Date(today + 'T12:00:00');
+      let totalMetrics = 0, totalErrors = 0;
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const dateStr = d.toISOString().slice(0, 10);
+        try {
+          const { metrics, errors } = await syncDate(userId, dateStr);
+          totalMetrics += Object.keys(metrics || {}).length;
+          totalErrors += (errors?.length || 0);
+        } catch (e) {
+          if (e.message?.includes('429')) { logger.warn(`[scheduler] Fitbit rate limited at ${dateStr}`); break; }
+          totalErrors++;
+        }
+        if (d < end) await new Promise(r => setTimeout(r, 250)); // throttle
+      }
+      logger.info(`[scheduler] Fitbit sync done: ${totalMetrics} metrics across ${from}→${today}, ${totalErrors} errors`);
+      // Also sync workouts (activity logs)
       if (_getUserSetting(userId, 'workoutsEnabled')) {
         try {
-          const wResult = await syncWorkouts(userId, today, today);
+          const wResult = await syncWorkouts(userId, from, today);
           logger.info(`[scheduler] Fitbit workouts synced: ${wResult?.synced || 0}`);
         } catch (we) {
           logger.debug(`[scheduler] Fitbit workout sync skipped: ${we.message}`);
@@ -166,10 +189,11 @@ async function _syncWellness(userId) {
   const hasWithings = db.prepare('SELECT 1 FROM withings_tokens WHERE user_id=?').get(userId);
   if (hasWithings && _shouldDeviceSync(userId, 'withings', local)
       && !_ranRecently(userId, 'withings_sync', _dedupWindow(userId, 'withings'))) {
+    const from = _fromDate('withings');
     try {
       const { syncRange } = await import('../routes/withings.js');
-      logger.info(`[scheduler] Withings sync for user ${userId} date ${today}`);
-      const result = await syncRange(userId, today, today);
+      logger.info(`[scheduler] Withings sync for user ${userId}: ${from} → ${today}`);
+      const result = await syncRange(userId, from, today);
       logger.info(`[scheduler] Withings sync done: ${result?.dates || 0} dates`);
     } catch (e) {
       logger.warn(`[scheduler] Withings sync error for user ${userId}: ${e.message}`);
@@ -181,10 +205,11 @@ async function _syncWellness(userId) {
   const hasGarmin = db.prepare('SELECT 1 FROM garmin_tokens WHERE user_id=?').get(userId);
   if (hasGarmin && _shouldDeviceSync(userId, 'garmin', local)
       && !_ranRecently(userId, 'garmin_sync', _dedupWindow(userId, 'garmin'))) {
+    const from = _fromDate('garmin');
     try {
       const { syncRange } = await import('../routes/garmin.js');
-      logger.info(`[scheduler] Garmin sync for user ${userId} date ${today}`);
-      const result = await syncRange(userId, today, today);
+      logger.info(`[scheduler] Garmin sync for user ${userId}: ${from} → ${today}`);
+      const result = await syncRange(userId, from, today);
       logger.info(`[scheduler] Garmin sync done: ${result?.synced || 0} synced`);
     } catch (e) {
       logger.warn(`[scheduler] Garmin sync error for user ${userId}: ${e.message}`);
