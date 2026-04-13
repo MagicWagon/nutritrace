@@ -143,10 +143,19 @@ async function _syncWellness(userId) {
   if (hasFitbit && _shouldDeviceSync(userId, 'fitbit', local)
       && !_ranRecently(userId, 'fitbit_sync', _dedupWindow(userId, 'fitbit'))) {
     try {
-      const { syncDate } = await import('../routes/fitbit.js');
+      const { syncDate, syncWorkouts } = await import('../routes/fitbit.js');
       logger.info(`[scheduler] Fitbit sync for user ${userId} date ${today}`);
       const { metrics, errors } = await syncDate(userId, today);
       logger.info(`[scheduler] Fitbit sync done: ${Object.keys(metrics || {}).length} metrics, ${errors?.length || 0} errors`);
+      // Also sync workouts (activity logs) — same schedule as metrics
+      if (_getUserSetting(userId, 'workoutsEnabled')) {
+        try {
+          const wResult = await syncWorkouts(userId, today, today);
+          logger.info(`[scheduler] Fitbit workouts synced: ${wResult?.synced || 0}`);
+        } catch (we) {
+          logger.debug(`[scheduler] Fitbit workout sync skipped: ${we.message}`);
+        }
+      }
     } catch (e) {
       logger.warn(`[scheduler] Fitbit sync error for user ${userId}: ${e.message}`);
       try { const { alertSyncFailure } = await import('./push-notify.js'); alertSyncFailure(userId, `Scheduled Fitbit sync failed: ${e.message}`); } catch {}

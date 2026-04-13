@@ -624,12 +624,11 @@ router.get('/workouts/:id', wrap((req, res) => {
   res.json({ ...row, gps_data: row.gps_data ? JSON.parse(row.gps_data) : null, has_gps: !!row.has_gps });
 }));
 
-// ── POST /workouts/sync — fetch activity logs from Fitbit API ─────────────────
-router.post('/workouts/sync', wrap(async (req, res) => {
-  const u = uid(req);
-  const { from, to } = req.body;
+// ── Workout sync (shared by route handler + scheduler) ────────────────────────
+async function _syncWorkouts(userId, from, to) {
   const afterDate = from || new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
   const beforeDate = to || new Date().toISOString().slice(0, 10);
+  const u = userId;
 
   // Fetch activity log list
   logger.info(`[fitbit] fetching activity logs for user ${u}: ${afterDate} → ${beforeDate}`);
@@ -726,7 +725,12 @@ router.post('/workouts/sync', wrap(async (req, res) => {
     } catch {}
   }
 
-  res.json({ ok: true, synced, total: activities.length });
+  return { ok: true, synced, total: activities.length };
+}
+
+router.post('/workouts/sync', wrap(async (req, res) => {
+  const result = await _syncWorkouts(uid(req), req.body.from, req.body.to);
+  res.json(result);
 }));
 
 // ── POST /workouts/:sourceId/gps — fetch TCX GPS data for a specific workout ──
@@ -799,5 +803,5 @@ router.delete('/disconnect', wrap((req, res) => {
   res.json({ ok: true });
 }));
 
-export { _syncDate as syncDate };
+export { _syncDate as syncDate, _syncWorkouts as syncWorkouts };
 export default router;
