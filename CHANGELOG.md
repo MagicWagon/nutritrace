@@ -5,6 +5,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.0-beta] — 2026-04-12
+
+### Added
+- **Self-service account deletion** — users can delete their own account and all associated data from Settings → Data & Privacy → Danger Zone. Cascades all foods, meals, diary, settings, wellness data, chat history. Prevents the last admin from deleting themselves.
+- **Per-device sync scheduling** — each connected service (Fitbit, Garmin, Withings, Health Connect) now has independent sync controls: mode (auto/scheduled/manual), interval (30min to daily), and active window. Daily interval shows a "Sync At" time picker; sub-daily shows start/end active window. Falls back to legacy shared settings for existing users.
+- **Diary item Replace action** — long-press a diary item → Replace opens the food picker in the same meal slot. Picks a new food, deletes the old one. Context menu reordered: Edit, Replace, Move to meal, Select multiple, Delete.
+- **Mandatory account creation on PWA** — server blocks all data APIs (503) when no users exist. First visit forces account creation via the wizard. Android local mode unchanged.
+
+### Changed
+- **Email templates polished** — added greeting lines, hidden preheader text for inbox previews, unified accent green (#00C47A), section headers via helper, stat row units dimmed, unsubscribe moved to footer slot. Optimized email logo from 1.1MB to 19KB (120x120 retina).
+- **Wellness tab renamed** — "Movement" → "Activity" (matches Fitbit, Garmin, Apple Health conventions).
+- **Recipe portion sheet unified** — now uses the shared Sheet component matching the diary food picker layout (side-by-side serving size + unit, total amount summary bar).
+- **Notifications badge removed** — "Experimental" label removed from Notifications section header.
+- **Time format respected everywhere** — TimePicker, water logs, workout times, FitBot chat timestamps all honor the 12h/24h setting. TimePicker shows 24h grid (00-23) when configured.
+- **Readiness/stress formulas tuned** (6-day calibration) — readiness: HRV concave power curve (pow 0.7, gain 80), weights 0.75/0.05/0.12+4, MAE 7.3→4.5. Stress: sleep weight 0.60, HRV gain 40, smoothing 0.40/0.60, MAE 6.0→3.17.
+
+### Fixed
+- **PWA stale cache** — replaced NavigateFallback with NetworkFirst for navigation. Deploys are picked up on next page load; no more manual cache clears.
+- **FitBot false unread dot** — persisted seen count in localStorage so component remounts don't show phantom notifications.
+- **Recipe portion sheet backdrop** — clicking outside no longer cancels ingredient input; only the X button dismisses.
+- **Scheduler dedup persistent** — all notification timestamps stored in app_config DB (survives container restarts). Weekly summary dedup check moved after day/hour gate so timestamp only burns on actual send.
+- **Sync timeout** — POST/PUT/DELETE pass-through uses 30s timeout (was 3s, causing Fitbit/Garmin/Withings sync failures on Android).
+
+---
+
 ## [0.38.9-beta] — 2026-04-11
 
 ### Fixed
