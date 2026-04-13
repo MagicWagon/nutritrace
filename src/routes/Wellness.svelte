@@ -1,7 +1,7 @@
 <script>
   import { onMount, onDestroy, tick } from 'svelte';
   import { wellnessMetrics, wellnessSyncMode, wellnessSyncRange, distUnit, tempUnit, pageBanners, dateFormat, withingsSyncRange as withingsSyncRangeSetting, fitbitEnabled, withingsEnabled, garminEnabled, garminSyncRange as garminSyncRangeSetting, weightUnit, goals, goalCelebrations, disableAnimations,
-    fitbitSyncMode, withingsSyncMode, garminSyncMode, timeFormat } from '../stores/settings.js';
+    fitbitSyncMode, withingsSyncMode, garminSyncMode, healthConnectSyncMode, timeFormat } from '../stores/settings.js';
   import Chart from 'chart.js/auto';
   import WellnessBanner from '../components/banners/WellnessBanner.svelte';
   import { showSuccess, showError } from '../stores/toast.js';
@@ -1095,8 +1095,10 @@
         if (!last || Date.now() - Number(last) > cooldownMs) {
           const fitbitMode  = $fitbitSyncMode  ?? $wellnessSyncMode;
           const garminMode_ = $garminSyncMode  ?? $wellnessSyncMode;
+          const hcMode_     = $healthConnectSyncMode ?? $wellnessSyncMode;
           if (status.connected && fitbitMode === 'auto')        { await sync(true); syncWorkouts(); }
           if (garminStatus?.connected && garminMode_ === 'auto') await syncGarmin(true);
+          if ($healthConnectEnabled && hcMode_ === 'auto')       syncHealthConnectManual();
         }
       }
     } else {
@@ -1124,8 +1126,10 @@
       if (!last || Date.now() - Number(last) > cooldownMs) {
         const fitbitMode  = $fitbitSyncMode  ?? $wellnessSyncMode;
         const garminMode_ = $garminSyncMode  ?? $wellnessSyncMode;
+        const hcMode_     = $healthConnectSyncMode ?? $wellnessSyncMode;
         if (status.connected && fitbitMode === 'auto')        await sync(true);
         if (garminStatus?.connected && garminMode_ === 'auto') await syncGarmin(true);
+        if ($healthConnectEnabled && hcMode_ === 'auto')       syncHealthConnectManual();
       }
     }
   }

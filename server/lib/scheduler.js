@@ -151,7 +151,7 @@ async function _syncWellness(userId) {
       && !_ranRecently(userId, 'fitbit_sync', _dedupWindow(userId, 'fitbit'))) {
     const from = _fromDate('wellness'); // Fitbit uses shared wellnessSyncRange
     try {
-      const { syncDate, syncWorkouts } = await import('../routes/fitbit.js');
+      const { syncDate, syncWorkouts, _checkWellnessAlerts } = await import('../routes/fitbit.js');
       logger.info(`[scheduler] Fitbit sync for user ${userId}: ${from} → ${today}`);
       // Fitbit syncDate is per-day — loop the range
       const start = new Date(from + 'T12:00:00');
@@ -163,6 +163,23 @@ async function _syncWellness(userId) {
           const { metrics, errors } = await syncDate(userId, dateStr);
           totalMetrics += Object.keys(metrics || {}).length;
           totalErrors += (errors?.length || 0);
+          // Wellness alerts + step goal for today's data only
+          if (dateStr === today && metrics) {
+            try {
+              if (_checkWellnessAlerts) await _checkWellnessAlerts(userId, metrics);
+            } catch {}
+            if (metrics.steps) {
+              try {
+                const { notifyStepGoal } = await import('./push-notify.js');
+                const goalRow = db.prepare('SELECT value FROM user_settings WHERE user_id=? AND key=?').get(userId, 'goals');
+                if (goalRow?.value) {
+                  const goals = JSON.parse(goalRow.value);
+                  const stepGoal = goals.steps?.min || goals.steps?.max;
+                  if (stepGoal) notifyStepGoal(userId, metrics.steps, stepGoal);
+                }
+              } catch {}
+            }
+          }
         } catch (e) {
           if (e.message?.includes('429')) { logger.warn(`[scheduler] Fitbit rate limited at ${dateStr}`); break; }
           totalErrors++;

@@ -803,5 +803,5 @@ router.delete('/disconnect', wrap((req, res) => {
   res.json({ ok: true });
 }));
 
-export { _syncDate as syncDate, _syncWorkouts as syncWorkouts };
+export { _syncDate as syncDate, _syncWorkouts as syncWorkouts, _checkWellnessAlerts };
 export default router;
