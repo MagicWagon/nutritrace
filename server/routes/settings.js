@@ -66,6 +66,22 @@ router.delete('/', wrap((req, res) => {
   res.json({ ok: true });
 }));
 
+// POST /api/settings/claim-celebration — atomically claim a goal celebration for today
+// Returns { fired: true } if this caller is the first to fire it, false if already fired.
+// Prevents duplicate celebrations across multiple devices (phone + PWA).
+router.post('/claim-celebration', wrap((req, res) => {
+  const { key } = req.body;
+  if (!key || typeof key !== 'string') return res.status(400).json({ error: 'key required' });
+  const userId = req.user?.id ?? 0;
+  const today = new Date().toISOString().slice(0, 10);
+  const dbKey = `_celeb_${userId}_${key}_${today}`;
+  const row = db.prepare('SELECT value FROM app_config WHERE key = ?').get(dbKey);
+  if (row?.value) return res.json({ fired: false });
+  db.prepare('INSERT INTO app_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+    .run(dbKey, '1');
+  res.json({ fired: true });
+}));
+
 // POST /api/settings/gotify-test — legacy alias
 router.post('/gotify-test', wrap(async (req, res) => {
   req.body.service = 'gotify';

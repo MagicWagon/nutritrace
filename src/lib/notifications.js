@@ -284,6 +284,19 @@ const GOAL_UNITS = {
  * @param {Object} goals — the user's goals object { calories: { min, max }, proteins: { min }, ... }
  * @param {Object} values — current totals { calories: 1850, proteins: 120, ... }
  */
+/** Ask the server to atomically claim this celebration. Returns true if this caller
+ *  is the first to fire it today. Falls back to local-only dedup if the request fails. */
+async function _claimCelebrationServer(key) {
+  try {
+    const { NtApi } = await import('./api.js');
+    const res = await NtApi.post('/api/settings/claim-celebration', { key });
+    return !!res?.fired;
+  } catch {
+    // Network error / native local mode — fall back to local-only dedup
+    return true;
+  }
+}
+
 export async function checkGoals(goals, values) {
   if (!goals || !values) return;
   _resetCelebrations();
@@ -304,8 +317,12 @@ export async function checkGoals(goals, values) {
 
     // Goal celebration: hit min target OR reached max target
     if ((goal.min != null && val >= goal.min) || (goal.max != null && val >= goal.max)) {
+      // Mark local first (fast), then claim server-side. If server says "already
+      // fired", we skip — cross-device dedup.
       _celebratedToday.add(celebKey);
       _persistCelebrations();
+      const serverClaimed = await _claimCelebrationServer(key);
+      if (!serverClaimed) { console.log(`[notifications] ${key} already celebrated on another device`); continue; }
       const label = GOAL_LABELS[key] || key;
       const unit = GOAL_UNITS[key] || '';
       const tgt = goal.min ?? goal.max;
@@ -318,6 +335,9 @@ export async function checkGoals(goals, values) {
     if (key === 'calories' && goal.max != null && val >= goal.max) {
       if (!_celebratedToday.has('cal_max')) {
         _celebratedToday.add('cal_max');
+        _persistCelebrations();
+        const serverClaimed = await _claimCelebrationServer('cal_max');
+        if (!serverClaimed) continue;
         await notify('notifCalorieGoal', '🔥 Calorie Target Reached',
           `You've hit ${Math.round(val).toLocaleString()} kcal — your daily target is ${Math.round(goal.max).toLocaleString()} kcal`, 6);
       }
@@ -337,6 +357,8 @@ export async function checkStepGoal(steps, goal) {
   if (steps >= goal && !_celebratedToday.has('steps_hit')) {
     _celebratedToday.add('steps_hit');
     _persistCelebrations();
+    const serverClaimed = await _claimCelebrationServer('steps_hit');
+    if (!serverClaimed) return;
     await notify('notifStepGoal', '👟 Step Goal Reached!',
       `You've walked ${steps.toLocaleString()} steps — goal was ${goal.toLocaleString()}!`, 5);
   } else if (!_celebratedToday.has('steps_midday')) {
@@ -344,6 +366,8 @@ export async function checkStepGoal(steps, goal) {
     if (hour >= 12 && hour <= 14 && steps < goal * 0.5) {
       _celebratedToday.add('steps_midday');
       _persistCelebrations();
+      const serverClaimed = await _claimCelebrationServer('steps_midday');
+      if (!serverClaimed) return;
       const remaining = goal - steps;
       await notify('notifStepGoal', '🚶 Step Goal Progress',
         `You're at ${steps.toLocaleString()} steps — ${remaining.toLocaleString()} to go!`, 4);
