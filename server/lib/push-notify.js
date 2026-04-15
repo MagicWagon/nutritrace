@@ -8,6 +8,24 @@
 import db from '../db.js';
 import { logger } from '../logger.js';
 
+// Cleanup stale dedup keys older than 7 days (runs once at module load)
+// Key format: _goal_<userId>_<type>_<YYYY-MM-DD> — extract date suffix
+try {
+  const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+  const rows = db.prepare(`SELECT key FROM app_config WHERE key LIKE '_goal_%'`).all();
+  const stale = rows.filter(r => {
+    const m = r.key.match(/_(\d{4}-\d{2}-\d{2})$/);
+    return m && m[1] < sevenDaysAgo;
+  });
+  if (stale.length > 0) {
+    const del = db.prepare('DELETE FROM app_config WHERE key = ?');
+    for (const r of stale) del.run(r.key);
+    logger.debug(`[push] cleaned up ${stale.length} stale dedup keys`);
+  }
+} catch (e) {
+  logger.debug(`[push] dedup cleanup failed: ${e.message}`);
+}
+
 function _getUserSetting(userId, key) {
   const row = db.prepare('SELECT value FROM user_settings WHERE user_id = ? AND key = ?').get(userId, key);
   if (!row?.value) return '';
@@ -98,18 +116,9 @@ export async function pushNotify(userId, settingKey, title, message, priority = 
   return _pushToService(userId, title, message, priority);
 }
 
-export function alertWellness(userId, message) {
-  return pushNotify(userId, 'notifWellnessAlerts', '⚠️ Wellness Alert', message, 7);
-}
-
-export function notifyWorkout(userId, message) {
-  return pushNotify(userId, 'notifWorkoutSummary', '🏋️ Workout Complete', message, 5);
-}
-
-export function alertSyncFailure(userId, message) {
-  return pushNotify(userId, 'notifSyncFailures', '🔄 Sync Issue', message, 8);
-}
-
+// Persistent per-day dedup — prevents the same notification firing multiple times
+// for the same event on the same day (e.g., steps hit goal → every Fitbit sync would
+// re-fire without this). Stored in app_config so it survives server restarts.
 function _firedToday(userId, key) {
   const today = new Date().toISOString().slice(0, 10);
   const dbKey = `_goal_${userId}_${key}_${today}`;
@@ -118,6 +127,34 @@ function _firedToday(userId, key) {
   db.prepare('INSERT INTO app_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
     .run(dbKey, '1');
   return false;
+}
+
+// Hash a message so we can dedup on content (for wellness alerts — different messages
+// for HRV drop vs sleep decline should both fire, but same one shouldn't repeat)
+function _msgHash(msg) {
+  let h = 0;
+  for (let i = 0; i < msg.length; i++) h = ((h << 5) - h + msg.charCodeAt(i)) | 0;
+  return String(h);
+}
+
+export function alertWellness(userId, message) {
+  // Dedup per message content per day — different alerts fire, same one doesn't repeat
+  if (_firedToday(userId, `wellness_${_msgHash(message)}`)) return;
+  return pushNotify(userId, 'notifWellnessAlerts', '⚠️ Wellness Alert', message, 7);
+}
+
+export function notifyWorkout(userId, message) {
+  // Dedup per message — new workouts have unique names/durations/calories, same
+  // workout re-syncing won't re-fire
+  if (_firedToday(userId, `workout_${_msgHash(message)}`)) return;
+  return pushNotify(userId, 'notifWorkoutSummary', '🏋️ Workout Complete', message, 5);
+}
+
+export function alertSyncFailure(userId, message) {
+  // Dedup per service per day — if Fitbit keeps failing, alert once per day, not every tick
+  const service = message.match(/^Scheduled (\w+) sync/i)?.[1]?.toLowerCase() || 'sync';
+  if (_firedToday(userId, `syncfail_${service}`)) return;
+  return pushNotify(userId, 'notifSyncFailures', '🔄 Sync Issue', message, 8);
 }
 
 export function notifyStepGoal(userId, steps, goal) {
