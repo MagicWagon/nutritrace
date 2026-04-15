@@ -110,19 +110,32 @@ export function alertSyncFailure(userId, message) {
   return pushNotify(userId, 'notifSyncFailures', '🔄 Sync Issue', message, 8);
 }
 
+function _firedToday(userId, key) {
+  const today = new Date().toISOString().slice(0, 10);
+  const dbKey = `_goal_${userId}_${key}_${today}`;
+  const row = db.prepare('SELECT value FROM app_config WHERE key = ?').get(dbKey);
+  if (row?.value) return true;
+  db.prepare('INSERT INTO app_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+    .run(dbKey, '1');
+  return false;
+}
+
 export function notifyStepGoal(userId, steps, goal) {
   if (steps >= goal) {
+    if (_firedToday(userId, 'stepsReached')) return;
     return pushNotify(userId, 'notifStepGoal', '👟 Step Goal Reached!',
       `${steps.toLocaleString()} steps — goal was ${goal.toLocaleString()}!`, 5);
   }
   const hour = new Date().getHours();
   if (hour >= 12 && hour <= 14 && steps < goal * 0.5) {
+    if (_firedToday(userId, 'stepsMidday')) return;
     return pushNotify(userId, 'notifStepGoal', '🚶 Step Goal Progress',
       `${steps.toLocaleString()} steps so far — ${(goal - steps).toLocaleString()} to go!`, 4);
   }
 }
 
 export function notifyCalorieGoal(userId, calories, goal) {
+  if (_firedToday(userId, 'caloriesReached')) return;
   return pushNotify(userId, 'notifCalorieGoal', '🔥 Calorie Target Reached',
     `${Math.round(calories).toLocaleString()} kcal — daily target is ${Math.round(goal).toLocaleString()} kcal`, 5);
 }
