@@ -151,9 +151,8 @@ async function _syncWellness(userId) {
       && !_ranRecently(userId, 'fitbit_sync', _dedupWindow(userId, 'fitbit'))) {
     const from = _fromDate('wellness'); // Fitbit uses shared wellnessSyncRange
     try {
-      const { syncDate, syncWorkouts, _checkWellnessAlerts } = await import('../routes/fitbit.js');
+      const { syncDate, syncWorkouts } = await import('../routes/fitbit.js');
       logger.info(`[scheduler] Fitbit sync for user ${userId}: ${from} → ${today}`);
-      // Fitbit syncDate is per-day — loop the range
       const start = new Date(from + 'T12:00:00');
       const end   = new Date(today + 'T12:00:00');
       let totalMetrics = 0, totalErrors = 0;
@@ -163,31 +162,13 @@ async function _syncWellness(userId) {
           const { metrics, errors } = await syncDate(userId, dateStr);
           totalMetrics += Object.keys(metrics || {}).length;
           totalErrors += (errors?.length || 0);
-          // Wellness alerts + step goal for today's data only
-          if (dateStr === today && metrics) {
-            try {
-              if (_checkWellnessAlerts) await _checkWellnessAlerts(userId, metrics);
-            } catch {}
-            if (metrics.steps) {
-              try {
-                const { notifyStepGoal } = await import('./push-notify.js');
-                const goalRow = db.prepare('SELECT value FROM user_settings WHERE user_id=? AND key=?').get(userId, 'goals');
-                if (goalRow?.value) {
-                  const goals = JSON.parse(goalRow.value);
-                  const stepGoal = goals.steps?.min || goals.steps?.max;
-                  if (stepGoal) notifyStepGoal(userId, metrics.steps, stepGoal);
-                }
-              } catch {}
-            }
-          }
         } catch (e) {
           if (e.message?.includes('429')) { logger.warn(`[scheduler] Fitbit rate limited at ${dateStr}`); break; }
           totalErrors++;
         }
-        if (d < end) await new Promise(r => setTimeout(r, 250)); // throttle
+        if (d < end) await new Promise(r => setTimeout(r, 250));
       }
       logger.info(`[scheduler] Fitbit sync done: ${totalMetrics} metrics across ${from}→${today}, ${totalErrors} errors`);
-      // Also sync workouts (activity logs)
       if (_getUserSetting(userId, 'workoutsEnabled')) {
         try {
           const wResult = await syncWorkouts(userId, from, today);
@@ -232,6 +213,41 @@ async function _syncWellness(userId) {
       logger.warn(`[scheduler] Garmin sync error for user ${userId}: ${e.message}`);
       try { const { alertSyncFailure } = await import('./push-notify.js'); alertSyncFailure(userId, `Scheduled Garmin sync failed: ${e.message}`); } catch {}
     }
+  }
+
+  // ── Post-sync: goal + wellness alert checks (device-agnostic) ──────────
+  // Read today's merged data from ALL sources and fire alerts/celebrations once.
+  try {
+    const todayMetrics = {};
+    const rows = db.prepare(
+      `SELECT metric_type, value FROM wellness_data WHERE user_id = ? AND date = ? ORDER BY source`
+    ).all(userId, today);
+    for (const r of rows) todayMetrics[r.metric_type] = r.value; // last source wins
+
+    // Step goal
+    if (todayMetrics.steps) {
+      const goalRow = db.prepare('SELECT value FROM user_settings WHERE user_id=? AND key=?').get(userId, 'goals');
+      if (goalRow?.value) {
+        try {
+          const goals = JSON.parse(goalRow.value);
+          const stepGoal = goals.steps?.min || goals.steps?.max;
+          if (stepGoal) {
+            const { notifyStepGoal } = await import('./push-notify.js');
+            notifyStepGoal(userId, todayMetrics.steps, stepGoal);
+          }
+        } catch {}
+      }
+    }
+
+    // Wellness alerts (HRV drop, sleep decline, RHR spike)
+    if (todayMetrics.hrv_daily_rmssd || todayMetrics.sleep_score || todayMetrics.resting_hr) {
+      try {
+        const { _checkWellnessAlerts } = await import('../routes/fitbit.js');
+        if (_checkWellnessAlerts) await _checkWellnessAlerts(userId, todayMetrics);
+      } catch {}
+    }
+  } catch (e) {
+    logger.debug(`[scheduler] post-sync alert check failed: ${e.message}`);
   }
 }
 
