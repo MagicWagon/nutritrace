@@ -630,12 +630,38 @@ async function _syncWorkouts(userId, from, to) {
   const beforeDate = to || new Date().toISOString().slice(0, 10);
   const u = userId;
 
-  // Fetch activity log list
+  // Fetch activity log list — use raw text parsing to preserve logId precision
+  // (Fitbit logIds exceed Number.MAX_SAFE_INTEGER, JSON.parse loses last digits)
   logger.info(`[fitbit] fetching activity logs for user ${u}: ${afterDate} → ${beforeDate}`);
-  const data = await _get(u, `/1/user/-/activities/list.json?afterDate=${afterDate}&sort=asc&offset=0&limit=100`);
+  let tok = await _token(u);
+  let actRes = await fetch(`https://api.fitbit.com/1/user/-/activities/list.json?afterDate=${afterDate}&sort=asc&offset=0&limit=100`, {
+    headers: { Authorization: `Bearer ${tok}` },
+  });
+  if (actRes.status === 401) {
+    tok = await _refresh(u);
+    actRes = await fetch(`https://api.fitbit.com/1/user/-/activities/list.json?afterDate=${afterDate}&sort=asc&offset=0&limit=100`, {
+      headers: { Authorization: `Bearer ${tok}` },
+    });
+  }
+  if (!actRes.ok) throw new Error(`Fitbit activity list ${actRes.status}`);
+  const rawText = await actRes.text();
+  // Extract logId values as strings BEFORE JSON.parse corrupts them
+  const logIdMap = {};
+  for (const m of rawText.matchAll(/"logId"\s*:\s*(\d+)/g)) {
+    logIdMap[m[1]] = m[1]; // store exact string
+  }
+  const data = JSON.parse(rawText);
+  // Restore precise logId strings (JSON.parse rounded them)
+  for (const a of (data.activities || [])) {
+    const imprecise = String(a.logId);
+    // Find the original logId that rounds to this value
+    for (const exact of Object.keys(logIdMap)) {
+      if (String(Number(exact)) === imprecise) { a._exactLogId = exact; break; }
+    }
+  }
   logger.info(`[fitbit] Fitbit returned ${(data.activities || []).length} activities`);
   if ((data.activities || []).length > 0) {
-    logger.debug(`[fitbit] first activity: ${JSON.stringify(data.activities[0]).slice(0, 300)}`);
+    logger.debug(`[fitbit] first activity logId: parsed=${data.activities[0].logId} exact=${data.activities[0]._exactLogId}`);
   }
   const activities = (data.activities || []).filter(a => {
     const d = (a.startDate || a.originalStartTime?.slice(0, 10) || '');
@@ -658,7 +684,7 @@ async function _syncWorkouts(userId, from, to) {
   let synced = 0;
   db.transaction(() => {
     for (const a of activities) {
-      const logId = String(a.logId);
+      const logId = a._exactLogId || String(a.logId);
       const date = a.startDate || a.originalStartTime?.slice(0, 10) || '';
       const activityName = a.activityName || a.name || 'Unknown';
       const activityType = (a.activityTypeId || '').toString();
