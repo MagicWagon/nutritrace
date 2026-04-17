@@ -5,6 +5,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.1-beta] — 2026-04-16
+
+### Added
+- **Scheduled syncs now include workouts** — Fitbit workout activity logs sync alongside metrics on every scheduled cycle (when workoutsEnabled is true).
+- **Full sync range** — all scheduled device syncs (Fitbit, Garmin, Withings) now sync the user's full configured sync range, not just today.
+- **Health Connect goal checks** — HC manual sync triggers step + wellness goal celebrations. Works in local mode (no server needed).
+- **GPS Retry button** — "No GPS data available" placeholder now includes a Retry button.
+- **Device-agnostic goal alerts** — step goal and wellness alerts fire once from merged data across ALL sources after all device syncs complete.
+
+### Fixed
+- **Fitbit logId precision** — logIds exceeding JavaScript's MAX_SAFE_INTEGER were silently rounded by JSON.parse, causing GPS/TCX fetches to fail with wrong IDs. Now extracted as strings from raw JSON before parsing.
+- **GPS flag protection** — `has_gps` can only go 0→1 on re-sync (MAX), never downgrade. Prevents scheduled re-syncs from hiding GPS data when Fitbit API inconsistently returns hasGps:false.
+- **Workout deduplication** — cleans up duplicate workout entries created by logId precision fix (keeps entry with GPS data or newer one).
+- **Step goal notification spam** — three independent paths were firing step notifications with different dedup keys. Unified all paths to use `_celeb_` prefix with matching key names. Steps removed from generic `checkGoals()` to prevent double-fire.
+- **Unified notification dedup** — server push-notify.js and client notifications.js now share the same dedup keys in app_config via `/api/settings/claim-celebration` endpoint. All goal types covered: steps, calories, water, wellness alerts, workouts, sync failures. Works cross-device.
+
+---
+
 ## [0.39.0-beta] — 2026-04-12
 
 ### Added
