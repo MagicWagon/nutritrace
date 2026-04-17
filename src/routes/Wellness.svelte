@@ -2151,6 +2151,9 @@
         <div class="workout-map-placeholder">
           <span class="material-symbols-rounded">map</span>
           <span>No GPS data available</span>
+          <button class="btn btn-ghost" style="margin-top:8px;font-size:13px" on:click={() => _loadGpsData(w)}>
+            <span class="material-symbols-rounded" style="font-size:16px">refresh</span> Retry
+          </button>
         </div>
       {/if}
 

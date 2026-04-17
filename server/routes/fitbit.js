@@ -650,7 +650,7 @@ async function _syncWorkouts(userId, from, to) {
       start_time=excluded.start_time, duration_ms=excluded.duration_ms,
       distance_km=excluded.distance_km, calories=excluded.calories,
       avg_hr=excluded.avg_hr, max_hr=excluded.max_hr, steps=excluded.steps,
-      has_gps=excluded.has_gps, updated_at=excluded.updated_at
+      has_gps=MAX(has_gps, excluded.has_gps), updated_at=excluded.updated_at
   `);
 
   // First pass: upsert workouts with placeholder max_hr, then fetch actual peak HR
