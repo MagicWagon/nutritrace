@@ -318,12 +318,12 @@ export async function fullSync(silent = false) {
       if (metrics.steps && stepGoal) await checkStepGoal(metrics.steps, stepGoal);
 
       // All wellness goals (sleep, active minutes, distance, etc.)
+      // Steps excluded — already handled by checkStepGoal above
       const wellnessValues = {};
       if (metrics.sleep_duration_min) wellnessValues.sleep_duration_min = metrics.sleep_duration_min;
       if (metrics.active_minutes) wellnessValues.active_minutes = metrics.active_minutes;
       if (metrics.distance_km) wellnessValues.distance_km = metrics.distance_km;
       if (metrics.calories_out) wellnessValues.calories_out = metrics.calories_out;
-      if (metrics.steps) wellnessValues.steps = metrics.steps;
       if (Object.keys(wellnessValues).length) await checkGoals(goals, wellnessValues);
     } catch {}
 
