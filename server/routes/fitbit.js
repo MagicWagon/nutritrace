@@ -735,6 +735,42 @@ async function _syncWorkouts(userId, from, to) {
     }
   }
 
+  // Clean up duplicate workouts from logId precision issue — keep the entry with
+  // the correct (exact) source_id, delete any older entries with the same
+  // date+start_time+activity that have a different (imprecise) source_id.
+  try {
+    const dupes = db.prepare(`
+      SELECT w1.id FROM workouts w1
+      INNER JOIN workouts w2 ON w1.user_id = w2.user_id AND w1.source = w2.source
+        AND w1.date = w2.date AND w1.start_time = w2.start_time
+        AND w1.activity_name = w2.activity_name AND w1.id != w2.id
+        AND w1.source_id != w2.source_id
+      WHERE w1.user_id = ? AND w1.gps_data IS NULL AND w2.gps_data IS NOT NULL
+    `).all(u);
+    if (dupes.length === 0) {
+      // No GPS-based distinction — just keep the newer one (higher id)
+      const dupes2 = db.prepare(`
+        SELECT w1.id FROM workouts w1
+        INNER JOIN workouts w2 ON w1.user_id = w2.user_id AND w1.source = w2.source
+          AND w1.date = w2.date AND w1.start_time = w2.start_time
+          AND w1.activity_name = w2.activity_name AND w1.id < w2.id
+          AND w1.source_id != w2.source_id
+        WHERE w1.user_id = ?
+      `).all(u);
+      if (dupes2.length > 0) {
+        const del = db.prepare('DELETE FROM workouts WHERE id = ?');
+        for (const d of dupes2) del.run(d.id);
+        logger.info(`[fitbit] cleaned up ${dupes2.length} duplicate workouts (logId precision fix)`);
+      }
+    } else {
+      const del = db.prepare('DELETE FROM workouts WHERE id = ?');
+      for (const d of dupes) del.run(d.id);
+      logger.info(`[fitbit] cleaned up ${dupes.length} duplicate workouts (kept entries with GPS data)`);
+    }
+  } catch (e) {
+    logger.debug(`[fitbit] duplicate cleanup skipped: ${e.message}`);
+  }
+
   logger.info(`[fitbit] synced ${synced} workouts for user ${u} (${afterDate} → ${beforeDate})`);
 
   // Gotify: workout summary for newly synced workouts
