@@ -423,6 +423,23 @@
       if (isNative) await loadLocalWellnessData();
       console.log('[wellness] HC sync done, data keys:', Object.keys(data), '_hasLocalData:', _hasLocalData, 'displayData keys:', Object.keys(displayData));
       showSuccess('Health Connect synced');
+      // Check step + wellness goals after HC sync (works in local mode too)
+      if (dateStr === localDateStr()) {
+        try {
+          const { dbGetWellnessByDate } = await import('../lib/db-native.js');
+          const todayData = await dbGetWellnessByDate(dateStr);
+          const metrics = todayData[dateStr] || {};
+          const { checkStepGoal, checkGoals } = await import('../lib/notifications.js');
+          const goalsObj = DB.getSetting('goals', {});
+          const stepGoal = goalsObj.steps?.min || goalsObj.steps?.max;
+          if (metrics.steps && stepGoal) await checkStepGoal(metrics.steps, stepGoal);
+          const wellnessValues = {};
+          if (metrics.sleep_duration_min) wellnessValues.sleep_duration_min = metrics.sleep_duration_min;
+          if (metrics.active_minutes) wellnessValues.active_minutes = metrics.active_minutes;
+          if (metrics.calories_out) wellnessValues.calories_out = metrics.calories_out;
+          if (Object.keys(wellnessValues).length) await checkGoals(goalsObj, wellnessValues);
+        } catch {}
+      }
     } catch (e) {
       showError('Health Connect sync failed: ' + (e.message || ''));
     }
