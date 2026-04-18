@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.3-beta] — 2026-04-18
+
+### Added
+- **Bedtime reminder** — new notification type for sleep. Evening nudge at user-set time (default 22:30) with optional wind-down pre-reminder (15/30/45/60/90 min before). Smart message toggle adjusts the text based on last night's sleep vs goal (e.g., "You slept 5h last night — prioritize an earlier bedtime"). Fires on server scheduler (push) and native Android worker (local).
+
+### Fixed
+- **Weigh-in reminder skips if already weighed in** — previously fired at the scheduled time regardless. Now checks both `diary.body_stats.weight` (manual entry) and `wellness_data` with `metric_type='weight_kg'` (Withings, Health Connect sync). Fixed on both server scheduler and native Android worker.
+
+---
+
 ## [0.39.2-beta] — 2026-04-17
 
 ### Changed
