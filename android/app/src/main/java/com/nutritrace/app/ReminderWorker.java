@@ -209,10 +209,51 @@ public class ReminderWorker extends Worker {
             String[] hm = time.split(":");
             int targetMin = Integer.parseInt(hm[0]) * 60 + Integer.parseInt(hm[1]);
             if (currentMin < targetMin || currentMin >= targetMin + 15) return;
+            // Skip if already weighed in today (diary.body_stats OR wellness_data)
+            if (hasWeightToday(db, today)) {
+                Log.d(TAG, "skipping weigh-in reminder — already weighed in today");
+                return;
+            }
             postNotification(4000, "⚖️ Weigh-in Reminder", "Time to step on the scale!");
         } catch (Exception e) {
             Log.w(TAG, "weigh-in check failed: " + e.getMessage());
         }
+    }
+
+    /** True if weight was logged today — checks diary.body_stats AND wellness_data. */
+    private boolean hasWeightToday(SQLiteDatabase db, String today) {
+        // Manual diary entry
+        Cursor c = null;
+        try {
+            c = db.rawQuery(
+                "SELECT body_stats FROM diary WHERE date = ? AND deleted_at IS NULL",
+                new String[]{today});
+            if (c.moveToFirst()) {
+                String bsJson = c.getString(0);
+                if (bsJson != null && !bsJson.isEmpty()) {
+                    JSONObject bs = new JSONObject(bsJson);
+                    double w = bs.optDouble("weight", 0);
+                    if (w > 0) return true;
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "body_stats read failed: " + e.getMessage());
+        } finally {
+            if (c != null) c.close();
+        }
+        // Synced from scale (Withings, Health Connect, etc.)
+        c = null;
+        try {
+            c = db.rawQuery(
+                "SELECT 1 FROM wellness_data WHERE date = ? AND metric_type = 'weight_kg' AND value > 0 LIMIT 1",
+                new String[]{today});
+            if (c.moveToFirst()) return true;
+        } catch (Exception e) {
+            Log.w(TAG, "wellness_data read failed: " + e.getMessage());
+        } finally {
+            if (c != null) c.close();
+        }
+        return false;
     }
 
     // ── Settings helpers ───────────────────────────────────────────────────

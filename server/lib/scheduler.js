@@ -336,13 +336,36 @@ async function _pushReminders(userId) {
    } // end if (times && times.length > 0)
   }
 
-  // Weigh-in reminder
+  // Weigh-in reminder — skip if already weighed in today (diary.body_stats OR wellness_data)
   if (_isEnabled(userId, 'notifWeighIn')) {
     const time = _getUserSetting(userId, 'notifWeighInTime') || '07:00';
     const [th, tm] = time.split(':').map(Number);
     const targetMin = th * 60 + tm;
     if (currentMin >= targetMin && currentMin < targetMin + 15 && !_ranRecently(userId, 'weighin')) {
-      await pushNotify(userId, 'notifWeighIn', '⚖️ Weigh-in Reminder', 'Time to step on the scale!', 4);
+      // Check if weight already logged today (either manual diary entry or synced from scale)
+      const today = local.dateStr;
+      let alreadyWeighed = false;
+      try {
+        // Manual diary entry
+        const uCond = userId === 0 ? '(user_id IS NULL OR user_id = 0)' : 'user_id = ?';
+        const uArgs = userId === 0 ? [today] : [today, userId];
+        const diaryRow = db.prepare(`SELECT body_stats FROM diary WHERE date = ? AND ${uCond} AND deleted_at IS NULL`).get(...uArgs);
+        if (diaryRow?.body_stats) {
+          const bs = JSON.parse(diaryRow.body_stats);
+          if (bs.weight != null && bs.weight > 0) alreadyWeighed = true;
+        }
+        // Synced from scale (Withings, Health Connect, etc.)
+        if (!alreadyWeighed) {
+          const wRow = db.prepare(`SELECT 1 FROM wellness_data WHERE user_id = ? AND date = ? AND metric_type = 'weight_kg' AND value > 0 LIMIT 1`).get(userId, today);
+          if (wRow) alreadyWeighed = true;
+        }
+      } catch (e) { logger.debug(`[scheduler] weigh-in check error: ${e.message}`); }
+
+      if (alreadyWeighed) {
+        logger.debug(`[scheduler] skipping weigh-in reminder — already logged today`);
+      } else {
+        await pushNotify(userId, 'notifWeighIn', '⚖️ Weigh-in Reminder', 'Time to step on the scale!', 4);
+      }
     }
   }
 
