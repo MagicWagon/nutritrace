@@ -91,6 +91,11 @@ public class ReminderWorker extends Worker {
         if (getBoolSetting(db, "notifWeighIn")) {
             checkWeighInReminder(db, currentMin, today);
         }
+
+        // Check bedtime reminder
+        if (getBoolSetting(db, "notifBedtime")) {
+            checkBedtimeReminder(db, currentMin, today);
+        }
     }
 
     // ── Meal reminders ─────────────────────────────────────────────────────
@@ -254,6 +259,85 @@ public class ReminderWorker extends Worker {
             if (c != null) c.close();
         }
         return false;
+    }
+
+    // ── Bedtime reminder (+ optional wind-down) ────────────────────────────
+    private void checkBedtimeReminder(SQLiteDatabase db, int currentMin, String today) {
+        String bedtime = getStringSetting(db, "notifBedtimeTime", "22:30");
+        try {
+            String[] hm = bedtime.split(":");
+            int bedtimeMin = Integer.parseInt(hm[0]) * 60 + Integer.parseInt(hm[1]);
+            boolean windDownEnabled = getBoolSetting(db, "notifBedtimeWindDown");
+            int windDownMin = (int) getIntSetting(db, "notifBedtimeWindDownMin", 30);
+            boolean smart = getBoolSetting(db, "notifBedtimeSmart") || (getRawSetting(db, "notifBedtimeSmart") == null); // default true
+            long sleepGoal = 480;
+            try {
+                String goalsJson = getRawSetting(db, "goals");
+                if (goalsJson != null) {
+                    JSONObject goals = new JSONObject(goalsJson);
+                    JSONObject sg = goals.optJSONObject("sleep_duration_min");
+                    if (sg != null) sleepGoal = sg.optLong("min", sg.optLong("max", 480));
+                }
+            } catch (Exception ignored) {}
+            double goalHours = Math.round(sleepGoal / 60.0 * 10) / 10.0;
+
+            // Build message — smart variant reads yesterday's sleep
+            String msg = "Aim for " + goalHours + "h tonight — time to wind down.";
+            if (smart) {
+                String yesterday = yesterdayDateStr(today);
+                long lastSleep = getSleepDuration(db, yesterday);
+                if (lastSleep > 0) {
+                    double lastH = Math.round(lastSleep / 60.0 * 10) / 10.0;
+                    if (lastSleep < sleepGoal - 60) {
+                        msg = "You slept " + lastH + "h last night — prioritize an earlier bedtime tonight.";
+                    } else if (lastSleep >= sleepGoal) {
+                        msg = "Great " + lastH + "h last night — keep it up with another " + goalHours + "h tonight.";
+                    }
+                }
+            }
+
+            // Main bedtime reminder
+            if (currentMin >= bedtimeMin && currentMin < bedtimeMin + 15) {
+                postNotification(5000, "🌙 Bedtime Reminder", msg);
+            }
+
+            // Wind-down pre-reminder
+            if (windDownEnabled) {
+                int windDownTarget = bedtimeMin - windDownMin;
+                if (windDownTarget >= 0 && currentMin >= windDownTarget && currentMin < windDownTarget + 15) {
+                    postNotification(5001, "🌙 Wind Down",
+                        "Bedtime in " + windDownMin + " min — start winding down. " + msg);
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "bedtime check failed: " + e.getMessage());
+        }
+    }
+
+    private String yesterdayDateStr(String today) {
+        try {
+            java.text.SimpleDateFormat fmt = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US);
+            java.util.Date d = fmt.parse(today);
+            long ms = d.getTime() - 86400000L;
+            return fmt.format(new java.util.Date(ms));
+        } catch (Exception e) {
+            return today;
+        }
+    }
+
+    private long getSleepDuration(SQLiteDatabase db, String date) {
+        Cursor c = null;
+        try {
+            c = db.rawQuery(
+                "SELECT value FROM wellness_data WHERE date = ? AND metric_type = 'sleep_duration_min' ORDER BY source LIMIT 1",
+                new String[]{date});
+            if (c.moveToFirst()) return (long) c.getDouble(0);
+        } catch (Exception e) {
+            Log.w(TAG, "sleep read failed: " + e.getMessage());
+        } finally {
+            if (c != null) c.close();
+        }
+        return 0;
     }
 
     // ── Settings helpers ───────────────────────────────────────────────────

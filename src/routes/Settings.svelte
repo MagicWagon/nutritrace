@@ -504,6 +504,11 @@
   let _notifSteps    = DB.getSetting('notifStepGoal',        false);
   let _notifWeighIn  = DB.getSetting('notifWeighIn',         false);
   let _notifWeighInTime = DB.getSetting('notifWeighInTime',  '07:00');
+  let _notifBedtime         = DB.getSetting('notifBedtime',         false);
+  let _notifBedtimeTime     = DB.getSetting('notifBedtimeTime',     '22:30');
+  let _notifBedtimeWindDown    = DB.getSetting('notifBedtimeWindDown',    false);
+  let _notifBedtimeWindDownMin = DB.getSetting('notifBedtimeWindDownMin', 30);
+  let _notifBedtimeSmart    = DB.getSetting('notifBedtimeSmart',    true);
   let _notifWeekly      = DB.getSetting('notifWeeklySummary',  false);
   let _weeklySummaryDay  = DB.getSetting('weeklySummaryDay',   0);
   let _weeklySummaryTime = DB.getSetting('weeklySummaryTime',  '09:00');
@@ -2710,6 +2715,52 @@
               <div class="setting-row">
                 <span class="setting-label">Time</span>
                 <TimePicker value={_notifWeighInTime} on:change={e => { _notifWeighInTime = e.detail; set('notifWeighInTime', e.detail); _scheduleWeighIn(); }} />
+              </div>
+            {/if}
+            <div class="setting-divider"></div>
+            <div class="setting-row">
+              <div>
+                <span class="setting-label">Bedtime Reminder</span>
+                <div class="setting-desc">Evening nudge to wind down for sleep</div>
+              </div>
+              <Toggle checked={_notifBedtime} on:change={e => { _notifBedtime = e.detail; set('notifBedtime', e.detail); }} />
+            </div>
+            {#if _notifBedtime}
+              <div class="setting-divider"></div>
+              <div class="setting-row">
+                <span class="setting-label">Bedtime</span>
+                <TimePicker value={_notifBedtimeTime} on:change={e => { _notifBedtimeTime = e.detail; set('notifBedtimeTime', e.detail); }} />
+              </div>
+              <div class="setting-divider"></div>
+              <div class="setting-row">
+                <div>
+                  <span class="setting-label">Wind-down Reminder</span>
+                  <div class="setting-desc">Extra nudge before bedtime to start winding down</div>
+                </div>
+                <Toggle checked={_notifBedtimeWindDown} on:change={e => { _notifBedtimeWindDown = e.detail; set('notifBedtimeWindDown', e.detail); }} />
+              </div>
+              {#if _notifBedtimeWindDown}
+                <div class="setting-divider"></div>
+                <div class="setting-row">
+                  <span class="setting-label">Minutes Before</span>
+                  <div class="select-wrap" style="width:120px">
+                    <select class="select sel-sm" bind:value={_notifBedtimeWindDownMin} on:change={e => set('notifBedtimeWindDownMin', parseInt(e.target.value))}>
+                      <option value={15}>15 min</option>
+                      <option value={30}>30 min</option>
+                      <option value={45}>45 min</option>
+                      <option value={60}>60 min</option>
+                      <option value={90}>90 min</option>
+                    </select>
+                  </div>
+                </div>
+              {/if}
+              <div class="setting-divider"></div>
+              <div class="setting-row">
+                <div>
+                  <span class="setting-label">Smart Message</span>
+                  <div class="setting-desc">Adjust the reminder based on last night's sleep (if tracked)</div>
+                </div>
+                <Toggle checked={_notifBedtimeSmart} on:change={e => { _notifBedtimeSmart = e.detail; set('notifBedtimeSmart', e.detail); }} />
               </div>
             {/if}
           </div>

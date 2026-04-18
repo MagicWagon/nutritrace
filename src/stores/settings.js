@@ -46,7 +46,9 @@ export const USER_PREFS = new Set([
   'notifLocalEnabled','notifPushService',
   'notifWaterReminders','notifWaterInterval','notifMealReminders','notifMealTimes',
   'notifGoalCelebrations','notifCalorieGoal','notifStepGoal',
-  'notifWeighIn','notifWeighInTime','notifWeeklySummary','weeklySummaryDay','weeklySummaryTime',
+  'notifWeighIn','notifWeighInTime',
+  'notifBedtime','notifBedtimeTime','notifBedtimeWindDown','notifBedtimeWindDownMin','notifBedtimeSmart',
+  'notifWeeklySummary','weeklySummaryDay','weeklySummaryTime',
   'notifWellnessAlerts','notifWorkoutSummary','notifSyncFailures',
   'appriseUrl','appriseTag','gotifyUrl','gotifyToken','ntfyUrl','ntfyTopic','ntfyToken',
   // UI behavior prefs that should match across devices
@@ -522,6 +524,11 @@ export const notifCalorieGoal     = createSettingStore('notifCalorieGoal',     f
 export const notifStepGoal        = createSettingStore('notifStepGoal',        false);
 export const notifWeighIn         = createSettingStore('notifWeighIn',         false);
 export const notifWeighInTime     = createSettingStore('notifWeighInTime',     '07:00');
+export const notifBedtime         = createSettingStore('notifBedtime',         false);
+export const notifBedtimeTime     = createSettingStore('notifBedtimeTime',     '22:30');
+export const notifBedtimeWindDown    = createSettingStore('notifBedtimeWindDown',    false);
+export const notifBedtimeWindDownMin = createSettingStore('notifBedtimeWindDownMin', 30); // minutes before bedtime
+export const notifBedtimeSmart    = createSettingStore('notifBedtimeSmart',    true);  // use last night's sleep to tailor message
 export const notifWeeklySummary   = createSettingStore('notifWeeklySummary',   false);
 export const weeklySummaryDay     = createSettingStore('weeklySummaryDay',     0);      // 0=Sun … 6=Sat
 export const weeklySummaryTime    = createSettingStore('weeklySummaryTime',    '09:00');

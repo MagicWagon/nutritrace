@@ -369,6 +369,65 @@ async function _pushReminders(userId) {
     }
   }
 
+  // Bedtime reminder (+ optional wind-down pre-reminder)
+  if (_isEnabled(userId, 'notifBedtime')) {
+    const bedtime = _getUserSetting(userId, 'notifBedtimeTime') || '22:30';
+    const [bh, bm] = bedtime.split(':').map(Number);
+    const bedtimeMin = bh * 60 + bm;
+    const windDownEnabled = _isEnabled(userId, 'notifBedtimeWindDown');
+    const windDownMin = _getUserSetting(userId, 'notifBedtimeWindDownMin') || 30;
+    const smart = _getUserSetting(userId, 'notifBedtimeSmart') !== false;
+    const sleepGoalMinutes = (() => {
+      const goalRow = db.prepare('SELECT value FROM user_settings WHERE user_id=? AND key=?').get(userId, 'goals');
+      if (goalRow?.value) {
+        try {
+          const g = JSON.parse(goalRow.value);
+          return g.sleep_duration_min?.min || g.sleep_duration_min?.max || 480;
+        } catch { return 480; }
+      }
+      return 480;
+    })();
+    const goalHours = Math.round(sleepGoalMinutes / 60 * 10) / 10;
+
+    // Build the reminder message (smart variant looks at last night's sleep)
+    let msg = `Aim for ${goalHours}h tonight — time to wind down.`;
+    if (smart) {
+      try {
+        const yesterday = (() => {
+          const d = new Date(local.dateStr + 'T12:00:00');
+          d.setDate(d.getDate() - 1);
+          return d.toISOString().slice(0, 10);
+        })();
+        const row = db.prepare(
+          `SELECT value FROM wellness_data WHERE user_id=? AND date=? AND metric_type='sleep_duration_min' ORDER BY source LIMIT 1`
+        ).get(userId, yesterday);
+        if (row?.value) {
+          const lastH = Math.round(row.value / 60 * 10) / 10;
+          if (row.value < sleepGoalMinutes - 60) {
+            msg = `You slept ${lastH}h last night — prioritize an earlier bedtime tonight.`;
+          } else if (row.value >= sleepGoalMinutes) {
+            msg = `Great ${lastH}h last night — keep it up with another ${goalHours}h tonight.`;
+          }
+        }
+      } catch {}
+    }
+
+    // Main bedtime reminder
+    if (currentMin >= bedtimeMin && currentMin < bedtimeMin + 15 && !_ranRecently(userId, 'bedtime')) {
+      await pushNotify(userId, 'notifBedtime', '🌙 Bedtime Reminder', msg, 4);
+    }
+
+    // Wind-down pre-reminder
+    if (windDownEnabled) {
+      const windDownTarget = bedtimeMin - windDownMin;
+      if (windDownTarget >= 0 && currentMin >= windDownTarget && currentMin < windDownTarget + 15
+          && !_ranRecently(userId, 'bedtime_winddown')) {
+        await pushNotify(userId, 'notifBedtime', '🌙 Wind Down',
+          `Bedtime in ${windDownMin} min — start winding down. ${msg}`, 4);
+      }
+    }
+  }
+
   // Weekly summary — user-configurable day + time
   // Dedup check is AFTER the day/hour gate so the timestamp only burns when we actually send
   if (_isEnabled(userId, 'notifWeeklySummary')) {
