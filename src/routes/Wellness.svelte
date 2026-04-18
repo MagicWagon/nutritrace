@@ -1648,14 +1648,29 @@
                       {/if}
                     {/each}
                   </div>
-                  <!-- Legend: each label floats at its segment's midpoint -->
-                  <div class="stage-legend-bar">
+                  <!-- Wide-screen legend: labels float at segment midpoints -->
+                  <div class="stage-legend-bar stage-legend-wide">
                     {#each sleepStages as stage}
                       {@const pct = sleepTotal > 0 ? ((displayData[stage.key] || 0) / sleepTotal * 100) : 0}
                       {#if pct >= 3}
                         <div class="stage-leg-seg" style="width:{pct.toFixed(1)}%">
                           <span class="stage-leg-label" style="color:{stage.color}">{stage.label}</span>
                           <span class="stage-leg-val">{fmtSleepStr(displayData[stage.key])}</span>
+                        </div>
+                      {/if}
+                    {/each}
+                  </div>
+                  <!-- Narrow-screen legend: vertical list with dots + labels + values + % -->
+                  <div class="stage-legend-list">
+                    {#each sleepStages as stage}
+                      {@const val = displayData[stage.key] || 0}
+                      {@const pct = sleepTotal > 0 ? (val / sleepTotal * 100) : 0}
+                      {#if val > 0}
+                        <div class="stage-list-row">
+                          <span class="stage-list-dot" style="background:{stage.color}"></span>
+                          <span class="stage-list-label">{stage.label}</span>
+                          <span class="stage-list-val">{fmtSleepStr(val)}</span>
+                          <span class="stage-list-pct">{Math.round(pct)}%</span>
                         </div>
                       {/if}
                     {/each}
@@ -2639,6 +2654,47 @@
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 100%;
+  }
+  /* Narrow-screen legend — vertical list */
+  .stage-legend-list {
+    display: none;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 10px;
+  }
+  .stage-list-row {
+    display: grid;
+    grid-template-columns: 10px 1fr auto auto;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+  }
+  .stage-list-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .stage-list-label {
+    color: var(--text-2);
+    font-weight: 500;
+  }
+  .stage-list-val {
+    color: var(--text-1);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .stage-list-pct {
+    color: var(--text-3);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    min-width: 32px;
+    text-align: right;
+  }
+  /* Swap between floating labels (wide) and vertical list (narrow) at 500px */
+  @media (max-width: 500px) {
+    .stage-legend-wide { display: none; }
+    .stage-legend-list { display: flex; }
   }
 
   /* Empty state */

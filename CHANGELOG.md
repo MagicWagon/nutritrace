@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.2-beta] — 2026-04-17
+
+### Changed
+- **Sleep stages mobile layout** — on narrow screens (under 500px), sleep stage breakdown now renders as a vertical list (colored dot + label + duration + %) instead of floating labels that overlap when segments are small. Tablet/desktop (≥500px) layout unchanged — stacked bar with midpoint-positioned labels. Responsive across phones, foldables (closed/open), and phone landscape.
+
+---
+
 ## [0.39.1-beta] — 2026-04-16
 
 ### Added
