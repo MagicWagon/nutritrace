@@ -5,6 +5,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.8-beta] — 2026-04-19
+
+### Added
+- **Notes shown in quick-add card** — when a food, recipe, or item with saved notes (e.g. "1 serving = 150g cooked") is added via the portion/quantity prompt, its notes appear above the inputs. Auto-hidden when empty — no setting needed. Same treatment in the multi-add portion sheet.
+- **FitBot — new `get_meals` tool** — lets the assistant look up the user's saved Meals and Recipes (with items, totals, and notes). Supports an optional name filter so queries like "what's in my 'Usual breakfast'" work reliably.
+
+### Changed
+- **FitBot `get_diary` now returns day notes + per-item notes + brand** — so when the user asks "why did I eat badly yesterday?" the assistant can read their own context back to them.
+- **Full backup + JSON import** now round-trip the new `diary.notes` column. Previous backups (without notes) still restore fine.
+
+### Fixed
+- Client-side local-backup flow always included notes via `NtApi.getAllDiary()`; the matching server import paths were missing `notes` in their INSERT statements — restoring a backup with notes used to silently drop them. Fixed in both `/api/data/import` and `/api/full-backup/restore`.
+
+---
+
 ## [0.39.7-beta] — 2026-04-19
 
 ### Added

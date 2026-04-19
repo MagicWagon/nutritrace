@@ -37,13 +37,23 @@ export const TOOLS = [
   },
   {
     name: 'get_diary',
-    description: 'Get food diary for a specific date. Returns all meals with food items, portions, quantities, and full nutrition breakdown (calories, protein, carbs, fat, and micronutrients). Also returns body stats and water intake for that date.',
+    description: 'Get food diary for a specific date. Returns all meals with food items (portions, quantities, brand, per-item notes like prep/serving info) and nutrition breakdown (calories, protein, carbs, fat). Also returns body stats, water intake, and any free-text "day notes" the user wrote (e.g. how they felt, sleep, cravings, context for why they ate what they ate).',
     parameters: {
       type: 'object',
       properties: {
         date: { type: 'string', description: 'Date (YYYY-MM-DD)' },
       },
       required: ['date'],
+    },
+  },
+  {
+    name: 'get_meals',
+    description: 'Get the user\'s saved Meals and Recipes from their library. Returns each one with its items (portions, quantities, per-item notes), totals (calories, macros), and any meal-level notes. Useful when the user refers to a saved meal by name ("my usual breakfast") or wants ideas based on meals they\'ve logged before.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Optional case-insensitive name filter. Omit to return all (capped at 50).' },
+      },
     },
   },
   {

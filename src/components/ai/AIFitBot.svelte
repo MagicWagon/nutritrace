@@ -164,25 +164,69 @@
         case 'get_diary': {
           try {
             const entry = await NtApi.getDiaryDate(args.date);
-            if (!entry || !entry.items?.length) return { date: args.date, items: [], totals: null };
-            const totals = Nutrition.sum(entry.items.map(i => Nutrition.calculate(i)));
+            const hasItems = entry?.items?.length > 0;
+            const notes = (entry?.notes || '').trim();
+            if (!hasItems && !notes) return { date: args.date, items: [], totals: null };
+            const totals = hasItems ? Nutrition.sum(entry.items.map(i => Nutrition.calculate(i))) : {};
             const names = mealNames.get();
             const meals = {};
-            for (const it of entry.items) {
-              const mIdx = it.meal ?? 0;
-              const mName = names[mIdx] || `Meal ${mIdx + 1}`;
-              (meals[mName] = meals[mName] || []).push({
-                name: it.name, portion: it.portion, unit: it.unit, quantity: it.quantity,
-                calories: Math.round((it.nutrition?.calories || 0) * (it.quantity || 1)),
-              });
+            if (hasItems) {
+              for (const it of entry.items) {
+                const mIdx = it.meal ?? 0;
+                const mName = names[mIdx] || `Meal ${mIdx + 1}`;
+                const row = {
+                  name: it.name, portion: it.portion, unit: it.unit, quantity: it.quantity,
+                  calories: Math.round((it.nutrition?.calories || 0) * (it.quantity || 1)),
+                };
+                if (it.brand) row.brand = it.brand;
+                if (typeof it.notes === 'string' && it.notes.trim()) row.notes = it.notes.trim();
+                (meals[mName] = meals[mName] || []).push(row);
+              }
             }
-            return {
+            const result = {
               date: args.date, meals,
-              totals: { calories: Math.round(totals.calories || 0), protein: Math.round(totals.proteins || 0), carbs: Math.round(totals.carbohydrates || 0), fat: Math.round(totals.fat || 0) },
-              body_stats: entry.body_stats || entry.bodyStats || {},
-              water_ml: (entry.water || []).reduce((s, l) => s + (l.amount || 0), 0),
+              totals: hasItems ? { calories: Math.round(totals.calories || 0), protein: Math.round(totals.proteins || 0), carbs: Math.round(totals.carbohydrates || 0), fat: Math.round(totals.fat || 0) } : null,
+              body_stats: entry?.body_stats || entry?.bodyStats || {},
+              water_ml: (entry?.water || []).reduce((s, l) => s + (l.amount || 0), 0),
             };
+            if (notes) result.day_notes = notes;
+            return result;
           } catch { return { date: args.date, error: 'Could not load diary' }; }
+        }
+        case 'get_meals': {
+          try {
+            const [rawMeals, rawRecipes] = await Promise.all([
+              NtApi.getMeals().catch(() => []),
+              NtApi.getRecipes().catch(() => []),
+            ]);
+            const shape = (m, kind) => {
+              const items = (m.items || []).map(it => {
+                const r = { name: it.name, portion: it.portion, unit: it.unit, quantity: it.quantity };
+                if (it.brand) r.brand = it.brand;
+                if (typeof it.notes === 'string' && it.notes.trim()) r.notes = it.notes.trim();
+                return r;
+              });
+              const totals = Nutrition.sum(items.map(i => Nutrition.calculate(i)));
+              const out = {
+                id: m.id, name: m.name, kind,
+                item_count: items.length,
+                calories: Math.round(totals.calories || 0),
+                protein_g: Math.round(totals.proteins || 0),
+                carbs_g: Math.round(totals.carbohydrates || 0),
+                fat_g: Math.round(totals.fat || 0),
+                items,
+              };
+              if (typeof m.notes === 'string' && m.notes.trim()) out.notes = m.notes.trim();
+              return out;
+            };
+            const q = (args.query || '').toLowerCase().trim();
+            let list = [
+              ...rawMeals.map(m => shape(m, 'meal')),
+              ...rawRecipes.map(m => shape(m, 'recipe')),
+            ];
+            if (q) list = list.filter(m => m.name?.toLowerCase().includes(q));
+            return { count: list.length, meals: list.slice(0, 50) };
+          } catch { return { error: 'Could not load meals library' }; }
         }
         case 'get_workouts': {
           let workouts;
@@ -904,8 +948,9 @@
     return `You are ${name}, a friendly and knowledgeable AI nutrition and fitness coach built into NutriTrace.
 
 You have FULL ACCESS to the user's complete health data through tools. ALWAYS use tools to look up data — NEVER guess or make up numbers. Available data:
-- **Food diary**: meals, items, portions, full nutrition (any date) — use get_diary
+- **Food diary**: meals, items, portions, full nutrition, plus per-item notes (prep/serving info) and free-text "day notes" the user writes about how they felt, slept, cravings, etc. (any date) — use get_diary
 - **Diary averages**: average daily intake over any period + logging consistency + weight trend — use get_diary_averages
+- **Saved meals & recipes**: the user's library of reusable meals/recipes with items, notes, and totals — use get_meals (supports a name filter)
 - **Wellness metrics**: steps, calories burned, distance, active minutes, sleep (duration, stages, score, efficiency), heart rate (resting HR, HRV, SpO2), respiratory rate, readiness score, stress score, skin temp, VO2 max — from Fitbit, Garmin, Health Connect (any date range) — use get_wellness_data
 - **Body composition**: weight, body fat %, muscle mass, bone mass, body water, lean/fat mass, visceral fat, vascular age, metabolic age, BMR, nerve health, ECG — from Withings (any date range) — use get_body_composition
 - **Workouts**: recorded exercises with duration, distance, calories, heart rate, steps, GPS (any date range) — use get_workouts

@@ -66,10 +66,10 @@ function restoreFromZip(zip) {
     for (const ms of data.meal_shares || []) insMealShare.run(ms);
 
     const insDiary = db.prepare(`
-      INSERT OR IGNORE INTO diary (id, user_id, date, items, body_stats, water, updated_at, deleted_at)
-      VALUES (@id, @user_id, @date, @items, @body_stats, @water, @updated_at, @deleted_at)
+      INSERT OR IGNORE INTO diary (id, user_id, date, items, body_stats, water, notes, updated_at, deleted_at)
+      VALUES (@id, @user_id, @date, @items, @body_stats, @water, @notes, @updated_at, @deleted_at)
     `);
-    for (const d of data.diary || []) insDiary.run({ deleted_at: null, ...d });
+    for (const d of data.diary || []) insDiary.run({ notes: null, deleted_at: null, ...d });
 
     const insSettings = db.prepare(`
       INSERT OR IGNORE INTO user_settings (user_id, key, value, updated_at, deleted_at) VALUES (@user_id, @key, @value, @updated_at, @deleted_at)

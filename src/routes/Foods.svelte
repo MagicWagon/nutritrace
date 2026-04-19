@@ -829,6 +829,12 @@
       {#if i > 0}<div style="height:1px;background:var(--border);margin:12px 0"></div>{/if}
       <div style="display:flex;flex-direction:column;gap:10px">
         <span style="font-size:13px;font-weight:600;color:var(--text-1)">{item.food.name}</span>
+        {#if (item.food.notes || '').trim()}
+          <div class="qty-notes qty-notes-compact">
+            <span class="material-symbols-rounded qty-notes-icon">sticky_note_2</span>
+            <span class="qty-notes-text">{item.food.notes}</span>
+          </div>
+        {/if}
         <div style="display:flex;gap:10px">
           <div style="flex:1">
             <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:5px">Serving Size</label>
@@ -863,6 +869,12 @@
 <!-- Quantity prompt sheet -->
 <Sheet bind:open={showQtyPrompt} title={promptFood ? promptFood.name : 'Add to Diary'}>
   <div style="display:flex;flex-direction:column;gap:16px;padding-top:8px">
+    {#if promptFood && (promptFood.notes || '').trim()}
+      <div class="qty-notes">
+        <span class="material-symbols-rounded qty-notes-icon">sticky_note_2</span>
+        <span class="qty-notes-text">{promptFood.notes}</span>
+      </div>
+    {/if}
     <div style="display:flex;gap:12px">
       <div style="flex:1">
         <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:6px">Serving Size</label>
@@ -918,6 +930,30 @@
 />
 
 <style>
+  /* Notes display in quick-add sheets */
+  .qty-notes {
+    display: flex; gap: 8px; align-items: flex-start;
+    padding: 10px 12px;
+    background: var(--surface-2);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius-sm);
+  }
+  .qty-notes.qty-notes-compact { padding: 8px 10px; }
+  .qty-notes-icon {
+    font-size: 16px; color: var(--accent);
+    flex-shrink: 0; margin-top: 1px;
+  }
+  .qty-notes-text {
+    font-size: 13px; line-height: 1.5;
+    color: var(--text-2);
+    white-space: pre-wrap; word-break: break-word;
+    display: -webkit-box;
+    -webkit-line-clamp: 5;
+    line-clamp: 5;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
   .foods-sticky-bar {
     position: sticky;
     /* page-top + 10 + 48 (--hamburger-row) + 40 (h1) + 12 (padding-bottom) = +110 */
