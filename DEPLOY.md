@@ -4,7 +4,7 @@
 
 ```bash
 # Clone and start
-git clone git@github.com:thebigjoe1/nutritrace.git
+git clone git@github.com:traceapps/nutritrace.git
 cd nutritrace
 cp .env.example .env          # edit as needed
 docker compose up -d
@@ -113,7 +113,7 @@ Each user connects their own fitness tracker using their own developer API crede
 5. In NutriTrace → Settings → Wellness → Fitbit, paste the credentials and save.
 6. Click **Connect** — you'll be redirected to Fitbit to authorize, then back to the Wellness page.
 
-**Required OAuth scopes** (automatically requested): `activity`, `heartrate`, `sleep`, `oxygen_saturation`, `respiratory_rate`, `profile`
+**Required OAuth scopes** (automatically requested): `activity`, `heartrate`, `sleep`, `oxygen_saturation`, `respiratory_rate`, `cardio_fitness`, `temperature`, `profile`, `location` (the last one is needed for TCX/GPS route data on workout logs)
 
 ### Withings
 

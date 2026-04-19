@@ -10,11 +10,13 @@ NutriTrace runs entirely in a single Docker container on your own hardware. No a
 
 ### Diary
 - Daily food diary with configurable meals (Breakfast, Lunch, Dinner, Snacks, or fully custom)
-- Quick-add foods, meals, and recipes with portion scaling
+- Quick-add foods, meals, and recipes with portion scaling — food notes (e.g. "1 serving = 150g cooked") are surfaced at add time
 - Nutrition bar with macro summary and per-meal breakdowns
 - Body stats tracking (weight, measurements, and more) with customizable fields
 - Water intake tracking with configurable containers and daily goal
-- Long-press (mobile) or right-click (desktop) for edit/move/delete actions
+- Long-press (mobile) or right-click (desktop) for item edit/move/delete actions
+- Per-meal ⋮ menu: copy or move all items to another meal, copy the meal to another date, save the meal to your library, or clear it
+- Per-day free-text notes (e.g. "felt bloated after lunch", "post-workout") — toggleable, with an indicator on dates that have a note
 
 ### Foods & Meals
 - Personal food database with photos, barcodes, categories, and custom labels
@@ -49,8 +51,9 @@ NutriTrace runs entirely in a single Docker container on your own hardware. No a
 
 ### AI Assistant (FitBot)
 - Optional AI chat assistant for nutrition questions and logging help
-- Supports Claude (Anthropic), OpenAI, and OpenRouter
-- Bring your own API key
+- Supports Claude (Anthropic), OpenAI, and Google Gemini — bring your own API key
+- Tool use across all providers: FitBot can query your real diary (with day notes + per-item notes), saved meals/recipes library, wellness metrics, body composition, workouts, and goals — no hallucinated numbers
+- Optional Goal Insights mode: proactive analysis of actual intake vs targets with evidence-based suggestions
 
 ### Backup & Restore
 - Full backup: ZIP archive of all database tables + uploaded images, stored on the server

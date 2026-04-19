@@ -1,6 +1,6 @@
 # Privacy Policy — NutriTrace
 
-**Last updated:** April 5, 2026
+**Last updated:** April 19, 2026
 
 ## Overview
 
@@ -9,7 +9,7 @@ NutriTrace is a self-hosted nutrition and wellness tracker. Your data is stored 
 ## Data Collection
 
 ### What NutriTrace stores on YOUR server:
-- Food diary entries, meals, recipes
+- Food diary entries, meals, recipes (including free-text notes on foods, meals, and per-day diary notes)
 - Nutrition goals and body stats
 - Water intake logs
 - Wellness data from connected devices (Fitbit, Garmin, Withings, Health Connect)
@@ -64,4 +64,4 @@ We may update this privacy policy from time to time. Changes will be noted in th
 
 ## Contact
 
-For privacy questions, open an issue at [github.com/thebigjoe1/nutritrace](https://github.com/thebigjoe1/nutritrace).
+For privacy questions, open an issue at [github.com/traceapps/nutritrace](https://github.com/traceapps/nutritrace).
