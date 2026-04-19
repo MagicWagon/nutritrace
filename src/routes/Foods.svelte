@@ -50,48 +50,13 @@
     if (_prevSrc !== searchSource) {
       import('../stores/toast.js').then(({ showInfo }) => showInfo('Source reset to Local — external sources only work for Foods')).catch(() => {});
     }
+    // Jump to top when switching tabs (no animation) so each tab starts from its top
+    const _sc = document.querySelector('.page-transition');
+    if (_sc) _sc.scrollTop = 0;
+    else window.scrollTo(0, 0);
   }
   $: _tabIcon = activeTab === 0 ? 'restaurant' : activeTab === 1 ? 'dinner_dining' : 'menu_book';
   $: { if (pickMode) loadYesterdayMeals(); }
-  $: { if (pickMode && activeTab === 0) loadRecentFoods(); }
-
-  // Recent foods (pick mode, Foods tab, empty search)
-  let recentFoods = [];
-  let _recentLoaded = false;
-  async function loadRecentFoods() {
-    if (!pickMode || activeTab !== 0 || _recentLoaded) return;
-    _recentLoaded = true;
-    try {
-      const all = await NtApi.getAllDiary();
-      // Sort by date desc (most recent first)
-      const sorted = [...(all || [])].sort((a, b) => String(b.date).localeCompare(String(a.date)));
-      const seen = new Map();
-      outer: for (const entry of sorted) {
-        const items = entry.items || [];
-        for (let i = items.length - 1; i >= 0; i--) {
-          const it = items[i];
-          if (!it || !it.name) continue;
-          const key = it.id ? `id:${it.id}` : `n:${(it.name||'').toLowerCase()}|b:${(it.brand||'').toLowerCase()}`;
-          if (!seen.has(key)) {
-            seen.set(key, { ...it });
-            if (seen.size >= 10) break outer;
-          }
-        }
-      }
-      recentFoods = [...seen.values()];
-    } catch (e) {
-      console.debug('[foods] recents load failed:', e?.message);
-      recentFoods = [];
-    }
-  }
-
-  async function addRecent(item) {
-    const targetMeal = Number(pickMeal) || 0;
-    const { addDiaryItem } = await import('../stores/diary.js');
-    await addDiaryItem({ ...item }, targetMeal, pickDate);
-    const { showSuccess } = await import('../stores/toast.js');
-    showSuccess(`Added ${item.name}`);
-  }
 
   let search = '';
   let searchSource = 'local';
@@ -625,31 +590,6 @@
       {#each $foodCategories as cat}
         <button class="cat-chip" class:active={activeCategoryFilter === _catName(cat)}
           on:click={() => activeCategoryFilter = activeCategoryFilter === _catName(cat) ? '' : _catName(cat)}>{$foodsShowLabels ? _catDisplay(cat) : _catName(cat)}</button>
-      {/each}
-    </div>
-  {/if}
-
-  <!-- Recent foods (pick mode, Foods tab, empty search) -->
-  {#if pickMode && recentFoods.length > 0 && !search && activeTab === 0 && (searchSource === 'local' || searchSource === 'shared')}
-    <p class="section-title" style="padding-bottom:4px">Recently Added</p>
-    <div class="card" style="margin-bottom:12px">
-      {#each recentFoods as item, ri}
-        {#if ri > 0}<div style="height:1px;background:var(--border);margin:0 16px"></div>{/if}
-        <button class="food-item-btn" style="padding:12px 14px" on:click={() => addRecent(item)}>
-          {#if $foodsShowThumbnails && item.imgUrl}
-            <img class="food-thumb" src={item.imgUrl} alt="" loading="lazy" referrerpolicy="no-referrer" on:error={e => e.target.style.display='none'} />
-          {:else}
-            <div class="food-thumb-placeholder">
-              <span class="material-symbols-rounded">restaurant</span>
-            </div>
-          {/if}
-          <div class="food-info">
-            <span class="food-name">{item.name}</span>
-            {#if item.brand}<span class="food-brand text-3 text-sm">{item.brand}</span>{/if}
-            <span class="food-kcal text-sm">{item.portion || item.amount || 100}{item.unit || 'g'}{#if (item.quantity || 1) > 1} × {item.quantity || 1}{/if} · {Math.round((item.nutrition?.calories || item.calories || 0) * (item.quantity || 1))} kcal</span>
-          </div>
-          <span class="material-symbols-rounded" style="font-size:18px;flex-shrink:0;color:var(--accent)">add_circle</span>
-        </button>
       {/each}
     </div>
   {/if}

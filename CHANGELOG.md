@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.9-beta] — 2026-04-19
+
+### Removed
+- **Foods picker "Recently Added" section** — removed (was added in 0.39.7). Didn't feel useful in practice.
+
+### Fixed
+- **Foods/Meals/Recipes tab switch** — when a tab was scrolled down and you switched to another, the new tab started at the same scroll offset instead of at the top. Now jumps to top on switch (no animation).
+
+---
+
 ## [0.39.8-beta] — 2026-04-19
 
 ### Added
