@@ -11,10 +11,11 @@
   import Sheet        from '../components/ui/Sheet.svelte';
   import Dialog       from '../components/ui/Dialog.svelte';
   import ActionSheet  from '../components/ui/ActionSheet.svelte';
-  import { showSuccess, showError } from '../stores/toast.js';
+  import { showSuccess, showError, showInfo } from '../stores/toast.js';
   import {
     currentDate, currentEntry, diaryTotals, macroPercents,
     prevDay, nextDay, loadEntry, removeDiaryItem, updateDiaryItem, saveBodyStats,
+    copyMealItems, moveMealItems, clearMealItems, copyMealToDate,
     diaryShowNutritionSummary, diaryShowBodyStats, diaryLoadError
   } from '../stores/diary.js';
   import { mealNames, goals, energyUnit, weightUnit, lengthUnit, navStyle,
@@ -259,6 +260,77 @@
       showSuccess('Item removed');
     }
     pendingDeleteIdx = null;
+  }
+
+  // Meal-level actions (⋮ on meal header)
+  let showMealAction       = false;
+  let actionMealIdx        = null;
+  let mealActionMode       = null;   // 'copy' | 'move' — picks target meal
+  let showMealTargetPicker = false;
+  let showCopyToDateStep1  = false;  // date input
+  let showCopyToDateStep2  = false;  // target meal picker after date chosen
+  let copyToDateValue      = '';
+  let showClearMealDialog  = false;
+
+  function openMealActionSheet(mealIdx) {
+    actionMealIdx = mealIdx;
+    _lockAndOpen(() => showMealAction = true);
+  }
+
+  function onMealAction(e) {
+    const val = e.detail?.value;
+    if (val === 'copy')      { mealActionMode = 'copy'; _lockAndOpen(() => showMealTargetPicker = true); }
+    else if (val === 'move') { mealActionMode = 'move'; _lockAndOpen(() => showMealTargetPicker = true); }
+    else if (val === 'copy_date') { copyToDateValue = $currentDate; _lockAndOpen(() => showCopyToDateStep1 = true); }
+    else if (val === 'clear') { _lockAndOpen(() => showClearMealDialog = true); }
+  }
+
+  async function onMealTargetPick(e) {
+    const targetIdx = e.detail?.value;
+    const from = actionMealIdx;
+    if (targetIdx == null || from == null) return;
+    try {
+      if (mealActionMode === 'copy') {
+        const n = await copyMealItems(from, targetIdx);
+        if (n) showSuccess(`Copied ${n} item${n === 1 ? '' : 's'} to ${meals[targetIdx]}`);
+      } else if (mealActionMode === 'move') {
+        if (targetIdx === from) { showInfo('Already in that meal'); return; }
+        const n = await moveMealItems(from, targetIdx);
+        if (n) showSuccess(`Moved ${n} item${n === 1 ? '' : 's'} to ${meals[targetIdx]}`);
+      }
+    } catch (err) {
+      showError(err?.message || 'Action failed');
+    }
+  }
+
+  function onCopyToDateNext() {
+    if (!copyToDateValue) return;
+    showCopyToDateStep1 = false;
+    _lockAndOpen(() => showCopyToDateStep2 = true);
+  }
+
+  async function onCopyToDatePick(e) {
+    const targetIdx = e.detail?.value;
+    const from = actionMealIdx;
+    const targetDate = copyToDateValue;
+    if (targetIdx == null || from == null || !targetDate) return;
+    try {
+      const n = await copyMealToDate(from, targetDate, targetIdx);
+      if (n) showSuccess(`Copied ${n} item${n === 1 ? '' : 's'} to ${meals[targetIdx]} on ${targetDate}`);
+      else showInfo('Nothing to copy');
+    } catch (err) {
+      showError(err?.message || 'Copy failed');
+    }
+  }
+
+  async function doClearMeal() {
+    if (actionMealIdx == null) return;
+    try {
+      const n = await clearMealItems(actionMealIdx);
+      if (n) showSuccess(`Cleared ${n} item${n === 1 ? '' : 's'} from ${meals[actionMealIdx]}`);
+    } catch (err) {
+      showError(err?.message || 'Clear failed');
+    }
   }
 
   function getMealTotals(items) {
@@ -747,7 +819,10 @@
               {items.reduce((s,it) => s + formatKcal(it), 0)} kcal
             </span>
           {/if}
-          <button class="btn-icon accent ml-auto" on:click={() => openAddFood(mealIdx)} aria-label="Add food to {meal}" title="Add food to {meal}">
+          <button class="btn-icon ml-auto meal-menu-btn" on:click={() => openMealActionSheet(mealIdx)} aria-label="Meal actions for {meal}" title="Meal actions">
+            <span class="material-symbols-rounded">more_vert</span>
+          </button>
+          <button class="btn-icon accent" on:click={() => openAddFood(mealIdx)} aria-label="Add food to {meal}" title="Add food to {meal}">
             <span class="material-symbols-rounded">add</span>
           </button>
         </div>
@@ -1185,6 +1260,73 @@
   title="Move to meal"
   actions={meals.map((m, i) => ({ label: m, icon: mealIcon(m), value: i }))}
   on:select={moveItemToMeal}
+/>
+
+<!-- Meal-level action sheet (⋮ on meal header) -->
+{#if actionMealIdx != null}
+  {@const _mealItems = getMealItems(entry.items, actionMealIdx)}
+  {@const _hasItems = _mealItems.length > 0}
+  <ActionSheet
+    bind:open={showMealAction}
+    title={meals[actionMealIdx] + (_hasItems ? ` · ${_mealItems.length} item${_mealItems.length === 1 ? '' : 's'}` : ' · empty')}
+    actions={_hasItems ? [
+      { label: 'Copy items to…',          icon: 'content_copy', value: 'copy'      },
+      { label: 'Move items to…',          icon: 'swap_horiz',   value: 'move'      },
+      { label: 'Copy meal to another date…', icon: 'event_repeat', value: 'copy_date' },
+      { label: 'Clear all items',         icon: 'delete_sweep', value: 'clear', danger: true },
+    ] : [
+      { label: 'Add food', icon: 'add', value: 'add' },
+    ]}
+    on:select={(e) => {
+      if (e.detail?.value === 'add') openAddFood(actionMealIdx);
+      else onMealAction(e);
+    }}
+  />
+{/if}
+
+<!-- Meal target picker (for copy/move items to…) -->
+<ActionSheet
+  bind:open={showMealTargetPicker}
+  title={mealActionMode === 'copy' ? 'Copy to meal' : 'Move to meal'}
+  actions={meals.map((m, i) => ({ label: m, icon: mealIcon(m), value: i }))}
+  on:select={onMealTargetPick}
+/>
+
+<!-- Copy meal to another date: step 1 — pick date -->
+{#if showCopyToDateStep1}
+  <div use:portal class="sheet-backdrop" role="dialog" aria-modal="true"
+    on:click={() => { if (!_sheetLock) showCopyToDateStep1 = false; }} on:keydown={() => {}}>
+    <div class="bs-sheet copy-date-sheet" on:click|stopPropagation on:keydown={() => {}}>
+      <div class="sheet-handle"></div>
+      <p class="sheet-title">Copy {meals[actionMealIdx] || 'meal'} to…</p>
+      <label class="copy-date-label">
+        <span>Target date</span>
+        <input type="date" bind:value={copyToDateValue} class="copy-date-input" />
+      </label>
+      <div class="copy-date-actions">
+        <button class="btn btn-ghost" on:click={() => showCopyToDateStep1 = false}>Cancel</button>
+        <button class="btn btn-primary" on:click={onCopyToDateNext} disabled={!copyToDateValue}>Next</button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Copy meal to another date: step 2 — pick target meal -->
+<ActionSheet
+  bind:open={showCopyToDateStep2}
+  title={`Copy to meal on ${copyToDateValue}`}
+  actions={meals.map((m, i) => ({ label: m, icon: mealIcon(m), value: i }))}
+  on:select={onCopyToDatePick}
+/>
+
+<!-- Clear meal confirm -->
+<Dialog
+  bind:open={showClearMealDialog}
+  title="Clear all items from {actionMealIdx != null ? meals[actionMealIdx] : 'meal'}?"
+  message="This will remove every item in this meal from your diary for {$currentDate}. This can't be undone."
+  confirmText="Clear"
+  dangerous
+  on:confirm={doClearMeal}
 />
 
 <!-- Date Picker Calendar Sheet -->
@@ -1805,6 +1947,21 @@
   }
   .bs-sheet-body  { padding: 8px 20px 0; display: flex; flex-direction: column; gap: 12px; }
   .bs-sheet-footer { padding: 16px 20px; }
+
+  /* Meal header ⋮ menu button — quieter than the accent + */
+  .meal-menu-btn { color: var(--text-3); }
+  .meal-menu-btn:active { color: var(--text-1); }
+
+  /* Copy meal to another date sheet */
+  .copy-date-sheet { padding: 0 20px 20px; }
+  .copy-date-sheet .sheet-title { padding: 4px 0 12px; }
+  .copy-date-label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--text-2); }
+  .copy-date-input {
+    padding: 10px 12px; border-radius: var(--radius-md);
+    border: 1px solid var(--border); background: var(--surface-2);
+    color: var(--text-1); font-size: 15px;
+  }
+  .copy-date-actions { display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; }
   .bs-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;

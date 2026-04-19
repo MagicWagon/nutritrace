@@ -5,6 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.6-beta] — 2026-04-19
+
+### Added
+- **Meal-level actions** — new `⋮` button on each meal header opens an action sheet:
+  - **Copy items to…** — duplicate all items from one meal into another on the same day.
+  - **Move items to…** — transfer all items from one meal to another on the same day.
+  - **Copy meal to another date…** — pick a date + target meal; items are appended there (source day unchanged).
+  - **Clear all items** — with confirm dialog, removes every item in the meal for the current day.
+  - Empty meals open to a single "Add food" shortcut so the entry point is always consistent.
+
+---
+
 ## [0.39.5-beta] — 2026-04-19
 
 ### Added

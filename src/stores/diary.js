@@ -153,6 +153,68 @@ export async function updateDiaryItem(index, changes) {
   currentEntry.set(await _save(updated));
 }
 
+export async function copyMealItems(fromMealIdx, toMealIdx) {
+  let entry = null;
+  currentEntry.subscribe(v => entry = v)();
+  if (!entry) return 0;
+  const src = (entry.items || []).filter(it => Number(it.meal ?? 0) === Number(fromMealIdx));
+  if (!src.length) return 0;
+  const now = new Date().toISOString();
+  const copies = src.map(it => ({ ...it, meal: Number(toMealIdx), addedAt: now }));
+  const updated = { ...entry, items: [...(entry.items || []), ...copies] };
+  currentEntry.set(await _save(updated));
+  return src.length;
+}
+
+export async function moveMealItems(fromMealIdx, toMealIdx) {
+  let entry = null;
+  currentEntry.subscribe(v => entry = v)();
+  if (!entry) return 0;
+  let count = 0;
+  const items = (entry.items || []).map(it => {
+    if (Number(it.meal ?? 0) === Number(fromMealIdx)) {
+      count++;
+      return { ...it, meal: Number(toMealIdx) };
+    }
+    return it;
+  });
+  if (!count) return 0;
+  currentEntry.set(await _save({ ...entry, items }));
+  return count;
+}
+
+export async function clearMealItems(mealIdx) {
+  let entry = null;
+  currentEntry.subscribe(v => entry = v)();
+  if (!entry) return 0;
+  const before = entry.items?.length || 0;
+  const items = (entry.items || []).filter(it => Number(it.meal ?? 0) !== Number(mealIdx));
+  if (items.length === before) return 0;
+  currentEntry.set(await _save({ ...entry, items }));
+  return before - items.length;
+}
+
+export async function copyMealToDate(fromMealIdx, targetDate, targetMealIdx) {
+  let entry = null;
+  currentEntry.subscribe(v => entry = v)();
+  if (!entry) return 0;
+  const src = (entry.items || []).filter(it => Number(it.meal ?? 0) === Number(fromMealIdx));
+  if (!src.length) return 0;
+
+  let viewDate = null;
+  currentDate.subscribe(v => viewDate = v)();
+
+  let target = _fromApi(await NtApi.getDiaryDate(targetDate));
+  if (!target) target = { date: targetDate, items: [], bodyStats: {}, water: [] };
+
+  const now = new Date().toISOString();
+  const copies = src.map(it => ({ ...it, meal: Number(targetMealIdx), addedAt: now }));
+  const updated = { ...target, date: targetDate, items: [...(target.items || []), ...copies] };
+  const saved = _fromApi(await NtApi.saveDiaryDate(targetDate, _toApi(updated)));
+  if (targetDate === viewDate) currentEntry.set(saved);
+  return src.length;
+}
+
 export async function addWaterLog(amountMl, date) {
   const todayStr = () => new Date().toLocaleDateString('sv-SE');
   let viewDate = null;
