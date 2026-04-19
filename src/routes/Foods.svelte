@@ -50,10 +50,19 @@
     if (_prevSrc !== searchSource) {
       import('../stores/toast.js').then(({ showInfo }) => showInfo('Source reset to Local — external sources only work for Foods')).catch(() => {});
     }
-    // Jump to top when switching tabs (no animation) so each tab starts from its top
-    const _sc = document.querySelector('.page-transition');
-    if (_sc) _sc.scrollTop = 0;
-    else window.scrollTo(0, 0);
+  }
+
+  // Reset scroll so the new tab starts from the top.
+  // Click handler runs BEFORE bind propagation, so first reset happens before
+  // reactive blocks/DOM updates fire. rAF pass catches any restore after layout.
+  function onTabChange() {
+    const reset = () => {
+      const sc = document.querySelector('.page-transition') || document.scrollingElement || document.documentElement;
+      if (sc) sc.scrollTop = 0;
+      window.scrollTo(0, 0);
+    };
+    reset();
+    requestAnimationFrame(reset);
   }
   $: _tabIcon = activeTab === 0 ? 'restaurant' : activeTab === 1 ? 'dinner_dining' : 'menu_book';
   $: { if (pickMode) loadYesterdayMeals(); }
@@ -551,7 +560,7 @@
   <!-- Tabs + Search (sticky below header) -->
   <div class="foods-sticky-bar">
   <div class="foods-tabs">
-    <Tabs tabs={TABS} bind:active={activeTab} />
+    <Tabs tabs={TABS} bind:active={activeTab} on:change={onTabChange} />
   </div>
 
   <div class="foods-search">

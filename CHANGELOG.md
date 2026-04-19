@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.10-beta] — 2026-04-19
+
+### Fixed
+- **Foods tab switch scroll position (take 2)** — previous fix (0.39.9) reset scroll in a reactive block, which ran AFTER Svelte painted the new tab at the old offset, causing a visible jump. Now the reset is wired to the Tabs `change` event so it fires synchronously on click (before the bind propagates) with a `requestAnimationFrame` follow-up. Result: the new tab renders starting at top with no perceptible jump.
+
+---
+
 ## [0.39.9-beta] — 2026-04-19
 
 ### Removed
