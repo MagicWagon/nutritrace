@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.4-beta] — 2026-04-19
+
+### Changed
+- **Sleep score formula tuned** (19-day calibration) — reduced quality bonus ceiling (8→6) and HRV component ceiling (15→12, null default 10→8). Targets the "great night" overshoot pattern where the formula was giving 95-100 for nights Fitbit scored 81-89. Sleep MAE 2.16→1.74, max gap 11→9. Indirectly improves stress accuracy since sleep is 60% of the stress formula.
+
+---
+
 ## [0.39.3-beta] — 2026-04-18
 
 ### Added
