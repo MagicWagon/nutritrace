@@ -33,11 +33,7 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
 ### ~~Garmin Connect~~ *(done — experimental, OAuth 1.0a)*
 ### ~~Withings~~ *(done — body comp, ECG, vascular age, metabolic age, EDA, segmental)*
 
-### Fitbit GPS / Activity Routes
-- Fitbit API provides GPS route data for outdoor activities (runs, walks, bike rides)
-- `GET /1/user/-/activities/{id}.json` returns TCX data with lat/lon/elevation
-- Could display route maps on a per-activity detail view (Leaflet or similar map library)
-- Only unused Fitbit API capability — everything else is already synced
+### ~~Fitbit GPS / Activity Routes~~ *(done — TCX parsed via location OAuth scope, route map on workout detail)*
 
 ### Google Health Connect (Android)
 - Android Health Connect API (REST or local SDK bridge via PWA)
@@ -187,4 +183,4 @@ Sync model going forward: develop in the (private) monorepo as today, then ship 
 
 ---
 
-*Last updated: 2026-04-06*
+*Last updated: 2026-04-19*
