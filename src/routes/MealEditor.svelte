@@ -564,6 +564,14 @@
             </div>
           {/each}
         </div>
+        <!-- Running total + inline "add another" so users don't scroll back up -->
+        <div class="ingredient-list-footer">
+          <span class="ingredient-list-total">{Math.round(totals.calories||0).toLocaleString()} kcal · {meal.items.length} {meal.items.length === 1 ? 'item' : 'items'}</span>
+          <button class="ingredient-add-row" on:click={openPicker}>
+            <span class="material-symbols-rounded">add</span>
+            <span>Add ingredient</span>
+          </button>
+        </div>
       {/if}
     </div>
 
@@ -808,6 +816,24 @@
 
   /* Ingredient rows */
   .ingredient-list { display: flex; flex-direction: column; touch-action: none; }
+  .ingredient-add-row {
+    display: flex; align-items: center; gap: 8px;
+    margin-top: 10px; padding: 10px 12px;
+    background: var(--surface-2); border: 1px dashed var(--border);
+    border-radius: var(--radius-md); color: var(--accent);
+    font-size: 13px; font-weight: 500; width: 100%;
+    cursor: pointer; transition: background var(--dur-fast);
+  }
+  .ingredient-add-row:hover { background: var(--surface-3); }
+  .ingredient-add-row .material-symbols-rounded { font-size: 18px; }
+  .ingredient-list-footer {
+    display: flex; flex-direction: column; gap: 8px; margin-top: 10px;
+  }
+  .ingredient-list-total {
+    font-size: 12px; color: var(--text-3); text-align: right;
+    font-weight: 500;
+  }
+  .ingredient-list-footer .ingredient-add-row { margin-top: 0; }
   .ingredient-row {
     display: flex; align-items: center; gap: 10px;
     padding: 6px 0; border-bottom: 1px solid var(--border);

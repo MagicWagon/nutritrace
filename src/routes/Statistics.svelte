@@ -490,22 +490,33 @@
     </div>
 
     {#if range === 'custom'}
-      <div class="custom-range-row" transition:slide={{ duration: 160 }}>
-        <button class="date-range-btn" class:active={showCalFor === 'start'} on:click={() => openCal('start')}>
-          <span class="material-symbols-rounded drb-icon">calendar_today</span>
-          <div class="drb-text">
-            <span class="drb-label">From</span>
-            <span class="drb-val">{fmtDate(customStart)}</span>
-          </div>
-        </button>
-        <span class="drb-arrow">→</span>
-        <button class="date-range-btn" class:active={showCalFor === 'end'} on:click={() => openCal('end')}>
-          <span class="material-symbols-rounded drb-icon">calendar_today</span>
-          <div class="drb-text">
-            <span class="drb-label">To</span>
-            <span class="drb-val">{fmtDate(customEnd)}</span>
-          </div>
-        </button>
+      <div transition:slide={{ duration: 160 }}>
+        <!-- Quick-select shortcuts — saves drilling into the calendar -->
+        <div class="custom-range-quick">
+          <button class="quick-chip" on:click={() => { const t = localDateStr(); const d = new Date(); d.setDate(d.getDate() - 6); customStart = localDateStr(d); customEnd = t; showCalFor = null; }}>Last 7d</button>
+          <button class="quick-chip" on:click={() => { const t = localDateStr(); const d = new Date(); d.setDate(d.getDate() - 29); customStart = localDateStr(d); customEnd = t; showCalFor = null; }}>Last 30d</button>
+          <button class="quick-chip" on:click={() => { const t = localDateStr(); const d = new Date(); d.setDate(d.getDate() - 89); customStart = localDateStr(d); customEnd = t; showCalFor = null; }}>Last 90d</button>
+          <button class="quick-chip" on:click={() => { const t = new Date(); customStart = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-01`; customEnd = localDateStr(); showCalFor = null; }}>This month</button>
+          <button class="quick-chip" on:click={() => { const t = new Date(); t.setMonth(t.getMonth() - 1); const start = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-01`; const end = new Date(t.getFullYear(), t.getMonth() + 1, 0); customStart = start; customEnd = localDateStr(end); showCalFor = null; }}>Last month</button>
+          <button class="quick-chip" on:click={() => { const y = new Date().getFullYear(); customStart = `${y}-01-01`; customEnd = localDateStr(); showCalFor = null; }}>YTD</button>
+        </div>
+        <div class="custom-range-row">
+          <button class="date-range-btn" class:active={showCalFor === 'start'} on:click={() => openCal('start')}>
+            <span class="material-symbols-rounded drb-icon">calendar_today</span>
+            <div class="drb-text">
+              <span class="drb-label">From</span>
+              <span class="drb-val">{fmtDate(customStart)}</span>
+            </div>
+          </button>
+          <span class="drb-arrow">→</span>
+          <button class="date-range-btn" class:active={showCalFor === 'end'} on:click={() => openCal('end')}>
+            <span class="material-symbols-rounded drb-icon">calendar_today</span>
+            <div class="drb-text">
+              <span class="drb-label">To</span>
+              <span class="drb-val">{fmtDate(customEnd)}</span>
+            </div>
+          </button>
+        </div>
       </div>
     {/if}
 
@@ -713,6 +724,17 @@
   .chart-type-btn:hover { background: var(--surface-3); color: var(--accent); }
 
   /* Custom range date buttons */
+  .custom-range-quick {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    margin: 8px 0;
+  }
+  .quick-chip {
+    padding: 6px 12px; border-radius: var(--radius-full);
+    background: var(--surface-2); border: 1px solid var(--border);
+    color: var(--text-2); font-size: 12px; font-weight: 500;
+    cursor: pointer; transition: background var(--dur-fast), color var(--dur-fast);
+  }
+  .quick-chip:hover { background: var(--surface-3); color: var(--text-1); }
   .custom-range-row {
     display: flex;
     align-items: center;

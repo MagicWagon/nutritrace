@@ -5,6 +5,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.5-beta] — 2026-04-19
+
+### Added
+- **Password strength indicator** — real-time weak/fair/strong bar on AcceptInvite, ResetPassword, Profile change-password, and Wizard admin account forms. Shared `src/lib/validation.js` mirrors LiftTrace.
+- **Wizard integration step summary** — shows which services (Open Food Facts, USDA, Mealie, FitBot AI) are configured vs skipped.
+- **MealEditor inline Add Ingredient button** — always visible at the bottom of the ingredient list with running totals (kcal · N items).
+- **Foods source filter reset toast** — subtle info toast when switching tabs silently resets the source back to Local.
+- **Foods pick-mode confirm label** — button now reads "Add N" (was just a checkmark) so users know exactly how many items they're adding.
+- **Statistics quick-select chips** — Last 7d / 30d / 90d / This month / Last month / YTD on the custom date range.
+- **Goal editor section hierarchy** — sheet now grouped into Display / Goal Behavior / Target sections with hint subtitles under each toggle explaining what it does.
+
+### Changed
+- `showInfo()` toast helper added to `src/stores/toast.js` for subtle info messages.
+
+---
+
 ## [0.39.4-beta] — 2026-04-19
 
 ### Changed

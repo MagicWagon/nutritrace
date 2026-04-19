@@ -683,6 +683,31 @@
 
         </div>
 
+        <!-- Integration summary: shows what's configured vs. skipped -->
+        {@const _intCfg = [
+          { k: 'off',    label: 'Open Food Facts', on: !intSkipped.off    && !!(intOFFUser.trim() || intOFFPass.trim()) },
+          { k: 'usda',   label: 'USDA',            on: !intSkipped.usda   && !!intUSDARKey.trim() },
+          { k: 'mealie', label: 'Mealie',          on: !intSkipped.mealie && !!(intMealieUrl.trim() || intMealieToken.trim()) },
+          { k: 'ai',     label: 'FitBot AI',       on: !intSkipped.ai     && (intAILocked || !!intAIKey.trim()) },
+        ]}
+        {@const _configured = _intCfg.filter(x => x.on).map(x => x.label)}
+        {@const _skipped    = _intCfg.filter(x => !x.on).map(x => x.label)}
+        <div class="int-summary">
+          {#if _configured.length > 0}
+            <div class="int-summary-row">
+              <span class="material-symbols-rounded" style="font-size:16px;color:var(--accent)">check_circle</span>
+              <span>Configured: <strong>{_configured.join(', ')}</strong></span>
+            </div>
+          {/if}
+          {#if _skipped.length > 0}
+            <div class="int-summary-row int-summary-skip">
+              <span class="material-symbols-rounded" style="font-size:16px">remove_circle</span>
+              <span>Skipped: {_skipped.join(', ')}</span>
+            </div>
+          {/if}
+          <div class="int-summary-hint">You can change these anytime in Settings.</div>
+        </div>
+
       <!-- ── Notifications ── -->
       {:else if currentStepName === 'notifications'}
         <div class="step-hero compact">
@@ -953,6 +978,19 @@
     display: flex; flex-direction: column; gap: 10px;
     overflow-y: auto; flex: 1;
   }
+  .int-summary {
+    margin-top: 12px; padding: 12px 14px;
+    background: var(--surface-2); border-radius: var(--radius-md);
+    display: flex; flex-direction: column; gap: 6px;
+    font-size: 13px;
+  }
+  .int-summary-row {
+    display: flex; align-items: center; gap: 8px;
+    color: var(--text-1);
+  }
+  .int-summary-row.int-summary-skip { color: var(--text-3); }
+  .int-summary-row.int-summary-skip .material-symbols-rounded { color: var(--text-3); }
+  .int-summary-hint { font-size: 11px; color: var(--text-3); margin-top: 2px; }
   .int-card {
     background: var(--surface-1); border: 1.5px solid var(--border);
     border-radius: var(--radius-lg); overflow: hidden;

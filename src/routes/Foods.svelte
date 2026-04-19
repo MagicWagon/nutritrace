@@ -43,9 +43,13 @@
   $: if (activeTab !== _prevTab) {
     _prevTab = activeTab;
     activeCategoryFilter = '';
-    // Non-foods tabs only support local + shared
+    // Non-foods tabs only support local + shared — reset & notify if source was external
+    const _prevSrc = searchSource;
     if (activeTab !== 0 && searchSource !== 'local' && searchSource !== 'shared') searchSource = 'local';
     if (searchSource === 'shared' && !_tabHasShared) searchSource = 'local';
+    if (_prevSrc !== searchSource) {
+      import('../stores/toast.js').then(({ showInfo }) => showInfo('Source reset to Local — external sources only work for Foods')).catch(() => {});
+    }
   }
   $: _tabIcon = activeTab === 0 ? 'restaurant' : activeTab === 1 ? 'dinner_dining' : 'menu_book';
   $: { if (pickMode) loadYesterdayMeals(); }
@@ -519,11 +523,13 @@
     {#if $pageBanners}<FoodsBanner />{/if}
     {#if pickMode && selectedFoods.size > 0}
       <h1 class="pick-count-title">{selectedFoods.size} selected</h1>
-      <button class="btn-icon accent" on:click={confirmMultiAdd} disabled={multiAdding} aria-label="Add selected to diary" title="Add selected to diary">
+      <button class="btn btn-primary pick-confirm-btn" on:click={confirmMultiAdd} disabled={multiAdding} aria-label="Add selected to diary">
         {#if multiAdding}
-          <span class="material-symbols-rounded spin">refresh</span>
+          <span class="material-symbols-rounded spin" style="font-size:16px">refresh</span>
+          <span>Adding…</span>
         {:else}
-          <span class="material-symbols-rounded">check</span>
+          <span class="material-symbols-rounded" style="font-size:16px">check</span>
+          <span>Add {selectedFoods.size}</span>
         {/if}
       </button>
     {:else}
@@ -1029,6 +1035,10 @@
   .food-item.food-selected { background: var(--accent-dim); }
 
   .pick-count-title { color: var(--accent); }
+  .pick-confirm-btn {
+    display: flex; align-items: center; gap: 6px;
+    height: 36px; padding: 0 14px; font-size: 13px; font-weight: 600;
+  }
 
   .source-chip-row::-webkit-scrollbar { display: none; }
   .source-chip {

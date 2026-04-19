@@ -585,59 +585,76 @@
       </div>
       <div class="sheet-body">
 
-        <!-- Options -->
+        <!-- Display options -->
         {#if !editStat?.isWellness}
-        <div class="toggle-row">
-          <label class="toggle-label">Show in Diary</label>
-          <label class="toggle-switch">
-            <input type="checkbox" bind:checked={editShowDiary} />
-            <span class="toggle-track"></span>
-          </label>
-        </div>
-        <div class="toggle-row">
-          <label class="toggle-label">Show in Statistics</label>
-          <label class="toggle-switch">
-            <input type="checkbox" bind:checked={editShowStats} />
-            <span class="toggle-track"></span>
-          </label>
-        </div>
+          <p class="goal-section-label">Display</p>
+          <div class="toggle-row">
+            <label class="toggle-label">Show in Diary</label>
+            <label class="toggle-switch">
+              <input type="checkbox" bind:checked={editShowDiary} />
+              <span class="toggle-track"></span>
+            </label>
+          </div>
+          <div class="toggle-row">
+            <label class="toggle-label">Show in Statistics</label>
+            <label class="toggle-switch">
+              <input type="checkbox" bind:checked={editShowStats} />
+              <span class="toggle-track"></span>
+            </label>
+          </div>
         {/if}
+
+        <!-- Goal behavior -->
+        <p class="goal-section-label">Goal Behavior</p>
         <div class="toggle-row">
-          <label class="toggle-label">Same goal every day</label>
+          <div class="toggle-label-wrap">
+            <label class="toggle-label">Same goal every day</label>
+            <span class="toggle-hint">{editShared ? 'One target for every day' : 'Different target per weekday'}</span>
+          </div>
           <label class="toggle-switch">
             <input type="checkbox" bind:checked={editShared} />
             <span class="toggle-track"></span>
           </label>
         </div>
         <div class="toggle-row">
-          <label class="toggle-label">Minimum goal (must reach target)</label>
+          <div class="toggle-label-wrap">
+            <label class="toggle-label">Minimum goal</label>
+            <span class="toggle-hint">{editIsMin ? 'Must reach at least this value' : 'Must not exceed this value'}</span>
+          </div>
           <label class="toggle-switch">
             <input type="checkbox" bind:checked={editIsMin} />
             <span class="toggle-track"></span>
           </label>
         </div>
         {#if isPercentEligible(editStat)}
-        <div class="toggle-row">
-          <label class="toggle-label">Goal as % of calories</label>
-          <label class="toggle-switch">
-            <input type="checkbox" bind:checked={editIsPercent} />
-            <span class="toggle-track"></span>
-          </label>
-        </div>
+          <div class="toggle-row">
+            <div class="toggle-label-wrap">
+              <label class="toggle-label">Goal as % of calories</label>
+              <span class="toggle-hint">Target scales with your calorie goal</span>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" bind:checked={editIsPercent} />
+              <span class="toggle-track"></span>
+            </label>
+          </div>
         {/if}
         <div class="toggle-row">
-          <label class="toggle-label">Auto-adjust to activity</label>
+          <div class="toggle-label-wrap">
+            <label class="toggle-label">Auto-adjust to activity</label>
+            <span class="toggle-hint">Adjusts based on calories burned from wearables</span>
+          </div>
           <label class="toggle-switch">
             <input type="checkbox" bind:checked={editAutoAdjust} />
             <span class="toggle-track"></span>
           </label>
         </div>
 
-        <div class="divider" style="margin:8px 0"></div>
+        <div class="divider" style="margin:12px 0 8px"></div>
 
         <!-- Goal value(s) -->
+        <p class="goal-section-label">Target{editShared ? '' : 's per day'}</p>
         {#if editShared}
-          <label class="form-label">Target ({editIsPercent ? '% of calories' : (editStat.unit || '')})</label>
+          <label class="form-label">Value ({editIsPercent ? '% of calories' : (editStat.unit || '')})</label>
           <input class="input" type="number" min="0" step="any"
             placeholder="0" bind:value={editVal0} />
         {:else}
@@ -800,10 +817,28 @@
   .sheet-body   { flex: 1; overflow-y: auto; padding: 8px 20px 0; display: flex; flex-direction: column; gap: 8px; }
   .sheet-footer { padding: 16px 20px; }
 
+  /* Section labels */
+  .goal-section-label {
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--text-2, #999);
+    margin: 10px 0 2px;
+  }
+  .goal-section-label:first-child { margin-top: 2px; }
+
   /* Toggle rows */
   .toggle-row {
     display: flex; align-items: center; justify-content: space-between;
+    gap: 12px;
     padding: 6px 0;
+  }
+  .toggle-label-wrap {
+    display: flex; flex-direction: column; gap: 2px;
+    min-width: 0; flex: 1;
+  }
+  .toggle-hint {
+    font-size: 12px; color: var(--text-2, #999);
+    line-height: 1.3;
   }
   .toggle-label { font-size: 14px; }
   .toggle-switch { position: relative; display: inline-block; width: 44px; height: 24px; cursor: pointer; }
