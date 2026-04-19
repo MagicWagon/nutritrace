@@ -15,13 +15,13 @@
   import {
     currentDate, currentEntry, diaryTotals, macroPercents,
     prevDay, nextDay, loadEntry, removeDiaryItem, updateDiaryItem, saveBodyStats,
-    copyMealItems, moveMealItems, clearMealItems, copyMealToDate,
+    copyMealItems, moveMealItems, clearMealItems, copyMealToDate, saveDiaryNote,
     diaryShowNutritionSummary, diaryShowBodyStats, diaryLoadError
   } from '../stores/diary.js';
   import { mealNames, goals, energyUnit, weightUnit, lengthUnit, navStyle,
            diaryShowBrands, diaryShowThumbnails,
            diaryShowTimestamps, diaryShowMacroSummary, diaryPromptQuantity,
-           diaryShowPortionSize, diaryShowNutritionBar, diaryTotalsMode,
+           diaryShowPortionSize, diaryShowNotes, diaryShowNutritionBar, diaryTotalsMode,
            diaryShowAllNutrients, diaryShowNutritionUnits, visibleNutriments, hiddenBodyStats,
            dateFormat, timeFormat, disableAnimations, goalCelebrations, pageBanners,
            calorieGoalMode, calorieGoalFactor } from '../stores/settings.js';
@@ -262,6 +262,30 @@
     pendingDeleteIdx = null;
   }
 
+  // Daily notes
+  let notesExpanded = false;
+  let _notesText = '';
+  let _notesSaving = false;
+  let _lastLoadedNotes = '';
+  $: if (entry && (entry.notes || '') !== _lastLoadedNotes) {
+    _lastLoadedNotes = entry.notes || '';
+    _notesText = _lastLoadedNotes;
+    // Auto-close when switching to a day with no note; keep open if note exists
+    if (!_lastLoadedNotes) notesExpanded = false;
+  }
+  function toggleNotes() { notesExpanded = !notesExpanded; }
+  async function commitNotes() {
+    if ((_notesText || '') === (entry?.notes || '')) return;
+    _notesSaving = true;
+    try {
+      await saveDiaryNote(_notesText);
+    } catch (e) {
+      showError(e?.message || 'Note save failed');
+    } finally {
+      _notesSaving = false;
+    }
+  }
+
   // Meal-level actions (⋮ on meal header)
   let showMealAction       = false;
   let actionMealIdx        = null;
@@ -271,6 +295,9 @@
   let showCopyToDateStep2  = false;  // target meal picker after date chosen
   let copyToDateValue      = '';
   let showClearMealDialog  = false;
+  let showSaveAsMeal       = false;
+  let saveAsMealName       = '';
+  let saveAsMealSaving     = false;
 
   function openMealActionSheet(mealIdx) {
     actionMealIdx = mealIdx;
@@ -282,7 +309,29 @@
     if (val === 'copy')      { mealActionMode = 'copy'; _lockAndOpen(() => showMealTargetPicker = true); }
     else if (val === 'move') { mealActionMode = 'move'; _lockAndOpen(() => showMealTargetPicker = true); }
     else if (val === 'copy_date') { copyToDateValue = $currentDate; _lockAndOpen(() => showCopyToDateStep1 = true); }
+    else if (val === 'save_meal') {
+      saveAsMealName = meals[actionMealIdx] || '';
+      _lockAndOpen(() => showSaveAsMeal = true);
+    }
     else if (val === 'clear') { _lockAndOpen(() => showClearMealDialog = true); }
+  }
+
+  async function doSaveAsMeal() {
+    if (actionMealIdx == null) return;
+    const name = (saveAsMealName || '').trim();
+    if (!name) { showError('Please enter a name'); return; }
+    const items = getMealItems(entry.items, actionMealIdx).map(({ _i, ...it }) => it);
+    if (!items.length) { showError('Nothing to save'); return; }
+    saveAsMealSaving = true;
+    try {
+      await NtApi.createMeal({ name, notes: '', categories: [], items, imgUrl: '' });
+      showSuccess(`Saved "${name}" to Meals`);
+      showSaveAsMeal = false;
+    } catch (err) {
+      showError(err?.message || 'Save failed');
+    } finally {
+      saveAsMealSaving = false;
+    }
   }
 
   async function onMealTargetPick(e) {
@@ -792,7 +841,12 @@
       <span class="material-symbols-rounded">chevron_left</span>
     </button>
     <button class="date-btn" on:click={openDatePicker} title="Jump to date">
-      <span class="date-label">{formatDate($currentDate)}</span>
+      <span class="date-label">
+        {formatDate($currentDate)}
+        {#if $diaryShowNotes && (entry?.notes || '').trim()}
+          <span class="material-symbols-rounded date-note-indicator" title="Has notes">edit_note</span>
+        {/if}
+      </span>
       <span class="date-sub">{formatDateSub($currentDate, $dateFormat)}</span>
     </button>
     <button class="btn-icon accent" on:click={nextDay} aria-label="Next day" title="Next day">
@@ -895,6 +949,30 @@
       </section>
     {/each}
 
+    {#if $diaryShowNotes}
+      <section class="diary-notes card" class:expanded={notesExpanded || _notesText}>
+        <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+        <div class="diary-notes-header" on:click={toggleNotes}>
+          <span class="material-symbols-rounded diary-notes-icon">edit_note</span>
+          <span class="diary-notes-label">Day notes</span>
+          {#if _notesText && !notesExpanded}
+            <span class="diary-notes-preview text-3 text-sm truncate">{_notesText}</span>
+          {/if}
+          <span class="material-symbols-rounded diary-notes-chevron">{notesExpanded ? 'expand_less' : 'expand_more'}</span>
+        </div>
+        {#if notesExpanded}
+          <div class="diary-notes-body">
+            <textarea class="diary-notes-textarea" bind:value={_notesText}
+              on:blur={commitNotes}
+              placeholder="How did today feel? Sleep, energy, hunger, cravings…"
+              rows="3"></textarea>
+            <div class="diary-notes-meta">
+              <span class="text-3 text-sm">{_notesSaving ? 'Saving…' : (_notesText ? `${_notesText.length} characters` : '')}</span>
+            </div>
+          </div>
+        {/if}
+      </section>
+    {/if}
 
   </div>
 </div>
@@ -1273,6 +1351,7 @@
       { label: 'Copy items to…',          icon: 'content_copy', value: 'copy'      },
       { label: 'Move items to…',          icon: 'swap_horiz',   value: 'move'      },
       { label: 'Copy meal to another date…', icon: 'event_repeat', value: 'copy_date' },
+      { label: 'Save as meal…',           icon: 'bookmark_add', value: 'save_meal' },
       { label: 'Clear all items',         icon: 'delete_sweep', value: 'clear', danger: true },
     ] : [
       { label: 'Add food', icon: 'add', value: 'add' },
@@ -1328,6 +1407,31 @@
   dangerous
   on:confirm={doClearMeal}
 />
+
+<!-- Save as meal sheet -->
+{#if showSaveAsMeal}
+  <div use:portal class="sheet-backdrop" role="dialog" aria-modal="true"
+    on:click={() => { if (!_sheetLock && !saveAsMealSaving) showSaveAsMeal = false; }} on:keydown={() => {}}>
+    <div class="bs-sheet copy-date-sheet" on:click|stopPropagation on:keydown={() => {}}>
+      <div class="sheet-handle"></div>
+      <p class="sheet-title">Save {actionMealIdx != null ? meals[actionMealIdx] : 'meal'} to library</p>
+      <label class="copy-date-label">
+        <span>Meal name</span>
+        <input type="text" bind:value={saveAsMealName} class="copy-date-input"
+          placeholder="e.g. Usual breakfast" autofocus />
+      </label>
+      <p class="text-3 text-sm" style="margin:8px 0 0">
+        {#if actionMealIdx != null}{getMealItems(entry.items, actionMealIdx).length} item{getMealItems(entry.items, actionMealIdx).length === 1 ? '' : 's'} will be saved{/if}
+      </p>
+      <div class="copy-date-actions">
+        <button class="btn btn-ghost" disabled={saveAsMealSaving}
+          on:click={() => showSaveAsMeal = false}>Cancel</button>
+        <button class="btn btn-primary" disabled={saveAsMealSaving || !saveAsMealName.trim()}
+          on:click={doSaveAsMeal}>{saveAsMealSaving ? 'Saving…' : 'Save'}</button>
+      </div>
+    </div>
+  </div>
+{/if}
 
 <!-- Date Picker Calendar Sheet -->
 {#if showDatePicker}
@@ -1634,8 +1738,9 @@
     cursor: pointer;
     gap: 1px;
   }
-  .date-label { font-size: 17px; font-weight: 700; color: var(--accent); }
+  .date-label { font-size: 17px; font-weight: 700; color: var(--accent); display: inline-flex; align-items: center; gap: 4px; }
   .date-sub   { font-size: 12px; color: var(--text-3); }
+  .date-note-indicator { font-size: 16px; color: var(--text-3); vertical-align: middle; }
 
   .diary-content { padding-top: 12px; padding-bottom: 16px; gap: 12px; display: flex; flex-direction: column; }
 
@@ -1784,6 +1889,33 @@
   .wc-log-info { flex:1; display:flex; flex-direction:column; gap:2px; }
   .wc-divider  { height:1px; background:var(--border); margin:0 16px; }
 
+
+  /* Daily notes card */
+  .diary-notes {
+    margin-top: 8px;
+    border-left: 3px solid var(--text-3);
+    transition: border-color var(--dur-fast);
+  }
+  .diary-notes.expanded { border-left-color: var(--accent); }
+  .diary-notes-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 14px; cursor: pointer;
+  }
+  .diary-notes-icon { font-size: 20px; color: var(--text-2); }
+  .diary-notes.expanded .diary-notes-icon { color: var(--accent); }
+  .diary-notes-label { font-size: 14px; font-weight: 600; color: var(--text-1); flex-shrink: 0; }
+  .diary-notes-preview { flex: 1; min-width: 0; font-size: 13px; color: var(--text-3); }
+  .diary-notes-chevron { font-size: 20px; color: var(--text-3); margin-left: auto; flex-shrink: 0; }
+  .diary-notes-body { padding: 0 14px 14px; }
+  .diary-notes-textarea {
+    width: 100%; min-height: 80px; resize: vertical;
+    padding: 10px 12px; border-radius: var(--radius-md);
+    border: 1px solid var(--border); background: var(--surface-2);
+    color: var(--text-1); font-size: 14px; line-height: 1.5;
+    font-family: inherit;
+  }
+  .diary-notes-textarea:focus { outline: none; border-color: var(--accent); }
+  .diary-notes-meta { margin-top: 6px; min-height: 16px; text-align: right; }
 
   .meal-group { overflow: visible; border-left: 3px solid var(--meal-color, var(--accent)); }
   .meal-header {

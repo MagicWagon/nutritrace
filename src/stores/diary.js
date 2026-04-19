@@ -29,7 +29,7 @@ export const macroPercents = derived(diaryTotals, $t => {
 function _fromApi(entry) {
   if (!entry) return null;
   const items = (entry.items || []).map(i => i.imgUrl ? { ...i, imgUrl: resolveAssetUrl(i.imgUrl) } : i);
-  return { ...entry, items, bodyStats: entry.body_stats || {}, body_stats: undefined };
+  return { ...entry, items, bodyStats: entry.body_stats || {}, body_stats: undefined, notes: entry.notes || '' };
 }
 
 // Map app camelCase → API snake_case
@@ -65,6 +65,7 @@ function _toApi(entry) {
     items:      _stripCachedPaths(entry.items || []),
     body_stats: entry.bodyStats  || entry.body_stats || {},
     water:      entry.water      || [],
+    notes:      entry.notes      || '',
   };
 }
 
@@ -235,6 +236,15 @@ export async function addWaterLog(amountMl, date) {
   const updated = { ...entry, water: [...(entry.water || []), log] };
   const saved = await _save(updated);
   if (targetDate === viewDate) currentEntry.set(saved);
+}
+
+export async function saveDiaryNote(notes) {
+  let entry = null;
+  currentEntry.subscribe(v => entry = v)();
+  if (!entry) return;
+  const trimmed = (notes || '').replace(/\s+$/g, '');
+  if ((entry.notes || '') === trimmed) return;
+  currentEntry.set(await _save({ ...entry, notes: trimmed }));
 }
 
 export async function saveBodyStats(stats) {

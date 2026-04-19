@@ -19,6 +19,7 @@
     appearance, accentColor, energyUnit, mealNames,
     diaryShowBrands, diaryShowTimestamps, diaryShowThumbnails, diaryShowAllNutrients,
     diaryShowNutritionUnits, diaryShowMacroSummary, diaryPromptQuantity, diaryShowPortionSize,
+    diaryShowNotes,
     diaryShowNutritionBar, diaryTotalsMode,
     foodsShowCategories, foodsShowLabels, foodsShowNotes, foodsShowThumbnails, foodsShowYesterdayMeals, foodsSort,
     barcodeBeep, barcodeFlashlight, cropPhotos,
@@ -1889,6 +1890,8 @@
           <div class="setting-row"><span class="setting-label">Ask for quantity when adding</span><Toggle checked={$diaryPromptQuantity} on:change={e => diaryPromptQuantity.set(e.detail)} /></div>
           <div class="setting-divider"></div>
           <div class="setting-row"><span class="setting-label">Show portion size</span><Toggle checked={$diaryShowPortionSize} on:change={e => diaryShowPortionSize.set(e.detail)} /></div>
+          <div class="setting-divider"></div>
+          <div class="setting-row"><span class="setting-label">Show daily notes</span><Toggle checked={$diaryShowNotes} on:change={e => diaryShowNotes.set(e.detail)} /></div>
           <div class="setting-divider"></div>
           <div class="setting-row"><span class="setting-label">Show daily goals progress bar</span><Toggle checked={$diaryShowNutritionBar} on:change={e => diaryShowNutritionBar.set(e.detail)} /></div>
         </div>

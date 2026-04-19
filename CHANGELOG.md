@@ -5,6 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.7-beta] — 2026-04-19
+
+### Added
+- **Recently Added foods** — when picking food for a meal (Foods tab, empty search), a "Recently Added" section appears above results showing the 10 most recent unique items you've logged. One tap adds it to the target meal.
+- **Save meal to library** — new action in the meal `⋮` sheet: "Save as meal…" — converts a diary meal into a reusable Meal entry with a name you choose.
+- **Day notes** — per-day free-text notes on the diary (e.g. "felt bloated after lunch"). Collapsible card at the bottom of the diary; a small pencil indicator appears next to the date when a note exists. Toggleable in Settings → Diary display → "Show daily notes" (default on). Notes sync across devices like the rest of diary data.
+
+### Changed
+- Diary table gains a `notes` column (auto-migration on server + native Android).
+
+---
+
 ## [0.39.6-beta] — 2026-04-19
 
 ### Added

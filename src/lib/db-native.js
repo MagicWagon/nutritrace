@@ -67,6 +67,7 @@ const SCHEMA = `
     items       TEXT DEFAULT '[]',
     body_stats  TEXT DEFAULT '{}',
     water       TEXT DEFAULT '[]',
+    notes       TEXT DEFAULT NULL,
     updated_at  TEXT DEFAULT (datetime('now')),
     deleted_at  TEXT DEFAULT NULL,
     sync_status TEXT DEFAULT 'synced',
@@ -162,6 +163,16 @@ async function _open() {
     await db.open();
     // Skip PRAGMAs — WAL is default on Android, foreign keys not needed for local-only schema
     await db.execute(SCHEMA);
+    // Migrations: add columns that may be missing from existing installs
+    try {
+      const info = await db.query(`PRAGMA table_info(diary)`);
+      const cols = (info?.values || []).map(r => r.name);
+      if (!cols.includes('notes')) {
+        await db.execute(`ALTER TABLE diary ADD COLUMN notes TEXT DEFAULT NULL`);
+      }
+    } catch (e) {
+      console.debug('[db-native] diary.notes migration skipped:', e?.message);
+    }
     console.log('[db-native] SQLite database ready');
     return db;
   } catch (e) {
@@ -371,6 +382,7 @@ export async function dbGetDiaryDate(date) {
     items:      _parseJson(row.items, []),
     body_stats: _parseJson(row.body_stats, {}),
     water:      _parseJson(row.water, []),
+    notes:      row.notes || '',
   };
 }
 
@@ -379,13 +391,14 @@ export async function dbSaveDiaryDate(date, data) {
   const items      = JSON.stringify(data.items || []);
   const body_stats = JSON.stringify(data.body_stats || {});
   const water      = JSON.stringify(data.water || []);
+  const notes      = (typeof data.notes === 'string' && data.notes.trim()) ? data.notes : null;
   await db.run(
-    `INSERT INTO diary (user_id, date, items, body_stats, water, updated_at, sync_status)
-     VALUES (?, ?, ?, ?, ?, ?, 'pending')
+    `INSERT INTO diary (user_id, date, items, body_stats, water, notes, updated_at, sync_status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
      ON CONFLICT(date, user_id) DO UPDATE SET
        items=excluded.items, body_stats=excluded.body_stats, water=excluded.water,
-       updated_at=excluded.updated_at, sync_status='pending'`,
-    [LOCAL_USER_ID, date, items, body_stats, water, _now()]
+       notes=excluded.notes, updated_at=excluded.updated_at, sync_status='pending'`,
+    [LOCAL_USER_ID, date, items, body_stats, water, notes, _now()]
   );
   return dbGetDiaryDate(date);
 }
@@ -401,6 +414,7 @@ export async function dbGetAllDiary() {
     items:      _parseJson(row.items, []),
     body_stats: _parseJson(row.body_stats, {}),
     water:      _parseJson(row.water, []),
+    notes:      row.notes || '',
   }));
 }
 
@@ -443,6 +457,7 @@ export async function dbGetPendingChanges() {
       items:      _parseJson(row.items, []),
       body_stats: _parseJson(row.body_stats, {}),
       water:      _parseJson(row.water, []),
+      notes:      row.notes || '',
     })),
   };
 }
@@ -543,7 +558,7 @@ export async function dbUpsertFromServer(table, serverRecord) {
 // Upsert diary from server pull (keyed by date)
 export async function dbUpsertDiaryFromServer(serverRecord) {
   const db = await getDb();
-  const { id: serverId, deleted_at, date, items, body_stats, water, updated_at } = serverRecord;
+  const { id: serverId, deleted_at, date, items, body_stats, water, notes, updated_at } = serverRecord;
 
   if (deleted_at) {
     await db.run(`DELETE FROM diary WHERE server_id = ? OR date = ?`, [serverId, date]);
@@ -563,15 +578,16 @@ export async function dbUpsertDiaryFromServer(serverRecord) {
   }
 
   await db.run(
-    `INSERT INTO diary (server_id, user_id, date, items, body_stats, water, updated_at, sync_status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'synced')
+    `INSERT INTO diary (server_id, user_id, date, items, body_stats, water, notes, updated_at, sync_status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'synced')
      ON CONFLICT(date, user_id) DO UPDATE SET
        server_id=excluded.server_id, items=excluded.items, body_stats=excluded.body_stats,
-       water=excluded.water, updated_at=excluded.updated_at, sync_status='synced'`,
+       water=excluded.water, notes=excluded.notes, updated_at=excluded.updated_at, sync_status='synced'`,
     [serverId, LOCAL_USER_ID, date,
      typeof items === 'string' ? items : JSON.stringify(items || []),
      typeof body_stats === 'string' ? body_stats : JSON.stringify(body_stats || {}),
      typeof water === 'string' ? water : JSON.stringify(water || []),
+     (typeof notes === 'string' && notes.trim()) ? notes : null,
      updated_at]
   );
 }

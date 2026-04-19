@@ -166,13 +166,15 @@ router.post('/push', wrap((req, res) => {
         db.prepare(`UPDATE diary SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE date = ? AND user_id ${u != null ? '= ?' : 'IS NULL'}`)
           .run(d.date, ...(u != null ? [u] : []));
       } else {
+        const dNotes = (typeof d.notes === 'string' && d.notes.trim()) ? d.notes : null;
         db.prepare(
-          `INSERT INTO diary (user_id, date, items, body_stats, water, updated_at)
-           VALUES (?, ?, ?, ?, ?, datetime('now'))
+          `INSERT INTO diary (user_id, date, items, body_stats, water, notes, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
            ON CONFLICT(date, user_id) DO UPDATE SET
              items = excluded.items, body_stats = excluded.body_stats, water = excluded.water,
+             notes = excluded.notes,
              updated_at = datetime('now'), deleted_at = NULL`
-        ).run(u, d.date, JSON.stringify(d.items || []), JSON.stringify(d.body_stats || {}), JSON.stringify(d.water || []));
+        ).run(u, d.date, JSON.stringify(d.items || []), JSON.stringify(d.body_stats || {}), JSON.stringify(d.water || []), dNotes);
       }
       const row = db.prepare(`SELECT id FROM diary WHERE date = ? AND user_id ${u != null ? '= ?' : 'IS NULL'}`)
         .get(d.date, ...(u != null ? [u] : []));

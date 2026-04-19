@@ -21,7 +21,7 @@ export const USER_PREFS = new Set([
   'diaryShowNutritionBar','diaryTotalsMode',
   'diaryShowBrands','diaryShowTimestamps','diaryShowThumbnails',
   'diaryShowAllNutrients','diaryShowNutritionUnits','diaryShowMacroSummary',
-  'diaryPromptQuantity','diaryShowPortionSize',
+  'diaryPromptQuantity','diaryShowPortionSize','diaryShowNotes',
   'foodsShowCategories','foodsShowLabels','foodsShowNotes','foodsShowThumbnails',
   'foodsShowYesterdayMeals','foodsSort',
   'barcodeBeep','cropPhotos',
@@ -348,6 +348,7 @@ export const diaryShowNutritionUnits= createSettingStore('diaryShowNutritionUnit
 export const diaryShowMacroSummary  = createSettingStore('diaryShowMacroSummary',   true);
 export const diaryPromptQuantity    = createSettingStore('diaryPromptQuantity',     true);
 export const diaryShowPortionSize   = createSettingStore('diaryShowPortionSize',    false);
+export const diaryShowNotes         = createSettingStore('diaryShowNotes',          true);
 
 export const foodsShowCategories    = createSettingStore('foodsShowCategories',    true);
 export const foodsShowLabels        = createSettingStore('foodsShowLabels',        true);
