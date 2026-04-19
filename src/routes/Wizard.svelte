@@ -6,6 +6,7 @@
   import { Nutrition } from '../lib/nutrition.js';
   import { mealNames, energyUnit, goals, weightUnit, heightUnit, bulkSet } from '../stores/settings.js';
   import { currentUser, userMgmtActive, setupRequired, loadAuthState } from '../stores/auth.js';
+  import { validatePassword, passwordStrength } from '../lib/validation.js';
   import { showError } from '../stores/toast.js';
   import { isNative, getServerUrl } from '../lib/platform.js';
 
@@ -172,10 +173,8 @@
       if (enableUserMgmt) {
         umError = '';
         if (!adminUsername.trim()) { umError = 'Username is required'; return; }
-        if (adminPassword.length < 8) { umError = 'Password must be at least 8 characters'; return; }
-        if (!/[a-z]/.test(adminPassword) || !/[A-Z]/.test(adminPassword) || !/[0-9]/.test(adminPassword) || !/[^a-zA-Z0-9]/.test(adminPassword)) {
-          umError = 'Password needs uppercase, lowercase, number, and special character'; return;
-        }
+        const pwErr = validatePassword(adminPassword);
+        if (pwErr) { umError = pwErr; return; }
         if (adminPassword !== adminConfirm) { umError = 'Passwords do not match'; return; }
         // Register the admin account
         umLoading = true;
@@ -432,11 +431,21 @@
             <div class="form-row-2">
               <div class="form-group">
                 <label class="form-label">Password *</label>
-                <input class="input" type="password" bind:value={adminPassword} autocomplete="new-password" />
+                <input class="input" type="password" bind:value={adminPassword} autocomplete="new-password" placeholder="8+ chars, upper, lower, number, symbol" />
+                {#if adminPassword}
+                  {@const pwScore = passwordStrength(adminPassword)}
+                  <div class="pw-strength" class:s-0={pwScore.score === 0} class:s-1={pwScore.score === 1} class:s-2={pwScore.score === 2} class:s-3={pwScore.score === 3} class:s-4={pwScore.score === 4}>
+                    <div class="pw-bar"><div class="pw-fill" style:width={`${(pwScore.score / 4) * 100}%`}></div></div>
+                    <span class="pw-label">{pwScore.label}</span>
+                  </div>
+                {/if}
               </div>
               <div class="form-group">
                 <label class="form-label">Confirm *</label>
                 <input class="input" type="password" bind:value={adminConfirm} autocomplete="new-password" />
+                {#if adminConfirm && adminPassword !== adminConfirm}
+                  <p class="pw-mismatch">Passwords don't match</p>
+                {/if}
               </div>
             </div>
 
@@ -875,6 +884,18 @@
     background: rgba(255,107,107,0.1); border-radius: var(--radius-sm);
     padding: 8px 12px;
   }
+  /* Password strength indicator */
+  .pw-strength { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+  .pw-bar { flex: 1; height: 4px; background: var(--surface-2); border-radius: var(--radius-full); overflow: hidden; }
+  .pw-fill { height: 100%; border-radius: var(--radius-full); transition: width var(--dur-base), background var(--dur-fast); }
+  .pw-strength.s-0 .pw-fill, .pw-strength.s-1 .pw-fill { background: var(--danger, #ef4444); }
+  .pw-strength.s-2 .pw-fill { background: #f59e0b; }
+  .pw-strength.s-3 .pw-fill { background: var(--accent); }
+  .pw-strength.s-4 .pw-fill { background: var(--success, #22c55e); }
+  .pw-label { font-size: 11px; font-weight: 600; color: var(--text-3); min-width: 64px; text-align: right; }
+  .pw-strength.s-4 .pw-label { color: var(--success, #22c55e); }
+  .pw-strength.s-0 .pw-label, .pw-strength.s-1 .pw-label { color: var(--danger, #ef4444); }
+  .pw-mismatch { color: var(--danger, #ef4444); font-size: 11px; margin: 4px 0 0; }
 
   /* Gender cards */
   .gender-cards { display: flex; gap: 16px; margin-top: 16px; }
