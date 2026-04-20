@@ -1,9 +1,9 @@
 # NutriTrace — Project Reference
 
 **App name**: NutriTrace
-**Version**: See `src/lib/version.js` (centralized)
+**Version**: See `src/lib/version.js` (centralized) — currently v0.39.11-beta
 **Location**: `/home/papa/Documents/claude_code/nutritrace/`
-**GitHub**: `git@github.com:thebigjoe1/nutritrace.git`
+**GitHub**: `git@github.com:traceapps/nutritrace-dev.git` (private monorepo)
 **Stack**: Svelte 4, svelte-spa-router v4 (hash routing), Vite, SQLite (server), PWA
 **Docker**: `docker compose up -d` → serves on port 3000
 
@@ -15,8 +15,12 @@
 - **`src/routes/Foods.svelte`** — Food picker with source filters (Local/OFF/USDA/Mealie/From Others).
 - **`src/routes/Statistics.svelte`** — Charts page. `_loadVer` guard prevents stale loads.
 - **`src/routes/Wellness.svelte`** — All wellness UI: metrics, sparklines, insights (readiness, stress, sleep debt, chronotype).
-- **`src/routes/Settings.svelte`** (~3000 lines) — All settings. Wellness section extracted to sub-component.
+- **`src/routes/Settings.svelte`** (~1700 lines after split) — All settings. Large sections extracted to sub-components.
 - **`src/components/settings/SettingsWellness.svelte`** — Fitbit/Withings/Garmin config, metric visibility.
+- **`src/components/settings/SettingsAI.svelte`** — FitBot AI settings (provider, model, API key, Smart Log, Goal Insights). Receives `envLocks` prop.
+- **`src/components/settings/SettingsNotifications.svelte`** — Device notifications, push service (Apprise/Gotify/ntfy), all reminders and alerts.
+- **`src/components/settings/SettingsUserManagement.svelte`** — Profile, user list, invite, session, disable user mgmt, sign out. Exposes `loadData()`.
+- **`src/components/settings/SettingsBackup.svelte`** — Full backup, JSON export/import, CSV export, danger zone. Exposes `loadFullBackups()` and `loadLocalBackups()`.
 - **`src/stores/diary.js`** — `currentDate`, `currentEntry`, `diaryTotals`. `loadEntry`, `addDiaryItem`, etc.
 - **`src/stores/settings.js`** — All settings as `createSettingStore` instances backed by localStorage + server sync.
 - **`src/lib/db.js`** — IndexedDB abstraction.
@@ -30,9 +34,14 @@
 - **Settings auto-save**: most save reactively via `$: set(key, value)`. Meal names save on blur.
 - **Wellness scores**: sleep score estimated server-side (Fitbit API doesn't expose it). Readiness and stress calculated client-side from 30-day HRV/RHR baselines.
 - **Fitbit OAuth scopes**: `activity heartrate sleep oxygen_saturation respiratory_rate cardio_fitness temperature profile location` — `location` is required for TCX/GPS route data on workout logs.
-- **AI FitBot tool use**: FitBot uses function calling (tool use) across all providers (Claude, OpenAI, Gemini). Seven tools: `get_wellness_data`, `get_body_composition`, `get_diary` (items + day notes + per-item notes), `get_workouts`, `get_goals`, `get_diary_averages`, `get_meals` (saved Meals/Recipes library with name filter). Execution loop runs up to 5 rounds. System prompt instructs AI to always use tools to fetch real data rather than relying on context. See `src/lib/aiChat.js`.
+- **AI FitBot tool use**: FitBot uses function calling (tool use) across all providers (Claude, OpenAI, Gemini). Seven tools: `get_wellness_data`, `get_body_composition`, `get_diary` (items + day notes + per-item notes + brand), `get_workouts`, `get_goals`, `get_diary_averages`, `get_meals` (saved Meals/Recipes library with optional name filter, cap 50). Execution loop runs up to 5 rounds. System prompt instructs AI to always use tools to fetch real data rather than relying on context. See `src/lib/aiChat.js`.
 - **Settings sync feedback loop**: `_suppressSync` flag in the settings store prevents a feedback loop when loading server settings back into Svelte stores. A 10-second recently-changed protection window prevents server pull from overwriting local changes. Settings are written to SQLite immediately (not debounced) on `.set()`. PWA polls server every 30s and on `visibilitychange` for real-time sync.
 - **Notifications architecture** (v0.32.0-beta): two delivery channels — device notifications (`src/lib/notifications.js`) using Capacitor local notifications on native or Web Notification API on PWA, and a push service channel (Apprise/Gotify/ntfy — one at a time). Device reminders use `every: 'day'` for infinite repeat and are re-scheduled on app open. Server scheduler (`server/lib/scheduler.js`) runs every 15 min: handles push reminders for PWA users, scheduled wellness sync, and weekly summaries. Push delivery is handled by `server/lib/push-notify.js` (renamed from `gotify.js`; now supports Apprise, Gotify, and ntfy). Native calls the push service directly via `CapacitorHttp`; PWA proxies through server `/api/notify`. Goal celebrations cover ALL goal types (calories, protein, carbs, fat, water, steps, sleep, etc.); each goal fires at most once per day via a `_celebratedToday` Set. No custom notification channel is needed — the default Capacitor channel works on all tested Android versions.
+- **Fuzzy food search**: local food/meal/recipe search uses edit-distance matching (tolerance 1 for words ≥4 chars) after exact substring and word-by-word checks. Implemented in `Foods.svelte` via `_fuzzyMatch()` and `_editDist()` helpers. External source search (OFF/USDA) unchanged.
+- **Bundle code splitting**: `vite.config.js` `manualChunks` splits chart.js → `charts`, jszip → `jszip`, emoji-picker-element → `emoji` into separate async chunks loaded on demand.
+- **diary.notes**: `TEXT DEFAULT NULL` column on diary table. Editable day-level notes card at bottom of diary (toggleable via `diaryShowNotes` setting). Covered by full backup, JSON import, and differential sync. `saveDiaryNote()` in `src/stores/diary.js`.
+- **Meal actions (⋮ menu)**: copy items to another meal, move items, copy meal to a different date, save as meal, clear all items. Accessed via ⋮ button on each meal header in Diary. State managed in `Diary.svelte` via `openMealActionSheet()`. Helpers in `src/stores/diary.js`: `copyMealItems`, `moveMealItems`, `clearMealItems`, `copyMealToDate`.
+- **Statistics goal line**: labeled "Base Goal" instead of "Goal" when metric is `calories` and `calorieGoalMode === 'dynamic'`, to clarify the fixed reference vs. adaptive daily goal.
 
 ## Svelte Reactivity Rules
 
