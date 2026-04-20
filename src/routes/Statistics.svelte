@@ -8,7 +8,8 @@
   import { NUTRIMENTS, Nutrition } from '../lib/nutrition.js';
   import { goals, energyUnit, weightUnit, lengthUnit, statsChartType, statsYZero,
            statsAvgLine, statsGoalLine, statsTrendLine, hiddenBodyStats, dateFormat, pageBanners,
-           fitbitEnabled, garminEnabled, withingsEnabled, healthConnectEnabled, wellnessMetrics } from '../stores/settings.js';
+           fitbitEnabled, garminEnabled, withingsEnabled, healthConnectEnabled, wellnessMetrics,
+           calorieGoalMode } from '../stores/settings.js';
   import { isNative } from '../lib/platform.js';
   import StatsBanner from '../components/banners/StatsBanner.svelte';
   let _waterShowInStats = DB.getSetting('waterShowInStats', true);
@@ -307,9 +308,10 @@
         if (density) goalVal = Math.round(calGoal * goalVal / 100 / density);
       }
       if (goalVal) {
+        const isDynamic = metric === 'calories' && $calorieGoalMode === 'dynamic';
         datasets.push({
           type: 'line',
-          label: 'Goal',
+          label: isDynamic ? 'Base Goal' : 'Goal',
           data: displayData.map(() => goalVal),
           borderColor: isDark ? 'rgba(129,140,248,0.8)' : 'rgba(99,102,241,0.8)',
           borderWidth: 1.5,
@@ -556,9 +558,18 @@
         </div>
       {:else if data.length === 0}
         <div class="chart-loading" style="background:transparent">
-          <div style="text-align:center;opacity:0.5">
-            <span class="material-symbols-rounded" style="font-size:32px">show_chart</span>
-            <div class="text-3 text-sm" style="margin-top:4px">No data for this period</div>
+          <div style="text-align:center;opacity:0.45;padding:8px 24px">
+            <span class="material-symbols-rounded" style="font-size:36px">show_chart</span>
+            <div class="text-2 text-sm" style="margin-top:6px;font-weight:600">No data for this period</div>
+            <div class="text-3 text-sm" style="margin-top:4px;line-height:1.45">
+              {#if metric === 'calories' || metric === 'proteins' || metric === 'carbohydrates' || metric === 'fat'}
+                Log food in your diary to see trends here
+              {:else if metric.startsWith('wl_')}
+                Connect a fitness tracker in Settings → Wellness
+              {:else}
+                No entries found — try a different date range
+              {/if}
+            </div>
           </div>
         </div>
       {/if}

@@ -9,6 +9,17 @@ export default defineConfig({
       '/uploads': 'http://localhost:3001',
     }
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'charts':  ['chart.js'],
+          'jszip':   ['jszip'],
+          'emoji':   ['emoji-picker-element'],
+        }
+      }
+    }
+  },
   // Capacitor native build: output to dist/ (default) — capacitor.config.ts points webDir here
   // The build is identical for web and native; platform branching happens at runtime via platform.js
   plugins: [

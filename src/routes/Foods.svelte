@@ -155,10 +155,37 @@
   $: _groupList = activeTab === 0 ? groupFoods : activeTab === 1 ? groupMeals : groupRecipes;
   $: displayList = searchSource === 'shared' ? _groupList : _ownList;
   $: { if (searchSource === 'shared' && _tabHasShared && !groupFoods.length && !groupMeals.length && !groupRecipes.length) loadGroupCatalogue(); }
+  function _editDist(a, b) {
+    if (Math.abs(a.length - b.length) > 2) return 99;
+    const m = a.length, n = b.length;
+    const dp = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]);
+    for (let j = 0; j <= n; j++) dp[0][j] = j;
+    for (let i = 1; i <= m; i++)
+      for (let j = 1; j <= n; j++)
+        dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+    return dp[m][n];
+  }
+
+  function _fuzzyMatch(food, q) {
+    const name  = (food.name  || '').toLowerCase();
+    const brand = (food.brand || '').toLowerCase();
+    const combined = name + (brand ? ' ' + brand : '');
+    const qLow = q.toLowerCase().trim();
+    if (!qLow) return true;
+    // 1. Exact substring (current behavior)
+    if (combined.includes(qLow)) return true;
+    // 2. All query words appear somewhere
+    const qWords = qLow.split(/\s+/);
+    if (qWords.length > 1 && qWords.every(w => combined.includes(w))) return true;
+    // 3. Fuzzy per-word: each query word matches a target word within edit distance 1
+    const tWords = combined.split(/\s+/);
+    return qWords.every(qw =>
+      qw.length >= 4 && tWords.some(tw => tw.length >= 3 && _editDist(qw, tw) <= 1)
+    );
+  }
+
   $: filteredBySearch = search
-    ? displayList.filter(f =>
-        (f.name||'').toLowerCase().includes(search.toLowerCase()) ||
-        (f.brand||'').toLowerCase().includes(search.toLowerCase()))
+    ? displayList.filter(f => _fuzzyMatch(f, search))
     : displayList;
   $: filteredList = activeCategoryFilter
     ? filteredBySearch.filter(f => (f.categories||[]).includes(activeCategoryFilter))
@@ -646,6 +673,14 @@
             Add {TABS[activeTab].label.slice(0,-1)}
           </button>
         </div>
+      {:else if filteredList.length === 0 && search}
+        <div class="empty-state">
+          <span class="material-symbols-rounded empty-icon">search_off</span>
+          <p>No matches for "{search}"</p>
+          {#if activeTab === 0}
+            <p class="empty-state-hint">Try searching Open Food Facts or USDA above</p>
+          {/if}
+        </div>
       {:else}
         <ul class="food-list">
           {#each filteredList as food (food.id)}
@@ -1021,6 +1056,7 @@
     color: var(--text-2);
   }
   .empty-icon { font-size: 48px; color: var(--accent); opacity: 0.6; }
+  .empty-state-hint { font-size: 12px; color: var(--text-3, #888); margin-top: -8px; }
 
   .loading-row {
     display: flex;

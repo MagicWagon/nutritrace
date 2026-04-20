@@ -5,6 +5,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.11-beta] — 2026-04-19
+
+### Added
+- **Fuzzy food search** — local food/meal/recipe search now handles typos and partial matches (e.g. "chiken" finds "Chicken Breast"). Uses word-by-word matching first, then edit-distance tolerance for queries ≥ 4 chars. External source search (OFF/USDA) unchanged. No toggle — degrades silently to exact match when fuzzy adds nothing.
+- **Search empty state in Foods** — when a local search returns no results, shows "No matches for '…'" with a hint to try Open Food Facts/USDA. Previously the list was silently empty.
+- **Statistics empty state context** — "No data" message on the chart now includes a contextual hint: nutrition metrics suggest logging food, wellness metrics suggest connecting a tracker, body stats suggest a different date range.
+- **Statistics dynamic goal line label** — when Dynamic Calorie Goal is active, the calorie goal line on the Statistics chart is now labeled "Base Goal" instead of "Goal" to clarify that the actual daily goal varies.
+
+### Changed
+- **Bundle code splitting** — chart.js, jszip, and emoji-picker-element are now split into separate async chunks. Cuts initial JS parse time on first load; chunks are loaded on demand.
+
+### Fixed
+- Settings split (background task — SettingsNotifications, SettingsBackup, SettingsUserManagement, SettingsAI sub-components)
+
+---
+
 ## [0.39.10-beta] — 2026-04-19
 
 ### Fixed

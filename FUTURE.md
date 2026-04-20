@@ -102,6 +102,11 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
 
 ## Foods / Nutrition
 
+### Fuzzy food search
+- Current search requires exact substring match; typos and partial words miss results
+- Replace with fuzzy matching (e.g. Fuse.js or server-side trigram search) so "chiken" finds "Chicken Breast"
+- Apply across local foods, meals, and recipes; no toggle needed — degrades silently to current behavior
+
 ### Nutrient calculator overlay
 - Select two foods → side-by-side comparison panel
 
@@ -129,7 +134,26 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
 
 ---
 
+## AI Assistant (FitBot)
+
+### Food photo logging via FitBot chat
+- User attaches a photo of a meal in the FitBot chat; Claude/GPT-4o vision identifies foods and estimates portions
+- Gap: AI currently responds in plain text — intercept a vision response that looks like a food list, pipe it into the Smart Log matcher, and open the Smart Log review modal for confirmation before adding to diary
+- Reuses existing Smart Log infra; no new UI needed beyond what FitBot chat already supports
+
+---
+
 ## UI / UX Polish
+
+### Empty-state polish
+- Diary, Foods, Statistics, and Wellness pages show a generic empty list when there's no data
+- Add contextual empty states with a short message and a relevant action (e.g. "No foods yet — tap + to add your first" on Foods; "No data for this date" on Diary)
+- No toggle needed — better UX unconditionally when empty
+
+### Error visibility / sync status
+- Sync errors (failed server push, offline, conflict) are silent — no user-visible feedback
+- Add a subtle status indicator (pill or icon near the top) that shows last sync time and surfaces errors with a tap-to-retry action
+- Especially useful on Android where background sync can fail quietly
 
 ### Accessibility
 - ActionSheet: add `role="dialog"` and focus trap
@@ -140,6 +164,22 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
 - Subtle spinner or opacity change on date navigation when network is slow
 
 ### ~~Water log editing~~ *(done — v0.38.1-beta)*
+
+---
+
+## Code / Performance
+
+### Settings.svelte split
+- Settings.svelte is ~3,000 lines; split remaining sections into sub-components (pattern already established with SettingsWellness.svelte)
+- Pure maintenance — no UX change, just makes the file faster to work in
+
+### Statistics dynamic goal line
+- Statistics charts show a fixed calorie goal line even when Dynamic Calorie Goal is enabled
+- Fix: pull the per-day dynamic value when drawing the goal overlay so the line reflects actual adaptive targets
+
+### Bundle code splitting
+- Main JS bundle is large; initial load on slow connections is noticeable
+- Dynamic imports for heavy rarely-used sections (Statistics charts, full Settings) would cut initial parse time
 
 ---
 
@@ -183,4 +223,4 @@ Sync model going forward: develop in the (private) monorepo as today, then ship 
 
 ---
 
-*Last updated: 2026-04-19*
+*Last updated: 2026-04-19 (added: FitBot food photo logging, fuzzy search, empty-state polish, sync error visibility, Settings split, Statistics dynamic goal line, bundle splitting)*
