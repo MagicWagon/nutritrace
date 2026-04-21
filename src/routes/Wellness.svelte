@@ -701,19 +701,6 @@
     };
   }
 
-  async function recalculateScores() {
-    try {
-      const result = await NtApi.post('/api/wellness/fitbit/recalculate', {});
-      showSuccess(`Recalculated: readiness=${result.readiness_score}, stress=${result.stress_score}`);
-      // Reload data to pick up new scores
-      _readinessLoaded = false;
-      _stressLoaded = false;
-      loadData();
-    } catch (e) {
-      showError('Recalculate failed: ' + (e.message || ''));
-    }
-  }
-
   async function loadReadiness() {
     _readinessLoaded = true;
     const today   = new Date();
@@ -792,7 +779,8 @@
     }
     // Sleep component — dominant weight (60%). Fitbit stress mgmt correlates heavily with sleep.
     const sleep_s = sleepScore != null ? sleepScore : 75;
-    return (0.15 * hrv_s) + (0.60 * sleep_s) + (0.10 * rhr_s) + 14; // tuned with 6 days of data, MAE 3.17
+    const raw = (0.15 * hrv_s) + (0.60 * sleep_s) + (0.10 * rhr_s) + 14; // tuned with 6 days of data, MAE 3.17
+    return { raw, hrv_s: Math.round(hrv_s), rhr_s: Math.round(rhr_s), sleep_s: Math.round(sleep_s) };
   }
 
   function _calcStressScore(todayHrv, todayRhr, todaySleepScore, history30d) {
@@ -813,14 +801,15 @@
     // Seed from first day with enough data — no stored scores needed.
     let smoothed = null;
     for (const d of history30d) {
-      const raw = _rawStressScore(d.hrv_daily_rmssd, d.resting_hr, d.sleep_score, hrvBaseline, rhrBaseline);
-      if (raw == null) continue;
-      smoothed = smoothed == null ? raw : 0.40 * smoothed + 0.60 * raw;
+      const r = _rawStressScore(d.hrv_daily_rmssd, d.resting_hr, d.sleep_score, hrvBaseline, rhrBaseline);
+      if (r == null) continue;
+      smoothed = smoothed == null ? r.raw : 0.40 * smoothed + 0.60 * r.raw;
     }
 
     // Today's score — more responsive to today's raw (60% today, 40% history)
-    const todayRaw = _rawStressScore(todayHrv, todayRhr, todaySleepScore, hrvBaseline, rhrBaseline);
-    if (todayRaw == null) return null;
+    const today = _rawStressScore(todayHrv, todayRhr, todaySleepScore, hrvBaseline, rhrBaseline);
+    if (today == null) return null;
+    const todayRaw = today.raw;
     const score = Math.round(_clamp(
       smoothed != null ? 0.40 * smoothed + 0.60 * todayRaw : todayRaw,
       1, 100
@@ -840,6 +829,9 @@
 
     return {
       score, label, color,
+      hrv_score:  today.hrv_s,
+      rhr_score:  today.rhr_s,
+      sleep_score_used: today.sleep_s,
       hrv_baseline: Math.round(hrvBaseline * 10) / 10,
       rhr_baseline: rhrBaseline != null ? Math.round(rhrBaseline) : null,
       data_days:    totalHrvCount,
@@ -1865,15 +1857,6 @@
                       Based on {readiness.data_days} days — accuracy improves as more data is collected.
                     </div>
                   {/if}
-                  {#if readiness.stored}
-                    <div class="score-debug-info">
-                      <span class="material-symbols-rounded" style="font-size:14px;color:var(--text-3)">lock</span>
-                      <span>Locked at sync · Calculated: {readiness.hrv_score != null ? Math.round((0.65 * readiness.hrv_score) + (0.20 * readiness.rhr_score) + (0.10 * (readiness.sleep_score_used || 75))) : '—'}</span>
-                      <button class="btn-recalc" on:click={recalculateScores} title="Force recalculate">
-                        <span class="material-symbols-rounded" style="font-size:16px">refresh</span>
-                      </button>
-                    </div>
-                  {/if}
                 {/if}
               </div>
             {/if}
@@ -1906,7 +1889,20 @@
                       <span class="readiness-label" style="color:{stressScore.color}">{stressScore.label}</span>
                     </div>
                   </div>
-                  <p class="si-desc" style="margin-top:6px;margin-bottom:0">Higher = nervous system is well balanced. Driven by HRV, sleep quality, and resting HR compared to your personal baselines. Moves gradually — reflects multi-day trends, not just today.</p>
+                  <div class="readiness-drivers">
+                    <div class="readiness-driver">
+                      <span class="rd-label">HRV</span>
+                      <span class="rd-val" style="color:{stressScore.hrv_score >= 65 ? 'var(--accent)' : stressScore.hrv_score >= 50 ? '#f59e0b' : '#ef4444'}">{stressScore.hrv_score}</span>
+                    </div>
+                    <div class="readiness-driver">
+                      <span class="rd-label">Resting HR</span>
+                      <span class="rd-val" style="color:{stressScore.rhr_score >= 65 ? 'var(--accent)' : stressScore.rhr_score >= 50 ? '#f59e0b' : '#ef4444'}">{stressScore.rhr_score}</span>
+                    </div>
+                    <div class="readiness-driver">
+                      <span class="rd-label">Sleep</span>
+                      <span class="rd-val" style="color:{stressScore.sleep_score_used >= 65 ? 'var(--accent)' : stressScore.sleep_score_used >= 50 ? '#f59e0b' : '#ef4444'}">{stressScore.sleep_score_used}</span>
+                    </div>
+                  </div>
                   {#if stressScore.data_days < 30}
                     <div class="si-calibration-note">
                       <span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">info</span>
@@ -2799,29 +2795,6 @@
     border-radius: var(--radius-sm, 6px);
     line-height: 1.4;
   }
-  .score-debug-info {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 11px;
-    color: var(--text-3);
-    margin-top: 8px;
-    padding: 6px 10px;
-    background: var(--surface-2);
-    border-radius: var(--radius-sm, 6px);
-  }
-  .btn-recalc {
-    margin-left: auto;
-    background: none;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm, 6px);
-    cursor: pointer;
-    color: var(--text-3);
-    padding: 2px 6px;
-    display: flex;
-    align-items: center;
-  }
-  .btn-recalc:hover { color: var(--accent); border-color: var(--accent); }
   .si-range-chips {
     display: flex;
     gap: 6px;

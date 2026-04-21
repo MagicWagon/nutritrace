@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.12-beta] — 2026-04-21
+
+### Added
+- **Stress Management driver chips** — the Stress card in Wellness → Heart now shows the three contributing factors (HRV / Resting HR / Sleep) with color-coded values, matching the pattern used by Daily Readiness. Easier to see why stress is where it is on any given day.
+
+### Removed
+- **Readiness "Locked at sync" debug strip + refresh button** — was a dev/calibration tool used while tuning formulas. Regular users never needed it. The `/api/wellness/fitbit/recalculate` endpoint remains for DevTools use during future tuning.
+
+---
+
 ## [0.39.11-beta] — 2026-04-19
 
 ### Added
