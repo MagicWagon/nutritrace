@@ -882,10 +882,10 @@
         </div>
 
         {#if items.length === 0}
-          <div class="meal-empty">
+          <button type="button" class="meal-empty" on:click={() => openAddFood(mealIdx)} aria-label="Add food to {meal}">
             <span class="material-symbols-rounded meal-empty-icon" style="color:{mealColor(mealIdx)}">add_circle</span>
-            <span class="meal-empty-text">Tap + to add food</span>
-          </div>
+            <span class="meal-empty-text">Tap to add food</span>
+          </button>
         {:else}
           <div class="meal-items">
             {#each items as item (item._i)}
@@ -1939,6 +1939,22 @@
     align-items: center;
     gap: 10px;
     padding: 16px 16px;
+    width: 100%;
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    color: inherit;
+    font: inherit;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 120ms;
+  }
+  .meal-empty:hover,
+  .meal-empty:active { background: var(--surface-2); }
+  .meal-empty:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+    border-radius: var(--radius-sm, 6px);
   }
   .meal-empty-icon { font-size: 20px; opacity: 0.5; flex-shrink: 0; }
   .meal-empty-text { font-size: 13px; color: var(--text-3); }

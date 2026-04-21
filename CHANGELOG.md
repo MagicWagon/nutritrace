@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.13-beta] — 2026-04-21
+
+### Changed
+- **Empty meal slots are now tappable** — when a meal has no items, the "Tap to add food" row itself opens the food picker. Previously the row was passive and users had to hunt for the + button. Label updated from "Tap + to add food" to "Tap to add food"; the + button still works as before.
+
+---
+
 ## [0.39.12-beta] — 2026-04-21
 
 ### Added
