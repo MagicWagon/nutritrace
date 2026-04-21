@@ -1,7 +1,7 @@
 # NutriTrace — Project Reference
 
 **App name**: NutriTrace
-**Version**: See `src/lib/version.js` (centralized) — currently v0.39.11-beta
+**Version**: See `src/lib/version.js` (centralized) — currently v0.39.13-beta
 **Location**: `/home/papa/Documents/claude_code/nutritrace/`
 **GitHub**: `git@github.com:traceapps/nutritrace-dev.git` (private monorepo)
 **Stack**: Svelte 4, svelte-spa-router v4 (hash routing), Vite, SQLite (server), PWA
