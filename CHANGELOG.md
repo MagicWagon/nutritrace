@@ -5,6 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.14-beta] — 2026-04-24
+
+### Fixed
+- **Weigh-in reminder now fires correctly** — server scheduler's `wellness_data` skip query was using strict `user_id = ?` (missing the NULL-fallback that the diary query uses). If the user was multi-user but their wellness_data rows had NULL user_id (older installs, or synced-from-Fitbit/Withings rows), the skip check missed the weight and fired the reminder anyway.
+- **Water reminder multi-user fallback** — water goal skip check now also falls back to NULL user_id rows (matches meal + weigh-in pattern).
+- **Weigh-in logging** (server + Android) — both checks now log what they found: `skipping weigh-in for user=X — diary.body_stats.weight=Y` or `firing weigh-in — no weight found`. Makes future diagnosis immediate instead of silent.
+
+---
+
 ## [0.39.13-beta] — 2026-04-21
 
 ### Changed

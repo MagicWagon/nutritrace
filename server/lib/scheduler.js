@@ -276,7 +276,11 @@ async function _pushReminders(userId) {
             const today = local.dateStr;
             const uCond = userId === 0 ? '(user_id IS NULL OR user_id = 0)' : 'user_id = ?';
             const uArgs = userId === 0 ? [today] : [today, userId];
-            const row = db.prepare(`SELECT water FROM diary WHERE date = ? AND ${uCond} AND deleted_at IS NULL`).get(...uArgs);
+            let row = db.prepare(`SELECT water FROM diary WHERE date = ? AND ${uCond} AND deleted_at IS NULL`).get(...uArgs);
+            // Multi-user fallback: also check NULL user_id (pre-auth diary rows)
+            if (!row && userId !== 0) {
+              row = db.prepare(`SELECT water FROM diary WHERE date = ? AND user_id IS NULL AND deleted_at IS NULL`).get(today);
+            }
             if (row?.water) {
               const waterTotal = JSON.parse(row.water).reduce((s, l) => s + (l.amount || 0), 0);
               if (waterTotal >= waterGoal) skipWater = true;
@@ -345,25 +349,33 @@ async function _pushReminders(userId) {
       // Check if weight already logged today (either manual diary entry or synced from scale)
       const today = local.dateStr;
       let alreadyWeighed = false;
+      let checkInfo = 'no match';
       try {
-        // Manual diary entry
+        // Manual diary entry — handle user_id match + NULL fallback (pre-auth rows)
         const uCond = userId === 0 ? '(user_id IS NULL OR user_id = 0)' : 'user_id = ?';
         const uArgs = userId === 0 ? [today] : [today, userId];
-        const diaryRow = db.prepare(`SELECT body_stats FROM diary WHERE date = ? AND ${uCond} AND deleted_at IS NULL`).get(...uArgs);
+        let diaryRow = db.prepare(`SELECT body_stats FROM diary WHERE date = ? AND ${uCond} AND deleted_at IS NULL`).get(...uArgs);
+        if (!diaryRow && userId !== 0) {
+          diaryRow = db.prepare(`SELECT body_stats FROM diary WHERE date = ? AND user_id IS NULL AND deleted_at IS NULL`).get(today);
+        }
         if (diaryRow?.body_stats) {
           const bs = JSON.parse(diaryRow.body_stats);
-          if (bs.weight != null && bs.weight > 0) alreadyWeighed = true;
+          if (bs.weight != null && bs.weight > 0) { alreadyWeighed = true; checkInfo = `diary.body_stats.weight=${bs.weight}`; }
         }
-        // Synced from scale (Withings, Health Connect, etc.)
+        // Synced from scale (Withings, Health Connect, etc.) — same user_id handling as diary
         if (!alreadyWeighed) {
-          const wRow = db.prepare(`SELECT 1 FROM wellness_data WHERE user_id = ? AND date = ? AND metric_type = 'weight_kg' AND value > 0 LIMIT 1`).get(userId, today);
-          if (wRow) alreadyWeighed = true;
+          let wRow = db.prepare(`SELECT value FROM wellness_data WHERE date = ? AND ${uCond} AND metric_type = 'weight_kg' AND value > 0 LIMIT 1`).get(...uArgs);
+          if (!wRow && userId !== 0) {
+            wRow = db.prepare(`SELECT value FROM wellness_data WHERE date = ? AND user_id IS NULL AND metric_type = 'weight_kg' AND value > 0 LIMIT 1`).get(today);
+          }
+          if (wRow) { alreadyWeighed = true; checkInfo = `wellness_data.weight_kg=${wRow.value}`; }
         }
       } catch (e) { logger.debug(`[scheduler] weigh-in check error: ${e.message}`); }
 
       if (alreadyWeighed) {
-        logger.debug(`[scheduler] skipping weigh-in reminder — already logged today`);
+        logger.info(`[scheduler] skipping weigh-in reminder for user=${userId} date=${today} — ${checkInfo}`);
       } else {
+        logger.info(`[scheduler] firing weigh-in reminder for user=${userId} date=${today} — no weight found`);
         await pushNotify(userId, 'notifWeighIn', '⚖️ Weigh-in Reminder', 'Time to step on the scale!', 4);
       }
     }

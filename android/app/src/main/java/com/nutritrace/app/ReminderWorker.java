@@ -215,18 +215,23 @@ public class ReminderWorker extends Worker {
             int targetMin = Integer.parseInt(hm[0]) * 60 + Integer.parseInt(hm[1]);
             if (currentMin < targetMin || currentMin >= targetMin + 15) return;
             // Skip if already weighed in today (diary.body_stats OR wellness_data)
-            if (hasWeightToday(db, today)) {
-                Log.d(TAG, "skipping weigh-in reminder — already weighed in today");
+            String weighCheck = describeWeightToday(db, today);
+            if (weighCheck != null) {
+                Log.i(TAG, "skipping weigh-in reminder for " + today + " — " + weighCheck);
                 return;
             }
+            Log.i(TAG, "firing weigh-in reminder for " + today + " — no weight found");
             postNotification(4000, "⚖️ Weigh-in Reminder", "Time to step on the scale!");
         } catch (Exception e) {
             Log.w(TAG, "weigh-in check failed: " + e.getMessage());
         }
     }
 
-    /** True if weight was logged today — checks diary.body_stats AND wellness_data. */
-    private boolean hasWeightToday(SQLiteDatabase db, String today) {
+    /**
+     * Describe where today's weight was found, or null if not found.
+     * Checks diary.body_stats.weight then wellness_data.weight_kg.
+     */
+    private String describeWeightToday(SQLiteDatabase db, String today) {
         // Manual diary entry
         Cursor c = null;
         try {
@@ -238,7 +243,7 @@ public class ReminderWorker extends Worker {
                 if (bsJson != null && !bsJson.isEmpty()) {
                     JSONObject bs = new JSONObject(bsJson);
                     double w = bs.optDouble("weight", 0);
-                    if (w > 0) return true;
+                    if (w > 0) return "diary.body_stats.weight=" + w;
                 }
             }
         } catch (Exception e) {
@@ -250,15 +255,15 @@ public class ReminderWorker extends Worker {
         c = null;
         try {
             c = db.rawQuery(
-                "SELECT 1 FROM wellness_data WHERE date = ? AND metric_type = 'weight_kg' AND value > 0 LIMIT 1",
+                "SELECT value FROM wellness_data WHERE date = ? AND metric_type = 'weight_kg' AND value > 0 LIMIT 1",
                 new String[]{today});
-            if (c.moveToFirst()) return true;
+            if (c.moveToFirst()) return "wellness_data.weight_kg=" + c.getDouble(0);
         } catch (Exception e) {
             Log.w(TAG, "wellness_data read failed: " + e.getMessage());
         } finally {
             if (c != null) c.close();
         }
-        return false;
+        return null;
     }
 
     // ── Bedtime reminder (+ optional wind-down) ────────────────────────────
