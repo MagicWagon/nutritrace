@@ -1,6 +1,6 @@
 services:
   nutritrace:
-    image: ghcr.io/thebigjoe1/nutritrace:latest
+    image: ghcr.io/traceapps/nutritrace:latest
     container_name: nutritrace
     ports:
       - "3000:3001"

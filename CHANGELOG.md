@@ -5,6 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.18-beta] — 2026-04-25 — Docker image org rename
+
+### Changed
+- **Docker image canonical path is now `ghcr.io/traceapps/nutritrace`** — `docker-compose.yml`, `README.md`, and `DEPLOY.md` all reference the new path.
+- **CI dual-publishes for one transition window** — `.github/workflows/docker.yml` pushes to BOTH `ghcr.io/traceapps/nutritrace` and `ghcr.io/thebigjoe1/nutritrace` so existing users on the old path keep getting updates. The old path will be dropped after v1.0 once docs are widely propagated.
+- **FUTURE.md repo-split notes updated** to reflect actual current structure (`traceapps/nutritrace-dev` private monorepo, `traceapps/nutritrace` public-on-1.0, `traceapps/nutritrace-android` standalone).
+
+### Migration for self-hosters on the old image path
+No action required. Both `ghcr.io/thebigjoe1/nutritrace:latest` and `ghcr.io/traceapps/nutritrace:latest` will keep getting builds for at least the next few releases. When you next update your `docker-compose.yml`, switch the image path to `ghcr.io/traceapps/nutritrace:latest`.
+
+---
+
 ## [0.39.17-beta] — 2026-04-25 — Pre-1.0 security hardening (Phase 2)
 
 ### Security

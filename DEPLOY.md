@@ -21,7 +21,7 @@ A minimal working setup:
 ```yaml
 services:
   nutritrace:
-    image: ghcr.io/thebigjoe1/nutritrace:latest
+    image: ghcr.io/traceapps/nutritrace:latest
     ports:
       - "3000:3001"
     volumes:
@@ -39,7 +39,7 @@ services:
 ```yaml
 services:
   nutritrace:
-    image: ghcr.io/thebigjoe1/nutritrace:latest
+    image: ghcr.io/traceapps/nutritrace:latest
     ports:
       - "3000:3001"
     volumes:

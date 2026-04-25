@@ -206,20 +206,20 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
 
 ---
 
-## Repo Split — Public Server / Private Android (deferred)
+## Repo Split — Public Server / Private Android
 
-Strategy (Option 2 from 2026-04-06 discussion):
-1. Create `thebigjoe1/nutritrace-server` as a **new private** repo with server + PWA only, single fresh commit at current version (no monorepo history). Review privately as long as needed, then flip to public via GitHub visibility toggle when ready.
-2. Create `thebigjoe1/nutritrace-android` as a new **private** repo with the Android shell + Capacitor config + native Java/Kotlin only.
-3. Original `thebigjoe1/nutritrace` stays private forever as the full historical monorepo (archive but never delete).
+Current structure:
+- `traceapps/nutritrace-dev` (private) — full monorepo with `android/`, used for development.
+- `traceapps/nutritrace` (private, will go public at v1.0) — synced from `nutritrace-dev` minus `android/` via `nutritrace-dev-sync.sh`.
+- `traceapps/nutritrace-android` (private) — standalone mirror of the Android shell.
 
-Pre-flight before pushing public:
+Pre-flight before flipping `traceapps/nutritrace` public:
 - Scrub for personal URLs, secrets, `.env` artifacts
 - Scrub for personal references in comments
-- Decide whether to mention the Android app in the public README + add a "Get on Play Store" link
 - Confirm AGPL-3.0 license file is present
+- Run `nutritrace-dev-sync.sh` once more to land latest beta in the public repo
 
-Sync model going forward: develop in the (private) monorepo as today, then ship release snapshots to the public server repo. Each public release is a clean snapshot, not a daily commit log — CHANGELOG carries the version history.
+Sync model going forward: develop in `nutritrace-dev` as today, then ship release snapshots to `traceapps/nutritrace`. Each public release is a clean snapshot, not a daily commit log — CHANGELOG carries the version history.
 
 ---
 

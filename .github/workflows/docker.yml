@@ -27,6 +27,11 @@ jobs:
         with:
           context: .
           push: true
+          # Dual-publish for one transition window so existing users on the
+          # old `thebigjoe1/nutritrace` path keep getting updates. Drop the
+          # old tags after v1.0 once docs/compose files are widely updated.
           tags: |
+            ghcr.io/traceapps/nutritrace:latest
+            ghcr.io/traceapps/nutritrace:${{ github.sha }}
             ghcr.io/thebigjoe1/nutritrace:latest
             ghcr.io/thebigjoe1/nutritrace:${{ github.sha }}

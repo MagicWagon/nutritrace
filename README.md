@@ -136,7 +136,7 @@ Smart Log uses a tightly-constrained prompt (~150 tokens in, ~50 out) so it's ch
 ```yaml
 services:
   nutritrace:
-    image: ghcr.io/thebigjoe1/nutritrace:latest
+    image: ghcr.io/traceapps/nutritrace:latest
     container_name: nutritrace
     ports:
       - "3000:3001"
