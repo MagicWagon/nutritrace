@@ -30,11 +30,13 @@ export function signToken(user) {
   );
 }
 
-/** Read session maxAge for cookies (in ms). 0 = no expiry → 10 years. */
+/** Read session maxAge for cookies (in ms). 0 = max-allowed (default 1 year). */
+const MAX_SESSION_HOURS = parseInt(process.env.MAX_SESSION_HOURS || '8760'); // 1 year default cap
 export function sessionMaxAge() {
   const cfg = db.prepare("SELECT value FROM app_config WHERE key = 'session_hours'").get();
-  const hours = cfg?.value != null && cfg.value !== '' ? parseInt(cfg.value) : 720;
-  return hours > 0 ? hours * 60 * 60 * 1000 : 100 * 365 * 24 * 60 * 60 * 1000;
+  const raw = cfg?.value != null && cfg.value !== '' ? parseInt(cfg.value) : 720;
+  const hours = raw > 0 ? Math.min(raw, MAX_SESSION_HOURS) : MAX_SESSION_HOURS;
+  return hours * 60 * 60 * 1000;
 }
 
 /** Attach req.user if a valid JWT cookie is present (non-blocking) */

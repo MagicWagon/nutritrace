@@ -39,8 +39,12 @@ function _userCfg(key, userId) {
   return row?.value || '';
 }
 
+import { encrypt, decrypt } from '../lib/token-crypto.js';
+
 function _getTokens(userId) {
-  return db.prepare('SELECT * FROM fitbit_tokens WHERE user_id = ?').get(userId);
+  const row = db.prepare('SELECT * FROM fitbit_tokens WHERE user_id = ?').get(userId);
+  if (!row) return row;
+  return { ...row, access_token: decrypt(row.access_token), refresh_token: decrypt(row.refresh_token) };
 }
 
 async function _refresh(userId) {
@@ -65,7 +69,7 @@ async function _refresh(userId) {
   const expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
   db.prepare(`
     UPDATE fitbit_tokens SET access_token=?, refresh_token=?, expires_at=? WHERE user_id=?
-  `).run(data.access_token, data.refresh_token, expiresAt, userId);
+  `).run(encrypt(data.access_token), encrypt(data.refresh_token), expiresAt, userId);
   return data.access_token;
 }
 
@@ -219,7 +223,7 @@ router.get('/callback', wrap(async (req, res) => {
       refresh_token  = excluded.refresh_token,
       expires_at     = excluded.expires_at,
       fitbit_user_id = excluded.fitbit_user_id
-  `).run(pkce.userId, td.access_token, td.refresh_token, expiresAt, td.user_id || null);
+  `).run(pkce.userId, encrypt(td.access_token), encrypt(td.refresh_token), expiresAt, td.user_id || null);
 
   res.redirect(_redir('/?fitbit=connected#/wellness'));
 }));

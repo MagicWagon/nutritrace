@@ -20,10 +20,14 @@ const BACKUPS_DIR = process.env.BACKUPS_PATH  || path.join(UPLOADS_DIR, 'backups
 
 fs.mkdirSync(BACKUPS_DIR, { recursive: true });
 
-// Multer: stream to disk (temp dir) so large ZIPs don't OOM the container
+// Multer: stream to disk (temp dir) so large ZIPs don't OOM the container.
+// 512 MB cap is generous for a full backup (DB + photos) but bounds disk-fill
+// abuse from repeated half-finished uploads. Override with BACKUP_UPLOAD_MAX_MB
+// if you legitimately need a larger limit.
+const _backupMaxMb = parseInt(process.env.BACKUP_UPLOAD_MAX_MB || '512');
 const upload = multer({
   storage: multer.diskStorage({ destination: (req, file, cb) => cb(null, os.tmpdir()) }),
-  limits: { fileSize: 2 * 1024 * 1024 * 1024 }, // 2 GB
+  limits: { fileSize: _backupMaxMb * 1024 * 1024 },
 });
 
 function restoreFromZip(zip) {

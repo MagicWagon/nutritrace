@@ -53,11 +53,19 @@ function rateLimitLogin(req, res, next) {
   next();
 }
 
+// Default to secure cookies (HTTPS-only) since most production deploys are
+// behind a reverse proxy or Cloudflare Tunnel. Self-hosters running on plain
+// HTTP (LAN, dev) can opt out with INSECURE_COOKIES=1 — they should be aware
+// that auth cookies will be sent in cleartext.
+const _insecureCookies = process.env.INSECURE_COOKIES === '1' || process.env.INSECURE_COOKIES === 'true';
+if (_insecureCookies) {
+  console.warn('[WARN] INSECURE_COOKIES=1 — auth cookies will be sent over plain HTTP. Only use this on a trusted LAN.');
+}
 const COOKIE_OPTS = {
   httpOnly: true,
   sameSite: 'lax',
   maxAge:   30 * 24 * 60 * 60 * 1000, // 30 days
-  secure:   process.env.NODE_ENV === 'production',
+  secure:   !_insecureCookies,
 };
 
 function safeUser(u) {

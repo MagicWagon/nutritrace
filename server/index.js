@@ -38,7 +38,15 @@ const app  = express();
 const PORT = process.env.PORT || 3001;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-app.use(express.json({ limit: '50mb' }));
+// Per-route JSON limits for endpoints that legitimately handle large payloads
+// (full data export/import, full-history sync push). Registered BEFORE the
+// global parser so they win — by the time the global parser runs, req.body
+// is already populated and it short-circuits.
+app.use('/api/data/import', express.json({ limit: '25mb' }));
+app.use('/api/sync/push',   express.json({ limit: '25mb' }));
+// Global cap: 1 MB. Prevents a single authed user from filling memory with
+// repeated large requests. Anything above belongs on a per-route opt-in.
+app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 
 // CORS — allow cross-origin requests from Android app (https://localhost) and same-origin

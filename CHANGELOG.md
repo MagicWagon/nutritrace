@@ -5,6 +5,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.17-beta] — 2026-04-25 — Pre-1.0 security hardening (Phase 2)
+
+### Security
+- **OAuth tokens encrypted at rest** — Fitbit, Withings, and Garmin access/refresh tokens are now encrypted with AES-256-GCM using a key derived (HKDF-SHA256) from `JWT_SECRET` (override with `TOKEN_ENC_KEY`). A leaked database file or backup no longer hands out long-lived wearable-API credentials. New module: `server/lib/token-crypto.js`. Migration is **lazy**: existing plaintext tokens continue to work and are re-written encrypted on the next refresh cycle. Rotating `JWT_SECRET` invalidates both sessions and stored OAuth tokens — users will have to reconnect their wearables; document this if you ever rotate.
+- **Mealie proxy SSRF fixed** — `/api/mealie/proxy` now requires `baseUrl` to match the user's saved `mealieBaseUrl` setting (multi-user). An authed user can no longer use the server as an open proxy to probe internal hosts or cloud-metadata endpoints. Single-user mode unchanged (no auth boundary to defend in that mode).
+- **Image-localizer SSRF fixed** — `POST /api/foods` and `/api/meals` (which run `localizeImage`) now refuse URLs whose hostname resolves to private/loopback/link-local IP ranges (10.x, 127.x, 172.16-31.x, 192.168.x, 169.254.x including cloud metadata, IPv6 ULA + loopback). Non-http(s) protocols also rejected.
+- **Auth cookie secure-by-default** — `secure: true` is the new default (was tied to `NODE_ENV=production` which most self-hosters never set). Set `INSECURE_COOKIES=1` to opt out for plain-HTTP LAN deploys (logged as a warning at startup).
+- **Body parser tightened** — global JSON limit lowered from 50 MB to 1 MB. The two endpoints that legitimately handle large payloads (`/api/data/import`, `/api/sync/push`) get per-route 25 MB limits. Caps memory abuse from a single authed user.
+- **Backup upload limit reduced** — 2 GB → 512 MB by default (override with `BACKUP_UPLOAD_MAX_MB`). Bounds disk-fill abuse from repeated half-finished uploads.
+- **Session duration capped at 1 year** — previously `session_hours = 0` meant 100 years. Override with `MAX_SESSION_HOURS` env var if you really want longer.
+
+### Notes for self-hosters
+- **HTTPS is now expected by default.** If your server is on plain HTTP (LAN, dev), set `INSECURE_COOKIES=1` in your `.env` or auth cookies will be rejected by the browser.
+- **OAuth tokens migrate transparently** on next sync — no admin action required.
+- **`JWT_SECRET` is now load-bearing for OAuth too.** If you ever rotate it, users must reconnect Fitbit/Withings/Garmin. Set a separate `TOKEN_ENC_KEY` if you want independent rotation.
+
+---
+
 ## [0.39.16-beta] — 2026-04-25 — Pre-1.0 security & polish (Phase 1)
 
 ### Security
