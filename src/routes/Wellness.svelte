@@ -736,7 +736,8 @@
 
     // Past days: use server-stored snapshot (locked in at sync time).
     // Today: always calculate live so score updates as data arrives.
-    // Always compute the breakdown for display
+    // Always compute the breakdown for display.
+    // displayData.sleep_score is already overridden with sleep_score_actual when seeded.
     readiness = _calcReadiness(
       displayData.hrv_daily_rmssd,
       displayData.resting_hr,
@@ -744,7 +745,7 @@
       yesterdayCalories,
       history
     );
-    // If a stored (locked-in) score exists, use it as the displayed score
+    // displayData.readiness_score is already overridden with readiness_score_actual when seeded.
     if (displayData.readiness_score != null) {
       const s = Math.round(displayData.readiness_score);
       readiness = { ...readiness, score: s, stored: true };
@@ -859,7 +860,8 @@
       return {
         hrv_daily_rmssd: g.hrv_daily_rmssd ?? f.hrv_daily_rmssd ?? null,
         resting_hr:      g.resting_hr      ?? f.resting_hr      ?? null,
-        sleep_score:     g.sleep_score     ?? f.sleep_score     ?? null,
+        // Prefer actual sleep when seeded for calibration; fall back to device-measured
+        sleep_score:     f.sleep_score_actual ?? g.sleep_score ?? f.sleep_score ?? null,
       };
     });
 
@@ -869,6 +871,7 @@
       displayData.sleep_score,
       history
     );
+    // displayData.stress_score is already overridden with stress_score_actual when seeded.
     if (displayData.stress_score != null) {
       const s = Math.round(displayData.stress_score);
       stressScore = { ...stressScore, score: s, stored: true };
@@ -1364,6 +1367,12 @@
         }
       }
     }
+    // Calibration overrides — when actual Fitbit values are seeded, they take
+    // precedence over our calculated/locked-in values. Keep the *_actual keys
+    // intact so consumers can still distinguish actual vs calc if needed.
+    if (merged.sleep_score_actual     != null) merged.sleep_score     = merged.sleep_score_actual;
+    if (merged.readiness_score_actual != null) merged.readiness_score = merged.readiness_score_actual;
+    if (merged.stress_score_actual    != null) merged.stress_score    = merged.stress_score_actual;
     return merged;
   })();
 

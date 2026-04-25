@@ -548,7 +548,13 @@ router.post('/recalculate', wrap(async (req, res) => {
   res.json({ ok: true, date: today, ...result });
 }));
 
-// ── POST /seed-scores — override scores with exact Fitbit values for calibration ──
+// ── POST /seed-scores — store actual Fitbit values for calibration ──
+// Writes to *_actual metric_types (not the calculated *_score) so that
+// routine syncs don't overwrite them. The Wellness UI prefers *_actual
+// for display when present, and the stress/readiness chains prefer them
+// for history. Once the formulas are dialed in and seeding stops, the
+// *_actual rows roll off the 30-day stress window naturally and the
+// system transitions to using calc only — no flag flip needed.
 router.post('/seed-scores', wrap(async (req, res) => {
   const u = uid(req);
   const { date, sleep_score, readiness_score, stress_score } = req.body;
@@ -561,12 +567,12 @@ router.post('/seed-scores', wrap(async (req, res) => {
       value = excluded.value, synced_at = excluded.synced_at
   `);
   db.transaction(() => {
-    if (sleep_score != null) upsert.run(u, date, 'sleep_score', sleep_score);
-    if (readiness_score != null) upsert.run(u, date, 'readiness_score', readiness_score);
-    if (stress_score != null) upsert.run(u, date, 'stress_score', stress_score);
+    if (sleep_score != null)     upsert.run(u, date, 'sleep_score_actual',     sleep_score);
+    if (readiness_score != null) upsert.run(u, date, 'readiness_score_actual', readiness_score);
+    if (stress_score != null)    upsert.run(u, date, 'stress_score_actual',    stress_score);
   })();
 
-  logger.info(`[fitbit] seeded scores for ${date}: sleep=${sleep_score} readiness=${readiness_score} stress=${stress_score}`);
+  logger.info(`[fitbit] seeded actual scores for ${date}: sleep=${sleep_score} readiness=${readiness_score} stress=${stress_score}`);
   res.json({ ok: true, date, sleep_score, readiness_score, stress_score });
 }));
 

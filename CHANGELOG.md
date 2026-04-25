@@ -5,6 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.15-beta] — 2026-04-25
+
+### Fixed
+- **Calibration seeds no longer overwritten by Fitbit sync** — `/api/wellness/fitbit/seed-scores` now writes to dedicated `*_actual` metric_types (`sleep_score_actual`, `readiness_score_actual`, `stress_score_actual`) instead of overwriting the calculated `*_score` values. Previously every Fitbit sync recomputed `sleep_score` from raw inputs and silently blew away seeded actuals — the stress chain has been using stale calculated values for weeks.
+- **Wellness UI prefers actuals when present** — sleep/readiness/stress display, the readiness card, the stress card, and the stress 30-day history chain all now prefer `*_actual` over `*_score`. When no actual is seeded, behavior is unchanged (live calc).
+- **Self-retiring design** — once formulas are dialed in and seeding stops, `*_actual` rows naturally roll off the 30-day stress window and the system transitions to using calc only. No flag flip, no migration step.
+
+---
+
 ## [0.39.14-beta] — 2026-04-24
 
 ### Fixed
