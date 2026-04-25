@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.21-beta] — 2026-04-25 — Final audit cleanup
+
+### Security
+- **Push-test SSRF fixed** — `/api/settings/push-test` (gotify branch) was accepting `body.url` and `body.token` and proxying to whatever the caller supplied, then falling back to saved settings. The client never sends those body fields anyway, so removing them eliminates an authed-user SSRF without changing any user-visible behavior. ntfy and Apprise paths already only used saved settings.
+- **AI chat payload caps** — `/api/ai/chat` now rejects `messages.length > 60` and `messages + systemPrompt > 200 KB`. Bounds the worst case for a misbehaving client (or compromised account) burning the admin's AI budget.
+- **Backup file extension guard** — `/api/full-backup/:name/{download,delete}` now require the requested filename to end in `.zip`. Without this, an admin could request any file that happened to live in `BACKUPS_DIR` (which is under `UPLOADS_DIR` by default).
+
+This brings the audit punch list to **complete** except for two intentionally-deferred items already in FUTURE.md (Android cleartext lockdown — right before Play Store; dep major bumps `better-sqlite3 9→11` + `multer 1→2` — v1.1 with full regression testing).
+
+---
+
 ## [0.39.20-beta] — 2026-04-25 — Capacitor SQLite encryption (SQLCipher)
 
 ### Security

@@ -213,6 +213,12 @@ router.get('/', requireAdmin, (req, res) => {
 // ── GET /api/full-backup/:name/download ───────────────────────────────────
 router.get('/:name/download', requireAdmin, (req, res) => {
   const filename = path.basename(req.params.name); // prevent path traversal
+  // Only serve files that look like backups — the BACKUPS_DIR is under
+  // UPLOADS_DIR, so without this guard an admin could grab arbitrary uploaded
+  // images by name.
+  if (!filename.toLowerCase().endsWith('.zip')) {
+    return res.status(404).json({ error: 'Not found' });
+  }
   const filePath = path.join(BACKUPS_DIR, filename);
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Not found' });
   res.download(filePath, filename);
@@ -221,6 +227,9 @@ router.get('/:name/download', requireAdmin, (req, res) => {
 // ── DELETE /api/full-backup/:name ─────────────────────────────────────────
 router.delete('/:name', requireAdmin, (req, res) => {
   const filename = path.basename(req.params.name);
+  if (!filename.toLowerCase().endsWith('.zip')) {
+    return res.status(404).json({ error: 'Not found' });
+  }
   const filePath = path.join(BACKUPS_DIR, filename);
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Not found' });
   fs.unlinkSync(filePath);

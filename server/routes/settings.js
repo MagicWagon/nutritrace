@@ -110,9 +110,12 @@ async function _pushTestHandler(req, res) {
   try {
     let resp;
     if (svc === 'gotify') {
-      const url = req.body.url || _s('gotifyUrl');
-      const token = req.body.token || _s('gotifyToken');
-      if (!url || !token) return res.status(400).json({ error: 'Gotify URL and token required' });
+      // SSRF guard: only ever proxy to the URL the user has saved. Body-supplied
+      // url/token are intentionally ignored — the client always saves before
+      // calling test, so saved values reflect what the user typed.
+      const url = _s('gotifyUrl');
+      const token = _s('gotifyToken');
+      if (!url || !token) return res.status(400).json({ error: 'Gotify URL and token required — save settings first' });
       resp = await fetch(`${url.replace(/\/+$/, '')}/message?token=${encodeURIComponent(token)}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: title || 'NutriTrace', message: message || 'Test notification — connected!', priority: priority || 5 }),
