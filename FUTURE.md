@@ -206,6 +206,17 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
 
 ---
 
+## Pre-1.0 Public Release — TODO
+
+Items to land before flipping `traceapps/nutritrace` public and submitting to Play Store:
+
+- **Android network security lockdown** — `android/app/src/main/res/xml/network_security_config.xml` currently allows cleartext + user-installed CAs in production. Restructure to `<base-config cleartextTrafficPermitted="false">` (locked down for Play Store release builds) + `<debug-overrides>` keeping cleartext + user CAs (for sideloaded debug APKs). Document the HTTPS expectation for Play Store users in 3 places: README Android section, DEPLOY.md "Connecting from Android" subsection, and in-app error message when Play Store build hits an HTTP server.
+- **Drop dual-publish window** — `.github/workflows/docker.yml` currently publishes to BOTH `ghcr.io/traceapps/nutritrace` and `ghcr.io/thebigjoe1/nutritrace`. Drop the old `thebigjoe1` tags after one or two releases past 1.0 once `docker compose pull` has propagated.
+- **Sync to public repo** — run `nutritrace-dev-sync.sh` to land latest beta in `traceapps/nutritrace`.
+- **Pre-flight scrub** — re-check for personal URLs, secrets, `.env` artifacts, personal references in comments before flipping public.
+
+---
+
 ## Repo Split — Public Server / Private Android
 
 Current structure:
