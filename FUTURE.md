@@ -211,6 +211,7 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
 Items to land before flipping `traceapps/nutritrace` public and submitting to Play Store:
 
 - **Android network security lockdown** — `android/app/src/main/res/xml/network_security_config.xml` currently allows cleartext + user-installed CAs in production. Restructure to `<base-config cleartextTrafficPermitted="false">` (locked down for Play Store release builds) + `<debug-overrides>` keeping cleartext + user CAs (for sideloaded debug APKs). Document the HTTPS expectation for Play Store users in 3 places: README Android section, DEPLOY.md "Connecting from Android" subsection, and in-app error message when Play Store build hits an HTTP server.
+- **Local-only encryption upgrade UI** — when a local-only install starts after the encryption update (v0.39.20+), `db-native.js` defers the migration and sets `nt:db_encryption_pending=1` in localStorage. Need a banner in Settings → Backup that surfaces this state and provides an "Upgrade Now" button gated on a fresh Local Full Backup export. Wires up to the already-exported `runLocalEncryptionUpgrade()` and `isEncryptionPending()` helpers in `db-native.js`.
 - **Sync to public repo** — run `nutritrace-dev-sync.sh` to land latest beta in `traceapps/nutritrace`.
 - **Pre-flight scrub** — re-check for personal URLs, secrets, `.env` artifacts, personal references in comments before flipping public.
 

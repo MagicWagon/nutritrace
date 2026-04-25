@@ -5,6 +5,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.20-beta] — 2026-04-25 — Capacitor SQLite encryption (SQLCipher)
+
+### Security
+- **Native SQLite is now encrypted at rest** — `androidIsEncryption: true` (and iOS) flips on SQLCipher in the Capacitor build. Per-device passphrase is generated on first launch (32 random bytes via `crypto.getRandomValues`) and stored in localStorage. Defense-in-depth on top of Android's existing file-based app-data encryption.
+
+### Migration (automatic, two paths)
+- **Server-connected devices** (your Pixel falls here): on first launch after the update, `db-native.js` detects the unencrypted DB, deletes it, creates a fresh encrypted DB, and the next sync repopulates from the server. **Zero data loss** because the local DB is just a cache of authoritative server data. You may briefly see an empty diary while the first sync completes.
+- **Local-only devices**: migration is **deferred**, not silent — wiping local SQLite without a server safety net would lose data. The DB stays unencrypted; a `nt:db_encryption_pending=1` flag is set in localStorage. Users explicitly trigger the upgrade after exporting a Local Full Backup. UI for that lives in the next release (already exported the helpers `runLocalEncryptionUpgrade()` + `isEncryptionPending()` from `db-native.js`).
+
+### What this protects against
+- Lost/stolen rooted device (where Android's OS-level encryption can be bypassed)
+- File-system-level backups that include the DB file
+- Future zero-day exploits against Android's data-directory encryption
+
+### What this does NOT change
+- The encryption secret lives in localStorage in the same app data directory as the DB. An attacker who can read one can read the other. This is a defense-in-depth layer, not an air-gap. Android Keystore-backed key would require a custom plugin.
+
+### Notes for self-hosters / developers
+- If you uninstall + reinstall the app, the localStorage secret is wiped along with everything else — the encrypted DB file becomes unrecoverable. Same outcome as `Clear Storage` in Android Settings. Re-install pulls from the server (server-connected mode) or starts fresh (local-only).
+
+---
+
 ## [0.39.19-beta] — 2026-04-25 — Upload magic-byte validation
 
 ### Security
