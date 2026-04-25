@@ -5,6 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.19-beta] — 2026-04-25 — Upload magic-byte validation
+
+### Security
+- **`/api/upload` now magic-byte validates** — was trusting the client-supplied `Content-Type`. After multer writes the file, the first bytes are inspected against known image signatures (JPEG, PNG, WebP, GIF, HEIC/HEIF, AVIF, BMP). Files that don't match are deleted from disk and the request is rejected with 400. SVG is intentionally NOT supported (script-execution risk; food/avatar uploads never need it).
+- New module: `server/lib/image-magic.js` — pure-stdlib magic-byte detector with both file-path and in-memory-buffer entry points.
+
+---
+
 ## [0.39.18-beta] — 2026-04-25 — Docker image org rename
 
 ### Changed
