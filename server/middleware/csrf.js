@@ -1,11 +1,12 @@
 import { userMgmtActive } from './auth.js';
 
 const SAFE_METHODS  = new Set(['GET', 'HEAD', 'OPTIONS']);
-// Login/logout/register don't need CSRF — they're how you get a token in the first place
-// Wellness routes are exempt: OAuth callbacks redirect back without a loaded app context,
-// so nt:csrf hasn't been populated in localStorage yet when the first sync/config POST fires.
-// Triggering a wellness sync via CSRF is not a meaningful attack vector.
-const SKIP_PREFIXES = ['/api/auth/', '/api/wellness/'];
+// Login/logout/register don't need CSRF — they're how you get a token in the first place.
+// Wellness OAuth callbacks are exempt because OAuth providers redirect users back to us
+// via a top-level navigation that can't carry our CSRF header — those endpoints validate
+// their own state token (CSRF-equivalent) via the oauth_state DB table.
+const SKIP_PREFIXES = ['/api/auth/'];
+const SKIP_SUFFIXES = ['/callback'];
 
 /**
  * CSRF protection for cookie-based (PWA) sessions.
@@ -19,6 +20,9 @@ const SKIP_PREFIXES = ['/api/auth/', '/api/wellness/'];
 export function csrfProtect(req, res, next) {
   if (SAFE_METHODS.has(req.method)) return next();
   if (SKIP_PREFIXES.some(p => req.path.startsWith(p))) return next();
+  // Allow OAuth callback paths (e.g. /api/wellness/fitbit/callback) — they validate
+  // their own state tokens, and the cross-origin redirect can't carry our CSRF header.
+  if (SKIP_SUFFIXES.some(s => req.path.endsWith(s))) return next();
   if (!userMgmtActive()) return next();                         // single-user mode
   if (req.headers.authorization?.startsWith('Bearer ')) return next(); // Bearer = CSRF-safe
   if (!req.user?.csrf) return next();                           // old token — skip for now

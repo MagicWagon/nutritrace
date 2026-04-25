@@ -2015,12 +2015,7 @@
           <div class="setting-divider"></div>
           <div class="about-row">
             <span class="material-symbols-rounded about-feat-icon">code</span>
-            <span>Server: <a href="https://github.com/thebigjoe1/nutritrace" target="_blank" rel="noopener" class="about-link">Open source</a> (AGPL-3.0)</span>
-          </div>
-          <div class="setting-divider"></div>
-          <div class="about-row">
-            <span class="material-symbols-rounded about-feat-icon">favorite</span>
-            <span>Inspired by <a href="https://github.com/davidhealey/waistline" target="_blank" rel="noopener" class="about-link">Waistline</a> and <a href="https://github.com/CodeWithCJ/SparkyFitness" target="_blank" rel="noopener" class="about-link">SparkyFitness</a></span>
+            <span>Server: <a href="https://github.com/traceapps/nutritrace" target="_blank" rel="noopener" class="about-link">Open source</a> (AGPL-3.0)</span>
           </div>
           <div class="setting-divider"></div>
           <div class="about-row" style="flex-direction:column;align-items:flex-start;gap:8px">
@@ -2029,10 +2024,10 @@
               <span>Support development</span>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;padding-left:30px">
-              <a href="https://github.com/sponsors/YOUR_GITHUB_USERNAME" target="_blank" rel="noopener" class="btn btn-secondary" style="height:30px;font-size:12px;padding:0 12px">
+              <a href="https://github.com/sponsors/traceapps" target="_blank" rel="noopener" class="btn btn-secondary" style="height:30px;font-size:12px;padding:0 12px">
                 <span class="material-symbols-rounded" style="font-size:14px">favorite</span> GitHub Sponsors
               </a>
-              <a href="https://ko-fi.com/YOUR_KOFI_USERNAME" target="_blank" rel="noopener" class="btn btn-secondary" style="height:30px;font-size:12px;padding:0 12px">
+              <a href="https://ko-fi.com/thebigjoe1" target="_blank" rel="noopener" class="btn btn-secondary" style="height:30px;font-size:12px;padding:0 12px">
                 <span class="material-symbols-rounded" style="font-size:14px">coffee</span> Ko-fi
               </a>
             </div>

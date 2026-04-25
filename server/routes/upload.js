@@ -3,6 +3,9 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { requireAuth } from '../middleware/auth.js';
+import { makeRateLimiter } from '../middleware/rate-limit.js';
+
+const uploadLimit = makeRateLimiter({ max: 60, windowMs: 60_000, label: 'upload' });
 
 
 const uploadsPath = process.env.UPLOADS_PATH || './uploads';
@@ -28,7 +31,7 @@ const upload = multer({
 const router = Router();
 router.use(requireAuth);
 
-router.post('/', (req, res, next) => {
+router.post('/', uploadLimit, (req, res, next) => {
   upload.single('file')(req, res, (err) => {
     if (err) return next(err);
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });

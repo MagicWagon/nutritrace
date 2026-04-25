@@ -113,7 +113,7 @@
               • <em>"<strong>same as yesterday</strong> for lunch"</em> → copy yesterday's items
             </div>
             <div style="margin-top:8px">
-              See the <a href="https://github.com/thebigjoe1/nutritrace#smart-log--voice--ai-food-logging" target="_blank" rel="noopener" class="about-link">Smart Log section in the README</a> for full examples and privacy details.
+              See the <a href="https://github.com/traceapps/nutritrace#smart-log--voice--ai-food-logging" target="_blank" rel="noopener" class="about-link">Smart Log section in the README</a> for full examples and privacy details.
             </div>
           </div>
         </div>

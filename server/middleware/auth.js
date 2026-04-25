@@ -2,9 +2,13 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import db from '../db.js';
 
+// In production, refuse to start without an explicit JWT_SECRET — silently falling
+// back to a known default would mean every deploy ships forgeable tokens.
+if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+  console.error('[FATAL] JWT_SECRET is required in production. Generate one with: openssl rand -base64 48');
+  process.exit(1);
+}
 export const JWT_SECRET = process.env.JWT_SECRET || 'nutritrace-dev-secret-change-in-production';
-
-// Warn at startup if using the default dev secret
 if (!process.env.JWT_SECRET) {
   console.warn('[WARN] JWT_SECRET not set — using insecure dev default. Set JWT_SECRET in your environment for production.');
 }

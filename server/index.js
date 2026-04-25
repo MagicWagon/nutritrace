@@ -23,6 +23,7 @@ import syncRoutes       from './routes/sync.js';
 import { logger }   from './logger.js';
 import { authenticate, userMgmtActive } from './middleware/auth.js';
 import { csrfProtect } from './middleware/csrf.js';
+import { makeRateLimiter } from './middleware/rate-limit.js';
 import { seedSmtpFromEnv } from './email.js';
 import { seedAiFromEnv } from './ai.js';
 
@@ -108,6 +109,10 @@ app.use('/api/settings',  settingsRoutes);
 app.use('/api/app-config',  appConfigRoutes);
 app.use('/api/ai',          aiRoutes);
 app.use('/api/full-backup',        fullBackupRoutes);
+// Per-IP rate limit on OAuth callbacks — these run unauthenticated and trigger
+// expensive token-exchange round-trips with the OAuth provider.
+const oauthCallbackLimit = makeRateLimiter({ max: 10, windowMs: 60_000, label: 'oauth-callback' });
+app.use(['/api/wellness/fitbit/callback', '/api/wellness/withings/callback', '/api/wellness/garmin/callback'], oauthCallbackLimit);
 app.use('/api/wellness/fitbit',   fitbitRoutes);
 app.use('/api/wellness/withings', withingsRoutes);
 app.use('/api/wellness/garmin',  garminRoutes);

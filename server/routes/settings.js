@@ -72,6 +72,11 @@ router.delete('/', wrap((req, res) => {
 router.post('/claim-celebration', wrap((req, res) => {
   const { key } = req.body;
   if (!key || typeof key !== 'string') return res.status(400).json({ error: 'key required' });
+  // Validate format: lowercase + digits + underscore + hyphen, max 40 chars.
+  // Covers all nutrient IDs (saturated-fat, vitamin-d) plus underscore-style keys
+  // (cal_max, steps_hit). Prevents a misbehaving client from spamming arbitrary
+  // keys into app_config.
+  if (!/^[a-z_][a-z0-9_-]{0,39}$/.test(key)) return res.status(400).json({ error: 'invalid key format' });
   const userId = req.user?.id ?? 0;
   const today = new Date().toISOString().slice(0, 10);
   const dbKey = `_celeb_${userId}_${key}_${today}`;

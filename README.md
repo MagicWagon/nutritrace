@@ -292,6 +292,15 @@ NutriTrace is free to self-host and always will be. If it's been useful to you a
 
 Or just star the repo — that helps with discoverability and costs nothing.
 
+## Credits
+
+NutriTrace was inspired by two excellent self-hosted nutrition trackers:
+
+- **[Waistline](https://github.com/davidhealey/waistline)** by David Healey — a privacy-focused Android nutrition diary that proved a great open-source nutrition tracker is possible.
+- **[SparkyFitness](https://github.com/CodeWithCJ/SparkyFitness)** by CodeWithCJ — a self-hosted fitness and nutrition tracker that influenced the wellness integrations and goal-tracking approach.
+
+Thanks to both projects for showing what's possible.
+
 ## License
 
 [AGPL-3.0](LICENSE) — server and PWA. The Android app is distributed separately as a paid release on the Play Store.

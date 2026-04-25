@@ -8,6 +8,10 @@
 import { isNative } from './platform.js';
 import { LocalNotifications } from '@capacitor/local-notifications';
 
+// Verbose notification logs are gated on dev — production users don't need
+// "[notifications] checking..." spam every minute.
+const _dlog = import.meta.env.DEV ? console.log : () => {};
+
 function _getLN() {
   if (!isNative) return null;
   return LocalNotifications;
@@ -31,7 +35,7 @@ async function _ensureChannel() {
       vibration: true,
     });
     _channelCreated = true;
-    console.log('[notifications] channel created');
+    _dlog('[notifications] channel created');
   } catch (e) {
     console.warn('[notifications] channel creation failed:', e.message);
   }
@@ -88,7 +92,7 @@ export async function showNotification(title, body, id = null) {
           body,
         }]
       });
-      console.log(`[notifications] scheduled OK: "${title}" id=${notifId}`);
+      _dlog(`[notifications] scheduled OK: "${title}" id=${notifId}`);
     } catch (e) {
       console.error('[notifications] schedule FAILED:', e);
     }
@@ -133,7 +137,7 @@ export async function scheduleWaterReminders(intervalMin = 120) {
 
   if (notifications.length) {
     await LN.schedule({ notifications });
-    console.log(`[notifications] scheduled ${notifications.length} repeating water reminders`);
+    _dlog(`[notifications] scheduled ${notifications.length} repeating water reminders`);
   }
 }
 
@@ -172,7 +176,7 @@ export async function scheduleMealReminders(times = ['08:00', '12:00', '18:00'],
 
   if (notifications.length) {
     await LN.schedule({ notifications });
-    console.log(`[notifications] scheduled ${notifications.length} repeating meal reminders`);
+    _dlog(`[notifications] scheduled ${notifications.length} repeating meal reminders`);
   }
 }
 
@@ -300,7 +304,7 @@ async function _claimCelebrationServer(key) {
 export async function checkGoals(goals, values) {
   if (!goals || !values) return;
   _resetCelebrations();
-  console.log('[notifications] checkGoals:', { goals: Object.keys(goals), values: Object.keys(values) });
+  _dlog('[notifications] checkGoals:', { goals: Object.keys(goals), values: Object.keys(values) });
 
   for (const [key, goal] of Object.entries(goals)) {
     if (!goal) continue;
@@ -311,9 +315,9 @@ export async function checkGoals(goals, values) {
     if (target == null) continue;
 
     const celebKey = `${key}_${new Date().toLocaleDateString('sv-SE')}`;
-    if (_celebratedToday.has(celebKey)) { console.log(`[notifications] ${key} already celebrated`); continue; }
+    if (_celebratedToday.has(celebKey)) { _dlog(`[notifications] ${key} already celebrated`); continue; }
 
-    console.log(`[notifications] checking ${key}: val=${val}, min=${goal.min}, max=${goal.max}`);
+    _dlog(`[notifications] checking ${key}: val=${val}, min=${goal.min}, max=${goal.max}`);
 
     // Goal celebration: hit min target OR reached max target
     if ((goal.min != null && val >= goal.min) || (goal.max != null && val >= goal.max)) {
@@ -322,11 +326,11 @@ export async function checkGoals(goals, values) {
       _celebratedToday.add(celebKey);
       _persistCelebrations();
       const serverClaimed = await _claimCelebrationServer(key);
-      if (!serverClaimed) { console.log(`[notifications] ${key} already celebrated on another device`); continue; }
+      if (!serverClaimed) { _dlog(`[notifications] ${key} already celebrated on another device`); continue; }
       const label = GOAL_LABELS[key] || key;
       const unit = GOAL_UNITS[key] || '';
       const tgt = goal.min ?? goal.max;
-      console.log(`[notifications] FIRING goal celebration for ${key}: ${val} >= ${tgt}`);
+      _dlog(`[notifications] FIRING goal celebration for ${key}: ${val} >= ${tgt}`);
       await notify('notifGoalCelebrations', '🎯 Goal Reached!',
         `You hit your ${label} goal: ${Math.round(val).toLocaleString()} ${unit} (target: ${Math.round(tgt).toLocaleString()})`, 5);
     }
@@ -505,7 +509,7 @@ export async function scheduleWeighInReminder(timeStr = '07:00') {
     schedule: { at, every: 'day', allowWhileIdle: true },
     channelId: 'nutritrace',
   }]});
-  console.log(`[notifications] scheduled repeating weigh-in reminder at ${timeStr}`);
+  _dlog(`[notifications] scheduled repeating weigh-in reminder at ${timeStr}`);
 }
 
 export async function cancelWeighInReminder() {

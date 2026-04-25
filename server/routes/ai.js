@@ -2,9 +2,11 @@ import { Router } from 'express';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
 import { wrap } from '../logger.js';
 import { getAiConfig } from '../ai.js';
+import { makeRateLimiter } from '../middleware/rate-limit.js';
 import db from '../db.js';
 
 const router = Router();
+const aiChatLimit = makeRateLimiter({ max: 30, windowMs: 60_000, label: 'ai' });
 
 const uid = req => userMgmtActive() ? req.user.id : null;
 const MAX_HISTORY = 200; // rows kept per user
@@ -57,7 +59,7 @@ const AI_DEFAULT_MODELS = {
  * Server-side proxy for AI calls — used when AI config is env-locked.
  * The API key never leaves the server; clients send only messages + systemPrompt.
  */
-router.post('/chat', requireAuth, wrap(async (req, res) => {
+router.post('/chat', requireAuth, aiChatLimit, wrap(async (req, res) => {
   const { messages, systemPrompt } = req.body;
   if (!Array.isArray(messages)) return res.status(400).json({ error: 'messages array required' });
 

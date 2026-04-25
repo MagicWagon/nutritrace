@@ -5,6 +5,42 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.16-beta] — 2026-04-25 — Pre-1.0 security & polish (Phase 1)
+
+### Security
+- **CSRF exemption narrowed** — was skipping ALL `/api/wellness/*` POSTs (sync, recalculate, seed-scores, disconnect). Now only OAuth `/callback` paths are exempt; everything else requires the X-CSRF-Token header for cookie sessions.
+- **JWT_SECRET refuse-to-start in production** — server now exits with a clear error if `NODE_ENV=production` and `JWT_SECRET` isn't set, instead of silently using the dev default.
+- **Per-username brute-force throttle** — login + recover + forgot-password add a per-username bucket (5/15min) on top of the existing per-IP bucket (10/15min). NAT users behind one IP no longer share an account-lockout pool.
+- **Recovery token now uses constant-time compare** — was vulnerable to timing-attack guessing.
+- **`/api/auth/users/list` gated behind sharing_enabled** — was exposing every account's display name + username to every authenticated user. Now returns `[]` unless food/meal sharing is on.
+- **`/api/auth/forgot-password` is constant-time + always returns 200** — was leaking SMTP-not-configured state and email existence via timing.
+- **CSRF token rotated on password change** — old sessions on other devices stop working after a password change.
+- **bcrypt cost factor bumped 10 → 12** — current best practice. Existing hashes remain valid (bcrypt verifies regardless of cost).
+- **Image proxy hostname allowlist** — replaced `.includes()` with strict suffix match. `i.imgur.com.evil.tld` no longer slips through. Also rejects non-http(s) protocols.
+- **Backup restore zip-slip + zip-bomb defense** — image extraction now rejects `..`, absolute paths, and any path that resolves outside `UPLOADS_DIR`. Hard cap of 10,000 entries and 5 GB total uncompressed.
+- **Celebration key validation** — `/api/settings/claim-celebration` now requires keys match `/^[a-z_][a-z0-9_-]{0,39}$/`. Stops a misbehaving client spamming arbitrary keys into `app_config`.
+- **Rate limits added** — new `server/middleware/rate-limit.js` token-bucket limiter applied to: `/api/ai/chat` (30/min/user), `/api/upload` (60/min/user), `/api/proxy` (60/min/IP), and `/api/wellness/*/callback` (10/min/IP).
+
+### Changed
+- **Console log noise cut** — `src/lib/sync.js`, `src/lib/notifications.js`, `src/lib/health-connect.js`, `src/stores/settings.js` — verbose `console.log` calls now gated on `import.meta.env.DEV`. Wellness readiness/stress debug calibration logs untouched (intentional).
+- **Sponsor button URLs fixed** — were placeholder `YOUR_GITHUB_USERNAME` / `YOUR_KOFI_USERNAME`; now `sponsors/traceapps` and `ko-fi.com/thebigjoe1`.
+- **About panel + Smart Log README link** point at `traceapps/nutritrace` (was `thebigjoe1/nutritrace`).
+
+### Performance
+- **Barcode scanner libs lazy-loaded** — zxing + html5-qrcode + quagga2 (~870 KB combined) were loaded on every page; now loaded on first scanner open and cached for subsequent opens. Removes ~870 KB from PWA cold-start payload.
+- **Logo file size** — `public/icons/logo.png` was 1,147 KB rendered at 32-56px in 6 places; replaced with the existing 47 KB icon-192. Saves ~1.1 MB on cold load.
+
+### Repo
+- **CONTRIBUTING.md added** — short guide for issues + PRs.
+- **`.dockerignore` excludes `android/`, `*.apk`, `*.aab`, `*.keystore`** — speeds Docker build context.
+- **FUTURE.md** — Health Connect moved from "needs testing" to done.
+
+### Notes for self-hosters
+- After this version, set `JWT_SECRET` in your `.env` (generate with `openssl rand -base64 48`) — the server will refuse to start in production without it.
+- The new `RECOVERY_TOKEN`, `JWT_SECRET`, and CSRF behaviors are documented in DEPLOY.md.
+
+---
+
 ## [0.39.15-beta] — 2026-04-25
 
 ### Fixed

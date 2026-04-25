@@ -1,6 +1,9 @@
 import { writable, get } from 'svelte/store';
 import { DB } from '../lib/db.js';
 
+// Verbose settings sync logs gated on dev — production doesn't need spam on every push.
+const _dlog = import.meta.env.DEV ? console.log : () => {};
+
 // ── Settings categorization ────────────────────────────────────────────────
 //
 // USER_PREFS — synced to server, travel with the user across devices.
@@ -111,7 +114,7 @@ export function scheduleSave(key, value) {
     if (!_shouldSyncToServer()) return;
     try {
       const url = _settingsUrl();
-      console.log(`[settings] pushing ${key}=${JSON.stringify(value)} to ${url}`);
+      _dlog(`[settings] pushing ${key}=${JSON.stringify(value)} to ${url}`);
       const res = await fetch(url, {
         method: 'PUT',
         credentials: 'include',
@@ -120,7 +123,7 @@ export function scheduleSave(key, value) {
         signal: AbortSignal.timeout(8000),
       });
       if (!res.ok) throw new Error(`Server responded ${res.status}`);
-      console.log(`[settings] pushed ${key} to server OK`);
+      _dlog(`[settings] pushed ${key} to server OK`);
       // If direct push succeeded on native, mark as synced so differential sync skips it
       if (isNative) {
         try {
@@ -187,7 +190,7 @@ export async function bulkSet(settingsObj) {
   try {
     const url = _settingsUrl() + '/bulk';
     const bulkObj = Object.fromEntries(userPrefEntries);
-    console.log(`[settings] bulk pushing ${userPrefEntries.length} keys`);
+    _dlog(`[settings] bulk pushing ${userPrefEntries.length} keys`);
     const res = await fetch(url, {
       method: 'PUT',
       credentials: 'include',
@@ -196,7 +199,7 @@ export async function bulkSet(settingsObj) {
       signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) throw new Error(`Server responded ${res.status}`);
-    console.log(`[settings] bulk pushed ${userPrefEntries.length} keys OK`);
+    _dlog(`[settings] bulk pushed ${userPrefEntries.length} keys OK`);
     // Mark all keys as synced in native SQLite
     if (isNative) {
       try {

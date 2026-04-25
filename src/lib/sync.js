@@ -8,6 +8,9 @@
  */
 
 import { getServerUrl, getAuthToken, loadImageMap } from './platform.js';
+
+// Verbose sync logs are gated on dev — production users don't need a console wall of "[sync] pushed X..."
+const _dlog = import.meta.env.DEV ? console.log : () => {};
 import {
   dbGetPendingChanges, dbMarkSynced, dbSetServerId,
   dbGetSyncMeta, dbSetSyncMeta,
@@ -78,7 +81,7 @@ async function pushChanges() {
   const hasPending = pending.foods.length || pending.meals.length || pending.diary.length || pendingSettings.length;
   if (!hasPending) return false;
 
-  console.log(`[sync] pushing: ${pending.foods.length} foods, ${pending.meals.length} meals, ${pending.diary.length} diary, ${pendingSettings.length} settings`);
+  _dlog(`[sync] pushing: ${pending.foods.length} foods, ${pending.meals.length} meals, ${pending.diary.length} diary, ${pendingSettings.length} settings`);
 
   // Build push payload with client_id and server_id
   const payload = {
@@ -121,7 +124,7 @@ async function pushChanges() {
     })),
   };
 
-  console.log(`[sync] push payload: ${payload.foods.length} foods, ${payload.meals.length} meals, ${payload.diary.length} diary, ${payload.settings.length} settings`);
+  _dlog(`[sync] push payload: ${payload.foods.length} foods, ${payload.meals.length} meals, ${payload.diary.length} diary, ${payload.settings.length} settings`);
 
   const res = await fetch(`${_baseUrl()}/api/sync/push`, {
     method: 'POST',
@@ -135,7 +138,7 @@ async function pushChanges() {
     throw new Error(`Push failed: ${res.status}`);
   }
   const result = await res.json();
-  console.log(`[sync] push result: ${result.foods?.length || 0} foods, ${result.meals?.length || 0} meals, ${result.diary?.length || 0} diary`);
+  _dlog(`[sync] push result: ${result.foods?.length || 0} foods, ${result.meals?.length || 0} meals, ${result.diary?.length || 0} diary`);
 
   // Update server_id mappings for newly created records
   for (const f of (result.foods || [])) {
@@ -165,7 +168,7 @@ async function pushChanges() {
   await dbPurgeSoftDeleted('meals');
   await dbPurgeSoftDeleted('diary');
 
-  console.log('[sync] push complete');
+  _dlog('[sync] push complete');
   return true;
 }
 
@@ -173,7 +176,7 @@ async function pushChanges() {
 async function pullChanges() {
   const lastSync = await dbGetSyncMeta('last_sync_at') || '1970-01-01T00:00:00.000Z';
 
-  console.log(`[sync] pulling since ${lastSync}`);
+  _dlog(`[sync] pulling since ${lastSync}`);
 
   const res = await fetch(`${_baseUrl()}/api/sync/pull?since=${encodeURIComponent(lastSync)}`, {
     headers: _headers(),
@@ -209,7 +212,7 @@ async function pullChanges() {
   const settingsMod = await import('../stores/settings.js');
   for (const s of pulledSettings) {
     if (localPendingKeys.has(s.key) || settingsMod.isRecentlyChanged(s.key)) {
-      console.log(`[sync] skip pulled setting ${s.key} — local change takes priority`);
+      _dlog(`[sync] skip pulled setting ${s.key} — local change takes priority`);
       continue;
     }
     await dbUpsertSettingFromServer(s);
@@ -237,7 +240,7 @@ async function pullChanges() {
   }
 
   const totalChanges = (data.foods?.length || 0) + (data.meals?.length || 0) + (data.diary?.length || 0) + (data.wellness?.length || 0) + pulledSettings.length + (data.workouts?.length || 0) + newChat.length;
-  console.log(`[sync] pull complete: ${data.foods?.length || 0} foods, ${data.meals?.length || 0} meals, ${data.diary?.length || 0} diary, ${data.wellness?.length || 0} wellness, ${pulledSettings.length} settings, ${data.workouts?.length || 0} workouts, ${newChat.length} chat`);
+  _dlog(`[sync] pull complete: ${data.foods?.length || 0} foods, ${data.meals?.length || 0} meals, ${data.diary?.length || 0} diary, ${data.wellness?.length || 0} wellness, ${pulledSettings.length} settings, ${data.workouts?.length || 0} workouts, ${newChat.length} chat`);
   return totalChanges > 0;
 }
 
@@ -348,11 +351,11 @@ export async function fullSync(silent = false) {
 export function startNetworkMonitor() {
   // Listen for browser online/offline events
   window.addEventListener('online', () => {
-    console.log('[sync] Network online detected');
+    _dlog('[sync] Network online detected');
     fullSync();
   });
   window.addEventListener('offline', () => {
-    console.log('[sync] Network offline detected');
+    _dlog('[sync] Network offline detected');
     syncState.update(s => ({ ...s, online: false }));
   });
 
@@ -364,7 +367,7 @@ export function startNetworkMonitor() {
     });
     const nowOnline = await checkOnline();
     if (nowOnline && !wasOnline) {
-      console.log('[sync] Server reachable again — syncing');
+      _dlog('[sync] Server reachable again — syncing');
       fullSync();
     }
   }, 30000);

@@ -698,7 +698,6 @@
         const goals = DB.getSetting('goals', {});
         if (waterGoal > 0) goals.water_ml = { min: waterGoal };
         const totals = Nutrition.sum((updated.items || []).map(i => Nutrition.calculate(i)));
-        console.log('[diary] water goal check:', { waterTotal, waterGoal, goalsKeys: Object.keys(goals) });
         await checkGoals(goals, { ...totals, water_ml: waterTotal });
       } catch (e) {
         console.error('[diary] goal check error:', e);
