@@ -5,6 +5,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.32-beta] — 2026-04-26 — Settings audit cleanup
+
+### Fixed
+- **Wizard-collected user profile fields now sync across devices** — `gender`, `dob`, `height_cm`, `weight_kg`, `target_weight`, `activity`, and `tdee` were being written to localStorage but weren't in `USER_PREFS`, so multi-device users lost their profile after the wizard. Added to USER_PREFS.
+- **`barcodeFlashlight` toggle visibility was inverted** — was hidden on native (where it's actually useful) and shown on PWA (where there's no flashlight). Flipped.
+- **Goals section disabled-state message** pointed to "Connected Services" — wellness trackers actually live in **Wellness**. Fixed.
+
+### Added
+- **Statistics → Include today in trends setting** (`statsIncludeToday`, default off) — persisted version of the inline checkbox already on the Statistics page. The inline checkbox now updates this setting directly, so per-session and persistent choices share state.
+- **Diary toggle descriptions** — every toggle in Settings → Diary now has a one-line description explaining what it controls. Same for Foods.
+- **Search keywords** for Help Improve section + "reset / defaults / clear settings" added to Backup so users can find the existing Danger Zone reset.
+
+### Changed
+- **"Celebrate goals" → "Goal pulse animation"** — was easily confused with the Notifications "Goal Celebrations" toggle (different feature). Description clarifies the distinction.
+
+### Removed (dead code)
+- `notifCalorieGoal`, `withingsDataPriority`, `loopBannerAnimations` — settings that existed in the store but had zero read sites anywhere in the codebase.
+- `goalsShowCalories`, `goalsShowWeight` local lets in Settings.svelte that were read but never rendered.
+- `diaryTotalsMode` import in Settings.svelte (still used in Diary.svelte; just not exposed in Settings UI).
+
+---
+
 ## [0.39.31-beta] — 2026-04-26 — In-app diagnostic logs
 
 ### Added

@@ -35,14 +35,17 @@ export const USER_PREFS = new Set([
   'weightUnit','heightUnit','lengthUnit','distUnit','tempUnit',
   'waterGoalMl','waterUnit','waterContainers','waterShowInStats','waterShowInDiary',
   'dateFormat','timeFormat','timezone',
-  'statsChartType','statsYZero','statsAvgLine','statsGoalLine','statsTrendLine',
+  'statsChartType','statsYZero','statsAvgLine','statsGoalLine','statsTrendLine','statsIncludeToday',
+  // User profile (collected by Wizard, used for goal calculation; sync so multi-device
+  // users see the same body profile)
+  'gender','dob','height_cm','weight_kg','target_weight','activity','tdee',
   'aiEnabled','aiProvider','aiApiKey','aiModel','aiAssistantName','quickLogEnabled','aiGoalInsights',
   'usdaEnabled','usdaApiKey','offUsername','offPassword',
   'mealieEnabled','mealieBaseUrl','mealieApiToken',
   'wellnessEnabled','fitbitEnabled','healthConnectEnabled','wellnessMetrics','workoutsEnabled',
   'wellnessSyncMode','wellnessSyncSchedule','wellnessSyncTime','wellnessSyncRange',
   'fitbitSyncMode','fitbitSyncInterval','fitbitSyncWindowStart','fitbitSyncWindowEnd',
-  'withingsEnabled','withingsSyncRange','withingsDataPriority',
+  'withingsEnabled','withingsSyncRange',
   'withingsSyncMode','withingsSyncInterval','withingsSyncWindowStart','withingsSyncWindowEnd',
   'garminEnabled','garminSyncRange',
   'garminSyncMode','garminSyncInterval','garminSyncWindowStart','garminSyncWindowEnd',
@@ -51,14 +54,14 @@ export const USER_PREFS = new Set([
   // Notifications
   'notifLocalEnabled','notifPushService',
   'notifWaterReminders','notifWaterInterval','notifMealReminders','notifMealTimes',
-  'notifGoalCelebrations','notifCalorieGoal','notifStepGoal',
+  'notifGoalCelebrations','notifStepGoal',
   'notifWeighIn','notifWeighInTime',
   'notifBedtime','notifBedtimeTime','notifBedtimeWindDown','notifBedtimeWindDownMin','notifBedtimeSmart',
   'notifWeeklySummary','weeklySummaryDay','weeklySummaryTime',
   'notifWellnessAlerts','notifWorkoutSummary','notifSyncFailures',
   'appriseUrl','appriseTag','gotifyUrl','gotifyToken','ntfyUrl','ntfyTopic','ntfyToken',
   // UI behavior prefs that should match across devices
-  'accentColor','startPage','goalCelebrations','pageBanners','loopBannerAnimations',
+  'accentColor','startPage','goalCelebrations','pageBanners',
 ]);
 
 // DEVICE_PREFS — local-only, never synced.
@@ -425,6 +428,7 @@ export const statsYZero     = createSettingStore('statsYZero',     true);
 export const statsAvgLine   = createSettingStore('statsAvgLine',   true);
 export const statsGoalLine  = createSettingStore('statsGoalLine',  true);
 export const statsTrendLine = createSettingStore('statsTrendLine', true);
+export const statsIncludeToday = createSettingStore('statsIncludeToday', false);
 
 // Units
 export const weightUnit = createSettingStore('weightUnit', 'lb');
@@ -457,7 +461,6 @@ export const catDisplay = c => { const l = catLabel(c); return l ? `${l} ${catNa
 
 // Page banners
 export const pageBanners          = createSettingStore('pageBanners',          true);
-export const loopBannerAnimations = createSettingStore('loopBannerAnimations', true);
 
 // Wellness (Activity Tracking)
 export const wellnessEnabled    = createSettingStore('wellnessEnabled',    false);
@@ -483,11 +486,6 @@ export const fitbitSyncWindowEnd    = createSettingStore('fitbitSyncWindowEnd', 
 
 export const withingsEnabled      = createSettingStore('withingsEnabled',      false);
 export const withingsSyncRange    = createSettingStore('withingsSyncRange',    7);
-export const withingsDataPriority = createSettingStore('withingsDataPriority', {
-  activity: 'fitbit',
-  sleep:    'fitbit',
-  heart:    'fitbit',
-});
 export const withingsSyncMode         = createSettingStore('withingsSyncMode',         null);
 export const withingsSyncInterval     = createSettingStore('withingsSyncInterval',     null);
 export const withingsSyncWindowStart  = createSettingStore('withingsSyncWindowStart',  null);
@@ -527,7 +525,6 @@ export const notifWaterInterval   = createSettingStore('notifWaterInterval',   1
 export const notifMealReminders   = createSettingStore('notifMealReminders',   false);
 export const notifMealTimes       = createSettingStore('notifMealTimes',       ['08:00','12:00','18:00']); // HH:MM
 export const notifGoalCelebrations = createSettingStore('notifGoalCelebrations', false);
-export const notifCalorieGoal     = createSettingStore('notifCalorieGoal',     false);
 export const notifStepGoal        = createSettingStore('notifStepGoal',        false);
 export const notifWeighIn         = createSettingStore('notifWeighIn',         false);
 export const notifWeighInTime     = createSettingStore('notifWeighInTime',     '07:00');

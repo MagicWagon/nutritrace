@@ -7,7 +7,8 @@
   import { NtApi } from '../lib/api.js';
   import { NUTRIMENTS, Nutrition } from '../lib/nutrition.js';
   import { goals, energyUnit, weightUnit, lengthUnit, statsChartType, statsYZero,
-           statsAvgLine, statsGoalLine, statsTrendLine, hiddenBodyStats, dateFormat, pageBanners,
+           statsAvgLine, statsGoalLine, statsTrendLine, statsIncludeToday,
+           hiddenBodyStats, dateFormat, pageBanners,
            fitbitEnabled, garminEnabled, withingsEnabled, healthConnectEnabled, wellnessMetrics,
            calorieGoalMode } from '../stores/settings.js';
   import { isNative } from '../lib/platform.js';
@@ -35,7 +36,6 @@
   let loading = false;
   let summary = null; // { avg, min, max, total, daysWithData }
   let _loadVer = 0;   // cancel stale concurrent loadData calls
-  let includeToday = false; // when true, include today's partial-day value in cumulative metrics
 
   // Cumulative metrics accumulate throughout the day (calories, steps, water, etc.).
   // Excluded from charts by default until the day is complete to avoid trend distortion.
@@ -233,7 +233,7 @@
     // today's value misrepresents the trend (a partial day looks like a dip).
     // Point-in-time metrics (sleep_score, weight, HRV, RHR, etc.) are left
     // alone — those are "what was measured", not "what accumulated".
-    if (isCumulative(metric) && !includeToday) {
+    if (isCumulative(metric) && !$statsIncludeToday) {
       const todayStr = localDateStr();
       rows = rows.filter(d => d.date !== todayStr);
     }
@@ -420,7 +420,7 @@
     return m ? (m.unit || '') : '';
   })();
 
-  $: { metric; range; customStart; customEnd; includeToday; $statsChartType; $statsYZero; $statsAvgLine; $statsGoalLine; $statsTrendLine;
+  $: { metric; range; customStart; customEnd; $statsIncludeToday; $statsChartType; $statsYZero; $statsAvgLine; $statsGoalLine; $statsTrendLine;
        if (canvasEl) loadData(); }
 
   onDestroy(() => { if (chart) chart.destroy(); });
@@ -574,7 +574,7 @@
     {#if isCumulative(metric)}
       <div class="include-today-row">
         <label class="include-today-label">
-          <input type="checkbox" bind:checked={includeToday} />
+          <input type="checkbox" checked={$statsIncludeToday} on:change={e => statsIncludeToday.set(e.target.checked)} />
           <span>Include today (partial day)</span>
         </label>
       </div>

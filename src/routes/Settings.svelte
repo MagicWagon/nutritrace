@@ -24,7 +24,7 @@
     diaryShowBrands, diaryShowTimestamps, diaryShowThumbnails, diaryShowAllNutrients,
     diaryShowNutritionUnits, diaryShowMacroSummary, diaryPromptQuantity, diaryShowPortionSize,
     diaryShowNotes,
-    diaryShowNutritionBar, diaryTotalsMode,
+    diaryShowNutritionBar,
     foodsShowCategories, foodsShowLabels, foodsShowNotes, foodsShowThumbnails, foodsShowYesterdayMeals, foodsSort,
     barcodeBeep, barcodeFlashlight, cropPhotos,
     foodCategories, visibleNutriments, nutrimentsOrder, customNutriments,
@@ -257,9 +257,10 @@
     notifications:     ['notifications','reminders','water reminder','meal reminder','gotify','push','alerts','wellness alerts','goal celebration','weekly summary','email summary'],
     wellness:          ['wellness','activity tracking','fitbit','withings','garmin','health connect','steps','sleep','heart rate','hrv','spo2','sync mode','sync range','connect','disconnect','connected devices','fitness tracker','body battery','stress'],
     sharing:           ['sharing','share','group','catalogue','catalog','visibility','private','members','food sharing'],
-    backup:            ['backup','export','import','restore','csv','clear data','json','full backup','images','zip'],
+    backup:            ['backup','export','import','restore','csv','clear data','json','full backup','images','zip','reset','defaults','clear settings','danger zone'],
     email:             ['email','smtp','mail','password reset','invites','notifications'],
     users:             ['users','user management','accounts','login','password','admin','register','profile'],
+    helpImprove:       ['help','improve','feedback','calibration','share','export','diagnostic','logs','verbose','bug','report','contribute'],
     about:             ['about','version','nutritrace'],
   };
 
@@ -427,13 +428,12 @@
   // ── Statistics ─────────────────────────────────────────────────────────────
   let statsChartType = DB.getSetting('statsChartType', 'bar');
   let statsYZero     = DB.getSetting('statsYZero',     true);
+  let statsIncludeTodayLocal = DB.getSetting('statsIncludeToday', false);
   let statsAvgLine   = DB.getSetting('statsAvgLine',   true);
   let statsGoalLine  = DB.getSetting('statsGoalLine',  true);
   let statsTrendLine = DB.getSetting('statsTrendLine', true);
 
-  // ── Goals ──────────────────────────────────────────────────────────────────
-  let goalsShowCalories = DB.getSetting('goalsShowCalories', true);
-  let goalsShowWeight   = DB.getSetting('goalsShowWeight',   true);
+
 
   // ── Units ──────────────────────────────────────────────────────────────────
   let weightUnit  = DB.getSetting('weightUnit',  'lb');
@@ -1146,8 +1146,8 @@
           <div class="setting-divider"></div>
           <div class="setting-row">
             <div>
-              <span class="setting-label">Celebrate goals</span>
-              <div class="setting-desc">Pulse effect when you reach goals</div>
+              <span class="setting-label">Goal pulse animation</span>
+              <div class="setting-desc">Pulse effect on the diary nutrition bar when you hit a goal. (For "celebration" notifications, see Notifications.)</div>
             </div>
             <Toggle checked={$goalCelebrations} on:change={e => goalCelebrations.set(e.detail)} />
           </div>
@@ -1266,25 +1266,55 @@
     {#if sectionOpen(openSections, settingsQuery, 'diary') && sectionVisible(settingsQuery, 'diary')}
       <div class="section-body" transition:slide={{ duration: 180 }}>
         <div class="card settings-card">
-          <div class="setting-row"><span class="setting-label">Show brand names</span><Toggle checked={$diaryShowBrands} on:change={e => diaryShowBrands.set(e.detail)} /></div>
+          <div class="setting-row">
+            <div><span class="setting-label">Show brand names</span><div class="setting-desc">Display the brand under each food name</div></div>
+            <Toggle checked={$diaryShowBrands} on:change={e => diaryShowBrands.set(e.detail)} />
+          </div>
           <div class="setting-divider"></div>
-          <div class="setting-row"><span class="setting-label">Show timestamps</span><Toggle checked={$diaryShowTimestamps} on:change={e => diaryShowTimestamps.set(e.detail)} /></div>
+          <div class="setting-row">
+            <div><span class="setting-label">Show timestamps</span><div class="setting-desc">Show the time each item was logged</div></div>
+            <Toggle checked={$diaryShowTimestamps} on:change={e => diaryShowTimestamps.set(e.detail)} />
+          </div>
           <div class="setting-divider"></div>
-          <div class="setting-row"><span class="setting-label">Show thumbnails</span><Toggle checked={$diaryShowThumbnails} on:change={e => diaryShowThumbnails.set(e.detail)} /></div>
+          <div class="setting-row">
+            <div><span class="setting-label">Show thumbnails</span><div class="setting-desc">Food/meal photos next to each item</div></div>
+            <Toggle checked={$diaryShowThumbnails} on:change={e => diaryShowThumbnails.set(e.detail)} />
+          </div>
           <div class="setting-divider"></div>
-          <div class="setting-row"><span class="setting-label">Show all nutrients</span><Toggle checked={$diaryShowAllNutrients} on:change={e => diaryShowAllNutrients.set(e.detail)} /></div>
+          <div class="setting-row">
+            <div><span class="setting-label">Show all nutrients</span><div class="setting-desc">When viewing a meal's totals, show every available nutrient (vitamins, minerals, etc.) instead of just the macros</div></div>
+            <Toggle checked={$diaryShowAllNutrients} on:change={e => diaryShowAllNutrients.set(e.detail)} />
+          </div>
           <div class="setting-divider"></div>
-          <div class="setting-row"><span class="setting-label">Show nutrition units</span><Toggle checked={$diaryShowNutritionUnits} on:change={e => diaryShowNutritionUnits.set(e.detail)} /></div>
+          <div class="setting-row">
+            <div><span class="setting-label">Show nutrition units</span><div class="setting-desc">Append "g" / "mg" / etc. after numeric values</div></div>
+            <Toggle checked={$diaryShowNutritionUnits} on:change={e => diaryShowNutritionUnits.set(e.detail)} />
+          </div>
           <div class="setting-divider"></div>
-          <div class="setting-row"><span class="setting-label">Show macro summary per meal</span><Toggle checked={$diaryShowMacroSummary} on:change={e => diaryShowMacroSummary.set(e.detail)} /></div>
+          <div class="setting-row">
+            <div><span class="setting-label">Show macro summary per meal</span><div class="setting-desc">P/C/F bar at the bottom of each meal — tap it for full nutrient breakdown</div></div>
+            <Toggle checked={$diaryShowMacroSummary} on:change={e => diaryShowMacroSummary.set(e.detail)} />
+          </div>
           <div class="setting-divider"></div>
-          <div class="setting-row"><span class="setting-label">Ask for quantity when adding</span><Toggle checked={$diaryPromptQuantity} on:change={e => diaryPromptQuantity.set(e.detail)} /></div>
+          <div class="setting-row">
+            <div><span class="setting-label">Ask for quantity when adding</span><div class="setting-desc">Prompt for portion size before adding a food (otherwise use the food's default)</div></div>
+            <Toggle checked={$diaryPromptQuantity} on:change={e => diaryPromptQuantity.set(e.detail)} />
+          </div>
           <div class="setting-divider"></div>
-          <div class="setting-row"><span class="setting-label">Show portion size</span><Toggle checked={$diaryShowPortionSize} on:change={e => diaryShowPortionSize.set(e.detail)} /></div>
+          <div class="setting-row">
+            <div><span class="setting-label">Show portion size</span><div class="setting-desc">Display "150g" / "1 cup" etc. on each diary item</div></div>
+            <Toggle checked={$diaryShowPortionSize} on:change={e => diaryShowPortionSize.set(e.detail)} />
+          </div>
           <div class="setting-divider"></div>
-          <div class="setting-row"><span class="setting-label">Show daily notes</span><Toggle checked={$diaryShowNotes} on:change={e => diaryShowNotes.set(e.detail)} /></div>
+          <div class="setting-row">
+            <div><span class="setting-label">Show daily notes</span><div class="setting-desc">Free-text notes section at the bottom of each day's diary</div></div>
+            <Toggle checked={$diaryShowNotes} on:change={e => diaryShowNotes.set(e.detail)} />
+          </div>
           <div class="setting-divider"></div>
-          <div class="setting-row"><span class="setting-label">Show daily goals progress bar</span><Toggle checked={$diaryShowNutritionBar} on:change={e => diaryShowNutritionBar.set(e.detail)} /></div>
+          <div class="setting-row">
+            <div><span class="setting-label">Show daily goals progress bar</span><div class="setting-desc">Progress strip at the bottom of the diary showing how much of your daily goals you've hit</div></div>
+            <Toggle checked={$diaryShowNutritionBar} on:change={e => diaryShowNutritionBar.set(e.detail)} />
+          </div>
         </div>
 
         <p class="sub-label">Meal names</p>
@@ -1411,15 +1441,30 @@
     {#if sectionOpen(openSections, settingsQuery, 'foods') && sectionVisible(settingsQuery, 'foods')}
       <div class="section-body" transition:slide={{ duration: 180 }}>
         <div class="card settings-card">
-          <div class="setting-row"><span class="setting-label">Show thumbnails</span><Toggle checked={$foodsShowThumbnails} on:change={e => foodsShowThumbnails.set(e.detail)} /></div>
+          <div class="setting-row">
+            <div><span class="setting-label">Show thumbnails</span><div class="setting-desc">Food/meal photos in the picker list</div></div>
+            <Toggle checked={$foodsShowThumbnails} on:change={e => foodsShowThumbnails.set(e.detail)} />
+          </div>
           <div class="setting-divider"></div>
-          <div class="setting-row"><span class="setting-label">Show categories</span><Toggle checked={$foodsShowCategories} on:change={e => foodsShowCategories.set(e.detail)} /></div>
+          <div class="setting-row">
+            <div><span class="setting-label">Show categories</span><div class="setting-desc">Filter chips at the top of the Foods picker</div></div>
+            <Toggle checked={$foodsShowCategories} on:change={e => foodsShowCategories.set(e.detail)} />
+          </div>
           <div class="setting-divider"></div>
-          <div class="setting-row"><span class="setting-label">Show category labels</span><Toggle checked={$foodsShowLabels} on:change={e => foodsShowLabels.set(e.detail)} /></div>
+          <div class="setting-row">
+            <div><span class="setting-label">Show category labels</span><div class="setting-desc">Display the category name + emoji on each food row</div></div>
+            <Toggle checked={$foodsShowLabels} on:change={e => foodsShowLabels.set(e.detail)} />
+          </div>
           <div class="setting-divider"></div>
-          <div class="setting-row"><span class="setting-label">Show notes</span><Toggle checked={$foodsShowNotes} on:change={e => foodsShowNotes.set(e.detail)} /></div>
+          <div class="setting-row">
+            <div><span class="setting-label">Show notes</span><div class="setting-desc">Show saved food notes (e.g. "1 serving = 150g cooked") in the quick-add card</div></div>
+            <Toggle checked={$foodsShowNotes} on:change={e => foodsShowNotes.set(e.detail)} />
+          </div>
           <div class="setting-divider"></div>
-          <div class="setting-row"><span class="setting-label">Show yesterday's meals</span><Toggle checked={$foodsShowYesterdayMeals} on:change={e => foodsShowYesterdayMeals.set(e.detail)} /></div>
+          <div class="setting-row">
+            <div><span class="setting-label">Show yesterday's meals</span><div class="setting-desc">In the Meals tab, surface yesterday's meals as quick-add cards (with item-list info button)</div></div>
+            <Toggle checked={$foodsShowYesterdayMeals} on:change={e => foodsShowYesterdayMeals.set(e.detail)} />
+          </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
             <span class="setting-label">Sort order</span>
@@ -1434,7 +1479,7 @@
         <p class="sub-label">Camera &amp; Scanning</p>
         <div class="card settings-card">
           <div class="setting-row"><span class="setting-label">Beep on successful scan</span><Toggle checked={$barcodeBeep} on:change={e => barcodeBeep.set(e.detail)} /></div>
-          {#if !isNative}
+          {#if isNative}
             <div class="setting-divider"></div>
             <div class="setting-row"><span class="setting-label">Use flashlight while scanning</span><Toggle checked={$barcodeFlashlight} on:change={e => barcodeFlashlight.set(e.detail)} /></div>
           {/if}
@@ -1583,7 +1628,7 @@
           <div class="setting-row">
             <div>
               <span class="setting-label">Dynamic Calorie Goal</span>
-              <div class="setting-desc">Connect a device in <strong>Connected Services</strong> to enable goal adjustment based on calories burned</div>
+              <div class="setting-desc">Connect a fitness tracker in <strong>Wellness</strong> to enable goal adjustment based on calories burned</div>
             </div>
             <Toggle checked={false} disabled={true} />
           </div>
@@ -1651,6 +1696,14 @@
           <div class="setting-row"><span class="setting-label">Show goal line</span><Toggle checked={statsGoalLine} on:change={e => { statsGoalLine = e.detail; set('statsGoalLine', e.detail); }} /></div>
           <div class="setting-divider"></div>
           <div class="setting-row"><span class="setting-label">Show trend line</span><Toggle checked={statsTrendLine} on:change={e => { statsTrendLine = e.detail; set('statsTrendLine', e.detail); }} /></div>
+          <div class="setting-divider"></div>
+          <div class="setting-row">
+            <div>
+              <span class="setting-label">Include today in trends</span>
+              <div class="setting-desc">For cumulative metrics (calories, water, steps, etc.) today is partial until the day ends. Off by default — the chart looks cleaner. Statistics page also has an inline toggle for one-off overrides.</div>
+            </div>
+            <Toggle checked={statsIncludeTodayLocal} on:change={e => { statsIncludeTodayLocal = e.detail; set('statsIncludeToday', e.detail); }} />
+          </div>
         </div>
       </div>
     {/if}
