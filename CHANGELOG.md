@@ -5,6 +5,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.23-beta] — 2026-04-25 — Roll back native SQLite encryption
+
+### Changed
+- **Reverted SQLCipher encryption from v0.39.20** — `@capacitor-community/sqlite` v8's secret-store semantics are unreliable in practice. The error sequence we hit:
+  1. v0.39.20: `setEncryptionSecret` called every launch → "file is not a database (26)" on second launch (passphrase rebinding bug)
+  2. v0.39.22: switched to `isSecretStored` gating → "setEncryptionSecret: state for nutritrace_localSQLdb not correct" (plugin requires no connections, but state tracking is fragile)
+- Modern Android encrypts the entire app data directory at the OS level (file-based encryption, default since Android 7), so the local SQLite is not in cleartext on a locked device anyway. SQLCipher was a defense-in-depth layer; losing it doesn't materially change the threat model for normal users.
+- New behavior in `db-native.js`: one-shot cleanup on first launch — clears the encrypted DB file, secure-store secret, and `nt:db_*` localStorage markers from any prior v0.39.20–22 install. Then opens unencrypted as before. Server-connected devices re-sync from the server (your phone will see a brief empty state then everything flows back).
+- `capacitor.config.ts`: `iosIsEncryption`/`androidIsEncryption` back to `false`.
+- FUTURE.md updated: native SQLite encryption deferred to v1.1, with a note to investigate alternatives (Android Keystore + per-row JS encryption, different plugin, or simply rely on Android's OS-level FBE).
+
+### What this means for you
+- Your phone will run the cleanup on first launch (delete the broken encrypted DB), then re-sync from the server. No data loss because the server is the source of truth for everything.
+- If you were on v0.39.19 or earlier and never installed v0.39.20–22, this is just a normal update with no migration.
+
+---
+
 ## [0.39.22-beta] — 2026-04-25 — Encryption open auto-recovery
 
 ### Fixed

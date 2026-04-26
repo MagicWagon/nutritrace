@@ -149,26 +149,15 @@ const SCHEMA = `
   CREATE INDEX IF NOT EXISTS idx_diary_sync ON diary(sync_status);
 `;
 
-// ── Encryption helpers ────────────────────────────────────────────────────
+// ── DB encryption (disabled in v0.39.23+) ─────────────────────────────────
 //
-// Per-device passphrase stored in localStorage. Generated once on first launch.
-// Threat model: defense-in-depth. Modern Android already encrypts the app data
-// directory at the OS level (file-based encryption), so the per-device key
-// living next to the DB is acceptable — neither file is readable without root
-// or a device-level backup. SQLCipher adds a layer against future zero-days
-// and rooted/forensic-attacker scenarios.
-function _getOrCreateSecret() {
-  let secret = localStorage.getItem('nt:db_secret');
-  if (!secret) {
-    const arr = new Uint8Array(32);
-    crypto.getRandomValues(arr);
-    let s = '';
-    for (let i = 0; i < arr.length; i++) s += String.fromCharCode(arr[i]);
-    secret = btoa(s);
-    localStorage.setItem('nt:db_secret', secret);
-  }
-  return secret;
-}
+// Native SQLite encryption via @capacitor-community/sqlite v8 had brittle
+// secret-store semantics — calling setEncryptionSecret on subsequent launches
+// produced "state not correct" / SQLITE_NOTADB failures that broke sync.
+// Reverted to plain SQLite for now. Modern Android still encrypts the app
+// data directory at the OS level, so the local DB is not in cleartext on a
+// locked device. SQLCipher integration deferred to v1.1 with a different
+// approach (likely Android Keystore + per-page encryption). See FUTURE.md.
 
 async function _applySchema(db) {
   await db.execute(SCHEMA);
@@ -198,39 +187,24 @@ async function _openUnencrypted() {
   return db;
 }
 
-async function _openEncrypted() {
-  await _closeAny();
-  const db = await sqlite.createConnection(DB_NAME, true, 'encryption', DB_VERSION, false);
-  await db.open();
-  await _applySchema(db);
-  return db;
-}
-
-async function _ensureSecretSet(secret) {
-  // The plugin's secure store survives across app launches. setEncryptionSecret
-  // is intended for first-time setup ONLY — calling it again can break decryption
-  // of existing files in some plugin versions. Use isSecretStored to decide.
-  let stored = false;
-  try {
-    const r = await sqlite.isSecretStored();
-    stored = r?.result === true;
-  } catch {}
-  if (!stored) {
-    try {
-      await sqlite.setEncryptionSecret(secret);
-      console.log('[db-native] Encryption secret stored in plugin secure store');
-    } catch (e) {
-      console.warn('[db-native] setEncryptionSecret failed:', e?.message);
-      throw e;
-    }
+/**
+ * One-shot cleanup for devices that ran v0.39.20–v0.39.22 (which tried to use
+ * SQLCipher). Removes the encrypted DB file and stale localStorage markers.
+ * Server-connected devices re-sync from the server. Local-only devices that
+ * have data in the encrypted file lose that data — local-only encryption
+ * users in the v0.39.20–22 window were already in a broken state, so wiping
+ * is the only recovery path that makes the app functional again.
+ */
+async function _cleanupEncryptedDbIfPresent() {
+  if (!localStorage.getItem('nt:db_encrypted') &&
+      !localStorage.getItem('nt:db_secret') &&
+      !localStorage.getItem('nt:db_encryption_pending')) {
+    return;
   }
-}
-
-async function _emergencyResetDb() {
-  console.warn('[db-native] Emergency reset: wiping DB + secret state');
+  console.warn('[db-native] Cleaning up encryption state from prior install (v0.39.20–22)');
   await _closeAny();
-  try { await sqlite.deleteDatabase(DB_NAME); } catch {}
   try { await CapacitorSQLite.clearEncryptionSecret(); } catch {}
+  try { await sqlite.deleteDatabase(DB_NAME); } catch {}
   localStorage.removeItem('nt:db_encrypted');
   localStorage.removeItem('nt:db_secret');
   localStorage.removeItem('nt:db_encryption_pending');
@@ -239,115 +213,14 @@ async function _emergencyResetDb() {
 async function _open() {
   console.log('[db-native] Opening SQLite database...');
   try {
-    const secret = _getOrCreateSecret();
-    await _ensureSecretSet(secret);
-
-    // Already-migrated devices: open encrypted directly. Marker is set after
-    // a successful encrypted open so we never get stuck mid-migration.
-    if (localStorage.getItem('nt:db_encrypted') === '1') {
-      try {
-        const db = await _openEncrypted();
-        console.log('[db-native] SQLite (encrypted) ready');
-        return db;
-      } catch (openErr) {
-        // Decrypt failed — likely passphrase mismatch (plugin secure store and
-        // localStorage drifted). On a server-connected install the local DB is
-        // just a cache, so the safe recovery is to wipe and re-sync. Local-only
-        // installs should NOT auto-wipe — user data is on the device only.
-        console.error('[db-native] Encrypted open failed:', openErr?.message);
-        const { getServerUrl } = await import('./platform.js');
-        const isServerConnected = !!getServerUrl();
-        if (!isServerConnected) {
-          throw new Error(`Local database can't be decrypted. To recover, restore from a Local Backup. (${openErr?.message || openErr})`);
-        }
-        console.warn('[db-native] Auto-recovering: server-connected device, will re-sync after wipe');
-        await _emergencyResetDb();
-        // Re-derive a fresh secret + reopen as if fresh install
-        const newSecret = _getOrCreateSecret();
-        await _ensureSecretSet(newSecret);
-        const db = await _openEncrypted();
-        localStorage.setItem('nt:db_encrypted', '1');
-        console.log('[db-native] SQLite (encrypted, recovered) ready — server sync will repopulate');
-        return db;
-      }
-    }
-
-    // Migration window. Three cases:
-    //   1. No old DB → fresh install → create encrypted, mark, done.
-    //   2. Old unencrypted DB + server-connected → wipe local cache, create
-    //      encrypted, mark, trigger full re-sync from server.
-    //   3. Old unencrypted DB + local-only → defer migration. Leave unencrypted
-    //      and surface a banner asking the user to back up first.
-    let oldDbExists = false;
-    try {
-      const r = await sqlite.isDatabase(DB_NAME);
-      oldDbExists = r?.result === true;
-    } catch {}
-
-    if (!oldDbExists) {
-      const db = await _openEncrypted();
-      localStorage.setItem('nt:db_encrypted', '1');
-      console.log('[db-native] SQLite (encrypted, fresh install) ready');
-      return db;
-    }
-
-    // Old DB exists. Check connection mode to decide path.
-    const { getServerUrl } = await import('./platform.js');
-    const isServerConnected = !!getServerUrl();
-
-    if (isServerConnected) {
-      console.log('[db-native] Migrating local cache to encrypted (server-connected — re-sync after)');
-      try { await sqlite.deleteDatabase(DB_NAME); } catch (e) {
-        console.warn('[db-native] deleteDatabase failed during migration:', e?.message);
-      }
-      const db = await _openEncrypted();
-      localStorage.setItem('nt:db_encrypted', '1');
-      // sync_meta lives inside the wiped DB, so dbGetSyncMeta('last_sync_at')
-      // will default to 1970-01-01 → full pull on next sync. No extra step.
-      console.log('[db-native] SQLite (encrypted, post-migration) ready — server sync will repopulate');
-      return db;
-    }
-
-    // Local-only: data isn't recoverable from a server. Surface a banner via
-    // localStorage flag and keep the unencrypted DB open for now. The user
-    // explicitly triggers the migration after exporting a Local Full Backup.
-    console.warn('[db-native] Local-only mode: encryption upgrade deferred until user backs up');
-    localStorage.setItem('nt:db_encryption_pending', '1');
+    await _cleanupEncryptedDbIfPresent();
     const db = await _openUnencrypted();
-    console.log('[db-native] SQLite (unencrypted, upgrade pending) ready');
+    console.log('[db-native] SQLite ready');
     return db;
   } catch (e) {
     console.error('[db-native] Failed to open SQLite database:', e);
     throw e;
   }
-}
-
-/**
- * Local-only manual migration trigger. Caller is responsible for ensuring the
- * user has exported a Local Full Backup first (UI gate). Wipes the unencrypted
- * DB, creates an encrypted one, restores from the provided in-memory snapshot
- * if given, and marks the migration complete.
- */
-export async function runLocalEncryptionUpgrade({ onProgress } = {}) {
-  if (!localStorage.getItem('nt:db_encryption_pending')) return { skipped: true };
-  onProgress?.('Closing database…');
-  await _closeAny();
-  _db = null;
-  _initPromise = null;
-  onProgress?.('Removing unencrypted database…');
-  try { await sqlite.deleteDatabase(DB_NAME); } catch {}
-  onProgress?.('Creating encrypted database…');
-  const db = await _openEncrypted();
-  _db = db;
-  localStorage.setItem('nt:db_encrypted', '1');
-  localStorage.removeItem('nt:db_encryption_pending');
-  onProgress?.('Done.');
-  return { ok: true };
-}
-
-/** True if the device is a local-only install awaiting encryption upgrade. */
-export function isEncryptionPending() {
-  return localStorage.getItem('nt:db_encryption_pending') === '1';
 }
 
 export async function getDb() {
