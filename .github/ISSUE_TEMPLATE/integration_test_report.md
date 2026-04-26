@@ -1,11 +1,11 @@
 ---
 name: Wellness integration test report
-about: Help us validate Garmin / non-Pixel Fitbit / other Withings models / Health Connect on different devices
+about: Validate Garmin / non-Pixel Fitbit / other Withings models / Health Connect on different devices
 title: "[Integration Test] "
 labels: integration, testing
 ---
 
-NutriTrace is tested daily on a **Pixel Watch 4** (Fitbit + Health Connect) and a **Withings Body Scan**. Reports against any other wearable, smart scale, or Health Connect setup are extremely valuable.
+NutriTrace is tested against a small set of devices, so reports from any other wearable, smart scale, or Health Connect setup are extremely valuable for spotting integration-specific quirks.
 
 ## Device or integration
 <!-- e.g.
