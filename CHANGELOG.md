@@ -5,6 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.24-beta] — 2026-04-25 — Bulletproof DB-open recovery
+
+### Fixed
+- v0.39.23 cleanup of leftover encryption state was conditional on localStorage markers — but on at least one device the markers were absent while the DB file was still encrypted from a prior install, so the cleanup didn't run and the open failed with SQLITE_NOTADB.
+- New behavior: try-then-wipe-then-retry pattern. Always attempt to open first. If it fails (any reason), unconditionally wipe the DB file (via plugin's `deleteDatabase` AND a Filesystem fallback, in case the plugin call silently no-ops on an encrypted file it can't open) and try again. Server-connected devices re-sync from the server; clean unencrypted DBs from v0.39.19 or earlier are unaffected because the first open succeeds.
+
+---
+
 ## [0.39.23-beta] — 2026-04-25 — Roll back native SQLite encryption
 
 ### Changed

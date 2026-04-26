@@ -187,36 +187,42 @@ async function _openUnencrypted() {
   return db;
 }
 
-/**
- * One-shot cleanup for devices that ran v0.39.20–v0.39.22 (which tried to use
- * SQLCipher). Removes the encrypted DB file and stale localStorage markers.
- * Server-connected devices re-sync from the server. Local-only devices that
- * have data in the encrypted file lose that data — local-only encryption
- * users in the v0.39.20–22 window were already in a broken state, so wiping
- * is the only recovery path that makes the app functional again.
- */
-async function _cleanupEncryptedDbIfPresent() {
-  if (!localStorage.getItem('nt:db_encrypted') &&
-      !localStorage.getItem('nt:db_secret') &&
-      !localStorage.getItem('nt:db_encryption_pending')) {
-    return;
-  }
-  console.warn('[db-native] Cleaning up encryption state from prior install (v0.39.20–22)');
-  await _closeAny();
-  try { await CapacitorSQLite.clearEncryptionSecret(); } catch {}
-  try { await sqlite.deleteDatabase(DB_NAME); } catch {}
-  localStorage.removeItem('nt:db_encrypted');
-  localStorage.removeItem('nt:db_secret');
-  localStorage.removeItem('nt:db_encryption_pending');
-}
-
 async function _open() {
   console.log('[db-native] Opening SQLite database...');
   try {
-    await _cleanupEncryptedDbIfPresent();
-    const db = await _openUnencrypted();
-    console.log('[db-native] SQLite ready');
-    return db;
+    // Always clear any leftover encryption state from prior installs (v0.39.20–22)
+    // — these are no-ops on devices that never ran those versions.
+    try { await CapacitorSQLite.clearEncryptionSecret(); } catch {}
+    localStorage.removeItem('nt:db_encrypted');
+    localStorage.removeItem('nt:db_secret');
+    localStorage.removeItem('nt:db_encryption_pending');
+
+    // Try to open the existing DB. If it succeeds, we're done. If it fails
+    // (most commonly SQLITE_NOTADB from a leftover encrypted file we can't
+    // decrypt without the prior plugin's secret), wipe the file and recreate.
+    try {
+      const db = await _openUnencrypted();
+      console.log('[db-native] SQLite ready');
+      return db;
+    } catch (firstErr) {
+      console.warn('[db-native] First open failed — wiping and retrying:', firstErr?.message);
+      await _closeAny();
+      try { await sqlite.deleteDatabase(DB_NAME); } catch (e) {
+        console.warn('[db-native] sqlite.deleteDatabase failed:', e?.message);
+      }
+      // Belt-and-suspenders: also try Capacitor Filesystem to hard-delete the
+      // file in case the plugin's deleteDatabase silently no-op'd.
+      try {
+        const { Filesystem, Directory } = await import('@capacitor/filesystem');
+        await Filesystem.deleteFile({
+          path: `databases/${DB_NAME}SQLite.db`,
+          directory: Directory.Data,
+        });
+      } catch {}
+      const db = await _openUnencrypted();
+      console.log('[db-native] SQLite ready (after wipe — server sync will repopulate)');
+      return db;
+    }
   } catch (e) {
     console.error('[db-native] Failed to open SQLite database:', e);
     throw e;
