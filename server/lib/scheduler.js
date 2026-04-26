@@ -86,7 +86,7 @@ function _isEnabled(userId, key) {
 
 /** Check if a device should sync now based on its per-device settings */
 function _shouldDeviceSync(userId, deviceKey, local) {
-  const mode = _getUserSetting(userId, `${deviceKey}SyncMode`) ?? _getUserSetting(userId, 'wellnessSyncMode');
+  const mode = _getUserSetting(userId, `${deviceKey}SyncMode`);
   if (mode !== 'scheduled') return false;
 
   const winStart = _getUserSetting(userId, `${deviceKey}SyncWindowStart`);

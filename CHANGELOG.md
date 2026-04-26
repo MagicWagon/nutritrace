@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.33-beta] — 2026-04-26 — Settings audit cleanup (round 2)
+
+### Removed (legacy)
+- **Legacy shared `wellnessSync*` keys** — `wellnessSyncMode`, `wellnessSyncSchedule`, `wellnessSyncTime` were the original sync-config trio before per-source settings landed in v0.30. They've been kept around as fallback seeds for the per-source values; with no public installs predating per-source, they're now safe to remove. Per-source defaults are now standalone (`'auto'` mode, daily interval). `wellnessSyncRange` stays — it's still the active shared range setting.
+- Server scheduler's `wellnessSyncMode` fallback path also removed.
+
+### Changed
+- **Wizard now uses the shared `<Toggle>` component** for all on/off switches (user-management opt-in step + 5 notification step toggles). Removed the bespoke `.fake-toggle` and the on/off-pill styled buttons. One toggle visual across the whole app.
+
+---
+
 ## [0.39.32-beta] — 2026-04-26 — Settings audit cleanup
 
 ### Fixed

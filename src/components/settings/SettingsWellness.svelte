@@ -6,7 +6,7 @@
   import { showSuccess, showError } from '../../stores/toast.js';
   import {
     wellnessEnabled, fitbitEnabled, healthConnectEnabled, wellnessMetrics, workoutsEnabled,
-    wellnessSyncMode, wellnessSyncSchedule, wellnessSyncTime, wellnessSyncRange,
+    wellnessSyncRange,
     fitbitSyncMode, fitbitSyncInterval, fitbitSyncWindowStart, fitbitSyncWindowEnd,
     withingsSyncRange, withingsEnabled,
     withingsSyncMode, withingsSyncInterval, withingsSyncWindowStart, withingsSyncWindowEnd,
@@ -152,36 +152,28 @@
     }
   }
 
-  let wellnessSyncModeVal     = DB.getSetting('wellnessSyncMode',     'auto');
-  let wellnessSyncScheduleVal = DB.getSetting('wellnessSyncSchedule', 'daily');
-  let wellnessSyncTimeVal     = DB.getSetting('wellnessSyncTime',     '14:00');
   let wellnessSyncRangeVal    = DB.getSetting('wellnessSyncRange',    7);
 
-  // Per-device sync state — null = use legacy shared value
-  const _legacyMode = wellnessSyncModeVal;
-  // Convert legacy schedule to interval minutes
-  const _legacyInterval = (() => {
-    const s = wellnessSyncScheduleVal;
-    if (s === 'every6h') return 360;
-    if (s === 'every12h') return 720;
-    return 1440; // daily
-  })();
-  let fitbitSyncModeVal         = DB.getSetting('fitbitSyncMode',         null) ?? _legacyMode;
-  let fitbitSyncIntervalVal     = DB.getSetting('fitbitSyncInterval',     null) ?? _legacyInterval;
-  let fitbitSyncWindowStartVal  = DB.getSetting('fitbitSyncWindowStart',  null) ?? '';
-  let fitbitSyncWindowEndVal    = DB.getSetting('fitbitSyncWindowEnd',    null) ?? '';
-  let withingsSyncModeVal       = DB.getSetting('withingsSyncMode',       null) ?? _legacyMode;
-  let withingsSyncIntervalVal   = DB.getSetting('withingsSyncInterval',   null) ?? _legacyInterval;
-  let withingsSyncWindowStartVal= DB.getSetting('withingsSyncWindowStart',null) ?? '';
-  let withingsSyncWindowEndVal  = DB.getSetting('withingsSyncWindowEnd',  null) ?? '';
-  let garminSyncModeVal         = DB.getSetting('garminSyncMode',         null) ?? _legacyMode;
-  let garminSyncIntervalVal     = DB.getSetting('garminSyncInterval',     null) ?? _legacyInterval;
-  let garminSyncWindowStartVal  = DB.getSetting('garminSyncWindowStart',  null) ?? '';
-  let garminSyncWindowEndVal    = DB.getSetting('garminSyncWindowEnd',    null) ?? '';
-  let hcSyncModeVal             = DB.getSetting('healthConnectSyncMode',         null) ?? _legacyMode;
-  let hcSyncIntervalVal         = DB.getSetting('healthConnectSyncInterval',     null) ?? _legacyInterval;
-  let hcSyncWindowStartVal      = DB.getSetting('healthConnectSyncWindowStart',  null) ?? '';
-  let hcSyncWindowEndVal        = DB.getSetting('healthConnectSyncWindowEnd',    null) ?? '';
+  // Per-device sync state — defaults to 'auto' mode + daily interval (1440 min)
+  // when never set. Each device tracks its own values independently.
+  const _defaultMode = 'auto';
+  const _defaultInterval = 1440; // daily
+  let fitbitSyncModeVal         = DB.getSetting('fitbitSyncMode',         _defaultMode);
+  let fitbitSyncIntervalVal     = DB.getSetting('fitbitSyncInterval',     _defaultInterval);
+  let fitbitSyncWindowStartVal  = DB.getSetting('fitbitSyncWindowStart',  '');
+  let fitbitSyncWindowEndVal    = DB.getSetting('fitbitSyncWindowEnd',    '');
+  let withingsSyncModeVal       = DB.getSetting('withingsSyncMode',       _defaultMode);
+  let withingsSyncIntervalVal   = DB.getSetting('withingsSyncInterval',   _defaultInterval);
+  let withingsSyncWindowStartVal= DB.getSetting('withingsSyncWindowStart','');
+  let withingsSyncWindowEndVal  = DB.getSetting('withingsSyncWindowEnd',  '');
+  let garminSyncModeVal         = DB.getSetting('garminSyncMode',         _defaultMode);
+  let garminSyncIntervalVal     = DB.getSetting('garminSyncInterval',     _defaultInterval);
+  let garminSyncWindowStartVal  = DB.getSetting('garminSyncWindowStart',  '');
+  let garminSyncWindowEndVal    = DB.getSetting('garminSyncWindowEnd',    '');
+  let hcSyncModeVal             = DB.getSetting('healthConnectSyncMode',         _defaultMode);
+  let hcSyncIntervalVal         = DB.getSetting('healthConnectSyncInterval',     _defaultInterval);
+  let hcSyncWindowStartVal      = DB.getSetting('healthConnectSyncWindowStart',  '');
+  let hcSyncWindowEndVal        = DB.getSetting('healthConnectSyncWindowEnd',    '');
 
   const SYNC_INTERVALS = [
     { value: 30,   label: 'Every 30 min' },

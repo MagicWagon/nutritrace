@@ -1,6 +1,6 @@
 <script>
   import { onMount, onDestroy, tick } from 'svelte';
-  import { wellnessMetrics, wellnessSyncMode, wellnessSyncRange, distUnit, tempUnit, pageBanners, dateFormat, withingsSyncRange as withingsSyncRangeSetting, fitbitEnabled, withingsEnabled, garminEnabled, garminSyncRange as garminSyncRangeSetting, weightUnit, goals, goalCelebrations, disableAnimations,
+  import { wellnessMetrics, wellnessSyncRange, distUnit, tempUnit, pageBanners, dateFormat, withingsSyncRange as withingsSyncRangeSetting, fitbitEnabled, withingsEnabled, garminEnabled, garminSyncRange as garminSyncRangeSetting, weightUnit, goals, goalCelebrations, disableAnimations,
     fitbitSyncMode, withingsSyncMode, garminSyncMode, healthConnectSyncMode, timeFormat } from '../stores/settings.js';
   import Chart from 'chart.js/auto';
   import WellnessBanner from '../components/banners/WellnessBanner.svelte';
@@ -1105,9 +1105,9 @@
         const last = localStorage.getItem(key);
         const cooldownMs = 15 * 60 * 1000;
         if (!last || Date.now() - Number(last) > cooldownMs) {
-          const fitbitMode  = $fitbitSyncMode  ?? $wellnessSyncMode;
-          const garminMode_ = $garminSyncMode  ?? $wellnessSyncMode;
-          const hcMode_     = $healthConnectSyncMode ?? $wellnessSyncMode;
+          const fitbitMode  = $fitbitSyncMode ;
+          const garminMode_ = $garminSyncMode ;
+          const hcMode_     = $healthConnectSyncMode;
           if (status.connected && fitbitMode === 'auto')        { await sync(true); syncWorkouts(); }
           if (garminStatus?.connected && garminMode_ === 'auto') await syncGarmin(true);
           if ($healthConnectEnabled && hcMode_ === 'auto')       syncHealthConnectManual();
@@ -1136,9 +1136,9 @@
       const last = localStorage.getItem(key);
       const cooldownMs = 15 * 60 * 1000;
       if (!last || Date.now() - Number(last) > cooldownMs) {
-        const fitbitMode  = $fitbitSyncMode  ?? $wellnessSyncMode;
-        const garminMode_ = $garminSyncMode  ?? $wellnessSyncMode;
-        const hcMode_     = $healthConnectSyncMode ?? $wellnessSyncMode;
+        const fitbitMode  = $fitbitSyncMode ;
+        const garminMode_ = $garminSyncMode ;
+        const hcMode_     = $healthConnectSyncMode;
         if (status.connected && fitbitMode === 'auto')        await sync(true);
         if (garminStatus?.connected && garminMode_ === 'auto') await syncGarmin(true);
         if ($healthConnectEnabled && hcMode_ === 'auto')       syncHealthConnectManual();

@@ -43,7 +43,7 @@ export const USER_PREFS = new Set([
   'usdaEnabled','usdaApiKey','offUsername','offPassword',
   'mealieEnabled','mealieBaseUrl','mealieApiToken',
   'wellnessEnabled','fitbitEnabled','healthConnectEnabled','wellnessMetrics','workoutsEnabled',
-  'wellnessSyncMode','wellnessSyncSchedule','wellnessSyncTime','wellnessSyncRange',
+  'wellnessSyncRange',
   'fitbitSyncMode','fitbitSyncInterval','fitbitSyncWindowStart','fitbitSyncWindowEnd',
   'withingsEnabled','withingsSyncRange',
   'withingsSyncMode','withingsSyncInterval','withingsSyncWindowStart','withingsSyncWindowEnd',
@@ -469,9 +469,9 @@ export const healthConnectEnabled = createSettingStore('healthConnectEnabled', f
 export const wellnessMetrics    = createSettingStore('wellnessMetrics',    null); // null = all visible
 export const workoutsEnabled   = createSettingStore('workoutsEnabled',   false); // show workout history + GPS maps in Movement tab
 // Legacy shared sync settings (kept for backward compat — new code uses per-device below)
-export const wellnessSyncMode     = createSettingStore('wellnessSyncMode',     'auto');
-export const wellnessSyncSchedule = createSettingStore('wellnessSyncSchedule', 'daily');
-export const wellnessSyncTime     = createSettingStore('wellnessSyncTime',     '14:00');
+// wellnessSyncRange remains as the shared "how many days back" setting
+// across all wellness sources. Per-source sync mode/interval moved to
+// fitbitSync*/withingsSync*/garminSync*/healthConnectSync* in v0.30+.
 export const wellnessSyncRange    = createSettingStore('wellnessSyncRange',    7);
 
 // Per-device sync settings:

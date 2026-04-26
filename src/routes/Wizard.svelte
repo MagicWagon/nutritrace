@@ -9,6 +9,7 @@
   import { validatePassword, passwordStrength } from '../lib/validation.js';
   import { showError } from '../stores/toast.js';
   import { isNative, getServerUrl } from '../lib/platform.js';
+  import Toggle from '../components/settings/Toggle.svelte';
 
   // In native local mode, skip user management step (single user, no server)
   const _isNativeLocal = isNative && !getServerUrl();
@@ -373,14 +374,12 @@
             <p class="step-desc">NutriTrace can run in single-user mode (default) or multi-user mode with separate logins and password resets. You can always enable this later in Settings.</p>
           </div>
 
-          <div class="toggle-row" on:click={() => enableUserMgmt = !enableUserMgmt} role="button" tabindex="0">
+          <div class="toggle-row">
             <div>
               <div class="toggle-label">Enable user accounts</div>
               <div class="toggle-hint">Each user gets their own food diary, settings, and profile</div>
             </div>
-            <div class="fake-toggle" class:on={enableUserMgmt}>
-              <div class="fake-thumb"></div>
-            </div>
+            <Toggle checked={enableUserMgmt} on:change={e => enableUserMgmt = e.detail} />
           </div>
         {/if}
 
@@ -724,8 +723,7 @@
                 <div class="int-card-title">Enable Notifications</div>
                 <div class="int-card-sub">Reminders, goal celebrations, and health alerts</div>
               </div>
-              <button class="int-skip-btn" style="background:{notifEnabled ? 'var(--accent)' : 'var(--surface-2)'};color:{notifEnabled ? 'var(--accent-text)' : 'var(--text-3)'}"
-                on:click={() => notifEnabled = !notifEnabled}>{notifEnabled ? 'On' : 'Off'}</button>
+              <Toggle checked={notifEnabled} on:change={e => notifEnabled = e.detail} />
             </div>
           </div>
 
@@ -737,8 +735,7 @@
                   <div class="int-card-title">Hydration Reminders</div>
                   <div class="int-card-sub">Periodic reminders to drink water (8am–10pm)</div>
                 </div>
-                <button class="int-skip-btn" style="background:{notifWater ? 'var(--accent)' : 'var(--surface-2)'};color:{notifWater ? 'var(--accent-text)' : 'var(--text-3)'}"
-                  on:click={() => notifWater = !notifWater}>{notifWater ? 'On' : 'Off'}</button>
+                <Toggle checked={notifWater} on:change={e => notifWater = e.detail} />
               </div>
             </div>
 
@@ -749,8 +746,7 @@
                   <div class="int-card-title">Meal Reminders</div>
                   <div class="int-card-sub">Daily reminders to log breakfast, lunch, and dinner</div>
                 </div>
-                <button class="int-skip-btn" style="background:{notifMeals ? 'var(--accent)' : 'var(--surface-2)'};color:{notifMeals ? 'var(--accent-text)' : 'var(--text-3)'}"
-                  on:click={() => notifMeals = !notifMeals}>{notifMeals ? 'On' : 'Off'}</button>
+                <Toggle checked={notifMeals} on:change={e => notifMeals = e.detail} />
               </div>
             </div>
 
@@ -761,8 +757,7 @@
                   <div class="int-card-title">Goal Celebrations</div>
                   <div class="int-card-sub">Celebrate when you hit your daily nutrition, water, or step goals</div>
                 </div>
-                <button class="int-skip-btn" style="background:{notifGoals ? 'var(--accent)' : 'var(--surface-2)'};color:{notifGoals ? 'var(--accent-text)' : 'var(--text-3)'}"
-                  on:click={() => notifGoals = !notifGoals}>{notifGoals ? 'On' : 'Off'}</button>
+                <Toggle checked={notifGoals} on:change={e => notifGoals = e.detail} />
               </div>
             </div>
 
@@ -773,8 +768,7 @@
                   <div class="int-card-title">Wellness Alerts</div>
                   <div class="int-card-sub">Alerts when HRV drops, sleep declines, or heart rate spikes</div>
                 </div>
-                <button class="int-skip-btn" style="background:{notifWellness ? 'var(--accent)' : 'var(--surface-2)'};color:{notifWellness ? 'var(--accent-text)' : 'var(--text-3)'}"
-                  on:click={() => notifWellness = !notifWellness}>{notifWellness ? 'On' : 'Off'}</button>
+                <Toggle checked={notifWellness} on:change={e => notifWellness = e.detail} />
               </div>
             </div>
           {/if}
@@ -882,18 +876,6 @@
   }
   .toggle-label { font-size: 15px; font-weight: 600; }
   .toggle-hint  { font-size: 12px; color: var(--text-3); margin-top: 2px; }
-  .fake-toggle {
-    width: 44px; height: 26px; border-radius: 13px;
-    background: var(--surface-3); position: relative; flex-shrink: 0;
-    transition: background var(--dur-fast);
-  }
-  .fake-toggle.on { background: var(--accent); }
-  .fake-thumb {
-    position: absolute; top: 3px; left: 3px;
-    width: 20px; height: 20px; border-radius: 50%;
-    background: white; transition: transform var(--dur-fast);
-  }
-  .fake-toggle.on .fake-thumb { transform: translateX(18px); }
 
   /* User mgmt form */
   .um-form { display: flex; flex-direction: column; gap: 12px; }
