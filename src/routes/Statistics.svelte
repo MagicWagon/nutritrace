@@ -35,6 +35,18 @@
   let loading = false;
   let summary = null; // { avg, min, max, total, daysWithData }
   let _loadVer = 0;   // cancel stale concurrent loadData calls
+  let includeToday = false; // when true, include today's partial-day value in cumulative metrics
+
+  // Cumulative metrics accumulate throughout the day (calories, steps, water, etc.).
+  // Excluded from charts by default until the day is complete to avoid trend distortion.
+  // Point-in-time metrics (sleep score, weight, HRV, RHR) are not affected.
+  function isCumulative(m) {
+    if (!m) return false;
+    if (NUTRIMENTS.some(n => n.id === m)) return true;
+    if (m === 'water' || m === 'water_ml') return true;
+    if (m === 'wl_steps' || m === 'wl_active') return true;
+    return false;
+  }
 
   // Wellness metrics — shown only when relevant integration is enabled
   $: _hasWellness = $fitbitEnabled || $garminEnabled || $healthConnectEnabled;
@@ -216,6 +228,15 @@
     }
 
     if (ver !== _loadVer) return; // stale — don't commit
+
+    // Drop today from cumulative-metric charts by default — until end of day,
+    // today's value misrepresents the trend (a partial day looks like a dip).
+    // Point-in-time metrics (sleep_score, weight, HRV, RHR, etc.) are left
+    // alone — those are "what was measured", not "what accumulated".
+    if (isCumulative(metric) && !includeToday) {
+      const todayStr = localDateStr();
+      rows = rows.filter(d => d.date !== todayStr);
+    }
     data = rows;
 
     // Compute summary
@@ -399,7 +420,7 @@
     return m ? (m.unit || '') : '';
   })();
 
-  $: { metric; range; customStart; customEnd; $statsChartType; $statsYZero; $statsAvgLine; $statsGoalLine; $statsTrendLine;
+  $: { metric; range; customStart; customEnd; includeToday; $statsChartType; $statsYZero; $statsAvgLine; $statsGoalLine; $statsTrendLine;
        if (canvasEl) loadData(); }
 
   onDestroy(() => { if (chart) chart.destroy(); });
@@ -547,6 +568,15 @@
             <span class="summary-lbl">Logged</span>
           </div>
         </div>
+      </div>
+    {/if}
+
+    {#if isCumulative(metric)}
+      <div class="include-today-row">
+        <label class="include-today-label">
+          <input type="checkbox" bind:checked={includeToday} />
+          <span>Include today (partial day)</span>
+        </label>
       </div>
     {/if}
 
@@ -830,6 +860,17 @@
   .dp-day.dp-sel   { background: var(--accent) !important; color: #fff; font-weight: 600; }
 
   .chart-card { padding: 16px; position: relative; }
+  .include-today-row {
+    display: flex; justify-content: flex-end;
+    padding: 0 4px 6px;
+    margin-top: -4px;
+  }
+  .include-today-label {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: var(--text-3);
+    cursor: pointer; user-select: none;
+  }
+  .include-today-label input[type="checkbox"] { margin: 0; cursor: pointer; }
   .chart-loading {
     position: absolute; inset: 0; z-index: 2;
     display: flex; align-items: center; justify-content: center;

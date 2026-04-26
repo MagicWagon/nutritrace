@@ -918,20 +918,25 @@
         const f = fitbitRows[d] || {};
         const g = garminRows[d] || {};
         const wd = new Date(d + 'T12:00:00').getDay();
-        // Only include the specific fields useful for calibration. No user_id,
-        // no exact dates, no PII. Numeric biometrics + scores only.
+        // Only include fields useful for calibration. No user_id, no exact
+        // dates, no PII. Numeric biometrics + scores only.
         const row = {
           dayIndex: i + 1,
           dayOfWeek: dayNames[wd],
-          // Actuals (only present if user has been seeding via /seed-scores)
-          sleep_actual:     f.sleep_score_actual     ?? null,
-          readiness_actual: f.readiness_score_actual ?? null,
-          stress_actual:    f.stress_score_actual    ?? null,
-          // Calculated
+          // Fitbit actuals (only present if user has been seeding via /seed-scores).
+          // Most useful for tuning — these are Fitbit's own published scores.
+          fitbit_sleep_actual:     f.sleep_score_actual     ?? null,
+          fitbit_readiness_actual: f.readiness_score_actual ?? null,
+          fitbit_stress_actual:    f.stress_score_actual    ?? null,
+          // Our calculated scores (server-side for sleep, client-side for readiness/stress).
           sleep_calc:       (f.sleep_score_actual ? null : f.sleep_score)         ?? null,
           readiness_calc:   (f.readiness_score_actual ? null : f.readiness_score) ?? null,
           stress_calc:      (f.stress_score_actual ? null : f.stress_score)       ?? null,
-          // Raw biometrics (Fitbit primary, Garmin fallback)
+          // Garmin's device-native scores (Garmin exposes these directly — no calc needed).
+          // Stress is conceptually different (continuous-measurement avg, not a morning score).
+          garmin_sleep:     g.sleep_score    ?? null,
+          garmin_stress:    g.stress_avg     ?? null,
+          // Raw biometrics — relevant for ANY device, useful for cross-device validation
           hrv:              f.hrv_daily_rmssd ?? g.hrv_daily_rmssd ?? null,
           rhr:              f.resting_hr      ?? g.resting_hr      ?? null,
           sleep_min:        f.sleep_duration_min ?? g.sleep_duration_min ?? null,
@@ -941,9 +946,9 @@
           spo2:             f.spo2_avg        ?? null,
           calories_out:     f.calories_out    ?? g.calories_out    ?? null,
         };
-        // Drop the day if there's no biometric data — empty rows aren't useful
-        const hasData = row.sleep_actual != null || row.sleep_calc != null ||
-                        row.hrv != null || row.rhr != null;
+        // Drop the day if there's no biometric data at all
+        const hasData = row.fitbit_sleep_actual != null || row.sleep_calc != null ||
+                        row.garmin_sleep != null || row.hrv != null || row.rhr != null;
         return hasData ? row : null;
       }).filter(Boolean);
 
@@ -2066,7 +2071,7 @@
           <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px">
             <span class="setting-label">Share calibration data</span>
             <p class="setting-desc" style="line-height:1.5">
-              NutriTrace estimates Sleep, Readiness, and Stress scores from your Fitbit data. The formulas are tuned against limited devices. If you have a Fitbit-compatible wearable and want to help, generate an anonymized export of your last 30 days — no user ID, no exact dates (just day-of-week and offsets). Review the JSON before sharing.
+              NutriTrace calculates Sleep, Readiness, and Stress scores from whatever HRV / resting HR / sleep data your device provides. The formulas are tuned against limited hardware. Sharing an anonymized 30-day export helps tune them across more devices and HRV sensors — no user ID, no exact dates (just day-of-week and offsets). Review the JSON before sharing.
               <br/><br/>
               Post the JSON in <a href="https://github.com/traceapps/nutritrace/discussions" target="_blank" rel="noopener" class="about-link">GitHub Discussions</a> with the "Calibration data" tag.
             </p>

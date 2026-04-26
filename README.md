@@ -311,8 +311,13 @@ NutriTrace is a one-person project with limited hardware to test against. The ar
 **Devices we don't own**
 We've tested only against a **Pixel Watch 4** (via the Fitbit API and Health Connect) and a **Withings Body Scan**. Garmin Connect integration is shipped but **not tested against a real Garmin device** — if you have one (Forerunner, Fenix, vívosmart, etc.), please file an [Integration Test report](https://github.com/traceapps/nutritrace/issues/new?template=integration_test_report.md). Same goes for older Fitbit models (Sense, Charge, Inspire), other Withings devices, and Health Connect across non-Pixel wearables.
 
-**Fitbit-equivalent score calibration**
-NutriTrace estimates Sleep, Daily Readiness, and Stress Management scores client-side (Fitbit's API doesn't expose them directly). The formulas are tuned against one person's daily readings on a Pixel Watch 4. If you have any Fitbit-compatible wearable and are willing to share a few days of data, use **Settings → Help Improve NutriTrace → Generate calibration export** to produce an anonymized JSON, then post it in [GitHub Discussions](https://github.com/traceapps/nutritrace/discussions). More diverse calibration data tightens the formulas for everyone.
+**Score calibration data**
+NutriTrace calculates Sleep, Daily Readiness, and Stress Management scores from whatever HRV / resting HR / sleep data your wearable provides. The formulas are tuned against one person's daily readings on a Pixel Watch 4. Two ways to help:
+
+- **If your device or app already publishes its own Sleep / Readiness / Stress scores** (e.g. the Fitbit app does): seeding those daily values gives us the calc-vs-actual gap so we can tune the formulas to match.
+- **If it doesn't** (most other wearables): your raw biometric data is still useful — different sensors collect HRV with different biases, and validating that the formulas behave sensibly across hardware matters.
+
+Use **Settings → Help Improve NutriTrace → Generate calibration export** to produce an anonymized JSON of your last 30 days, then post it in [GitHub Discussions](https://github.com/traceapps/nutritrace/discussions). More diverse data tightens the formulas for everyone.
 
 **Experimental features**
 Features marked **Experimental** in Settings (Smart Log, Goal Insights, Food Sharing, Dynamic Calorie Goal, Garmin integration) work but haven't been hammered enough to drop the label. Real-world bug reports help us promote them to stable. The badge comes off when we're confident in edge-case handling, not on a calendar.

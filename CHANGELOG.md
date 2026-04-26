@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.30-beta] — 2026-04-26
+
+### Added
+- **Statistics: today excluded from cumulative-metric trends by default** — calories, protein/carbs/fat, water, steps, active minutes, and other accumulating metrics no longer include today's partial-day value in the chart or summary stats. A small "Include today (partial day)" checkbox above the chart lets users opt back in. Point-in-time metrics (sleep score, weight, HRV, RHR, SpO2, body composition) are unaffected and always include today. Eliminates the "today looks like a dip" distortion that affected average/trend lines.
+- **Yesterday's meal info sheet now shows item thumbnails** — each food item gets its image (with placeholder icon if none), matching the visual pattern used elsewhere in the app.
+
+### Changed
+- **Yesterday's meals card layout** — info icon moved before the add button so the primary action (add) sits at the rightmost position per Material Design convention. Generic "restaurant" icon replaced with `mealIcon()` so each meal type (Breakfast, Lunch, Dinner, Snacks, custom names) gets its own glyph.
+
+---
+
 ## [0.39.29-beta] — 2026-04-26 — Pre-RC1 polish
 
 ### Added

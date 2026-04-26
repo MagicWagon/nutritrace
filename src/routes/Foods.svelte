@@ -17,6 +17,7 @@
   import { Nutrition } from '../lib/nutrition.js';
   import { Mealie } from '../lib/mealieApi.js';
   import { foodsShowThumbnails, foodsShowCategories, foodsShowLabels, foodsShowNotes, foodsSort, foodCategories, foodsShowYesterdayMeals, mealNames, usdaEnabled, usdaApiKey, catName as _catName, catDisplay as _catDisplay, pageBanners } from '../stores/settings.js';
+  import { mealIcon } from '../lib/mealIcon.js';
   import FoodsBanner from '../components/banners/FoodsBanner.svelte';
 
   // Query string params
@@ -637,20 +638,23 @@
     <div class="card" style="margin-bottom:12px">
       {#each yesterdayMeals as group, gi}
         {#if gi > 0}<div style="height:1px;background:var(--border);margin:0 16px"></div>{/if}
-        <div style="display:flex;align-items:center">
+        <div style="display:flex;align-items:center;padding-right:8px">
           <button class="food-item-btn" style="padding:12px 14px;flex:1" on:click={() => addYesterdayMeal(group)}>
             <div class="ing-thumb-placeholder" style="width:52px;height:52px;border-radius:var(--radius-sm);background:var(--accent-dim);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-              <span class="material-symbols-rounded" style="color:var(--accent);font-size:20px">restaurant</span>
+              <span class="material-symbols-rounded" style="color:var(--accent);font-size:20px">{mealIcon(group.mealName)}</span>
             </div>
             <div class="food-info">
               <span class="food-name">{group.mealName}</span>
               <span class="food-kcal text-sm">{group.items.length} items · {group.totalKcal} kcal</span>
             </div>
-            <span class="material-symbols-rounded" style="font-size:18px;flex-shrink:0;color:var(--accent)">add_circle</span>
           </button>
-          <button class="btn-icon" style="margin-right:8px" on:click|stopPropagation={() => yesterdayInfoGroup = group}
+          <button class="btn-icon" on:click|stopPropagation={() => yesterdayInfoGroup = group}
             aria-label="Show items in {group.mealName}" title="Show items">
             <span class="material-symbols-rounded">info</span>
+          </button>
+          <button class="btn-icon accent" on:click|stopPropagation={() => addYesterdayMeal(group)}
+            aria-label="Add {group.mealName} to today" title="Add to today">
+            <span class="material-symbols-rounded">add_circle</span>
           </button>
         </div>
       {/each}
@@ -901,7 +905,16 @@
   {#if yesterdayInfoGroup}
     <div style="padding:0 4px 8px">
       {#each yesterdayInfoGroup.items as it}
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border)">
+          {#if it.imgUrl}
+            <img src={it.imgUrl} alt="" loading="lazy" referrerpolicy="no-referrer"
+              style="width:40px;height:40px;border-radius:var(--radius-sm,6px);object-fit:cover;flex-shrink:0"
+              on:error={e => e.target.style.display='none'} />
+          {:else}
+            <div style="width:40px;height:40px;border-radius:var(--radius-sm,6px);background:var(--surface-3);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <span class="material-symbols-rounded" style="color:var(--text-3);font-size:18px">restaurant</span>
+            </div>
+          {/if}
           <div style="display:flex;flex-direction:column;min-width:0;flex:1">
             <span style="font-weight:500;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{it.name || 'Unnamed'}</span>
             {#if it.brand}<span class="text-3 text-sm">{it.brand}</span>{/if}
@@ -909,7 +922,7 @@
               {it.quantity ? `${it.quantity} × ` : ''}{it.portion || 100}{it.unit || 'g'}
             </span>
           </div>
-          <span class="text-2 text-sm" style="font-variant-numeric:tabular-nums;margin-left:8px">
+          <span class="text-2 text-sm" style="font-variant-numeric:tabular-nums;margin-left:8px;flex-shrink:0">
             {Math.round((it.nutrition?.calories || it.calories || 0) * (it.quantity || 1))} kcal
           </span>
         </div>
