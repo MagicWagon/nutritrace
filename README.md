@@ -351,7 +351,7 @@ Features marked **Experimental** in Settings (Smart Log, Goal Insights, Food Sha
 If you're filing a bug, logs make it 10× faster to fix. Easiest path first:
 
 **In-app logs** (PWA + Android — recommended):
-**Settings → Help Improve NutriTrace → View logs.** A 500-line in-memory ring buffer captures `console.log/info/warn/error/debug` plus uncaught errors. Toggle **Verbose** to capture extra sync / DB / notification detail. The viewer has Copy / Share / Clear — Share opens the system share sheet (Gmail, Drive, Files) on Android, Web Share API on PWA. No USB cable, no DevTools needed.
+**Settings → Diagnostics → View logs.** A 500-line in-memory ring buffer captures `console.log/info/warn/error/debug` plus uncaught errors. Toggle **Verbose** to capture extra sync / DB / notification detail. The viewer has Copy / Share / Clear — Share opens the system share sheet (Gmail, Drive, Files) on Android, Web Share API on PWA. No USB cable, no DevTools needed.
 
 **Server logs** (Docker):
 ```bash

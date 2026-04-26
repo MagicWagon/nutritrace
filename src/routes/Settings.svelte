@@ -260,7 +260,7 @@
     backup:            ['backup','export','import','restore','csv','clear data','json','full backup','images','zip','reset','defaults','clear settings','danger zone'],
     email:             ['email','smtp','mail','password reset','invites','notifications'],
     users:             ['users','user management','accounts','login','password','admin','register','profile'],
-    helpImprove:       ['help','improve','feedback','calibration','share','export','diagnostic','logs','verbose','bug','report','contribute'],
+    helpImprove:       ['diagnostics','logs','verbose','calibration','export','bug','report','troubleshoot'],
     about:             ['about','version','nutritrace'],
   };
 
@@ -888,7 +888,7 @@
   let userMgmtRef;
   $: if (openSections.users && $userMgmtActive) userMgmtRef?.loadData();
 
-  // ── Help Improve: diagnostic logs ────────────────────────────────────────
+  // ── Diagnostics: in-app log capture ──────────────────────────────────────
   let _logsSheet = false;
   let _logsText = '';
   let _logsCopied = false;
@@ -935,7 +935,7 @@
     setVerboseLogging(on);
   }
 
-  // ── Help Improve: anonymized calibration export ──────────────────────────
+  // ── Diagnostics: anonymized calibration export ───────────────────────────
   let _calibExportSheet = false;
   let _calibExportJson  = '';
   let _calibExportCount = 0;
@@ -2160,10 +2160,10 @@
     {/if}
     {/if}
 
-    <!-- Help Improve -->
+    <!-- Diagnostics -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'helpImprove')} on:click={() => toggleSection('helpImprove')}>
-      <span class="material-symbols-rounded si">volunteer_activism</span>
-      <span>Help Improve NutriTrace</span>
+      <span class="material-symbols-rounded si">troubleshoot</span>
+      <span>Diagnostics</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.helpImprove}>expand_more</span>
     </button>
     {#if sectionOpen(openSections, settingsQuery, 'helpImprove') && sectionVisible(settingsQuery, 'helpImprove')}
@@ -2189,11 +2189,9 @@
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px">
-            <span class="setting-label">Share calibration data</span>
+            <span class="setting-label">Calibration export</span>
             <p class="setting-desc" style="line-height:1.5">
-              NutriTrace calculates Sleep, Readiness, and Stress scores from whatever HRV / resting HR / sleep data your device provides. The formulas are tuned against limited hardware. Sharing an anonymized 30-day export helps tune them across more devices and HRV sensors — no user ID, no exact dates (just day-of-week and offsets). Review the JSON before sharing.
-              <br/><br/>
-              Post the JSON in <a href="https://github.com/traceapps/nutritrace/discussions" target="_blank" rel="noopener" class="about-link">GitHub Discussions</a> with the "Calibration data" tag.
+              Anonymized 30-day JSON of your wellness data (HRV, RHR, sleep, calculated Trace scores). Useful for tracking how Trace scores compare to your device's own scores over time, or for attaching to a wellness-related bug report. Held in-memory until you copy it — nothing is sent anywhere automatically. Review the JSON before sharing.
             </p>
             <div class="form-group" style="width:100%;padding:0">
               <label class="form-label" for="calib-device">Your device (optional, free text)</label>
@@ -2466,10 +2464,6 @@
           <span class="material-symbols-rounded" style="font-size:16px">content_copy</span> Copy JSON
         {/if}
       </button>
-      <a class="btn btn-secondary" style="flex:1;height:40px;font-size:13px;display:flex;align-items:center;justify-content:center;gap:6px;text-decoration:none"
-        href="https://github.com/traceapps/nutritrace/discussions" target="_blank" rel="noopener">
-        <span class="material-symbols-rounded" style="font-size:16px">forum</span> Open Discussions
-      </a>
     </div>
   </div>
 </Sheet>
