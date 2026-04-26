@@ -3,6 +3,7 @@ package com.nutritrace.app;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Build;
@@ -214,16 +215,79 @@ public class ReminderWorker extends Worker {
             String[] hm = time.split(":");
             int targetMin = Integer.parseInt(hm[0]) * 60 + Integer.parseInt(hm[1]);
             if (currentMin < targetMin || currentMin >= targetMin + 15) return;
-            // Skip if already weighed in today (diary.body_stats OR wellness_data)
+
             String weighCheck = describeWeightToday(db, today);
+
+            // Self-heal: if a previous tick fired the notification but the weight
+            // has since arrived (Withings/HC sync, manual entry), pull it from
+            // the tray. This was the original v0.39.27 bug — first tick fires
+            // before sync, later tick sees the data but the notification stays.
             if (weighCheck != null) {
-                Log.i(TAG, "skipping weigh-in reminder for " + today + " — " + weighCheck);
+                Log.i(TAG, "skipping weigh-in for " + today + " — " + weighCheck);
+                cancelNotification(4000);
                 return;
             }
-            Log.i(TAG, "firing weigh-in reminder for " + today + " — no weight found");
+
+            // Once-per-day dedup: avoid the multi-fire pattern that triggers
+            // Android's "noisy" mute when WorkManager's 15-min ticks land
+            // multiple times inside the reminder window.
+            SharedPreferences prefs = getApplicationContext()
+                .getSharedPreferences("nt_reminder_state", Context.MODE_PRIVATE);
+            if (today.equals(prefs.getString("weighin_fired", null))) {
+                Log.d(TAG, "skipping weigh-in for " + today + " — already fired today");
+                return;
+            }
+
+            // Staleness gate: if the device is server-connected but local sync
+            // is stale (> 1 hour), the local DB may not reflect a weight that
+            // the server already knows about. Defer to the server scheduler's
+            // push reminder. Local-only devices have no last_sync_at row, so
+            // this gate doesn't apply to them.
+            Long lastSyncMs = readLastSyncMs(db);
+            if (lastSyncMs != null && (System.currentTimeMillis() - lastSyncMs) > 60 * 60 * 1000L) {
+                Log.i(TAG, "skipping weigh-in for " + today + " — local sync stale; server will fire if needed");
+                return;
+            }
+
+            Log.i(TAG, "firing weigh-in for " + today + " — no weight found");
+            prefs.edit().putString("weighin_fired", today).apply();
             postNotification(4000, "⚖️ Weigh-in Reminder", "Time to step on the scale!");
         } catch (Exception e) {
             Log.w(TAG, "weigh-in check failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Read sync_meta.last_sync_at as epoch ms. Returns null if no sync has
+     * ever happened (local-only device) or the value can't be parsed.
+     */
+    private Long readLastSyncMs(SQLiteDatabase db) {
+        Cursor c = null;
+        try {
+            c = db.rawQuery("SELECT value FROM sync_meta WHERE key = 'last_sync_at'", null);
+            if (c.moveToFirst()) {
+                String ts = c.getString(0);
+                if (ts != null && !ts.isEmpty()) {
+                    java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat(
+                        "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US);
+                    sdf.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+                    return sdf.parse(ts).getTime();
+                }
+            }
+        } catch (Exception e) {
+            // sync_meta table doesn't exist (very old install) or value malformed
+        } finally {
+            if (c != null) c.close();
+        }
+        return null;
+    }
+
+    /** Cancel a previously-posted notification by ID (best-effort). */
+    private void cancelNotification(int id) {
+        try {
+            NotificationManagerCompat.from(getApplicationContext()).cancel(id);
+        } catch (Exception e) {
+            Log.w(TAG, "cancelNotification(" + id + ") failed: " + e.getMessage());
         }
     }
 

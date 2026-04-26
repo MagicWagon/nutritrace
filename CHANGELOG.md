@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.28-beta] — 2026-04-26 — Weigh-in reminder false-positive fix
+
+### Fixed
+- **Device-side weigh-in reminder no longer fires when weight is already logged** — the WorkManager periodic check runs every 15 min and was firing on early ticks within the reminder window before today's Withings/HC sync brought the weight into the local cache. Once the weight arrived, later ticks correctly identified it but the original notification stayed in the tray. Three-part fix in `ReminderWorker.java`:
+  1. **Self-heal**: when a tick finds the weight, cancel any previously-posted notification with the same ID. The notification disappears from the tray once data syncs.
+  2. **Once-per-day dedup**: track "fired today" in SharedPreferences. Prevents the multi-fire-then-Android-mute pattern.
+  3. **Staleness gate**: if `sync_meta.last_sync_at` is older than 1 hour on a server-connected device, defer to the server scheduler's push reminder instead of firing locally on stale data. Local-only devices (no `last_sync_at` row) are unaffected.
+
+---
+
 ## [0.39.27-beta] — 2026-04-26
 
 ### Changed
