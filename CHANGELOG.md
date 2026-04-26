@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.29-beta] — 2026-04-26 — Pre-RC1 polish
+
+### Added
+- **Yesterday's meal info button** in the Foods picker — tap the (i) icon next to a yesterday's-meal card to open a sheet listing every item in that meal (name, brand, quantity, kcal each). The "Add this meal" button at the bottom is the same action as the main row tap.
+- **Calibration data export** in Settings → Help Improve NutriTrace — generates an anonymized JSON of the last 30 days of Fitbit/Garmin readings (no user ID, no exact dates — just day-of-week and offset). User reviews the JSON before sharing in GitHub Discussions to help tune the score formulas.
+- **GitHub issue templates** — `bug_report.md`, `feature_request.md`, and `integration_test_report.md` (the last specifically for community-tested wearables/scales/Health Connect setups). Each includes log location guidance and a redaction reminder.
+- **README** — new "Principles", "Roadmap", "Help us test", and "Troubleshooting" sections. Sets the values story up front, names the testing gaps honestly, and gives contributors a clear on-ramp.
+
+### Deferred to FUTURE.md
+- Per-meal totals popup nutrient filter — should it always show all nutrients (vs respecting the day-summary's `diaryShowAllNutrients` toggle)? Defer the call until we have user feedback on what they reach for.
+
+---
+
 ## [0.39.28-beta] — 2026-04-26 — Weigh-in reminder false-positive fix
 
 ### Fixed

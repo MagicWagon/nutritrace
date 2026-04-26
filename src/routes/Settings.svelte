@@ -58,7 +58,7 @@
   let openSections = { serverConnection: false, appearance: false, regional: false, diary: false, foods: false, water: false,
                        categories: false, nutrients: false, goals: false, bodyStats: false, statistics: false,
                        connectedServices: false, ai: false, notifications: false, wellness: false, sharing: false,
-                       backup: false, email: false, users: false, about: false };
+                       backup: false, email: false, users: false, helpImprove: false, about: false };
 
   // ── Server Connection (native only) ─────────────────────────────────────
   let serverUrlInput = getServerUrl() || '';
@@ -886,6 +886,91 @@
   // ── User Management ref ────────────────────────────────────────────────────
   let userMgmtRef;
   $: if (openSections.users && $userMgmtActive) userMgmtRef?.loadData();
+
+  // ── Help Improve: anonymized calibration export ──────────────────────────
+  let _calibExportSheet = false;
+  let _calibExportJson  = '';
+  let _calibExportCount = 0;
+  let _calibDeviceLabel = ''; // user-supplied free-text, e.g. "Pixel Watch 4"
+  let _calibCopied = false;
+
+  async function _generateCalibExport() {
+    try {
+      // Pull last 30 days of Fitbit/Garmin data via the existing /data endpoint.
+      const today = new Date();
+      const from  = new Date(today); from.setDate(from.getDate() - 30);
+      const fmt   = d => d.toLocaleDateString('sv-SE');
+      const fromStr = fmt(from), toStr = fmt(today);
+
+      let fitbitRows = {}, garminRows = {};
+      try { fitbitRows = await NtApi.get(`/api/wellness/fitbit/data?from=${fromStr}&to=${toStr}`) || {}; } catch {}
+      try { garminRows = await NtApi.get(`/api/wellness/garmin/data?from=${fromStr}&to=${toStr}`) || {}; } catch {}
+
+      // Build deterministic day list, oldest → newest
+      const dates = [];
+      for (let i = 0; i < 30; i++) {
+        const d = new Date(from); d.setDate(from.getDate() + i);
+        dates.push(fmt(d));
+      }
+
+      const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      const days = dates.map((d, i) => {
+        const f = fitbitRows[d] || {};
+        const g = garminRows[d] || {};
+        const wd = new Date(d + 'T12:00:00').getDay();
+        // Only include the specific fields useful for calibration. No user_id,
+        // no exact dates, no PII. Numeric biometrics + scores only.
+        const row = {
+          dayIndex: i + 1,
+          dayOfWeek: dayNames[wd],
+          // Actuals (only present if user has been seeding via /seed-scores)
+          sleep_actual:     f.sleep_score_actual     ?? null,
+          readiness_actual: f.readiness_score_actual ?? null,
+          stress_actual:    f.stress_score_actual    ?? null,
+          // Calculated
+          sleep_calc:       (f.sleep_score_actual ? null : f.sleep_score)         ?? null,
+          readiness_calc:   (f.readiness_score_actual ? null : f.readiness_score) ?? null,
+          stress_calc:      (f.stress_score_actual ? null : f.stress_score)       ?? null,
+          // Raw biometrics (Fitbit primary, Garmin fallback)
+          hrv:              f.hrv_daily_rmssd ?? g.hrv_daily_rmssd ?? null,
+          rhr:              f.resting_hr      ?? g.resting_hr      ?? null,
+          sleep_min:        f.sleep_duration_min ?? g.sleep_duration_min ?? null,
+          deep_min:         f.sleep_deep_min  ?? g.sleep_deep_min  ?? null,
+          rem_min:          f.sleep_rem_min   ?? g.sleep_rem_min   ?? null,
+          efficiency:       f.sleep_efficiency ?? null,
+          spo2:             f.spo2_avg        ?? null,
+          calories_out:     f.calories_out    ?? g.calories_out    ?? null,
+        };
+        // Drop the day if there's no biometric data — empty rows aren't useful
+        const hasData = row.sleep_actual != null || row.sleep_calc != null ||
+                        row.hrv != null || row.rhr != null;
+        return hasData ? row : null;
+      }).filter(Boolean);
+
+      const payload = {
+        version: 1,
+        exportedAt: new Date().toISOString().slice(0, 10),
+        device: _calibDeviceLabel.trim() || '(unspecified)',
+        appVersion: APP_VERSION,
+        days,
+      };
+      _calibExportJson  = JSON.stringify(payload, null, 2);
+      _calibExportCount = days.length;
+      _calibCopied = false;
+    } catch (e) {
+      showError('Could not generate calibration export: ' + (e.message || ''));
+    }
+  }
+
+  async function _copyCalibExport() {
+    try {
+      await navigator.clipboard.writeText(_calibExportJson);
+      _calibCopied = true;
+      setTimeout(() => _calibCopied = false, 2000);
+    } catch (e) {
+      showError('Copy failed — select the text manually');
+    }
+  }
 
   // ── Reactive saves ─────────────────────────────────────────────────────────
 
@@ -1969,6 +2054,36 @@
     {/if}
     {/if}
 
+    <!-- Help Improve -->
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'helpImprove')} on:click={() => toggleSection('helpImprove')}>
+      <span class="material-symbols-rounded si">volunteer_activism</span>
+      <span>Help Improve NutriTrace</span>
+      <span class="material-symbols-rounded chevron" class:rotated={openSections.helpImprove}>expand_more</span>
+    </button>
+    {#if sectionOpen(openSections, settingsQuery, 'helpImprove') && sectionVisible(settingsQuery, 'helpImprove')}
+      <div class="section-body" transition:slide={{ duration: 180 }}>
+        <div class="card settings-card">
+          <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px">
+            <span class="setting-label">Share calibration data</span>
+            <p class="setting-desc" style="line-height:1.5">
+              NutriTrace estimates Sleep, Readiness, and Stress scores from your Fitbit data. The formulas are tuned against limited devices. If you have a Fitbit-compatible wearable and want to help, generate an anonymized export of your last 30 days — no user ID, no exact dates (just day-of-week and offsets). Review the JSON before sharing.
+              <br/><br/>
+              Post the JSON in <a href="https://github.com/traceapps/nutritrace/discussions" target="_blank" rel="noopener" class="about-link">GitHub Discussions</a> with the "Calibration data" tag.
+            </p>
+            <div class="form-group" style="width:100%;padding:0">
+              <label class="form-label" for="calib-device">Your device (optional, free text)</label>
+              <input id="calib-device" class="input" placeholder="e.g. Pixel Watch 4, Fitbit Charge 6, Sense 2"
+                bind:value={_calibDeviceLabel} />
+            </div>
+            <button class="btn btn-primary" style="height:40px;font-size:13px" on:click={() => { _generateCalibExport(); _calibExportSheet = true; }}>
+              <span class="material-symbols-rounded" style="font-size:16px">data_object</span>
+              Generate calibration export
+            </button>
+          </div>
+        </div>
+      </div>
+    {/if}
+
     <!-- About -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'about')} on:click={() => toggleSection('about')}>
       <span class="material-symbols-rounded si">info</span>
@@ -2183,6 +2298,29 @@
       </div>
     </div>
     <button class="btn btn-primary w-full" on:click={addCustomNutrient}>Add Nutrient</button>
+  </div>
+</Sheet>
+
+<!-- Calibration export preview -->
+<Sheet bind:open={_calibExportSheet} title="Calibration Export — Review">
+  <div style="padding:0 4px 8px">
+    <p class="setting-desc" style="line-height:1.5;margin-bottom:10px">
+      {_calibExportCount} day{_calibExportCount === 1 ? '' : 's'} of data, anonymized. Review the JSON below before sharing — nothing is uploaded automatically.
+    </p>
+    <textarea readonly style="width:100%;height:240px;font-family:monospace;font-size:11px;padding:8px;border:1px solid var(--border);border-radius:var(--radius-sm,6px);background:var(--surface-2);color:var(--text-1);resize:vertical">{_calibExportJson}</textarea>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn btn-primary" style="flex:1;height:40px;font-size:13px" on:click={_copyCalibExport}>
+        {#if _calibCopied}
+          <span class="material-symbols-rounded" style="font-size:16px">check</span> Copied
+        {:else}
+          <span class="material-symbols-rounded" style="font-size:16px">content_copy</span> Copy JSON
+        {/if}
+      </button>
+      <a class="btn btn-secondary" style="flex:1;height:40px;font-size:13px;display:flex;align-items:center;justify-content:center;gap:6px;text-decoration:none"
+        href="https://github.com/traceapps/nutritrace/discussions" target="_blank" rel="noopener">
+        <span class="material-symbols-rounded" style="font-size:16px">forum</span> Open Discussions
+      </a>
+    </div>
   </div>
 </Sheet>
 

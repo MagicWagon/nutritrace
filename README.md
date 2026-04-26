@@ -6,6 +6,15 @@ NutriTrace runs entirely in a single Docker container on your own hardware. No a
 
 ---
 
+## Principles
+
+- **Self-hosting is and will remain free.** The server, PWA, and source code will never be paywalled.
+- **No trackers, no analytics, no telemetry.** NutriTrace doesn't phone home — your usage is invisible to anyone but you.
+- **Your data stays on your hardware.** No central server, no cloud sync we can read; nothing leaves your network unless you opt into a third-party integration (OFF, USDA, Fitbit, etc.).
+- **Open source under AGPL-3.0.** Every line that touches your data is readable.
+
+---
+
 ## Features
 
 ### Diary
@@ -283,14 +292,62 @@ All external API calls are proxied server-side — no keys are exposed to the br
 
 ---
 
+## Roadmap
+
+**Coming soon:**
+- **Android app** — works server-connected or fully local/offline, with Health Connect support. Currently in private beta; public release planned during the v1.x cycle. Distribution channels will be announced before public release.
+- **Adaptive TDEE** — learn your true energy expenditure from intake + weight trend over time
+- **Cross-domain Wellness Dashboard** — correlate nutrition, sleep, activity, body composition
+
+**Future:**
+- **iOS** — pending hardware and Apple Developer account access (see Support).
+
+---
+
+## Help us test
+
+NutriTrace is a one-person project with limited hardware to test against. The areas where community feedback would meaningfully improve the app:
+
+**Devices we don't own**
+We've tested only against a **Pixel Watch 4** (via the Fitbit API and Health Connect) and a **Withings Body Scan**. Garmin Connect integration is shipped but **not tested against a real Garmin device** — if you have one (Forerunner, Fenix, vívosmart, etc.), please file an [Integration Test report](https://github.com/traceapps/nutritrace/issues/new?template=integration_test_report.md). Same goes for older Fitbit models (Sense, Charge, Inspire), other Withings devices, and Health Connect across non-Pixel wearables.
+
+**Fitbit-equivalent score calibration**
+NutriTrace estimates Sleep, Daily Readiness, and Stress Management scores client-side (Fitbit's API doesn't expose them directly). The formulas are tuned against one person's daily readings on a Pixel Watch 4. If you have any Fitbit-compatible wearable and are willing to share a few days of data, use **Settings → Help Improve NutriTrace → Generate calibration export** to produce an anonymized JSON, then post it in [GitHub Discussions](https://github.com/traceapps/nutritrace/discussions). More diverse calibration data tightens the formulas for everyone.
+
+**Experimental features**
+Features marked **Experimental** in Settings (Smart Log, Goal Insights, Food Sharing, Dynamic Calorie Goal, Garmin integration) work but haven't been hammered enough to drop the label. Real-world bug reports help us promote them to stable. The badge comes off when we're confident in edge-case handling, not on a calendar.
+
+---
+
+## Troubleshooting
+
+If you're filing a bug, logs make it 10× faster to fix. Where to find them:
+
+**Server logs** (Docker):
+```bash
+docker logs nutritrace --tail 200
+```
+For deeper diagnosis, set `LOG_LEVEL=debug` in your `.env` and restart. **Note:** debug logs contain personal health data (HRV, RHR, sleep duration, calorie counts). Redact these before posting publicly.
+
+**PWA logs** (any browser):
+F12 → Console tab. Filter by `[wellness]`, `[sync]`, `[diary]`, etc. depending on the area.
+
+**Android app logs**:
+1. Connect the device to a computer via USB
+2. Visit `chrome://inspect/#devices` in Chrome
+3. Click "inspect" on the NutriTrace WebView
+4. Console tab → reproduce the issue → screenshot or copy the output
+
+**Where to file:** [github.com/traceapps/nutritrace/issues](https://github.com/traceapps/nutritrace/issues). Templates are provided for bug reports, feature requests, and integration test reports.
+
+---
+
 ## Support
 
-NutriTrace is free to self-host and always will be. If it's been useful to you and you'd like to support continued development:
+NutriTrace is free to self-host and always will be. It's built and maintained by one person; donations help cover real costs like an Apple Developer account and Mac/iPhone hardware to enable an iOS port, plus ongoing infrastructure. Donations are appreciated but never required — starring the repo helps with discoverability and costs nothing.
 
 [![GitHub Sponsors](https://img.shields.io/badge/GitHub_Sponsors-❤-EA4AAA?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/traceapps)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-Buy_me_a_coffee-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/thebigjoe1)
-
-Or just star the repo — that helps with discoverability and costs nothing.
 
 ## Credits
 
@@ -303,4 +360,4 @@ Thanks to both projects for showing what's possible.
 
 ## License
 
-[AGPL-3.0](LICENSE) — server and PWA. The Android app is distributed separately as a paid release on the Play Store.
+[AGPL-3.0](LICENSE) — entire codebase including the Android app source.

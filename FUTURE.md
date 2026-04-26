@@ -206,6 +206,12 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
 
 ---
 
+## Post-1.0 follow-ups
+
+- **Nutrition card filter behavior** — the per-meal totals popup and the day Nutrition Summary both respect the `diaryShowAllNutrients` toggle (default 9 nutrients vs all). Decide: should the per-meal popup ALWAYS show all available nutrients (since user opted in by tapping the macro bar) regardless of the toggle, or stay consistent with the day summary? Three options: (a) leave as-is, (b) always show all in the popup, (c) add an in-popup expand toggle. Defer the call until we have user feedback on what they reach for.
+
+---
+
 ## Pre-1.0 Public Release — TODO
 
 Items to land before flipping `traceapps/nutritrace` public and submitting to Play Store:

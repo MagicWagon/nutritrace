@@ -132,6 +132,7 @@
   let promptUnit = 'g';
   let activeCategoryFilter = ''; // '' = all
   let yesterdayMeals = []; // { mealIdx, mealName, items, totalKcal } — only in pick mode
+  let yesterdayInfoGroup = null; // group whose detail sheet is currently open
 
   // Multi-select (pick mode only)
   let selectedFoods = new Set();      // Set<food object reference>
@@ -636,16 +637,22 @@
     <div class="card" style="margin-bottom:12px">
       {#each yesterdayMeals as group, gi}
         {#if gi > 0}<div style="height:1px;background:var(--border);margin:0 16px"></div>{/if}
-        <button class="food-item-btn" style="padding:12px 14px" on:click={() => addYesterdayMeal(group)}>
-          <div class="ing-thumb-placeholder" style="width:52px;height:52px;border-radius:var(--radius-sm);background:var(--accent-dim);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            <span class="material-symbols-rounded" style="color:var(--accent);font-size:20px">restaurant</span>
-          </div>
-          <div class="food-info">
-            <span class="food-name">{group.mealName}</span>
-            <span class="food-kcal text-sm">{group.items.length} items · {group.totalKcal} kcal</span>
-          </div>
-          <span class="material-symbols-rounded" style="font-size:18px;flex-shrink:0;color:var(--accent)">add_circle</span>
-        </button>
+        <div style="display:flex;align-items:center">
+          <button class="food-item-btn" style="padding:12px 14px;flex:1" on:click={() => addYesterdayMeal(group)}>
+            <div class="ing-thumb-placeholder" style="width:52px;height:52px;border-radius:var(--radius-sm);background:var(--accent-dim);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <span class="material-symbols-rounded" style="color:var(--accent);font-size:20px">restaurant</span>
+            </div>
+            <div class="food-info">
+              <span class="food-name">{group.mealName}</span>
+              <span class="food-kcal text-sm">{group.items.length} items · {group.totalKcal} kcal</span>
+            </div>
+            <span class="material-symbols-rounded" style="font-size:18px;flex-shrink:0;color:var(--accent)">add_circle</span>
+          </button>
+          <button class="btn-icon" style="margin-right:8px" on:click|stopPropagation={() => yesterdayInfoGroup = group}
+            aria-label="Show items in {group.mealName}" title="Show items">
+            <span class="material-symbols-rounded">info</span>
+          </button>
+        </div>
       {/each}
     </div>
   {/if}
@@ -885,6 +892,38 @@
     </div>
     <button class="btn btn-primary w-full" on:click={confirmQtyPrompt}>Add to Diary</button>
   </div>
+</Sheet>
+
+<!-- Yesterday's meal info sheet — list of items in that meal group -->
+<Sheet open={yesterdayInfoGroup != null}
+  title={yesterdayInfoGroup ? `${yesterdayInfoGroup.mealName} — yesterday` : ''}
+  on:close={() => yesterdayInfoGroup = null}>
+  {#if yesterdayInfoGroup}
+    <div style="padding:0 4px 8px">
+      {#each yesterdayInfoGroup.items as it}
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--border)">
+          <div style="display:flex;flex-direction:column;min-width:0;flex:1">
+            <span style="font-weight:500;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{it.name || 'Unnamed'}</span>
+            {#if it.brand}<span class="text-3 text-sm">{it.brand}</span>{/if}
+            <span class="text-3 text-sm">
+              {it.quantity ? `${it.quantity} × ` : ''}{it.portion || 100}{it.unit || 'g'}
+            </span>
+          </div>
+          <span class="text-2 text-sm" style="font-variant-numeric:tabular-nums;margin-left:8px">
+            {Math.round((it.nutrition?.calories || it.calories || 0) * (it.quantity || 1))} kcal
+          </span>
+        </div>
+      {/each}
+      <div style="display:flex;justify-content:space-between;padding:12px;font-weight:600">
+        <span>Total</span>
+        <span>{yesterdayInfoGroup.totalKcal} kcal</span>
+      </div>
+      <button class="btn btn-primary w-full" style="margin-top:8px"
+        on:click={() => { const g = yesterdayInfoGroup; yesterdayInfoGroup = null; addYesterdayMeal(g); }}>
+        Add this meal
+      </button>
+    </div>
+  {/if}
 </Sheet>
 
 <BarcodeScanner bind:open={scannerOpen} on:scan={handleScan} on:close={() => scannerOpen = false} />
