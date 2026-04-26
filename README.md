@@ -15,6 +15,10 @@ NutriTrace runs entirely in a single Docker container on your own hardware. No a
 
 ---
 
+![NutriTrace diary view — a full day of food logging with macro bar, per-meal breakdowns, and water tracking](docs/screenshots/01-diary.png)
+
+---
+
 ## Features
 
 ### Diary
@@ -27,6 +31,10 @@ NutriTrace runs entirely in a single Docker container on your own hardware. No a
 - Per-meal ⋮ menu: copy or move all items to another meal, copy the meal to another date, save the meal to your library, or clear it
 - Per-day free-text notes (e.g. "felt bloated after lunch", "post-workout") — toggleable, with an indicator on dates that have a note
 
+<p align="center">
+  <img src="docs/screenshots/06-diary-mobile.png" alt="NutriTrace diary on Android — same diary view, mobile layout" width="320">
+</p>
+
 ### Foods & Meals
 - Personal food database with photos, barcodes, categories, and custom labels
 - Barcode scanner (camera) for quick food lookup via Open Food Facts
@@ -38,6 +46,8 @@ NutriTrace runs entirely in a single Docker container on your own hardware. No a
 - Charts for any tracked nutrient or body stat over time
 - Bar and line chart modes; average, trend, and goal overlay lines
 - Configurable date ranges
+
+![NutriTrace statistics — calorie trend over time with average, goal, and trend overlays](docs/screenshots/02-statistics.png)
 
 ### Goals
 - Calorie and nutrient goals with template support
@@ -64,6 +74,8 @@ NutriTrace runs entirely in a single Docker container on your own hardware. No a
 - Tool use across all providers: Trace can query your real diary (with day notes + per-item notes), saved meals/recipes library, wellness metrics, body composition, workouts, and goals — no hallucinated numbers
 - Optional Goal Insights mode: proactive analysis of actual intake vs targets with evidence-based suggestions
 
+![Trace AI Assistant chat — answering a nutrition question by querying real diary data](docs/screenshots/04-ai-assistant.png)
+
 ### Backup & Restore
 - Full backup: ZIP archive of all database tables + uploaded images, stored on the server
 - Download backups to your device or restore from a previously saved backup
@@ -78,6 +90,10 @@ NutriTrace runs entirely in a single Docker container on your own hardware. No a
 ## Smart Log — voice + AI food logging
 
 Smart Log is an experimental feature that lets you log food by **pressing and holding the Trace button** on any page and saying what you ate. The AI parses your sentence and matches each item against your saved foods, meals, recipes, or yesterday's diary.
+
+<p align="center">
+  <img src="docs/screenshots/05-smart-log.png" alt="Smart Log review modal — voice input parsed into matched food items, edit before adding to diary" width="320">
+</p>
 
 ### Setup
 1. Settings → AI Assistant → enable the assistant and configure a provider key (Claude, OpenAI, or Gemini).
@@ -262,6 +278,8 @@ The database schema migrates automatically on startup.
 ## Wellness Integrations
 
 NutriTrace can sync data from Fitbit, Withings, Garmin, and Android Health Connect. Each cloud provider (Fitbit/Withings/Garmin) requires registering a free OAuth application with the respective service and entering the credentials in **Settings → Wellness**. Health Connect is on-device and needs no developer setup.
+
+![NutriTrace Wellness page — sleep, HRV, readiness, stress, and activity sparklines from connected devices](docs/screenshots/03-wellness.png)
 
 ### Fitbit
 1. Go to [dev.fitbit.com](https://dev.fitbit.com) → **Register an App**
