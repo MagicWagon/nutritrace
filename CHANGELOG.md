@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.27-beta] — 2026-04-26
+
+### Changed
+- **Meal header kcal hidden when macro footer is on** — the macro summary footer at the bottom of each meal already shows kcal at the end of `... · N kcal`, so showing it in the header too was redundant. Now it only appears in the header when `diaryShowMacroSummary` is off (in which case the header is the only place to see the meal total).
+
+---
+
 ## [0.39.26-beta] — 2026-04-26
 
 ### Changed

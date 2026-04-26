@@ -875,7 +875,7 @@
         <div class="meal-header" style="--meal-color:{mealColor(mealIdx)}">
           <span class="meal-type-icon material-symbols-rounded">{mealIcon(meal)}</span>
           <span class="meal-name">{meal}</span>
-          {#if items.length > 0}
+          {#if items.length > 0 && !$diaryShowMacroSummary}
             <span class="meal-kcal text-3 text-sm">
               {items.reduce((s,it) => s + formatKcal(it), 0)} kcal
             </span>
