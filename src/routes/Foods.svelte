@@ -16,7 +16,8 @@
   import { API, USDA, NtApi } from '../lib/api.js';
   import { Nutrition } from '../lib/nutrition.js';
   import { Mealie } from '../lib/mealieApi.js';
-  import { foodsShowThumbnails, foodsShowCategories, foodsShowLabels, foodsShowNotes, foodsSort, foodCategories, foodsShowYesterdayMeals, mealNames, usdaEnabled, usdaApiKey, catName as _catName, catDisplay as _catDisplay, pageBanners } from '../stores/settings.js';
+  import { resolveAssetUrl } from '../lib/platform.js';
+  import { foodsShowThumbnails, foodsShowCategories, foodsShowLabels, foodsShowNotes, foodsSort, foodCategories, foodsShowYesterdayMeals, foodsYesterdayCollapsed, foodsSavedCollapsed, mealNames, usdaEnabled, usdaApiKey, catName as _catName, catDisplay as _catDisplay, pageBanners } from '../stores/settings.js';
   import { mealIcon } from '../lib/mealIcon.js';
   import FoodsBanner from '../components/banners/FoodsBanner.svelte';
 
@@ -67,6 +68,11 @@
   }
   $: _tabIcon = activeTab === 0 ? 'restaurant' : activeTab === 1 ? 'dinner_dining' : 'menu_book';
   $: { if (pickMode) loadYesterdayMeals(); }
+  // Saved-meals collapse only kicks in when the SAVED MEALS header is actually rendered
+  // (Meals tab + pick mode + yesterday section visible + not searching). Otherwise the
+  // header isn't shown and the user has no way to toggle it back, so the list must render.
+  $: _savedMealsHeaderVisible = pickMode && activeTab === 1 && yesterdayMeals.length > 0 && !search;
+  $: _hideSavedMealsList = _savedMealsHeaderVisible && $foodsSavedCollapsed;
 
   let search = '';
   let searchSource = 'local';
@@ -134,6 +140,7 @@
   let activeCategoryFilter = ''; // '' = all
   let yesterdayMeals = []; // { mealIdx, mealName, items, totalKcal } — only in pick mode
   let yesterdayInfoGroup = null; // group whose detail sheet is currently open
+  let _yesterdayImgFailed = new Set(); // items whose thumbnail failed to load — fall back to placeholder
 
   // Multi-select (pick mode only)
   let selectedFoods = new Set();      // Set<food object reference>
@@ -634,7 +641,14 @@
 
   <!-- Yesterday's meals (pick mode only) -->
   {#if pickMode && yesterdayMeals.length > 0 && !search && activeTab === 1}
-    <p class="section-title" style="padding-bottom:4px">Yesterday's Meals</p>
+    <button class="meal-section-header" type="button"
+      on:click={() => foodsYesterdayCollapsed.set(!$foodsYesterdayCollapsed)}
+      aria-expanded={!$foodsYesterdayCollapsed}>
+      <span class="meal-section-label">Yesterday's Meals</span>
+      <span class="material-symbols-rounded meal-section-chevron"
+        class:meal-section-chevron-collapsed={$foodsYesterdayCollapsed}>expand_more</span>
+    </button>
+    {#if !$foodsYesterdayCollapsed}
     <div class="card" style="margin-bottom:12px">
       {#each yesterdayMeals as group, gi}
         {#if gi > 0}<div style="height:1px;background:var(--border);margin:0 16px"></div>{/if}
@@ -659,6 +673,18 @@
         </div>
       {/each}
     </div>
+    {/if}
+    <!-- Sibling header for the saved meals list — only render when both sections coexist
+         (yesterday is showing AND there are saved meals to display) so it acts as a divider. -->
+    {#if filteredList.length > 0}
+      <button class="meal-section-header" type="button"
+        on:click={() => foodsSavedCollapsed.set(!$foodsSavedCollapsed)}
+        aria-expanded={!$foodsSavedCollapsed}>
+        <span class="meal-section-label">Saved Meals</span>
+        <span class="material-symbols-rounded meal-section-chevron"
+          class:meal-section-chevron-collapsed={$foodsSavedCollapsed}>expand_more</span>
+      </button>
+    {/if}
   {/if}
 
   {#if loadError}
@@ -692,7 +718,7 @@
             <p class="empty-state-hint">Try searching Open Food Facts or USDA above</p>
           {/if}
         </div>
-      {:else}
+      {:else if !_hideSavedMealsList}
         <ul class="food-list">
           {#each filteredList as food (food.id)}
             {@const _sel = selectedFoods.has(food)}
@@ -906,10 +932,10 @@
     <div style="padding:0 4px 8px">
       {#each yesterdayInfoGroup.items as it}
         <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border)">
-          {#if it.imgUrl}
-            <img src={it.imgUrl} alt="" loading="lazy" referrerpolicy="no-referrer"
+          {#if it.imgUrl && !_yesterdayImgFailed.has(it)}
+            <img src={resolveAssetUrl(it.imgUrl)} alt="" loading="lazy" referrerpolicy="no-referrer"
               style="width:40px;height:40px;border-radius:var(--radius-sm,6px);object-fit:cover;flex-shrink:0"
-              on:error={e => e.target.style.display='none'} />
+              on:error={() => { _yesterdayImgFailed.add(it); _yesterdayImgFailed = _yesterdayImgFailed; }} />
           {:else}
             <div style="width:40px;height:40px;border-radius:var(--radius-sm,6px);background:var(--surface-3);display:flex;align-items:center;justify-content:center;flex-shrink:0">
               <span class="material-symbols-rounded" style="color:var(--text-3);font-size:18px">restaurant</span>
@@ -966,6 +992,38 @@
 />
 
 <style>
+  /* Meals tab section headers ("Yesterday's Meals" / "Saved Meals") — small uppercase
+     label matching .section-title style, but as a clickable button with a chevron so
+     users can collapse each section independently. */
+  .meal-section-header {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    background: none;
+    border: none;
+    padding: var(--space-4) var(--page-px) var(--space-2);
+    cursor: pointer;
+    text-align: left;
+    color: var(--text-3);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .meal-section-header:active { color: var(--text-2); }
+  .meal-section-label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    flex: 1;
+  }
+  .meal-section-chevron {
+    font-size: 20px;
+    transition: transform var(--dur-fast) var(--ease-out);
+  }
+  .meal-section-chevron-collapsed { transform: rotate(-90deg); }
+
   /* Notes display in quick-add sheets */
   .qty-notes {
     display: flex; gap: 8px; align-items: flex-start;
@@ -1056,6 +1114,9 @@
     text-align: left;
     transition: background var(--dur-fast);
     color: var(--text-1);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
   }
   .food-item-btn:active { background: var(--surface-2); }
   .food-thumb {

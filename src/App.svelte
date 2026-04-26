@@ -34,7 +34,7 @@
   import ForgotPassword from './routes/ForgotPassword.svelte';
   import ResetPassword  from './routes/ResetPassword.svelte';
   import AcceptInvite   from './routes/AcceptInvite.svelte';
-  import AIFitBot   from './components/ai/AIFitBot.svelte';
+  import Trace      from './components/ai/Trace.svelte';
   import Wellness   from './routes/Wellness.svelte';
 
   const routes = {
@@ -335,7 +335,7 @@
 {/if}
 
 <Toast />
-<AIFitBot />
+<Trace />
 
 {/if}
 

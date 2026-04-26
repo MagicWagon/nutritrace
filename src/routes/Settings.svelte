@@ -7,7 +7,7 @@
   import Toggle from '../components/settings/Toggle.svelte';
 
   import SettingsWellness from '../components/settings/SettingsWellness.svelte';
-  import SettingsAI from '../components/settings/SettingsAI.svelte';
+  import SettingsTrace from '../components/settings/SettingsTrace.svelte';
   import SettingsNotifications from '../components/settings/SettingsNotifications.svelte';
   import SettingsUserManagement from '../components/settings/SettingsUserManagement.svelte';
   import SettingsBackup from '../components/settings/SettingsBackup.svelte';
@@ -253,7 +253,7 @@
     bodyStats:         ['body stats','body','weight','measurements','stats'],
     statistics:        ['statistics','chart','y-axis','average','goal line','trend','stats'],
     connectedServices: ['connected services','usda','open food facts','mealie','recipe','search language','country','api key','credentials','username','password'],
-    ai:                ['ai','fitbot','assistant','provider','model','api key','artificial intelligence','chat','smart log','voice','quick log','goal insights'],
+    ai:                ['ai','trace','assistant','provider','model','api key','artificial intelligence','chat','smart log','voice','quick log','goal insights'],
     notifications:     ['notifications','reminders','water reminder','meal reminder','gotify','push','alerts','wellness alerts','goal celebration','weekly summary','email summary'],
     wellness:          ['wellness','activity tracking','fitbit','withings','garmin','health connect','steps','sleep','heart rate','hrv','spo2','sync mode','sync range','connect','disconnect','connected devices','fitness tracker','body battery','stress'],
     sharing:           ['sharing','share','group','catalogue','catalog','visibility','private','members','food sharing'],
@@ -1884,7 +1884,7 @@
       <span class="material-symbols-rounded chevron" class:rotated={openSections.ai}>expand_more</span>
     </button>
     {#if sectionOpen(openSections, settingsQuery, 'ai') && sectionVisible(settingsQuery, 'ai')}
-      <SettingsAI envLocks={envLocks} />
+      <SettingsTrace envLocks={envLocks} />
     {/if}
 
     <!-- ── Notifications ────────────────────────────────────────────────────── -->
@@ -2267,7 +2267,7 @@
               <a href="https://github.com/sponsors/traceapps" target="_blank" rel="noopener" class="btn btn-secondary" style="height:30px;font-size:12px;padding:0 12px">
                 <span class="material-symbols-rounded" style="font-size:14px">favorite</span> GitHub Sponsors
               </a>
-              <a href="https://ko-fi.com/thebigjoe1" target="_blank" rel="noopener" class="btn btn-secondary" style="height:30px;font-size:12px;padding:0 12px">
+              <a href="https://ko-fi.com/traceapps" target="_blank" rel="noopener" class="btn btn-secondary" style="height:30px;font-size:12px;padding:0 12px">
                 <span class="material-symbols-rounded" style="font-size:14px">coffee</span> Ko-fi
               </a>
             </div>

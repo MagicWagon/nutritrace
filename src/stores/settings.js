@@ -29,7 +29,7 @@ export const USER_PREFS = new Set([
   'diaryShowAllNutrients','diaryShowNutritionUnits','diaryShowMacroSummary',
   'diaryPromptQuantity','diaryShowPortionSize','diaryShowNotes',
   'foodsShowCategories','foodsShowLabels','foodsShowNotes','foodsShowThumbnails',
-  'foodsShowYesterdayMeals','foodsSort',
+  'foodsShowYesterdayMeals','foodsYesterdayCollapsed','foodsSavedCollapsed','foodsSort',
   'barcodeBeep','cropPhotos',
   'offSearchLanguage','offSearchCountry','offUploadCountry',
   'weightUnit','heightUnit','lengthUnit','distUnit','tempUnit',
@@ -364,6 +364,10 @@ export const foodsShowLabels        = createSettingStore('foodsShowLabels',     
 export const foodsShowNotes         = createSettingStore('foodsShowNotes',         true);
 export const foodsShowThumbnails    = createSettingStore('foodsShowThumbnails',    true);
 export const foodsShowYesterdayMeals= createSettingStore('foodsShowYesterdayMeals',true);
+// Foods → Meals tab: per-section collapse state (only takes effect when both Yesterday and Saved
+// sections are visible — i.e. yesterday has items + user is in pick mode). Default expanded.
+export const foodsYesterdayCollapsed= createSettingStore('foodsYesterdayCollapsed',false);
+export const foodsSavedCollapsed    = createSettingStore('foodsSavedCollapsed',    false);
 export const foodsSort              = createSettingStore('foodsSort',              'alpha');
 
 export const barcodeBeep            = createSettingStore('barcodeBeep',            false);
@@ -506,7 +510,7 @@ export const healthConnectSyncWindowEnd    = createSettingStore('healthConnectSy
 // Sharing
 export const defaultFoodVisibility = createSettingStore('defaultFoodVisibility', 'private'); // 'private' | 'group' | 'specific'
 
-// FitBot AI
+// AI Assistant (Trace)
 export const aiEnabled       = createSettingStore('aiEnabled',       false);
 export const aiProvider      = createSettingStore('aiProvider',      'claude');
 export const aiApiKey        = createSettingStore('aiApiKey',        '');
@@ -522,7 +526,7 @@ try {
     DB.setSetting('aiAssistantName', 'Trace');
   }
 } catch {}
-// Quick Log — natural-language food entry powered by FitBot's AI provider.
+// Quick Log — natural-language food entry powered by the assistant's AI provider.
 // Off by default (experimental). Only usable when aiEnabled is true.
 export const quickLogEnabled  = createSettingStore('quickLogEnabled',  false);
 export const aiGoalInsights   = createSettingStore('aiGoalInsights',   false);

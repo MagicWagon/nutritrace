@@ -2,7 +2,7 @@
   import { onMount, onDestroy, tick } from 'svelte';
   import { fly, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
-  import FitBotFace from './FitBotFace.svelte';
+  import TraceFace from './TraceFace.svelte';
   import { NtApi }     from '../../lib/api.js';
   import { DB, localDateStr } from '../../lib/db.js';
   import { Nutrition } from '../../lib/nutrition.js';
@@ -440,7 +440,7 @@
     window.addEventListener('resize', _updatePanelPos);
   }
 
-  // ── Hold-to-record (Smart Log via FitBot FAB) ──────────────────────────────
+  // ── Hold-to-record (Smart Log via Trace FAB) ───────────────────────────────
   // Press the FAB and hold for 700ms → robot face morphs to mic, FAB turns
   // red, beep + haptic fire, native speech recognition starts. Release ends
   // recording and runs Smart Log. Move finger before 700ms → drag mode
@@ -547,11 +547,11 @@
             showError("Didn't catch that — try again");
           }
         }).catch((e) => {
-          console.warn('[fitbot-hold] native voice failed:', e?.message);
+          console.warn('[trace-hold] native voice failed:', e?.message);
           showError('Voice recognition failed: ' + (e?.message || 'unknown error'));
         });
       } catch (e) {
-        console.warn('[fitbot-hold] plugin unavailable:', e?.message);
+        console.warn('[trace-hold] plugin unavailable:', e?.message);
         recordingMode = false;
         showError('Voice plugin unavailable');
       }
@@ -578,7 +578,7 @@
           }
         };
         rec.onerror = (e) => {
-          console.warn('[fitbot-hold] web voice error:', e.error);
+          console.warn('[trace-hold] web voice error:', e.error);
           if (_commitNextTranscript) showError('Voice error: ' + (e.error || 'unknown'));
         };
         rec.onend = () => {
@@ -590,10 +590,10 @@
             // — leaving this as a hook for future refinement.
           }
         };
-        window.__fitbotHoldRec = rec;
+        window.__traceHoldRec = rec;
         rec.start();
       } catch (e) {
-        console.warn('[fitbot-hold] web speech start failed:', e.message);
+        console.warn('[trace-hold] web speech start failed:', e.message);
         recordingMode = false;
         showError('Could not start mic: ' + e.message);
       }
@@ -617,9 +617,9 @@
         const { SpeechRecognition } = await import('@capacitor-community/speech-recognition');
         await SpeechRecognition.stop();
       } catch {}
-    } else if (window.__fitbotHoldRec) {
-      try { commit ? window.__fitbotHoldRec.stop() : window.__fitbotHoldRec.abort(); } catch {}
-      window.__fitbotHoldRec = null;
+    } else if (window.__traceHoldRec) {
+      try { commit ? window.__traceHoldRec.stop() : window.__traceHoldRec.abort(); } catch {}
+      window.__traceHoldRec = null;
     }
   }
 
@@ -636,7 +636,7 @@
       userMealNames.subscribe(v => names = v)();
       const parsed = await parseInput(text, names || ['Breakfast','Lunch','Dinner','Snacks']);
       if (!parsed.items || parsed.items.length === 0) {
-        console.warn('[fitbot-hold] no items parsed from:', text);
+        console.warn('[trace-hold] no items parsed from:', text);
         showError(`Couldn't find any food in "${text}"`);
         return;
       }
@@ -645,7 +645,7 @@
       smartLogMeal = parsed.meal;
       showSmartLog = true;
     } catch (e) {
-      console.error('[fitbot-hold] parse failed:', e);
+      console.error('[trace-hold] parse failed:', e);
       showError('Smart Log parse failed: ' + (e.message || 'unknown error'));
     }
   }
@@ -1138,7 +1138,7 @@ Water: ${ctx.waterText}`
     {:else if recordingMode}
       <span class="material-symbols-rounded fab-mic" style="font-size:30px">mic</span>
     {:else}
-      <div class="fab-robot-wrap"><FitBotFace size={42} /></div>
+      <div class="fab-robot-wrap"><TraceFace size={42} /></div>
     {/if}
     {#if hasUnread && !panelOpen}
       <div class="fab-badge" transition:fade={{ duration: 120 }}></div>
@@ -1188,7 +1188,7 @@ Water: ${ctx.waterText}`
       <div class="ai-header">
         <div class="ai-header-brand">
           <div class="ai-avatar">
-            <FitBotFace size={32} />
+            <TraceFace size={32} />
           </div>
           <div>
             <div class="ai-header-name">{assistantName}</div>
@@ -1223,7 +1223,7 @@ Water: ${ctx.waterText}`
           <!-- Welcome screen -->
           <div class="ai-welcome">
             <div class="ai-welcome-avatar">
-              <FitBotFace size={48} />
+              <TraceFace size={48} />
             </div>
             <p class="ai-welcome-name">Hi, I'm {assistantName}!</p>
             <p class="ai-welcome-desc">Ask me anything — nutrition, sleep, activity, recovery, hydration, body composition. I have access to all your data from today.</p>
@@ -1249,7 +1249,7 @@ Water: ${ctx.waterText}`
             <div class="ai-msg" class:user={msg.role === 'user'}>
               {#if msg.role === 'assistant'}
                 <div class="ai-msg-avatar">
-                  <FitBotFace size={24} />
+                  <TraceFace size={24} />
                 </div>
               {/if}
               <div class="ai-msg-body">
@@ -1269,7 +1269,7 @@ Water: ${ctx.waterText}`
         {#if loading}
           <div class="ai-msg">
             <div class="ai-msg-avatar">
-              <FitBotFace size={24} />
+              <TraceFace size={24} />
             </div>
             <div class="ai-msg-body">
               <div class="ai-bubble ai-typing">

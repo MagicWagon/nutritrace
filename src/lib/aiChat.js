@@ -321,7 +321,7 @@ async function _callGeminiWithTools(apiKey, model, messages, systemPrompt, tools
 
 let _toolHandler = null;
 
-/** Register the tool handler (called from AIFitBot.svelte) */
+/** Register the tool handler (called from Trace.svelte) */
 export function setToolHandler(handler) { _toolHandler = handler; }
 
 async function _executeTool(name, args) {

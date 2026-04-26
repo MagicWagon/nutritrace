@@ -5,6 +5,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.35-beta] — 2026-04-26 — AI Assistant internal rename + LiftTrace label parity + Android thumbnail + long-press fixes + collapsible Meals sections
+
+### Added
+- **Collapsible "Yesterday's Meals" + "Saved Meals" sections** in Foods → Meals tab. Each section header is now a clickable row with a chevron; collapse state persists per-section (`foodsYesterdayCollapsed`, `foodsSavedCollapsed`, both default expanded). The new "Saved Meals" header only renders when "Yesterday's Meals" is also visible — acts as a divider between the two parallel sections rather than a redundant label on a single tab. Search behavior unchanged: typing hides both headers and results take over; user-set collapse state preserved across search clears.
+
+### Fixed
+- **Yesterday-meal info-sheet thumbnails missing on Android.** The `<img>` tag passed `it.imgUrl` raw, so external food images (Open Food Facts, USDA, Mealie) were blocked by the WebView. Wrapped with `resolveAssetUrl()` so external URLs route through `/api/proxy` in native server mode (matches Diary's existing pattern). Also fixed the load-error fallback: a broken image now swaps to the placeholder glyph instead of leaving a blank slot. PWA was unaffected — same-origin browser fetch wasn't blocked.
+- **Long-press selecting surrounding text.** Diary items and Foods rows opened the action sheet but also visually selected nearby words. Added `user-select: none`, `-webkit-user-select: none`, `-webkit-touch-callout: none` to `.diary-item` and `.food-item-btn` so the long-press gesture only triggers the menu — no text selection, no copy/paste callout.
+
+### Changed
+- **Component + symbol rename completes the FitBot → Trace work** from v0.39.34. User-facing strings were already done; this bump aligns the internals so the codebase reads consistently and matches LiftTrace's `Trace.svelte` / `TraceFace.svelte` / `SettingsTrace.svelte` layout. No behavior change.
+  - Files: `AIFitBot.svelte` → `Trace.svelte`, `FitBotFace.svelte` → `TraceFace.svelte`, `SettingsAI.svelte` → `SettingsTrace.svelte` (renamed via `git mv`, history preserved).
+  - Symbols + tags: `<AIFitBot />` → `<Trace />`, `<FitBotFace />` → `<TraceFace />`, `<SettingsAI />` → `<SettingsTrace />`.
+  - CSS class `.fitbot-face` → `.trace-face`. Global `window.__fitbotHoldRec` → `__traceHoldRec`. Console tags `[fitbot-hold]` → `[trace-hold]`. Settings search keyword `'fitbot'` → `'trace'`.
+  - Migration code at `App.svelte` and `stores/settings.js` still references the literal `'FitBot'` — required so existing installs detect the legacy name and bump it to `'Trace'`.
+- **LiftTrace label parity** (cross-app cohesion, applied in LiftTrace v0.10.0-beta.3): both apps now share the exact same AI Assistant section UX — section label "AI Assistant", toggle "Enable AI Assistant", description "Adds a floating chat button to all pages". The brand name "Trace" appears only as the default value of the user-customizable assistant-name field, so renaming the assistant doesn't leave stale labels around the rest of the UI.
+
+---
+
 ## [0.39.34-beta] — 2026-04-26 — AI Assistant rename + Wizard skip + diagnostic logs Share
 
 ### Changed
@@ -14,7 +33,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Diagnostic logs viewer adds a Share button** next to Copy/Clear (borrowed from LiftTrace). On native uses `@capacitor/share` to open the Android share sheet (Gmail, Files, Drive, etc.); on PWA uses Web Share API; falls back to clipboard. Lets users send logs straight from the app to their email or a GitHub issue without manual paste-juggling.
 
 ### Notes
-- All user-facing "FitBot" strings in source + docs are now "Trace" or "AI Assistant" depending on context. Internal symbol names (`AIFitBot.svelte`, `FitBotFace.svelte`, `__fitbotHoldRec`) stay as-is — they're invisible to users and renaming would churn imports.
+- All user-facing "FitBot" strings in source + docs are now "Trace" or "AI Assistant" depending on context. Internal symbol rename followed in v0.39.35-beta.
 
 ---
 

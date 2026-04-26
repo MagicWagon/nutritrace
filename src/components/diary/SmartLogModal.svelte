@@ -20,7 +20,7 @@
   export let defaultMealSlot = 0;   // index into mealNames (used if AI can't infer)
   export let openMode = 'text';     // 'text' | 'voice' | 'preParsed'
   // When openMode === 'preParsed', the caller has already run parseInput and
-  // matched items via the AIFitBot hold-to-record path. We skip the input/
+  // matched items via the Trace hold-to-record path. We skip the input/
   // parsing phases entirely and jump straight to the review modal.
   export let preParsedMatches = null;  // [{ item, candidates, best, source }, ...]
   export let preParsedMeal = null;     // string | null — AI-inferred meal name
@@ -42,7 +42,7 @@
 
   onMount(async () => {
     // Pre-parsed mode: caller already ran parseInput + matchItems via the
-    // AIFitBot hold-to-record gesture. Jump straight to review.
+    // Trace hold-to-record gesture. Jump straight to review.
     if (openMode === 'preParsed' && preParsedMatches && preParsedMatches.length > 0) {
       parsedMeal = preParsedMeal;
       inputText = preParsedSourceText || '';

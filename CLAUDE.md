@@ -1,7 +1,7 @@
 # NutriTrace — Project Reference
 
 **App name**: NutriTrace
-**Version**: See `src/lib/version.js` (centralized) — currently v0.39.13-beta
+**Version**: See `src/lib/version.js` (centralized) — currently v0.39.35-beta
 **Location**: `/home/papa/Documents/claude_code/nutritrace/`
 **GitHub**: `git@github.com:traceapps/nutritrace-dev.git` (private monorepo)
 **Stack**: Svelte 4, svelte-spa-router v4 (hash routing), Vite, SQLite (server), PWA
@@ -17,7 +17,9 @@
 - **`src/routes/Wellness.svelte`** — All wellness UI: metrics, sparklines, insights (readiness, stress, sleep debt, chronotype).
 - **`src/routes/Settings.svelte`** (~1700 lines after split) — All settings. Large sections extracted to sub-components.
 - **`src/components/settings/SettingsWellness.svelte`** — Fitbit/Withings/Garmin config, metric visibility.
-- **`src/components/settings/SettingsAI.svelte`** — AI Assistant settings (provider, model, API key, Smart Log, Goal Insights). Receives `envLocks` prop.
+- **`src/components/settings/SettingsTrace.svelte`** — AI Assistant settings (provider, model, API key, Smart Log, Goal Insights). Receives `envLocks` prop.
+- **`src/components/ai/Trace.svelte`** — AI assistant chat panel + FAB (formerly `AIFitBot.svelte` until v0.39.35). Hold-to-record voice → Smart Log.
+- **`src/components/ai/TraceFace.svelte`** — animated robot face SVG used everywhere the assistant is shown (formerly `FitBotFace.svelte`). Identical to LiftTrace's `TraceFace.svelte` for TraceApps brand cohesion.
 - **`src/components/settings/SettingsNotifications.svelte`** — Device notifications, push service (Apprise/Gotify/ntfy), all reminders and alerts.
 - **`src/components/settings/SettingsUserManagement.svelte`** — Profile, user list, invite, session, disable user mgmt, sign out. Exposes `loadData()`.
 - **`src/components/settings/SettingsBackup.svelte`** — Full backup, JSON export/import, CSV export, danger zone. Exposes `loadFullBackups()` and `loadLocalBackups()`.

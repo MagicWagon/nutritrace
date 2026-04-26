@@ -1303,7 +1303,7 @@
   {/if}
 </Sheet>
 
-<!-- Smart Log lives on the assistant FAB (hold to dictate) — see AIFitBot.svelte -->
+<!-- Smart Log lives on the assistant FAB (hold to dictate) — see Trace.svelte -->
 
 
 <!-- Delete confirm dialog -->
@@ -2028,6 +2028,9 @@
     padding: 10px 16px;
     border-bottom: 1px solid var(--border);
     transition: background var(--dur-fast);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
   }
   .diary-item:last-child { border-bottom: none; }
   .diary-item:active { background: var(--surface-2); }
