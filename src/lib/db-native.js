@@ -206,24 +206,70 @@ async function _openEncrypted() {
   return db;
 }
 
+async function _ensureSecretSet(secret) {
+  // The plugin's secure store survives across app launches. setEncryptionSecret
+  // is intended for first-time setup ONLY — calling it again can break decryption
+  // of existing files in some plugin versions. Use isSecretStored to decide.
+  let stored = false;
+  try {
+    const r = await sqlite.isSecretStored();
+    stored = r?.result === true;
+  } catch {}
+  if (!stored) {
+    try {
+      await sqlite.setEncryptionSecret(secret);
+      console.log('[db-native] Encryption secret stored in plugin secure store');
+    } catch (e) {
+      console.warn('[db-native] setEncryptionSecret failed:', e?.message);
+      throw e;
+    }
+  }
+}
+
+async function _emergencyResetDb() {
+  console.warn('[db-native] Emergency reset: wiping DB + secret state');
+  await _closeAny();
+  try { await sqlite.deleteDatabase(DB_NAME); } catch {}
+  try { await CapacitorSQLite.clearEncryptionSecret(); } catch {}
+  localStorage.removeItem('nt:db_encrypted');
+  localStorage.removeItem('nt:db_secret');
+  localStorage.removeItem('nt:db_encryption_pending');
+}
+
 async function _open() {
   console.log('[db-native] Opening SQLite database...');
   try {
-    // Set the encryption secret unconditionally — needed for both opening an
-    // already-encrypted DB and creating a new encrypted one after migration.
     const secret = _getOrCreateSecret();
-    try {
-      await CapacitorSQLite.setEncryptionSecret({ passphrase: secret });
-    } catch (e) {
-      // setEncryptionSecret throws if a secret is already set this session — that's fine.
-    }
+    await _ensureSecretSet(secret);
 
     // Already-migrated devices: open encrypted directly. Marker is set after
     // a successful encrypted open so we never get stuck mid-migration.
     if (localStorage.getItem('nt:db_encrypted') === '1') {
-      const db = await _openEncrypted();
-      console.log('[db-native] SQLite (encrypted) ready');
-      return db;
+      try {
+        const db = await _openEncrypted();
+        console.log('[db-native] SQLite (encrypted) ready');
+        return db;
+      } catch (openErr) {
+        // Decrypt failed — likely passphrase mismatch (plugin secure store and
+        // localStorage drifted). On a server-connected install the local DB is
+        // just a cache, so the safe recovery is to wipe and re-sync. Local-only
+        // installs should NOT auto-wipe — user data is on the device only.
+        console.error('[db-native] Encrypted open failed:', openErr?.message);
+        const { getServerUrl } = await import('./platform.js');
+        const isServerConnected = !!getServerUrl();
+        if (!isServerConnected) {
+          throw new Error(`Local database can't be decrypted. To recover, restore from a Local Backup. (${openErr?.message || openErr})`);
+        }
+        console.warn('[db-native] Auto-recovering: server-connected device, will re-sync after wipe');
+        await _emergencyResetDb();
+        // Re-derive a fresh secret + reopen as if fresh install
+        const newSecret = _getOrCreateSecret();
+        await _ensureSecretSet(newSecret);
+        const db = await _openEncrypted();
+        localStorage.setItem('nt:db_encrypted', '1');
+        console.log('[db-native] SQLite (encrypted, recovered) ready — server sync will repopulate');
+        return db;
+      }
     }
 
     // Migration window. Three cases:

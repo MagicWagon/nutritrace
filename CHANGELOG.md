@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.22-beta] — 2026-04-25 — Encryption open auto-recovery
+
+### Fixed
+- **SQLCipher decrypt failure auto-recovery** — v0.39.20 called `setEncryptionSecret` on every launch. The plugin's secure-store semantics in @capacitor-community/sqlite v8 don't reliably re-bind the passphrase to existing encrypted files when called twice; some devices got "file is not a database (26)" on the second launch.
+- New behavior:
+  1. Use `isSecretStored()` to check if the plugin secure store already has a passphrase. Only call `setEncryptionSecret` on first setup. Eliminates the re-binding bug.
+  2. If the encrypted open still fails (e.g., the secret in the secure store and localStorage have drifted on an older install), auto-recover on **server-connected** devices: clear secret + DB, re-derive a fresh passphrase, recreate the DB, let server sync repopulate. **Local-only** devices fail loudly with a recovery message instead of wiping data.
+- New `_emergencyResetDb()` helper for the recovery path; calls `clearEncryptionSecret()` + `deleteDatabase()` + clears localStorage markers.
+
+---
+
 ## [0.39.21-beta] — 2026-04-25 — Final audit cleanup
 
 ### Security
