@@ -3,7 +3,7 @@
  *
  * Wraps console.{log,info,warn,error,debug} so everything that goes to the
  * browser console is also captured in a buffer the user can view + copy
- * via Settings → Help Improve → View diagnostic logs.
+ * via Settings → Diagnostics → View diagnostic logs.
  *
  * Buffer is 500 lines (a few minutes of normal activity), small enough to
  * fit in a clipboard. No PII filtering — the user is the one viewing it
