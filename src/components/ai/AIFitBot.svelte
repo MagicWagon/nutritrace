@@ -37,7 +37,7 @@
   let aiEnvLocked = false;
 
   // Settings — refreshed each time panel opens
-  let assistantName = 'FitBot';
+  let assistantName = 'Trace';
   let apiKey        = '';
 
   $: if (panelOpen) {
@@ -1001,7 +1001,7 @@ Water: ${ctx.waterText}`
     const provider = aiProvider.get() || 'claude';
     const model    = aiModel.get()    || undefined;
 
-    if (!aiEnvLocked && !key) { showError('Add your API key in Settings → FitBot AI'); return; }
+    if (!aiEnvLocked && !key) { showError('Add your API key in Settings → AI Assistant'); return; }
 
     const image = attachedImage;
     const userMsg = { role: 'user', content: content || '(image)', time: fmtTime(), image: image?.preview };
@@ -1129,7 +1129,7 @@ Water: ${ctx.waterText}`
     role="button"
     tabindex="0"
     aria-label={recordingMode ? (cancelPreview ? 'Release to cancel' : 'Recording — release to log') : 'Open AI coach (hold to dictate food)'}
-    title={$quickLogEnabled ? 'Tap to chat · hold to log food by voice' : 'FitBot AI'}
+    title={$quickLogEnabled ? 'Tap to chat · hold to log food by voice' : 'AI Assistant'}
   >
     {#if loading}
       <div class="fab-spinner"></div>
@@ -1212,7 +1212,7 @@ Water: ${ctx.waterText}`
           <div class="ai-setup">
             <span class="material-symbols-rounded ai-setup-icon">key</span>
             <p class="ai-setup-title">API key required</p>
-            <p class="ai-setup-desc">Add your AI provider key in <strong>Settings → FitBot AI</strong> to start chatting.</p>
+            <p class="ai-setup-desc">Add your AI provider key in <strong>Settings → AI Assistant</strong> to start chatting.</p>
             <p class="ai-setup-desc" style="margin-top:4px">Supports Anthropic Claude, OpenAI, and Google Gemini.</p>
             <a href="#/settings" class="btn btn-primary" style="margin-top:16px" on:click={() => panelOpen = false}>
               Open Settings

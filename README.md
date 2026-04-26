@@ -58,10 +58,10 @@ NutriTrace runs entirely in a single Docker container on your own hardware. No a
 - All data is scoped per user
 - Configurable session timeout
 
-### AI Assistant (FitBot)
+### AI Assistant (Trace)
 - Optional AI chat assistant for nutrition questions and logging help
 - Supports Claude (Anthropic), OpenAI, and Google Gemini — bring your own API key
-- Tool use across all providers: FitBot can query your real diary (with day notes + per-item notes), saved meals/recipes library, wellness metrics, body composition, workouts, and goals — no hallucinated numbers
+- Tool use across all providers: Trace can query your real diary (with day notes + per-item notes), saved meals/recipes library, wellness metrics, body composition, workouts, and goals — no hallucinated numbers
 - Optional Goal Insights mode: proactive analysis of actual intake vs targets with evidence-based suggestions
 
 ### Backup & Restore
@@ -77,15 +77,15 @@ NutriTrace runs entirely in a single Docker container on your own hardware. No a
 
 ## Smart Log — voice + AI food logging
 
-Smart Log is an experimental feature that lets you log food by **pressing and holding the FitBot button** on any page and saying what you ate. The AI parses your sentence and matches each item against your saved foods, meals, recipes, or yesterday's diary.
+Smart Log is an experimental feature that lets you log food by **pressing and holding the Trace button** on any page and saying what you ate. The AI parses your sentence and matches each item against your saved foods, meals, recipes, or yesterday's diary.
 
 ### Setup
-1. Settings → AI Assistant → enable **FitBot AI** and configure a provider key (Claude, OpenAI, or Gemini).
+1. Settings → AI Assistant → enable the assistant and configure a provider key (Claude, OpenAI, or Gemini).
 2. In the same section, enable the **Smart Log** toggle (Experimental).
 3. Grant microphone permission the first time you use it.
 
 ### How to use it
-- **Press and hold** the FitBot floating button (any page) for ~½ second.
+- **Press and hold** the Trace floating button (any page) for ~½ second.
 - The robot face morphs to a microphone, the FAB turns red, you'll hear a short beep and feel a haptic buzz.
 - **Speak** what you ate.
 - **Release** the button to commit. Slide your finger off the FAB before releasing to **cancel**.
@@ -216,10 +216,10 @@ On first launch, a setup wizard walks you through enabling user management and c
 | `SMTP_USER` | No | — | SMTP username |
 | `SMTP_PASS` | No | — | SMTP password |
 | `SMTP_FROM` | No | — | From address, e.g. `NutriTrace <noreply@example.com>` |
-| `AI_PROVIDER` | No | — | Lock FitBot to a specific provider for all users: `claude` \| `openai` \| `gemini` |
+| `AI_PROVIDER` | No | — | Lock Trace to a specific provider for all users: `claude` \| `openai` \| `gemini` |
 | `AI_API_KEY` | No | — | Shared AI API key. Key is server-side only — never sent to the browser. |
 | `AI_MODEL` | No | provider default | Override the AI model (e.g. `claude-haiku-4-5-20251001`) |
-| `AI_ENABLED` | No | — | Set to `true` to auto-enable FitBot for all users |
+| `AI_ENABLED` | No | — | Set to `true` to auto-enable Trace for all users |
 
 SMTP and AI settings can also be configured in the Settings UI. Environment variables take priority over UI values and lock those fields for all users.
 

@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.34-beta] — 2026-04-26 — AI Assistant rename + Wizard skip + diagnostic logs Share
+
+### Changed
+- **AI Assistant default name "FitBot" → "Trace"** — ties to the broader brand (TraceApps + NutriTrace + "Trace Every Bite") and drops the dated "[X]Bot" pattern. Existing users on the literal default ("FitBot") get auto-migrated to "Trace" in `App.svelte`. Users who picked their own custom name keep it. The setting label is "Assistant name" — change to anything you like in Settings → AI Assistant.
+- **Wizard "I'll do this later" skip link** added to the welcome step. Confirmation modal explains "calorie targets won't be calculated automatically" and that Settings can finish setup any time. Link is hidden when forced account creation is required (multi-user mode setup).
+- **Bedtime reminder sub-controls now slide in/out** when toggled — was abrupt show/hide. Wrapped the `_notifBedtime` and `_notifBedtimeWindDown` conditional bodies in `transition:slide` divs.
+- **Diagnostic logs viewer adds a Share button** next to Copy/Clear (borrowed from LiftTrace). On native uses `@capacitor/share` to open the Android share sheet (Gmail, Files, Drive, etc.); on PWA uses Web Share API; falls back to clipboard. Lets users send logs straight from the app to their email or a GitHub issue without manual paste-juggling.
+
+### Notes
+- All user-facing "FitBot" strings in source + docs are now "Trace" or "AI Assistant" depending on context. Internal symbol names (`AIFitBot.svelte`, `FitBotFace.svelte`, `__fitbotHoldRec`) stay as-is — they're invisible to users and renaming would churn imports.
+
+---
+
 ## [0.39.33-beta] — 2026-04-26 — Settings audit cleanup (round 2)
 
 ### Removed (legacy)

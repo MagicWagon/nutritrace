@@ -13,12 +13,12 @@
 
   function set(key, value) { DB.setSetting(key, value); scheduleSave(key, value); }
 
-  // ── FitBot AI state ──────────────────────────────────────────────────────────
+  // ── AI Assistant state ───────────────────────────────────────────────────────
   let aiEnabledVal       = DB.getSetting('aiEnabled',       false);
   let aiProviderVal      = DB.getSetting('aiProvider',      'claude');
   let aiApiKeyVal        = DB.getSetting('aiApiKey',        '');
   let aiModelVal         = DB.getSetting('aiModel',         '');
-  let aiAssistantNameVal = DB.getSetting('aiAssistantName', 'FitBot');
+  let aiAssistantNameVal = DB.getSetting('aiAssistantName', 'Trace');
   let quickLogEnabledVal = DB.getSetting('quickLogEnabled', false);
   let aiShowKey          = false;
   let aiKeySaved         = false;
@@ -52,7 +52,7 @@
   <div class="card settings-card">
     <div class="setting-row">
       <div>
-        <span class="setting-label">Enable FitBot AI</span>
+        <span class="setting-label">Enable AI Assistant</span>
         <div class="setting-desc">Adds a floating chat button to all pages</div>
       </div>
       <Toggle checked={aiEnabledVal} on:change={e => aiEnabledVal = e.detail} disabled={envLocks.ai} />
@@ -63,7 +63,7 @@
       <div class="setting-row">
         <span class="setting-label">Assistant name</span>
         <input class="input" style="width:130px;text-align:right"
-          placeholder="FitBot"
+          placeholder="Trace"
           bind:value={aiAssistantNameVal} />
       </div>
 
@@ -98,7 +98,7 @@
             Smart Log
             <span class="labs-badge" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);vertical-align:middle">Experimental</span>
           </span>
-          <div class="setting-desc">Hold the FitBot button, speak what you ate — AI parses the items and meal slot, matches your food database, then confirms before saving</div>
+          <div class="setting-desc">Hold the assistant button, speak what you ate — AI parses the items and meal slot, matches your food database, then confirms before saving</div>
         </div>
         <Toggle checked={quickLogEnabledVal} on:change={e => quickLogEnabledVal = e.detail} />
       </div>
@@ -125,7 +125,7 @@
           <span class="setting-label">Goal Insights
             <span class="labs-badge" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);vertical-align:middle">Experimental</span>
           </span>
-          <div class="setting-desc">FitBot analyzes your intake trends and proactively suggests goal adjustments when patterns are consistent</div>
+          <div class="setting-desc">The assistant analyzes your intake trends and proactively suggests goal adjustments when patterns are consistent</div>
         </div>
         <Toggle checked={$aiGoalInsights} on:change={e => aiGoalInsights.set(e.detail)} />
       </div>

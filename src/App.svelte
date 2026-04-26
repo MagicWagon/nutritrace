@@ -253,9 +253,13 @@
       setInterval(_refreshSettings, 30000); // every 30 seconds
     }
 
-    // Migrate assistant name: 'Buddy' → 'FitBot'
-    if (DB.getSetting('aiAssistantName', null) === 'Buddy') {
-      DB.setSetting('aiAssistantName', 'FitBot');
+    // Migrate assistant name: legacy 'Buddy' / 'FitBot' defaults → 'Trace'.
+    // Users who set their own custom name keep it.
+    {
+      const _curName = DB.getSetting('aiAssistantName', null);
+      if (_curName === 'Buddy' || _curName === 'FitBot') {
+        DB.setSetting('aiAssistantName', 'Trace');
+      }
     }
 
     // Migrate water containers: replace old defaults with current ones

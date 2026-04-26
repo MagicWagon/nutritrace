@@ -511,7 +511,17 @@ export const aiEnabled       = createSettingStore('aiEnabled',       false);
 export const aiProvider      = createSettingStore('aiProvider',      'claude');
 export const aiApiKey        = createSettingStore('aiApiKey',        '');
 export const aiModel         = createSettingStore('aiModel',         '');
-export const aiAssistantName = createSettingStore('aiAssistantName', 'FitBot');
+export const aiAssistantName = createSettingStore('aiAssistantName', 'Trace');
+
+// One-time migration: existing installs that never customized the assistant
+// name end up with 'FitBot' (the old default). Bump those to 'Trace' so the
+// rename is visible without manual action. Users who picked their own name
+// (anything other than literal 'FitBot') are left alone.
+try {
+  if (DB.getSetting('aiAssistantName', null) === 'FitBot') {
+    DB.setSetting('aiAssistantName', 'Trace');
+  }
+} catch {}
 // Quick Log — natural-language food entry powered by FitBot's AI provider.
 // Off by default (experimental). Only usable when aiEnabled is true.
 export const quickLogEnabled  = createSettingStore('quickLogEnabled',  false);

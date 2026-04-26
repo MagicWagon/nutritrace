@@ -79,6 +79,7 @@
 
   // Which cards are collapsed/skipped
   let intSkipped = { off: false, usda: false, mealie: false, ai: false };
+  let skipSetupConfirm = false; // confirmation modal for "I'll do this later"
 
   // ── Notifications step ────────────────────────────────────────────────────
   let notifEnabled   = false;
@@ -460,6 +461,11 @@
           <div class="logo-icon">🥗</div>
           <h1 class="step-title">Welcome to NutriTrace</h1>
           <p class="step-desc">Your personal nutrition tracker. Let's get you set up in about a minute.</p>
+          {#if !(_forceAccountCreation && !$userMgmtActive)}
+            <button type="button" class="skip-setup-link" on:click={() => skipSetupConfirm = true}>
+              I'll do this later
+            </button>
+          {/if}
         </div>
 
       <!-- ── Units ── -->
@@ -687,7 +693,7 @@
           { k: 'off',    label: 'Open Food Facts', on: !intSkipped.off    && !!(intOFFUser.trim() || intOFFPass.trim()) },
           { k: 'usda',   label: 'USDA',            on: !intSkipped.usda   && !!intUSDARKey.trim() },
           { k: 'mealie', label: 'Mealie',          on: !intSkipped.mealie && !!(intMealieUrl.trim() || intMealieToken.trim()) },
-          { k: 'ai',     label: 'FitBot AI',       on: !intSkipped.ai     && (intAILocked || !!intAIKey.trim()) },
+          { k: 'ai',     label: 'AI Assistant',    on: !intSkipped.ai     && (intAILocked || !!intAIKey.trim()) },
         ]}
         {@const _configured = _intCfg.filter(x => x.on).map(x => x.label)}
         {@const _skipped    = _intCfg.filter(x => !x.on).map(x => x.label)}
@@ -833,6 +839,21 @@
   </div>
 </div>
 
+{#if skipSetupConfirm}
+  <div class="skip-modal-backdrop" on:click|self={() => skipSetupConfirm = false}>
+    <div class="skip-modal" on:click|stopPropagation>
+      <h3 class="skip-modal-title">Skip setup?</h3>
+      <p class="skip-modal-desc">
+        You can set up your goals, units, and integrations any time from <strong>Settings</strong>. Until then, calorie targets won't be calculated automatically.
+      </p>
+      <div class="skip-modal-actions">
+        <button class="btn btn-secondary" on:click={() => skipSetupConfirm = false}>Continue setup</button>
+        <button class="btn btn-primary" on:click={() => { skipSetupConfirm = false; skip(); }}>Skip for now</button>
+      </div>
+    </div>
+  </div>
+{/if}
+
 <style>
   .wizard-shell {
     min-height: 100dvh;
@@ -866,6 +887,30 @@
   .hero-icon { font-size: 48px; color: var(--accent); }
   .step-title { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
   .step-desc  { font-size: 16px; color: var(--text-2); line-height: 1.6; max-width: 320px; }
+
+  .skip-setup-link {
+    margin-top: 24px;
+    background: none; border: none; cursor: pointer;
+    color: var(--text-3); font-size: 14px; text-decoration: underline;
+    padding: 8px 16px;
+  }
+  .skip-setup-link:hover { color: var(--text-2); }
+
+  .skip-modal-backdrop {
+    position: fixed; inset: 0; z-index: 1000;
+    background: rgba(0,0,0,0.5); display: flex;
+    align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  .skip-modal {
+    background: var(--surface-1); border-radius: var(--radius-lg);
+    padding: 24px; max-width: 360px; width: 100%;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .skip-modal-title { font-size: 18px; font-weight: 600; margin: 0; }
+  .skip-modal-desc  { font-size: 14px; color: var(--text-2); line-height: 1.5; margin: 0; }
+  .skip-modal-actions { display: flex; gap: 8px; margin-top: 8px; }
+  .skip-modal-actions .btn { flex: 1; }
 
   /* User management toggle */
   .toggle-row {

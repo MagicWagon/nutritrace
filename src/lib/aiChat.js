@@ -89,7 +89,7 @@ export const TOOLS = [
 // ── Main entry point ─────────────────────────────────────────────────────────
 
 export async function callAI({ provider, apiKey, model, messages, systemPrompt, tools, onToolCall }) {
-  if (!apiKey) throw new Error('No API key configured. Add one in Settings → FitBot AI.');
+  if (!apiKey) throw new Error('No API key configured. Add one in Settings → AI Assistant.');
   switch (provider) {
     case 'claude':  return _callClaudeWithTools(apiKey, model, messages, systemPrompt, tools, onToolCall);
     case 'openai':  return _callOpenAIWithTools(apiKey, model, messages, systemPrompt, tools, onToolCall);

@@ -908,6 +908,24 @@
       showError('Copy failed — select the text manually');
     }
   }
+  async function _shareLogs() {
+    try {
+      if (isNative) {
+        const { Share } = await import('@capacitor/share');
+        await Share.share({
+          title: 'NutriTrace diagnostic logs',
+          text: _logsText,
+          dialogTitle: 'Share NutriTrace logs',
+        });
+      } else if (typeof navigator !== 'undefined' && navigator.share) {
+        await navigator.share({ title: 'NutriTrace diagnostic logs', text: _logsText });
+      } else {
+        await _copyLogs();
+      }
+    } catch (e) {
+      // User cancelled — silent.
+    }
+  }
   function _clearLogs() {
     clearLogBuffer();
     _logsText = '(cleared)';
@@ -2422,6 +2440,9 @@
         {:else}
           <span class="material-symbols-rounded" style="font-size:16px">content_copy</span> Copy
         {/if}
+      </button>
+      <button class="btn btn-secondary" style="flex:1;height:40px;font-size:13px" on:click={_shareLogs}>
+        <span class="material-symbols-rounded" style="font-size:16px">share</span> Share
       </button>
       <button class="btn btn-secondary" style="flex:1;height:40px;font-size:13px" on:click={_clearLogs}>
         <span class="material-symbols-rounded" style="font-size:16px">delete</span> Clear

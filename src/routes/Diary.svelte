@@ -245,7 +245,7 @@
     push('/foods?pick=1&meal=' + mealIdx + '&date=' + $currentDate);
   }
 
-  // Smart Log entry point lives on the FitBot FAB (hold-to-record). Diary
+  // Smart Log entry point lives on the assistant FAB (hold-to-record). Diary
   // refreshes automatically via the global 'wl:setting' / sync events when
   // the modal saves new items. No local Smart Log state needed here.
 
@@ -1303,7 +1303,7 @@
   {/if}
 </Sheet>
 
-<!-- Smart Log lives on the FitBot FAB (hold to dictate) — see AIFitBot.svelte -->
+<!-- Smart Log lives on the assistant FAB (hold to dictate) — see AIFitBot.svelte -->
 
 
 <!-- Delete confirm dialog -->

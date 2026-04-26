@@ -231,7 +231,7 @@ async function pullChanges() {
     await dbUpsertWorkoutFromServer(w);
   }
 
-  // Chat history — pull only, notify the FitBot component via event
+  // Chat history — pull only, notify the AI Assistant component via event
   const newChat = data.chat_history || [];
   if (newChat.length && typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('nt:chat-updated', { detail: { messages: newChat } }));

@@ -83,7 +83,7 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
 
 ### ~~Meal-level macro summary~~ *(done — per-meal P/C/F bar + text)*
 
-### ~~Quick-log (voice / text)~~ *(done — Smart Log v3, hold FitBot button; water logging added v0.38.2-beta)*
+### ~~Quick-log (voice / text)~~ *(done — Smart Log v3, hold Trace button; water logging added v0.38.2-beta)*
 
 ### ~~Dynamic Calorie Goal~~ *(done — v0.38.3-beta, Experimental)*
 - ~~Fixed (current, default) vs Dynamic (device calories_out × factor)~~
@@ -134,12 +134,12 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
 
 ---
 
-## AI Assistant (FitBot)
+## AI Assistant (Trace)
 
-### Food photo logging via FitBot chat
-- User attaches a photo of a meal in the FitBot chat; Claude/GPT-4o vision identifies foods and estimates portions
+### Food photo logging via Trace chat
+- User attaches a photo of a meal in the Trace chat; Claude/GPT-4o vision identifies foods and estimates portions
 - Gap: AI currently responds in plain text — intercept a vision response that looks like a food list, pipe it into the Smart Log matcher, and open the Smart Log review modal for confirmation before adding to diary
-- Reuses existing Smart Log infra; no new UI needed beyond what FitBot chat already supports
+- Reuses existing Smart Log infra; no new UI needed beyond what Trace chat already supports
 
 ---
 
@@ -240,4 +240,4 @@ Sync model going forward: develop in `nutritrace-dev` as today, then ship releas
 
 ---
 
-*Last updated: 2026-04-19 (added: FitBot food photo logging, fuzzy search, empty-state polish, sync error visibility, Settings split, Statistics dynamic goal line, bundle splitting)*
+*Last updated: 2026-04-19 (added: Trace food photo logging, fuzzy search, empty-state polish, sync error visibility, Settings split, Statistics dynamic goal line, bundle splitting)*

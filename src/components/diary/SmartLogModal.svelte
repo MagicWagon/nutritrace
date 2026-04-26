@@ -1,5 +1,5 @@
 <!--
-  Smart Log modal — natural-language food logging via FitBot AI.
+  Smart Log modal — natural-language food logging via the AI Assistant.
 
   Voice input:
     - Native (Capacitor): @capacitor-community/speech-recognition (Android system recognizer)

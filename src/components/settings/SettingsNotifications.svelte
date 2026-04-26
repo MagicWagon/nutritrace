@@ -275,6 +275,7 @@
         <Toggle checked={_notifBedtime} on:change={e => { _notifBedtime = e.detail; set('notifBedtime', e.detail); }} />
       </div>
       {#if _notifBedtime}
+       <div transition:slide={{ duration: 160 }}>
         <div class="setting-divider"></div>
         <div class="setting-row">
           <span class="setting-label">Bedtime</span>
@@ -289,6 +290,7 @@
           <Toggle checked={_notifBedtimeWindDown} on:change={e => { _notifBedtimeWindDown = e.detail; set('notifBedtimeWindDown', e.detail); }} />
         </div>
         {#if _notifBedtimeWindDown}
+          <div transition:slide={{ duration: 160 }}>
           <div class="setting-divider"></div>
           <div class="setting-row">
             <span class="setting-label">Minutes Before</span>
@@ -302,6 +304,7 @@
               </select>
             </div>
           </div>
+          </div>
         {/if}
         <div class="setting-divider"></div>
         <div class="setting-row">
@@ -311,6 +314,7 @@
           </div>
           <Toggle checked={_notifBedtimeSmart} on:change={e => { _notifBedtimeSmart = e.detail; set('notifBedtimeSmart', e.detail); }} />
         </div>
+       </div>
       {/if}
     </div>
 
