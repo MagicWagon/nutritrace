@@ -8,9 +8,11 @@
 import { isNative } from './platform.js';
 import { LocalNotifications } from '@capacitor/local-notifications';
 
-// Verbose notification logs are gated on dev — production users don't need
-// "[notifications] checking..." spam every minute.
-const _dlog = import.meta.env.DEV ? console.log : () => {};
+// Verbose notification logs gated on dev OR opt-in verbose mode
+// (Settings → Help Improve → Verbose diagnostic logging).
+const _dlog = import.meta.env.DEV
+  ? console.log
+  : (...a) => { try { if (localStorage.getItem('nt:verboseLogging') === '1') console.log(...a); } catch {} };
 
 function _getLN() {
   if (!isNative) return null;

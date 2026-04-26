@@ -5,6 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.31-beta] — 2026-04-26 — In-app diagnostic logs
+
+### Added
+- **In-app log capture** — `src/lib/log-capture.js` wraps `console.{log,info,warn,error,debug}` into a 500-line in-memory ring buffer, captured from app boot. Includes uncaught errors and unhandled promise rejections automatically.
+- **Settings → Help Improve NutriTrace → View diagnostic logs** — opens a sheet with the buffer contents, plus Copy and Clear buttons. User pastes into a GitHub issue when filing a bug. Nothing leaves the device automatically.
+- **Verbose diagnostic logging toggle** in the same Settings section — turns ON the high-detail `_dlog` calls in `sync.js`, `notifications.js`, `health-connect.js`, and the settings store (these were dev-build-only before). Off by default. Ideal flow: turn on → reproduce the bug → View logs → Copy → file issue → turn off.
+
+### Changed
+- The dev-only `_dlog` helpers across the client now also activate when `localStorage.nt:verboseLogging === '1'` in production builds. Same gating, just adds an opt-in path.
+
+---
+
 ## [0.39.30-beta] — 2026-04-26
 
 ### Added

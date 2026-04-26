@@ -9,8 +9,11 @@
 
 import { getServerUrl, getAuthToken, loadImageMap } from './platform.js';
 
-// Verbose sync logs are gated on dev — production users don't need a console wall of "[sync] pushed X..."
-const _dlog = import.meta.env.DEV ? console.log : () => {};
+// Verbose sync logs are gated on dev OR opt-in verbose mode
+// (Settings → Help Improve → Verbose diagnostic logging).
+const _dlog = import.meta.env.DEV
+  ? console.log
+  : (...a) => { try { if (localStorage.getItem('nt:verboseLogging') === '1') console.log(...a); } catch {} };
 import {
   dbGetPendingChanges, dbMarkSynced, dbSetServerId,
   dbGetSyncMeta, dbSetSyncMeta,

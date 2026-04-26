@@ -20,7 +20,10 @@
  * EXPERIMENTAL — labeled as such in Settings.
  */
 
-const _dlog = import.meta.env.DEV ? console.log : () => {};
+// Gated on dev OR opt-in verbose mode (Settings → Help Improve → Verbose diagnostic logging).
+const _dlog = import.meta.env.DEV
+  ? console.log
+  : (...a) => { try { if (localStorage.getItem('nt:verboseLogging') === '1') console.log(...a); } catch {} };
 
 import { isNative } from './platform.js';
 import { HealthConnect } from '@devmaxime/capacitor-health-connect';

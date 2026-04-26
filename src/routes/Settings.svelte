@@ -3,6 +3,7 @@
   import { get } from 'svelte/store';
   import { slide, fade } from 'svelte/transition';
   import { portal } from '../lib/portal.js';
+  import { getLogBufferText, clearLogBuffer, isVerboseLogging, setVerboseLogging } from '../lib/log-capture.js';
   import Toggle from '../components/settings/Toggle.svelte';
 
   import SettingsWellness from '../components/settings/SettingsWellness.svelte';
@@ -886,6 +887,35 @@
   // ── User Management ref ────────────────────────────────────────────────────
   let userMgmtRef;
   $: if (openSections.users && $userMgmtActive) userMgmtRef?.loadData();
+
+  // ── Help Improve: diagnostic logs ────────────────────────────────────────
+  let _logsSheet = false;
+  let _logsText = '';
+  let _logsCopied = false;
+  let _verboseLogging = isVerboseLogging();
+
+  function _openLogsSheet() {
+    _logsText = getLogBufferText() || '(no log lines captured yet)';
+    _logsCopied = false;
+    _logsSheet = true;
+  }
+  async function _copyLogs() {
+    try {
+      await navigator.clipboard.writeText(_logsText);
+      _logsCopied = true;
+      setTimeout(() => _logsCopied = false, 2000);
+    } catch (e) {
+      showError('Copy failed — select the text manually');
+    }
+  }
+  function _clearLogs() {
+    clearLogBuffer();
+    _logsText = '(cleared)';
+  }
+  function _toggleVerbose(on) {
+    _verboseLogging = on;
+    setVerboseLogging(on);
+  }
 
   // ── Help Improve: anonymized calibration export ──────────────────────────
   let _calibExportSheet = false;
@@ -2068,6 +2098,25 @@
     {#if sectionOpen(openSections, settingsQuery, 'helpImprove') && sectionVisible(settingsQuery, 'helpImprove')}
       <div class="section-body" transition:slide={{ duration: 180 }}>
         <div class="card settings-card">
+          <div class="setting-row">
+            <div>
+              <span class="setting-label">Verbose diagnostic logging</span>
+              <div class="setting-desc">Enables detailed app-internal logs (sync, settings, notifications, Health Connect). Off by default — turn on while reproducing a bug, then export below.</div>
+            </div>
+            <Toggle checked={_verboseLogging} on:change={e => _toggleVerbose(e.detail)} />
+          </div>
+          <div class="setting-divider"></div>
+          <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px">
+            <span class="setting-label">View diagnostic logs</span>
+            <p class="setting-desc" style="line-height:1.5">
+              Last 500 lines from the app's console. Useful for bug reports — copy and paste into a <a href="https://github.com/traceapps/nutritrace/issues" target="_blank" rel="noopener" class="about-link">GitHub issue</a>. The buffer holds in-memory only; nothing is sent anywhere automatically.
+            </p>
+            <button class="btn btn-secondary" style="height:40px;font-size:13px" on:click={_openLogsSheet}>
+              <span class="material-symbols-rounded" style="font-size:16px">terminal</span>
+              View logs
+            </button>
+          </div>
+          <div class="setting-divider"></div>
           <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px">
             <span class="setting-label">Share calibration data</span>
             <p class="setting-desc" style="line-height:1.5">
@@ -2303,6 +2352,28 @@
       </div>
     </div>
     <button class="btn btn-primary w-full" on:click={addCustomNutrient}>Add Nutrient</button>
+  </div>
+</Sheet>
+
+<!-- Diagnostic logs viewer -->
+<Sheet bind:open={_logsSheet} title="Diagnostic Logs">
+  <div style="padding:0 4px 8px">
+    <p class="setting-desc" style="line-height:1.5;margin-bottom:10px">
+      Last 500 lines captured. Copy and paste into a bug report. <strong>Redact</strong> any HRV / RHR / weight / calorie values before posting publicly — they're personal health data.
+    </p>
+    <textarea readonly style="width:100%;height:280px;font-family:monospace;font-size:11px;padding:8px;border:1px solid var(--border);border-radius:var(--radius-sm,6px);background:var(--surface-2);color:var(--text-1);resize:vertical;white-space:pre">{_logsText}</textarea>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn btn-primary" style="flex:1;height:40px;font-size:13px" on:click={_copyLogs}>
+        {#if _logsCopied}
+          <span class="material-symbols-rounded" style="font-size:16px">check</span> Copied
+        {:else}
+          <span class="material-symbols-rounded" style="font-size:16px">content_copy</span> Copy
+        {/if}
+      </button>
+      <button class="btn btn-secondary" style="flex:1;height:40px;font-size:13px" on:click={_clearLogs}>
+        <span class="material-symbols-rounded" style="font-size:16px">delete</span> Clear
+      </button>
+    </div>
   </div>
 </Sheet>
 
