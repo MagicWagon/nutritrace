@@ -1,6 +1,6 @@
 # Privacy Policy — NutriTrace
 
-**Last updated:** April 19, 2026
+**Last updated:** April 26, 2026
 
 ## Overview
 
@@ -35,7 +35,7 @@ NutriTrace connects to the following external services **only when you explicitl
 - **Withings** — Body composition data via OAuth. Subject to [Withings privacy policy](https://www.withings.com/privacy).
 - **Garmin** — Activity data via OAuth. Subject to [Garmin privacy policy](https://www.garmin.com/privacy).
 - **Health Connect (Android)** — On-device health data. Data stays on your device.
-- **AI Providers (Claude/OpenAI/Gemini)** — If Trace AI is enabled, your conversation and relevant health context is sent to the AI provider you choose. Subject to their respective privacy policies. Your API key is stored on your server, not ours.
+- **AI Providers (Claude/OpenAI/Gemini)** — If the AI Assistant (Trace) is enabled, your conversation and relevant health context is sent to the AI provider you choose. Subject to their respective privacy policies. Your API key is stored on your server, not ours.
 - **Push notification services (Gotify/ntfy/Apprise)** — If configured, notification content is sent to your self-hosted push server.
 
 ## Data Retention

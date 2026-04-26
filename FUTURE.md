@@ -35,9 +35,7 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
 
 ### ~~Fitbit GPS / Activity Routes~~ *(done — TCX parsed via location OAuth scope, route map on workout detail)*
 
-### Google Health Connect (Android)
-- Android Health Connect API (REST or local SDK bridge via PWA)
-- Steps, sleep, HR from any Android wearable
+### ~~Google Health Connect (Android)~~ *(done — v0.35, see Phase 2 entry below)*
 
 ### Apple Health (iOS)
 - Requires a native iOS wrapper (WebKit `WKWebView` + Swift bridge)
@@ -91,7 +89,7 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
 - ~~Factor: 0.80 (lose) / 1.00 (maintain) / 1.20 (gain)~~
 - ~~Uses yesterday's final burn, falls back to fixed goal if no data~~
 - ~~Touchpoints: diary bar (dynamic pill), goals page (badge + annotation)~~
-- Statistics goal line integration (uses fixed goal for now — future enhancement)
+- ~~Statistics goal line integration~~ *(done — v0.39.11, labeled "Base Goal" when dynamic mode is on)*
 
 ### Adaptive TDEE
 - Learn actual TDEE by correlating weight trends with calorie intake over 35+ days
@@ -102,10 +100,7 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
 
 ## Foods / Nutrition
 
-### Fuzzy food search
-- Current search requires exact substring match; typos and partial words miss results
-- Replace with fuzzy matching (e.g. Fuse.js or server-side trigram search) so "chiken" finds "Chicken Breast"
-- Apply across local foods, meals, and recipes; no toggle needed — degrades silently to current behavior
+### ~~Fuzzy food search~~ *(done — v0.39.11, `_fuzzyMatch` + `_editDist` in Foods.svelte: exact substring → word-by-word → edit-distance ≤1 for words ≥4 chars; covers local foods, meals, recipes)*
 
 ### Nutrient calculator overlay
 - Select two foods → side-by-side comparison panel
@@ -136,19 +131,28 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
 
 ## AI Assistant (Trace)
 
-### Food photo logging via Trace chat
-- User attaches a photo of a meal in the Trace chat; Claude/GPT-4o vision identifies foods and estimates portions
-- Gap: AI currently responds in plain text — intercept a vision response that looks like a food list, pipe it into the Smart Log matcher, and open the Smart Log review modal for confirmation before adding to diary
-- Reuses existing Smart Log infra; no new UI needed beyond what Trace chat already supports
+### Food photo logging via Trace chat — auto-pipe to Smart Log
+- *Image attachments to Trace chat already shipped* — users can attach a meal photo and Claude/GPT-4o vision identifies foods + estimates portions in plain text reply.
+- **Still pending:** intercept a vision response that looks like a food list, pipe it into the Smart Log matcher, and open the Smart Log review modal for confirmation before adding to diary. Reuses existing Smart Log infra; no new UI needed beyond what Trace chat already supports.
+
+### Local / self-hosted LLM support (post-1.0, high priority)
+Add a generic **OpenAI-compatible** provider option in `src/lib/aiChat.js` that accepts a custom base URL + model name (no API key required). Covers Ollama, LocalAI, LM Studio, vLLM, llama.cpp's server, and anything else exposing the OpenAI `/v1/chat/completions` schema in one shot — don't hardcode "Ollama" specifically.
+
+Why it matters: closes the privacy story. PRIVACY.md currently has to say "your conversation goes to Claude/OpenAI/Gemini." With a local LLM enabled, *nothing leaves the user's network*. The self-hosted-nutrition-tracker audience overlaps heavily with the homelab/self-hosted-LLM crowd, so this reads as a feature, not a hassle.
+
+Implementation notes / caveats to document:
+- **Tool-use reliability varies by model.** The existing AI Assistant uses tool calls heavily (`get_diary`, `get_wellness_data`, etc.). Llama 3.1+ and Mistral handle them reasonably; smaller / older models silently break tool calls.
+- Either gate Goal Insights + Smart Log behind a "model supports tools?" capability detection that falls back to text-only, OR document which local models we've verified and warn in Settings.
+- Vision (food-photo logging) requires a multimodal local model — even more model-dependent. Keep image attachments hidden for local provider unless model is known multimodal.
+- Set expectations honestly in the Settings UI: "Local models trade convenience for privacy — quality and tool reliability vary by model."
+
+When this ships, update PRIVACY.md "Third-Party Services" entry for AI Providers to note the local-LLM option ("if configured, your conversation never leaves your network").
 
 ---
 
 ## UI / UX Polish
 
-### Empty-state polish
-- Diary, Foods, Statistics, and Wellness pages show a generic empty list when there's no data
-- Add contextual empty states with a short message and a relevant action (e.g. "No foods yet — tap + to add your first" on Foods; "No data for this date" on Diary)
-- No toggle needed — better UX unconditionally when empty
+### ~~Empty-state polish~~ *(done — contextual empty states across Diary, Foods, Goals, Wellness, MealEditor, Settings; Foods + Statistics empty-state messages added v0.39.11)*
 
 ### Error visibility / sync status
 - Sync errors (failed server push, offline, conflict) are silent — no user-visible feedback
@@ -169,17 +173,11 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
 
 ## Code / Performance
 
-### Settings.svelte split
-- Settings.svelte is ~3,000 lines; split remaining sections into sub-components (pattern already established with SettingsWellness.svelte)
-- Pure maintenance — no UX change, just makes the file faster to work in
+### ~~Settings.svelte split~~ *(done — v0.39.11, 5 sub-components: SettingsWellness, SettingsTrace, SettingsNotifications, SettingsUserManagement, SettingsBackup. Settings.svelte dropped to ~1700 lines as a thin orchestrator)*
 
-### Statistics dynamic goal line
-- Statistics charts show a fixed calorie goal line even when Dynamic Calorie Goal is enabled
-- Fix: pull the per-day dynamic value when drawing the goal overlay so the line reflects actual adaptive targets
+### ~~Statistics dynamic goal line~~ *(done — v0.39.11, see Diary Enhancements → Dynamic Calorie Goal entry above)*
 
-### Bundle code splitting
-- Main JS bundle is large; initial load on slow connections is noticeable
-- Dynamic imports for heavy rarely-used sections (Statistics charts, full Settings) would cut initial parse time
+### ~~Bundle code splitting~~ *(done — v0.39.11, `manualChunks` in vite.config.js splits chart.js, jszip, emoji-picker-element into separate async chunks loaded on demand)*
 
 ---
 
@@ -218,8 +216,10 @@ Items to land before flipping `traceapps/nutritrace` public and submitting to Pl
 
 - **Android network security lockdown** — `android/app/src/main/res/xml/network_security_config.xml` currently allows cleartext + user-installed CAs in production. Restructure to `<base-config cleartextTrafficPermitted="false">` (locked down for Play Store release builds) + `<debug-overrides>` keeping cleartext + user CAs (for sideloaded debug APKs). Document the HTTPS expectation for Play Store users in 3 places: README Android section, DEPLOY.md "Connecting from Android" subsection, and in-app error message when Play Store build hits an HTTP server.
 - **Native SQLite encryption (revisit)** — `@capacitor-community/sqlite` v8 SQLCipher integration was rolled back in v0.39.23 because `setEncryptionSecret`'s secure-store semantics produced "state not correct" / SQLITE_NOTADB failures on subsequent launches. Defer to v1.1; investigate alternatives: (a) Android Keystore-backed key + per-row encryption in JS, (b) different SQLite plugin with stable encryption story, (c) just rely on Android's OS-level data-directory encryption (file-based encryption, default since Android 7) and document that as sufficient.
+- **Public demo instance** — host `demo.nutritrace.app` on the existing Oracle Cloud Always Free machine. Pattern (standard for self-hosted demos — Mealie, Penpot, Vikunja all do this): single shared instance, signup disabled, pre-seeded with a realistic sample week of foods/meals/diary/wellness, cron resets the DB every 6–24h. Implementation: `DEMO_MODE=1` env flag that (a) blocks signup, (b) auto-signs in as the demo user, (c) returns 503 from AI/SMTP/upload routes (don't burn API keys, don't email random addresses), (d) renders a sticky banner "DEMO — data resets daily, don't enter real info". Add `server/scripts/seed-demo.js` to wipe + reseed; cron via systemd timer on the Oracle box. Demo URL is the single biggest conversion lever for awesome-selfhosted submission and r/selfhosted launch posts — defer to just before launch so the demo shows the v1.0 surface, not a beta.
 - **Sync to public repo** — run `nutritrace-dev-sync.sh` to land latest beta in `traceapps/nutritrace`.
-- **Pre-flight scrub** — re-check for personal URLs, secrets, `.env` artifacts, personal references in comments before flipping public.
+- ~~**Pre-flight scrub**~~ *(done 2026-04-26 — full audit ran in v0.39.35-beta cycle: zero personal email/name leaks, `.env` properly gitignored, no hardcoded URLs/IPs in shipping files, all OAuth credentials user-configurable, sync script handles `thebigjoe1` → `traceapps` rewrites, Ko-fi handle migrated to `traceapps`)*
+- **Discovery push** (post-flip) — submit to awesome-selfhosted, post to r/selfhosted with screenshots/demo link, submit to selfh.st newsletter, then Show HN a few weeks later once Reddit traffic stabilizes. AlternativeTo + Umbrel/CasaOS app store listings as secondary follow-ups. Prerequisites: demo instance live, 4–5 screenshots in README, v1.0.0 tag (curated lists shy away from beta).
 
 ---
 
@@ -240,4 +240,4 @@ Sync model going forward: develop in `nutritrace-dev` as today, then ship releas
 
 ---
 
-*Last updated: 2026-04-19 (added: Trace food photo logging, fuzzy search, empty-state polish, sync error visibility, Settings split, Statistics dynamic goal line, bundle splitting)*
+*Last updated: 2026-04-26 (added: public demo instance plan on Oracle Cloud Always Free, discovery-push checklist for launch, local/self-hosted LLM support as post-1.0 high-priority; marked done: fuzzy food search, Settings split, bundle splitting, dynamic goal line, empty-state polish, Health Connect duplicate, pre-flight scrub; clarified: Food-photo Trace chat — image attachments shipped, only the auto-pipe-to-Smart-Log piece is still open)*

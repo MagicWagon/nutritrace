@@ -261,7 +261,7 @@ The database schema migrates automatically on startup.
 
 ## Wellness Integrations
 
-NutriTrace can sync data from Fitbit, Withings, and Garmin. Each requires registering a free OAuth application with the respective service and entering the credentials in **Settings → Wellness**.
+NutriTrace can sync data from Fitbit, Withings, Garmin, and Android Health Connect. Each cloud provider (Fitbit/Withings/Garmin) requires registering a free OAuth application with the respective service and entering the credentials in **Settings → Wellness**. Health Connect is on-device and needs no developer setup.
 
 ### Fitbit
 1. Go to [dev.fitbit.com](https://dev.fitbit.com) → **Register an App**
@@ -278,7 +278,10 @@ NutriTrace can sync data from Fitbit, Withings, and Garmin. Each requires regist
 ### Garmin
 Garmin Health API requires a partnership approval (not a free developer program). If you have access, set the callback URL to `https://your-nutritrace-domain.com/api/wellness/garmin/callback`.
 
-> **Note:** The callback URLs must use your public domain (not `localhost`). Both Fitbit and Withings require HTTPS.
+### Health Connect (Android)
+Reads steps, sleep, heart rate, weight, and exercise directly from the Android Health Connect API. Works in the NutriTrace Android app without any server setup — useful for users running fully local/offline. Enable in **Settings → Wellness → Health Connect** on the Android app and grant the requested permissions.
+
+> **Note:** The callback URLs for Fitbit/Withings/Garmin must use your public domain (not `localhost`). All three require HTTPS.
 
 ---
 
@@ -295,12 +298,11 @@ All external API calls are proxied server-side — no keys are exposed to the br
 ## Roadmap
 
 **Coming soon:**
-- **Android app** — works server-connected or fully local/offline, with Health Connect support. Currently in private beta; public release planned during the v1.x cycle. Distribution channels will be announced before public release.
+- **Android app** — works server-connected or fully local/offline, with Health Connect support. Currently in development and testing; public release planned during the v1.x cycle. Distribution channels will be announced before public release.
 - **Adaptive TDEE** — learn your true energy expenditure from intake + weight trend over time
-- **Cross-domain Wellness Dashboard** — correlate nutrition, sleep, activity, body composition
 
 **Future:**
-- **iOS** — pending hardware and Apple Developer account access (see Support).
+- **iOS app** — pending hardware and Apple Developer account access (see Support).
 
 ---
 
