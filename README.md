@@ -336,7 +336,7 @@ NutriTrace surfaces three derived wellness scores. Where the source device expos
 
 **Trace Sleep Score** combines sleep duration, deep / REM percentages, SpO₂, HRV, and efficiency into a single 0–100 value (formula in `server/routes/fitbit.js`). **Trace Readiness** weighs HRV against a 30-day baseline plus resting HR and last night's sleep, with an activity-spike penalty. **Trace Stress** is a 7-day-smoothed inverse of HRV + RHR + sleep (formula in `server/lib/wellness-scores.js`).
 
-The formulas are tuned against the maintainer's own Pixel Watch 4 data — readings on other devices may not match what your device's own app shows. The intent is internal consistency (your scores comparable day-to-day across whatever data sources you've connected), not 1:1 parity with Fitbit / Garmin / Withings native scores.
+These scores prioritize day-to-day consistency across whatever data sources you've connected. They're not intended to match what each device's own app shows — readings may differ from device-native scores.
 
 If a wellness integration on your device behaves wrong (missing data, weird numbers), file an [Integration Test report](https://github.com/traceapps/nutritrace/issues/new?template=integration_test_report.md) — the more devices reported, the easier it is to spot integration-specific quirks.
 
