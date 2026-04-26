@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.26-beta] — 2026-04-26
+
+### Changed
+- **Per-meal totals popup tap target** — moved from the kcal text on the meal header to the **macro footer at the bottom of each meal** (the P/C/F bar + percentages). That's the real "summary at a glance" element, so making it the tap target for the detailed breakdown is the natural fit.
+
+---
+
 ## [0.39.25-beta] — 2026-04-26
 
 ### Added

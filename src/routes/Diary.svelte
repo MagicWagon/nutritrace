@@ -876,12 +876,9 @@
           <span class="meal-type-icon material-symbols-rounded">{mealIcon(meal)}</span>
           <span class="meal-name">{meal}</span>
           {#if items.length > 0}
-            <button type="button" class="meal-kcal-btn" on:click={() => mealTotalsIdx = mealIdx}
-              aria-label="Show {meal} totals" title="Show nutrition totals">
-              <span class="meal-kcal text-3 text-sm">
-                {items.reduce((s,it) => s + formatKcal(it), 0)} kcal
-              </span>
-            </button>
+            <span class="meal-kcal text-3 text-sm">
+              {items.reduce((s,it) => s + formatKcal(it), 0)} kcal
+            </span>
           {/if}
           <button class="btn-icon ml-auto meal-menu-btn" on:click={() => openMealActionSheet(mealIdx)} aria-label="Meal actions for {meal}" title="Meal actions">
             <span class="material-symbols-rounded">more_vert</span>
@@ -946,14 +943,15 @@
         {#if $diaryShowMacroSummary && items.length > 0}
           {@const mt = getMealTotals(items)}
           {#if mt}
-            <div class="meal-macro-footer">
+            <button type="button" class="meal-macro-footer" on:click={() => mealTotalsIdx = mealIdx}
+              aria-label="Show {meal} nutrition totals" title="Show nutrition totals">
               <div class="meal-macro-bar">
                 <div class="mmb-p" style="width:{mt.p}%" title="Protein {mt.p}%"></div>
                 <div class="mmb-c" style="width:{mt.c}%" title="Carbs {mt.c}%"></div>
                 <div class="mmb-f" style="width:{mt.f}%" title="Fat {mt.f}%"></div>
               </div>
               <span class="meal-macro-text text-3 text-sm"><span style="color:var(--macro-protein)">{mt.p}% P</span> · <span style="color:var(--macro-carbs)">{mt.c}% C</span> · <span style="color:var(--macro-fat)">{mt.f}% F</span> · <span style="color:var(--macro-calories)">{mt.cal} kcal</span></span>
-            </div>
+            </button>
           {/if}
         {/if}
       </section>
@@ -1979,15 +1977,6 @@
   }
   .meal-name   { font-size: 15px; font-weight: 600; color: var(--text-1); }
   .meal-kcal   { margin-left: 4px; }
-  .meal-kcal-btn {
-    background: none; border: none; padding: 4px 8px; margin-left: -4px;
-    border-radius: var(--radius-sm, 6px);
-    cursor: pointer; color: inherit; font: inherit;
-    -webkit-tap-highlight-color: transparent;
-    transition: background 120ms;
-  }
-  .meal-kcal-btn:hover, .meal-kcal-btn:active { background: var(--surface-2); }
-  .meal-kcal-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; }
   .ml-auto     { margin-left: auto; }
   .meal-empty  {
     display: flex;
@@ -2195,7 +2184,18 @@
   .ns-row:last-child { border-bottom: none; }
 
   /* Meal macro footer */
-  .meal-macro-footer { padding: 8px 16px 10px; border-top: 1px solid var(--border); }
+  .meal-macro-footer {
+    padding: 8px 16px 10px; border-top: 1px solid var(--border);
+    width: 100%; display: block; text-align: left;
+    background: none; cursor: pointer; color: inherit; font: inherit;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 120ms;
+  }
+  .meal-macro-footer:hover, .meal-macro-footer:active { background: var(--surface-2); }
+  .meal-macro-footer:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: -2px;
+    border-radius: var(--radius-sm, 6px);
+  }
   .meal-macro-bar {
     height: 8px; border-radius: 4px;
     background: var(--surface-3); overflow: hidden;
