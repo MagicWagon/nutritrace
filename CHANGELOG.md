@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.39.25-beta] — 2026-04-26
+
+### Added
+- **Per-meal nutrition totals popup** — tap the kcal text on any meal header in Diary to open a bottom sheet with the full nutrient breakdown for that meal: 4 macro pills (Protein/Carbs/Fat/kcal) + every visible nutriment with a value, plus item count. Mirrors the day-level Nutrition Summary but scoped to one meal. Respects the user's "Show all nutrients" toggle.
+
+---
+
 ## [0.39.24-beta] — 2026-04-25 — Bulletproof DB-open recovery
 
 ### Fixed

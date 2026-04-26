@@ -286,6 +286,14 @@
     }
   }
 
+  // Per-meal nutrition totals popup (tap kcal text to open)
+  let mealTotalsIdx = null;
+  $: _mealTotalsItems = (mealTotalsIdx != null && entry?.items)
+    ? getMealItems(entry.items, mealTotalsIdx) : [];
+  $: _mealTotals = _mealTotalsItems.length
+    ? Nutrition.sum(_mealTotalsItems.map(i => Nutrition.calculate(i)))
+    : {};
+
   // Meal-level actions (⋮ on meal header)
   let showMealAction       = false;
   let actionMealIdx        = null;
@@ -868,9 +876,12 @@
           <span class="meal-type-icon material-symbols-rounded">{mealIcon(meal)}</span>
           <span class="meal-name">{meal}</span>
           {#if items.length > 0}
-            <span class="meal-kcal text-3 text-sm">
-              {items.reduce((s,it) => s + formatKcal(it), 0)} kcal
-            </span>
+            <button type="button" class="meal-kcal-btn" on:click={() => mealTotalsIdx = mealIdx}
+              aria-label="Show {meal} totals" title="Show nutrition totals">
+              <span class="meal-kcal text-3 text-sm">
+                {items.reduce((s,it) => s + formatKcal(it), 0)} kcal
+              </span>
+            </button>
           {/if}
           <button class="btn-icon ml-auto meal-menu-btn" on:click={() => openMealActionSheet(mealIdx)} aria-label="Meal actions for {meal}" title="Meal actions">
             <span class="material-symbols-rounded">more_vert</span>
@@ -1613,6 +1624,42 @@
   </div>
 {/if}
 
+<!-- Per-meal nutrition totals sheet -->
+<Sheet open={mealTotalsIdx != null} title={mealTotalsIdx != null ? `${meals[mealTotalsIdx]} totals` : ''}
+  on:close={() => mealTotalsIdx = null}>
+  <div class="ns-body">
+    <div class="ns-macros">
+      <div class="ns-macro-pill" style="background:var(--macro-protein-dim)">
+        <span class="ns-macro-val" style="color:var(--macro-protein)">{Math.round(_mealTotals.proteins || 0)}g</span>
+        <span class="ns-macro-lbl">Protein</span>
+      </div>
+      <div class="ns-macro-pill" style="background:var(--macro-carbs-dim)">
+        <span class="ns-macro-val" style="color:var(--macro-carbs)">{Math.round(_mealTotals.carbohydrates || 0)}g</span>
+        <span class="ns-macro-lbl">Carbs</span>
+      </div>
+      <div class="ns-macro-pill" style="background:var(--macro-fat-dim)">
+        <span class="ns-macro-val" style="color:var(--macro-fat)">{Math.round(_mealTotals.fat || 0)}g</span>
+        <span class="ns-macro-lbl">Fat</span>
+      </div>
+      <div class="ns-macro-pill" style="background:var(--macro-calories-dim)">
+        <span class="ns-macro-val" style="color:var(--macro-calories)">{Math.round(_mealTotals.calories || 0).toLocaleString()}</span>
+        <span class="ns-macro-lbl">kcal</span>
+      </div>
+    </div>
+    <div class="ns-rows">
+      {#each NUTRIMENTS.filter(n => ($diaryShowAllNutrients ? true : n.default) && (_mealTotals[n.id] || 0) > 0) as n}
+        <div class="ns-row">
+          <span>{n.label}</span>
+          <span class="font-medium">{(Math.round((_mealTotals[n.id]||0)*10)/10).toLocaleString()} {n.unit}</span>
+        </div>
+      {/each}
+    </div>
+    <div class="text-3 text-sm" style="text-align:center;padding:8px 0 4px">
+      {_mealTotalsItems.length} {_mealTotalsItems.length === 1 ? 'item' : 'items'}
+    </div>
+  </div>
+</Sheet>
+
 
 <style>
   /* Date picker calendar */
@@ -1932,6 +1979,15 @@
   }
   .meal-name   { font-size: 15px; font-weight: 600; color: var(--text-1); }
   .meal-kcal   { margin-left: 4px; }
+  .meal-kcal-btn {
+    background: none; border: none; padding: 4px 8px; margin-left: -4px;
+    border-radius: var(--radius-sm, 6px);
+    cursor: pointer; color: inherit; font: inherit;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 120ms;
+  }
+  .meal-kcal-btn:hover, .meal-kcal-btn:active { background: var(--surface-2); }
+  .meal-kcal-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; }
   .ml-auto     { margin-left: auto; }
   .meal-empty  {
     display: flex;
