@@ -10,7 +10,7 @@ NutriTrace runs entirely in a single Docker container on your own hardware. No a
 
 - **Self-hosting is and will remain free.** The server, PWA, and source code will never be paywalled.
 - **No trackers, no analytics, no telemetry.** NutriTrace doesn't phone home — your usage is invisible to anyone but you.
-- **Your data stays on your hardware.** No central server, no cloud sync we can read; nothing leaves your network unless you opt into a third-party integration (OFF, USDA, Fitbit, etc.).
+- **Your data stays on your hardware.** No central server, no cloud sync that can read it; nothing leaves your network unless you opt into a third-party integration (OFF, USDA, Fitbit, etc.).
 - **Open source under AGPL-3.0.** Every line that touches your data is readable.
 
 ---
@@ -225,7 +225,7 @@ On first launch, a setup wizard walks you through enabling user management and c
 | `DATA_UPLOADS_PATH` | Yes | — | Host path for uploaded images and backups |
 | `JWT_SECRET` | If using users | — | Secret key for signing auth tokens. Use a long random string. |
 | `RECOVERY_TOKEN` | No | — | Passphrase required to disable user management from the login page (lockout recovery). Without this the recovery endpoint is disabled. |
-| `LOG_LEVEL` | No | `info` | Log verbosity: `error` \| `warn` \| `info` \| `debug`. Use `debug` for detailed Fitbit/Withings sync output. |
+| `LOG_LEVEL` | No | `info` | Log verbosity: `error` \| `warn` \| `info` \| `debug`. Use `debug` for detailed wellness sync output (Fitbit, Withings, Garmin, Health Connect). |
 | `SMTP_HOST` | No | — | SMTP server hostname (for password reset & invites) |
 | `SMTP_PORT` | No | `587` | SMTP port |
 | `SMTP_SECURE` | No | `false` | `true` for SSL (port 465), `false` for STARTTLS |
@@ -324,29 +324,34 @@ All external API calls are proxied server-side — no keys are exposed to the br
 
 ---
 
-## Help us test
+## Wellness scores — how they're computed
 
-NutriTrace is a one-person project with limited hardware to test against. The areas where community feedback would meaningfully improve the app:
+NutriTrace surfaces three derived wellness scores. Where the source device exposes its own value via API, that value is used directly. Where it doesn't, NutriTrace computes one. The computed scores are prefixed **Trace** in this section to make the distinction explicit.
 
-**Devices we don't own**
-We've tested only against a **Pixel Watch 4** (via the Fitbit API and Health Connect) and a **Withings Body Scan**. Garmin Connect integration is shipped but **not tested against a real Garmin device** — if you have one (Forerunner, Fenix, vívosmart, etc.), please file an [Integration Test report](https://github.com/traceapps/nutritrace/issues/new?template=integration_test_report.md). Same goes for older Fitbit models (Sense, Charge, Inspire), other Withings devices, and Health Connect across non-Pixel wearables.
+| Score | Fitbit | Garmin | Withings | Health Connect |
+|---|---|---|---|---|
+| Sleep | **Trace Sleep Score** (computed — Fitbit API doesn't expose its own) | Native `overallSleepScore` | Native sleep score when present | **Trace Sleep Score** |
+| Daily Readiness | **Trace Readiness** (computed) | **Trace Readiness** (computed) | **Trace Readiness** (computed) | **Trace Readiness** (computed) |
+| Stress | **Trace Stress** (computed) | Garmin's native `stress_avg` is stored separately; **Trace Stress** is also computed | **Trace Stress** (computed) | **Trace Stress** (computed) |
 
-**Score calibration data**
-NutriTrace calculates Sleep, Daily Readiness, and Stress Management scores from whatever HRV / resting HR / sleep data your wearable provides. The formulas are tuned against one person's daily readings on a Pixel Watch 4. Two ways to help:
+**Trace Sleep Score** combines sleep duration, deep / REM percentages, SpO₂, HRV, and efficiency into a single 0–100 value (formula in `server/routes/fitbit.js`). **Trace Readiness** weighs HRV against a 30-day baseline plus resting HR and last night's sleep, with an activity-spike penalty. **Trace Stress** is a 7-day-smoothed inverse of HRV + RHR + sleep (formula in `server/lib/wellness-scores.js`).
 
-- **If your device or app already publishes its own Sleep / Readiness / Stress scores** (e.g. the Fitbit app does): seeding those daily values gives us the calc-vs-actual gap so we can tune the formulas to match.
-- **If it doesn't** (most other wearables): your raw biometric data is still useful — different sensors collect HRV with different biases, and validating that the formulas behave sensibly across hardware matters.
+The formulas are tuned against the maintainer's own Pixel Watch 4 data — readings on other devices may not match what your device's own app shows. The intent is internal consistency (your scores comparable day-to-day across whatever data sources you've connected), not 1:1 parity with Fitbit / Garmin / Withings native scores.
 
-Use **Settings → Help Improve NutriTrace → Generate calibration export** to produce an anonymized JSON of your last 30 days, then post it in [GitHub Discussions](https://github.com/traceapps/nutritrace/discussions). More diverse data tightens the formulas for everyone.
+If a wellness integration on your device behaves wrong (missing data, weird numbers), file an [Integration Test report](https://github.com/traceapps/nutritrace/issues/new?template=integration_test_report.md) — the more devices reported, the easier it is to spot integration-specific quirks.
 
-**Experimental features**
-Features marked **Experimental** in Settings (Smart Log, Goal Insights, Food Sharing, Dynamic Calorie Goal, Garmin integration) work but haven't been hammered enough to drop the label. Real-world bug reports help us promote them to stable. The badge comes off when we're confident in edge-case handling, not on a calendar.
+## Experimental features
+
+Features marked **Experimental** in Settings (Smart Log, Goal Insights, Food Sharing, Dynamic Calorie Goal, Garmin integration) work but haven't been hammered enough to drop the label. Real-world bug reports help promote them to stable. The badge comes off when edge-case handling is solid, not on a calendar.
 
 ---
 
 ## Troubleshooting
 
-If you're filing a bug, logs make it 10× faster to fix. Where to find them:
+If you're filing a bug, logs make it 10× faster to fix. Easiest path first:
+
+**In-app logs** (PWA + Android — recommended):
+**Settings → Help Improve NutriTrace → View logs.** A 500-line in-memory ring buffer captures `console.log/info/warn/error/debug` plus uncaught errors. Toggle **Verbose** to capture extra sync / DB / notification detail. The viewer has Copy / Share / Clear — Share opens the system share sheet (Gmail, Drive, Files) on Android, Web Share API on PWA. No USB cable, no DevTools needed.
 
 **Server logs** (Docker):
 ```bash
@@ -354,10 +359,11 @@ docker logs nutritrace --tail 200
 ```
 For deeper diagnosis, set `LOG_LEVEL=debug` in your `.env` and restart. **Note:** debug logs contain personal health data (HRV, RHR, sleep duration, calorie counts). Redact these before posting publicly.
 
-**PWA logs** (any browser):
+**Browser DevTools** (PWA, advanced):
 F12 → Console tab. Filter by `[wellness]`, `[sync]`, `[diary]`, etc. depending on the area.
 
-**Android app logs**:
+**Android via chrome://inspect** (advanced fallback):
+If the in-app log viewer doesn't capture what you need:
 1. Connect the device to a computer via USB
 2. Visit `chrome://inspect/#devices` in Chrome
 3. Click "inspect" on the NutriTrace WebView
