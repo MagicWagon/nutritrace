@@ -5,6 +5,44 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.0-rc.1] — 2026-04-26 — First public release candidate
+
+After many months of development as the v0.x-beta series, NutriTrace is going public for wider testing. This release candidate is a snapshot of the v0.39.x line that has been running stably in single-user and multi-user setups, with all major feature work complete. The full beta history is preserved below.
+
+### What's in v1.0.0-rc.1
+
+Aggregate feature surface (everything below is shipped):
+
+- **Diary** — configurable meals, multi-ingredient meals + recipes, body stats, water tracking, day-level free-text notes, per-meal ⋮ menu (copy / move / save-as-meal / clear / copy-to-date), long-press item actions
+- **Foods & Meals** — personal food database with photos, barcodes, categories; barcode scanner; meal/recipe builder; OFF + USDA + Mealie import; fuzzy search
+- **Statistics** — charts for any tracked metric, average / trend / goal overlays, dynamic-goal "Base Goal" line
+- **Goals** — calorie + nutrient goals with templates, Wizard TDEE calculation, optional Dynamic Calorie Goal (Experimental)
+- **AI Assistant (Trace)** — Claude / OpenAI / Gemini, tool use across all providers (real diary + meals + wellness + workouts + goals queries), Smart Log voice food entry (hold-to-record), Goal Insights (Experimental)
+- **Wellness Integrations** — Fitbit, Withings, Garmin, Health Connect (Android). Computed Trace Sleep / Readiness / Stress scores prioritizing day-to-day consistency
+- **Notifications** — device notifications + push services (Apprise / Gotify / ntfy), water / meal / weigh-in / bedtime / wellness alerts / weekly summary
+- **Backup & Restore** — full ZIP backup, JSON export/import, CSV diary export, Waistline import
+- **Multi-user + sharing** — optional account system, food sharing with private / group / specific visibility
+- **Self-hosted** — single Docker container, AGPL-3.0, no telemetry, no cloud sync, all data on your hardware
+- **PWA** — works offline-first in any modern browser, installable to home screen on Android
+
+### Distribution
+
+- Source: [github.com/traceapps/nutritrace](https://github.com/traceapps/nutritrace) (AGPL-3.0)
+- Docker image: `ghcr.io/traceapps/nutritrace:1.0.0-rc.1` and `:latest`
+
+### Known limitations (post-1.0 work — see FUTURE.md)
+
+- **Native Android app** — in development and testing, public release planned during the v1.x cycle. Android users can install the PWA via Chrome's "Add to Home Screen" today.
+- **Public demo instance** — coming post-1.0 on existing infrastructure
+- **Local / self-hosted LLM support** — high-priority post-1.0 (Ollama, LocalAI, LM Studio, vLLM via OpenAI-compatible adapter)
+- **iOS** — pending hardware + Apple Developer account access
+
+### Reporting bugs
+
+`Settings → Diagnostics → View logs` → Copy / Share → attach to a [GitHub issue](https://github.com/traceapps/nutritrace/issues). Templates provided for bugs, feature requests, and wellness integration test reports.
+
+---
+
 ## [0.39.36-beta] — 2026-04-26 — Trace FAB self-heals off-screen positions
 
 ### Fixed
