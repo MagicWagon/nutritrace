@@ -8,8 +8,8 @@ labels: enhancement
 ## What problem does this solve?
 <!--
 Describe the use case. "I want to track X but currently I have to do Y" is
-much more useful than "please add Z" — it lets us think about the right
-shape of the solution.
+much more useful than "please add Z" — it leaves room to think about the
+right shape of the solution.
 -->
 
 ## Proposed solution (optional)
