@@ -388,8 +388,28 @@
 
   // ── Draggable FAB ──────────────────────────────────────────────────────────
   /** Saved position: { x, y } from top-left, or null → use CSS default (bottom-right) */
+  function _clampFabPos(pos) {
+    // Returns null for missing or unrecoverable positions (FAB falls back to CSS
+    // default: bottom-right). Without this, a position saved at a wider viewport
+    // could render off-screen on a smaller monitor and a hard refresh won't help.
+    if (!pos || typeof window === 'undefined') return null;
+    const maxX = window.innerWidth  - 64;
+    const maxY = window.innerHeight - 64;
+    if (maxX < 8 || maxY < 8) return null;
+    return {
+      x: Math.max(8, Math.min(maxX, pos.x)),
+      y: Math.max(8, Math.min(maxY, pos.y)),
+    };
+  }
   let fabPos    = (() => {
-    try { return JSON.parse(localStorage.getItem('wl:aiFabPos') || 'null'); } catch { return null; }
+    try {
+      const saved = JSON.parse(localStorage.getItem('wl:aiFabPos') || 'null');
+      const clamped = _clampFabPos(saved);
+      if (clamped && saved && (clamped.x !== saved.x || clamped.y !== saved.y)) {
+        localStorage.setItem('wl:aiFabPos', JSON.stringify(clamped));
+      }
+      return clamped;
+    } catch { return null; }
   })();
   let hasDragged = false;
 
@@ -404,6 +424,19 @@
   let _isDesktop = false;
   function _updatePanelPos() {
     if (typeof window === 'undefined') return;
+    // Re-clamp the FAB on resize — keeps it visible when the viewport shrinks
+    // (window resize, monitor swap). Persist the clamped value so the next load
+    // doesn't have to re-clamp from the same stale data.
+    if (fabPos) {
+      const clamped = _clampFabPos(fabPos);
+      if (!clamped || clamped.x !== fabPos.x || clamped.y !== fabPos.y) {
+        fabPos = clamped;
+        try {
+          if (clamped) localStorage.setItem('wl:aiFabPos', JSON.stringify(clamped));
+          else localStorage.removeItem('wl:aiFabPos');
+        } catch {}
+      }
+    }
     _isDesktop = window.innerWidth > 768;
     if (!_isDesktop || !panelOpen) { panelStyle = ''; return; }
 

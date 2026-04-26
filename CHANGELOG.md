@@ -5,7 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [0.39.35-beta] — 2026-04-26 — AI Assistant internal rename + LiftTrace label parity + Android thumbnail + long-press fixes + collapsible Meals sections
+## [0.39.36-beta] — 2026-04-26 — Trace FAB self-heals off-screen positions
+
+### Fixed
+- **Trace FAB invisible on desktop PWA after viewport changes.** The FAB position is persisted in `localStorage` (`wl:aiFabPos`), but clamping was only applied during a drag — never on load or window resize. A position dragged on a wider monitor (or saved at a different viewport size) could end up off-screen on a smaller one, with no way to recover short of clearing localStorage. Mobile devices weren't affected because they have separate localStorage origins. Fix: added `_clampFabPos()` helper that clamps to current viewport bounds; runs on mount (writes back the corrected value) and inside `_updatePanelPos` on every resize. LiftTrace already had this guard — NutriTrace was the lone outlier.
+
+
 
 ### Added
 - **Collapsible "Yesterday's Meals" + "Saved Meals" sections** in Foods → Meals tab. Each section header is now a clickable row with a chevron; collapse state persists per-section (`foodsYesterdayCollapsed`, `foodsSavedCollapsed`, both default expanded). The new "Saved Meals" header only renders when "Yesterday's Meals" is also visible — acts as a divider between the two parallel sections rather than a redundant label on a single tab. Search behavior unchanged: typing hides both headers and results take over; user-set collapse state preserved across search clears.
