@@ -171,6 +171,31 @@ When this ships, update PRIVACY.md "Third-Party Services" entry for AI Providers
 
 ---
 
+## Internationalization (i18n)
+
+Currently English-only. UI strings are hardcoded throughout the Svelte components, so translation contributions are not yet possible. Asked about by Lemmy users early in the launch window, so worth landing reasonably soon.
+
+Implementation sketch:
+- Add `svelte-i18n` (de-facto choice for Svelte 4) and a `src/i18n/` directory with one JSON file per locale (`en.json`, `fr.json`, etc.).
+- Extract all hardcoded strings to keys. Largest surface areas: `Diary.svelte`, `Foods.svelte`, `Wellness.svelte`, `Settings.svelte` (+ split sub-components), `MealEditor.svelte`, `FoodEditor.svelte`, ActionSheets, error toasts.
+- Locale picker in Settings → Appearance, persisted via `createSettingStore` like theme. Default to browser locale on first load with English fallback.
+- Date / number formatting via `Intl.DateTimeFormat` and `Intl.NumberFormat` (already platform-native, no extra deps). Audit existing date strings for hardcoded `en-US` style.
+- Pluralization via svelte-i18n message format (ICU-style).
+- Server-side strings (email subjects, push notification bodies, AI system prompts) stay English for now, or take a separate pass once the client side is stable.
+
+Translation contribution path:
+- Self-host **Weblate** alongside the demo instance, or use the free tier on `hosted.weblate.org` for libre projects. Weblate is the standard in the self-hosted scene (Mealie, Immich, Paperless-ngx all use it) and lowers the bar for non-developer translators.
+- PR-based fallback: contributors copy `en.json` to `<lang>.json` and submit a PR. Document the workflow in `CONTRIBUTING.md`.
+- Seed initial languages from community requests on Lemmy / GitHub issues. Don't pre-translate machine-only — wait for actual native speakers per language to avoid uncanny-valley UX.
+
+Scope explicitly out:
+- User-entered data (food names, notes, meal names) stays as-is. NutriTrace doesn't translate user content.
+- OFF/USDA food names come from those upstreams in their own languages already.
+
+Likely v1.1 or v1.2 feature. Doing this *before* v1.0 risks delaying launch and locking the string set before the surface settles.
+
+---
+
 ## Code / Performance
 
 ### ~~Settings.svelte split~~ *(done — v0.39.11, 5 sub-components: SettingsWellness, SettingsTrace, SettingsNotifications, SettingsUserManagement, SettingsBackup. Settings.svelte dropped to ~1700 lines as a thin orchestrator)*
@@ -253,4 +278,4 @@ Sync model going forward: develop in `nutritrace-dev` as today, then ship releas
 
 ---
 
-*Last updated: 2026-04-26 (added: public demo instance plan on Oracle Cloud Always Free, discovery-push checklist for launch, local/self-hosted LLM support as post-1.0 high-priority; marked done: fuzzy food search, Settings split, bundle splitting, dynamic goal line, empty-state polish, Health Connect duplicate, pre-flight scrub; clarified: Food-photo Trace chat — image attachments shipped, only the auto-pipe-to-Smart-Log piece is still open)*
+*Last updated: 2026-04-28 (added: Internationalization section — svelte-i18n + Weblate path, prompted by Lemmy translation request)*
