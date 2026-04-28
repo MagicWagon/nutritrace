@@ -1,6 +1,7 @@
 <script>
   import { onMount, tick } from 'svelte';
   import { push, location } from 'svelte-spa-router';
+  import { _ } from 'svelte-i18n';
   import { fade, fly } from 'svelte/transition';
 
   import Tabs        from '../components/ui/Tabs.svelte';
@@ -582,7 +583,7 @@
         {/if}
       </button>
     {:else}
-      <h1>Foods</h1>
+      <h1>{$_('routes.foods.title')}</h1>
       <button class="btn-icon accent" on:click={() => {
         if (activeTab === 0) openEditor(null, 'foodList');
         else if (activeTab === 1) openMealEditor(null, false);

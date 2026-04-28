@@ -61,7 +61,7 @@ export const USER_PREFS = new Set([
   'notifWellnessAlerts','notifWorkoutSummary','notifSyncFailures',
   'appriseUrl','appriseTag','gotifyUrl','gotifyToken','ntfyUrl','ntfyTopic','ntfyToken',
   // UI behavior prefs that should match across devices
-  'accentColor','startPage','goalCelebrations','pageBanners',
+  'accentColor','startPage','goalCelebrations','pageBanners','language',
 ]);
 
 // DEVICE_PREFS — local-only, never synced.
@@ -339,6 +339,7 @@ function createSettingStore(key, defaultValue) {
 }
 
 export const appearance       = createSettingStore('appearance',       'system');
+export const language          = createSettingStore('language',          'en');
 export const energyUnit        = createSettingStore('energyUnit',       'kcal');
 export const mealNames         = createSettingStore('mealNames',        ['Breakfast','Lunch','Dinner','Snacks']);
 export const goals             = createSettingStore('goals',            {});

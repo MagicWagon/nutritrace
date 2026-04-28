@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte';
+  import { _ } from 'svelte-i18n';
   import { DB, localDateStr } from '../lib/db.js';
   import { NtApi } from '../lib/api.js';
   import { portal } from '../lib/portal.js';
@@ -303,7 +304,7 @@
 <div class="page-shell">
   <header class="page-header" class:has-banner={$pageBanners}>
     {#if $pageBanners}<GoalsBanner />{/if}
-    <h1>Goals</h1>
+    <h1>{$_('routes.goals.title')}</h1>
   </header>
 
   <!-- Tabs -->

@@ -1,5 +1,6 @@
 <script>
   import { onMount, onDestroy, tick } from 'svelte';
+  import { _ } from 'svelte-i18n';
   import { wellnessMetrics, wellnessSyncRange, distUnit, tempUnit, pageBanners, dateFormat, withingsSyncRange as withingsSyncRangeSetting, fitbitEnabled, withingsEnabled, garminEnabled, garminSyncRange as garminSyncRangeSetting, weightUnit, goals, goalCelebrations, disableAnimations,
     fitbitSyncMode, withingsSyncMode, garminSyncMode, healthConnectSyncMode, timeFormat } from '../stores/settings.js';
   import Chart from 'chart.js/auto';
@@ -1394,7 +1395,7 @@
   <!-- Header -->
   <header class="page-header" class:has-banner={$pageBanners}>
     {#if $pageBanners}<WellnessBanner />{/if}
-    <h1>Wellness</h1>
+    <h1>{$_('routes.wellness.title')}</h1>
   </header>
 
   <!-- Fixed sync buttons — portalled to body so position:fixed is viewport-relative -->

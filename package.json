@@ -35,6 +35,7 @@
     "emoji-picker-element": "^1.29.1",
     "jszip": "^3.10.1",
     "nodemailer": "^8.0.3",
+    "svelte-i18n": "^4.0.1",
     "svelte-spa-router": "^4.0.1"
   },
   "devDependencies": {

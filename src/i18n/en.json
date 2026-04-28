@@ -1,0 +1,51 @@
+{
+  "nav": {
+    "diary": "Diary",
+    "foods": "Foods",
+    "wellness": "Wellness",
+    "statistics": "Statistics",
+    "goals": "Goals",
+    "settings": "Settings"
+  },
+  "routes": {
+    "diary":      { "title": "Diary" },
+    "foods":      { "title": "Foods" },
+    "wellness":   { "title": "Wellness" },
+    "statistics": { "title": "Statistics" },
+    "goals":      { "title": "Goals" },
+    "settings":   { "title": "Settings" }
+  },
+  "common": {
+    "sign_out":     "Sign out",
+    "experimental": "Experimental"
+  },
+  "settings": {
+    "appearance": {
+      "section":          "Appearance",
+      "language":         "Language",
+      "theme":            "Theme",
+      "accent_color":     "Accent color",
+      "navigation_style": "Navigation style"
+    },
+    "regional":           { "section": "Regional & Units" },
+    "diary":              { "section": "Diary" },
+    "water":              { "section": "Water" },
+    "foods":              { "section": "Foods" },
+    "categories":         { "section": "Categories" },
+    "nutrients":          { "section": "Nutrients" },
+    "goals":              { "section": "Goals" },
+    "body_stats":         { "section": "Body Stats" },
+    "statistics":         { "section": "Statistics" },
+    "connected_services": { "section": "Connected Services" },
+    "ai":                 { "section": "AI Assistant" },
+    "notifications":      { "section": "Notifications" },
+    "wellness":           { "section": "Wellness" },
+    "sharing":            { "section": "Food Sharing" },
+    "users":              { "section": "User Management" },
+    "email":              { "section": "Email (SMTP)" },
+    "backup":             { "section": "Backup & Restore" },
+    "server":             { "section": "Server Connection" },
+    "diagnostics":        { "section": "Diagnostics" },
+    "about":              { "section": "About" }
+  }
+}

@@ -1,6 +1,7 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import { push } from 'svelte-spa-router';
+  import { _ } from 'svelte-i18n';
   import { resolveAssetUrl } from '../lib/platform.js';
   import { fade, slide, fly } from 'svelte/transition';
   import { tweened } from 'svelte/motion';
@@ -838,7 +839,7 @@
     {#if selectMode}
       <h1 class="select-mode-title">{selectedItems.size} selected</h1>
     {:else}
-      <h1>Diary</h1>
+      <h1>{$_('routes.diary.title')}</h1>
     {/if}
   </header>
 
