@@ -17,17 +17,24 @@
   },
   "common": {
     "sign_out":     "Sign out",
-    "experimental": "Experimental"
+    "experimental": "Experimental",
+    "hide":         "Hide",
+    "errors": {
+      "cant_reach_server": "Could not reach server",
+      "failed":            "Failed"
+    }
   },
   "settings": {
     "appearance": {
       "section":          "Appearance",
-      "language":         "Language",
       "theme":            "Theme",
       "accent_color":     "Accent color",
       "navigation_style": "Navigation style"
     },
-    "regional":           { "section": "Regional & Units" },
+    "regional":           {
+      "section":  "Regional & Units",
+      "language": "Language"
+    },
     "diary":              { "section": "Diary" },
     "water":              { "section": "Water" },
     "foods":              { "section": "Foods" },
@@ -47,5 +54,77 @@
     "server":             { "section": "Server Connection" },
     "diagnostics":        { "section": "Diagnostics" },
     "about":              { "section": "About" }
+  },
+  "login": {
+    "subtitle":             "Sign in to your account",
+    "username":             "Username",
+    "username_placeholder": "Enter username",
+    "password":             "Password",
+    "password_placeholder": "Enter password",
+    "sign_in":              "Sign in",
+    "signing_in":           "Signing in…",
+    "forgot_password":      "Forgot password?",
+    "locked_out":           "Locked out?",
+    "errors": {
+      "failed": "Login failed"
+    },
+    "recovery": {
+      "confirm":           "This will delete all user accounts. Your food & diary data will be kept. Continue?",
+      "explainer":         "If you never set up user accounts intentionally, you can disable user management. <strong>This will delete all user accounts.</strong> Your food &amp; diary data will be kept.",
+      "token_prompt":      "Enter the <code>RECOVERY_TOKEN</code> from your server environment:",
+      "token_placeholder": "Recovery token",
+      "action":            "Disable user management & reset",
+      "disabling":         "Disabling…",
+      "failed":            "Recovery failed",
+      "success":           "User management disabled — you are now in single-user mode",
+      "done":              "User management has been disabled.<br>Redirecting…"
+    }
+  },
+  "forgot_password": {
+    "title":             "Reset Password",
+    "intro":             "Enter your email address and we'll send you a link to reset your password.",
+    "email_label":       "Email address",
+    "send_link":         "Send reset link",
+    "sending":           "Sending…",
+    "back_to_signin":    "Back to sign in",
+    "sent":              "If an account exists for <strong>{email}</strong>, a reset link has been sent. Check your inbox."
+  },
+  "reset_password": {
+    "title":               "New Password",
+    "verifying":           "Verifying link…",
+    "invalid_link":        "This reset link is invalid or has expired.",
+    "request_new":         "Request a new link",
+    "success":             "Password updated. Redirecting…",
+    "set_for":             "Set a new password for <strong>{username}</strong>",
+    "new_password":        "New password",
+    "confirm_password":    "Confirm password",
+    "password_placeholder": "8+ chars, upper, lower, number, symbol",
+    "submit":              "Set new password",
+    "saving":              "Saving…",
+    "errors": {
+      "required": "Password is required",
+      "mismatch": "Passwords do not match",
+      "failed":   "Reset failed"
+    }
+  },
+  "accept_invite": {
+    "title":                "Create Account",
+    "verifying":            "Verifying invite…",
+    "invalid_link":         "This invite link is invalid or has expired. Ask your admin for a new one.",
+    "success":              "Account created! Redirecting…",
+    "intro":                "You've been invited to NutriTrace. Choose a username and password to get started.",
+    "intro_with_email":     "You were invited as <strong>{email}</strong>. Choose a username and password to get started.",
+    "username_label":       "Username *",
+    "username_placeholder": "Choose a username",
+    "full_name_label":      "Full name (optional)",
+    "full_name_placeholder": "Your name",
+    "password_label":       "Password *",
+    "confirm_label":        "Confirm password *",
+    "submit":               "Create account",
+    "creating":             "Creating account…",
+    "errors": {
+      "username_required": "Username is required",
+      "failed":            "Failed to create account"
+    }
   }
 }

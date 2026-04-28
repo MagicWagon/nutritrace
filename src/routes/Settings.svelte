@@ -259,7 +259,7 @@
   const SECTION_KEYWORDS = {
     serverConnection:  ['server','connection','sync','cloud','local','remote','connect','disconnect','url'],
     appearance:        ['appearance','theme','dark','light','accent','color','navigation','sidebar','persistent','start page','animations','celebrations','reduce motion','banner','page banner'],
-    regional:          ['regional','date format','time format','locale','date','time','12h','24h','units','energy unit','weight unit','height','circumference','distance','temperature','imperial','metric'],
+    regional:          ['regional','language','translation','date format','time format','locale','date','time','12h','24h','units','energy unit','weight unit','height','circumference','distance','temperature','imperial','metric'],
     diary:             ['diary','brands','timestamps','thumbnails','nutrients','nutrition units','macros','macro summary','prompt quantity','portion size','nutrition bar','goals progress','meal names','meals'],
     foods:             ['foods','thumbnails','category','notes','yesterday meals','sort order','sort','barcode','scan','beep','flashlight','crop photos'],
     water:             ['water','display unit','daily goal','containers','bottle','cup','glass'],
@@ -1115,15 +1115,6 @@
       <div class="section-body" transition:slide={{ duration: 180 }}>
         <div class="card settings-card">
           <div class="setting-row">
-            <span class="setting-label">{$_('settings.appearance.language')}</span>
-            <div class="select-wrap" style="width:150px">
-              <select class="select sel-sm" bind:value={$language}>
-                {#each AVAILABLE_LOCALES as l}<option value={l.code}>{l.label}</option>{/each}
-              </select>
-            </div>
-          </div>
-          <div class="setting-divider"></div>
-          <div class="setting-row">
             <span class="setting-label">{$_('settings.appearance.theme')}</span>
             <div class="select-wrap" style="width:150px">
               <select class="select sel-sm" value={$appearance} on:change={e => applyAppearance(e.target.value)}>
@@ -1218,6 +1209,15 @@
     {#if sectionOpen(openSections, settingsQuery, 'regional') && sectionVisible(settingsQuery, 'regional')}
       <div class="section-body" transition:slide={{ duration: 180 }}>
         <div class="card settings-card">
+          <div class="setting-row">
+            <span class="setting-label">{$_('settings.regional.language')}</span>
+            <div class="select-wrap" style="width:150px">
+              <select class="select sel-sm" bind:value={$language}>
+                {#each AVAILABLE_LOCALES as l}<option value={l.code}>{l.label}</option>{/each}
+              </select>
+            </div>
+          </div>
+          <div class="setting-divider"></div>
           <div class="setting-row">
             <span class="setting-label">Date format</span>
             <div class="select-wrap" style="width:160px">
