@@ -68,8 +68,10 @@
   let serverShowPw = false;
   let serverConnecting = false;
   let serverMode = getNativeMode(); // 'local' | 'server'
-  // True when running as a standalone phone app (hide multi-user / server features)
-  const isNativeLocal = isNative && !getServerUrl();
+  // True when running as a standalone phone app (hide multi-user / server
+  // features). Reactive on serverMode so the UI updates instantly when the
+  // user disconnects, without waiting for the post-disconnect reload.
+  $: isNativeLocal = isNative && (serverMode !== 'server' || !getServerUrl());
 
   // ── Server connect/merge flow ──────────────────────────────────────────────
   let mergeStep = null;  // null | 'ask-settings' | 'syncing' | 'summary'
@@ -199,14 +201,32 @@
     migrationSummary = null;
   }
 
-  function disconnectServer() {
+  async function disconnectServer() {
+    // Clear server-mode infrastructure
     setServerUrl(null);
     setAuthToken(null);
     setNativeMode('local');
+
+    // Clear cached auth state so loadAuthState's local branch runs cleanly
+    // after the reload. Without this, the cached user + userMgmtActive flag
+    // survives in localStorage and the UI keeps showing Sign Out / connected
+    // state even though no server is reachable.
+    localStorage.removeItem('wl:userId');
+    localStorage.removeItem('nt:cachedUser');
+    localStorage.removeItem('nt:cachedUserMgmt');
+    localStorage.removeItem('nt:csrf');
+
+    // Reset Svelte stores immediately so any open Settings panels
+    // re-render to the disconnected state before the reload kicks in.
+    currentUser.set(null);
+    userMgmtActive.set(false);
+
+    // Local UI state
     serverMode = 'local';
     serverUrlInput = '';
     serverUsername = '';
     serverPassword = '';
+
     showSuccess('Disconnected — using local storage');
     setTimeout(() => window.location.reload(), 600);
   }
