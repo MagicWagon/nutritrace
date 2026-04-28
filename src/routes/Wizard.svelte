@@ -1,5 +1,6 @@
 <script>
   import { push } from 'svelte-spa-router';
+  import { _ } from 'svelte-i18n';
   import { fly, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import { DB, localDateStr } from '../lib/db.js';
@@ -167,8 +168,8 @@
                && !(currentStepName === 'gender'   && !gender)
                && !(currentStepName === 'activity' && !activity);
 
-  $: btnLabel = step === ALL_STEPS.length - 1 ? 'Finish'
-    : step === 0 ? 'Get Started' : 'Next';
+  $: btnLabel = step === ALL_STEPS.length - 1 ? $_('wizard.nav.finish')
+    : step === 0 ? $_('wizard.nav.get_started') : $_('wizard.nav.next');
 
   async function next() {
     if (currentStepName === 'usermgmt') {
@@ -342,7 +343,7 @@
   <!-- Skip button -->
   <div class="wizard-topbar">
     {#if step > 0 && step < ALL_STEPS.length - 1 && !(_forceAccountCreation && !$userMgmtActive)}
-      <button class="btn btn-ghost wizard-skip" on:click={skip}>Skip</button>
+      <button class="btn btn-ghost wizard-skip" on:click={skip}>{$_('wizard.nav.skip')}</button>
     {:else}
       <div></div>
     {/if}
@@ -365,14 +366,14 @@
         {#if _forceAccountCreation}
           <div class="step-hero compact">
             <span class="material-symbols-rounded hero-icon">person_add</span>
-            <h1 class="step-title">Create Your Account</h1>
-            <p class="step-desc">Set up your admin account to secure your NutriTrace instance. You can invite other users later from Settings.</p>
+            <h1 class="step-title">{$_('wizard.usermgmt.create_account_title')}</h1>
+            <p class="step-desc">{$_('wizard.usermgmt.create_account_desc')}</p>
           </div>
         {:else}
           <div class="step-hero compact">
             <span class="material-symbols-rounded hero-icon">group</span>
-            <h1 class="step-title">Multi-User Support</h1>
-            <p class="step-desc">NutriTrace can run in single-user mode (default) or multi-user mode with separate logins and password resets. You can always enable this later in Settings.</p>
+            <h1 class="step-title">{$_('wizard.usermgmt.multi_user_title')}</h1>
+            <p class="step-desc">{$_('wizard.usermgmt.multi_user_desc')}</p>
           </div>
 
           <div class="toggle-row">
@@ -459,8 +460,8 @@
       {:else if currentStepName === 'welcome'}
         <div class="step-hero">
           <div class="logo-icon">🥗</div>
-          <h1 class="step-title">Welcome to NutriTrace</h1>
-          <p class="step-desc">Your personal nutrition tracker. Let's get you set up in about a minute.</p>
+          <h1 class="step-title">{$_('wizard.welcome.title')}</h1>
+          <p class="step-desc">{$_('wizard.welcome.desc')}</p>
           {#if !(_forceAccountCreation && !$userMgmtActive)}
             <button type="button" class="skip-setup-link" on:click={() => skipSetupConfirm = true}>
               I'll do this later
@@ -470,8 +471,8 @@
 
       <!-- ── Units ── -->
       {:else if currentStepName === 'units'}
-        <h2 class="step-title">Measurement System</h2>
-        <p class="step-desc">How do you measure things?</p>
+        <h2 class="step-title">{$_('wizard.units.title')}</h2>
+        <p class="step-desc">{$_('wizard.units.desc')}</p>
         <div class="gender-cards">
           <button class="option-card" class:selected={unitSystem === 'metric'}
             on:click={() => applyUnitSystem('metric')}>
@@ -495,8 +496,8 @@
 
       <!-- ── Gender ── -->
       {:else if currentStepName === 'gender'}
-        <h2 class="step-title">What is your gender?</h2>
-        <p class="step-desc">Used to calculate your calorie needs.</p>
+        <h2 class="step-title">{$_('wizard.gender.title')}</h2>
+        <p class="step-desc">{$_('wizard.gender.desc')}</p>
         <div class="gender-cards">
           {#each [['male','man','Male'],['female','woman','Female']] as [val, icon, lbl]}
             <button class="option-card" class:selected={gender === val}
@@ -512,16 +513,16 @@
 
       <!-- ── Date of Birth ── -->
       {:else if currentStepName === 'dob'}
-        <h2 class="step-title">When were you born?</h2>
-        <p class="step-desc">Your age affects your metabolic rate.</p>
+        <h2 class="step-title">{$_('wizard.dob.title')}</h2>
+        <p class="step-desc">{$_('wizard.dob.desc')}</p>
         <input class="input" type="date" bind:value={dob}
           max={localDateStr()}
           style="margin-top:24px;font-size:16px" />
 
       <!-- ── Height ── -->
       {:else if currentStepName === 'height'}
-        <h2 class="step-title">What is your height?</h2>
-        <p class="step-desc">Used to estimate your calorie needs.</p>
+        <h2 class="step-title">{$_('wizard.height.title')}</h2>
+        <p class="step-desc">{$_('wizard.height.desc')}</p>
         <div style="margin-top:24px;display:flex;flex-direction:column;gap:12px">
           {#if hUnit === 'cm'}
             <label class="form-label">Height (cm)</label>
@@ -543,22 +544,22 @@
 
       <!-- ── Current Weight ── -->
       {:else if currentStepName === 'weight'}
-        <h2 class="step-title">What is your weight?</h2>
+        <h2 class="step-title">{$_('wizard.weight.title')}</h2>
         <p class="step-desc">Your current body weight ({wUnit}).</p>
         <input class="input" type="number" min="20" max="500" step="0.1"
           bind:value={weight} style="margin-top:24px;font-size:16px" />
 
       <!-- ── Target Weight ── -->
       {:else if currentStepName === 'target'}
-        <h2 class="step-title">What is your target weight?</h2>
+        <h2 class="step-title">{$_('wizard.target.title')}</h2>
         <p class="step-desc">Your goal weight ({wUnit}). Leave same as current to maintain.</p>
         <input class="input" type="number" min="20" max="500" step="0.1"
           bind:value={targetW} style="margin-top:24px;font-size:16px" />
 
       <!-- ── Activity Level ── -->
       {:else if currentStepName === 'activity'}
-        <h2 class="step-title">How active are you?</h2>
-        <p class="step-desc">Affects your daily calorie needs.</p>
+        <h2 class="step-title">{$_('wizard.activity.title')}</h2>
+        <p class="step-desc">{$_('wizard.activity.desc')}</p>
         <div class="activity-list">
           {#each ACTIVITY_LEVELS as lvl}
             <button class="activity-card" class:selected={activity === lvl.value}
@@ -576,8 +577,8 @@
       {:else if currentStepName === 'integrations'}
         <div class="step-hero compact">
           <span class="material-symbols-rounded hero-icon">extension</span>
-          <h1 class="step-title">Integrations</h1>
-          <p class="step-desc">Connect optional services. Skip anything you don't need — you can configure these later in Settings.</p>
+          <h1 class="step-title">{$_('wizard.integrations.title')}</h1>
+          <p class="step-desc">{$_('wizard.integrations.desc')}</p>
         </div>
 
         <div class="int-cards">
@@ -717,8 +718,8 @@
       {:else if currentStepName === 'notifications'}
         <div class="step-hero compact">
           <span class="material-symbols-rounded hero-icon">notifications</span>
-          <h1 class="step-title">Stay on Track</h1>
-          <p class="step-desc">Get helpful reminders and celebrate your wins. You can customize all of these later in Settings.</p>
+          <h1 class="step-title">{$_('wizard.notifications.title')}</h1>
+          <p class="step-desc">{$_('wizard.notifications.desc')}</p>
         </div>
 
         <div class="int-cards">
@@ -782,8 +783,8 @@
 
       <!-- ── Summary ── -->
       {:else if currentStepName === 'summary'}
-        <h2 class="step-title">Your Daily Goals</h2>
-        <p class="step-desc">Calculated from your stats using the Mifflin-St Jeor formula.</p>
+        <h2 class="step-title">{$_('wizard.summary.title')}</h2>
+        <p class="step-desc">{$_('wizard.summary.desc')}</p>
         <div class="summary-card">
           <div class="tdee-row">
             <div class="tdee-label">Estimated TDEE</div>
@@ -825,7 +826,7 @@
   <!-- Nav buttons -->
   <div class="wizard-nav">
     {#if step > 0}
-      <button class="btn btn-secondary" on:click={prev}>Back</button>
+      <button class="btn btn-secondary" on:click={prev}>{$_('common.back')}</button>
     {:else}
       <div></div>
     {/if}
@@ -842,13 +843,13 @@
 {#if skipSetupConfirm}
   <div class="skip-modal-backdrop" on:click|self={() => skipSetupConfirm = false}>
     <div class="skip-modal" on:click|stopPropagation>
-      <h3 class="skip-modal-title">Skip setup?</h3>
+      <h3 class="skip-modal-title">{$_('wizard.skip_modal.title')}</h3>
       <p class="skip-modal-desc">
-        You can set up your goals, units, and integrations any time from <strong>Settings</strong>. Until then, calorie targets won't be calculated automatically.
+        {@html $_('wizard.skip_modal.desc')}
       </p>
       <div class="skip-modal-actions">
-        <button class="btn btn-secondary" on:click={() => skipSetupConfirm = false}>Continue setup</button>
-        <button class="btn btn-primary" on:click={() => { skipSetupConfirm = false; skip(); }}>Skip for now</button>
+        <button class="btn btn-secondary" on:click={() => skipSetupConfirm = false}>{$_('wizard.skip_modal.continue')}</button>
+        <button class="btn btn-primary" on:click={() => { skipSetupConfirm = false; skip(); }}>{$_('wizard.skip_modal.skip_now')}</button>
       </div>
     </div>
   </div>

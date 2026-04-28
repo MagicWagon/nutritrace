@@ -64,7 +64,7 @@
   async function saveBodyStatsLocal() {
     await saveBodyStats(bodyStatsData);
     diaryShowBodyStats.set(false);
-    showSuccess('Body stats saved');
+    showSuccess($_('diary.toast.body_stats_saved'));
   }
 
   function openEditItem(item) {
@@ -94,7 +94,7 @@
     });
     showEditSheet = false;
     editItem = null;
-    showSuccess('Updated');
+    showSuccess($_('diary.toast.updated'));
   }
 
   $: meals = $mealNames || ['Breakfast','Lunch','Dinner','Snacks'];
@@ -258,7 +258,7 @@
   async function doDelete() {
     if (pendingDeleteIdx !== null) {
       await removeDiaryItem(pendingDeleteIdx);
-      showSuccess('Item removed');
+      showSuccess($_('diary.toast.item_removed'));
     }
     pendingDeleteIdx = null;
   }
@@ -281,7 +281,7 @@
     try {
       await saveDiaryNote(_notesText);
     } catch (e) {
-      showError(e?.message || 'Note save failed');
+      showError(e?.message || $_('diary.errors.note_save_failed'));
     } finally {
       _notesSaving = false;
     }
@@ -328,9 +328,9 @@
   async function doSaveAsMeal() {
     if (actionMealIdx == null) return;
     const name = (saveAsMealName || '').trim();
-    if (!name) { showError('Please enter a name'); return; }
+    if (!name) { showError($_('diary.errors.name_required')); return; }
     const items = getMealItems(entry.items, actionMealIdx).map(({ _i, ...it }) => it);
-    if (!items.length) { showError('Nothing to save'); return; }
+    if (!items.length) { showError($_('diary.errors.nothing_to_save')); return; }
     saveAsMealSaving = true;
     try {
       await NtApi.createMeal({ name, notes: '', categories: [], items, imgUrl: '' });
@@ -811,23 +811,23 @@
   <!-- Action icons — fixed at top-right, same level as hamburger -->
   <div use:portal class="diary-topbar-actions">
     {#if selectMode}
-      <button class="btn-icon" on:click={exitSelectMode} aria-label="Cancel selection" title="Cancel selection">
+      <button class="btn-icon" on:click={exitSelectMode} aria-label={$_('diary.actions.cancel_selection')} title={$_('diary.actions.cancel_selection')}>
         <span class="material-symbols-rounded">close</span>
       </button>
       <button class="btn-icon" style="color:var(--danger)" disabled={selectedItems.size === 0}
-        on:click={() => showMultiDeleteDialog = true} aria-label="Delete selected items" title="Delete selected">
+        on:click={() => showMultiDeleteDialog = true} aria-label={$_('diary.actions.delete_selected')} title={$_('diary.actions.delete_selected')}>
         <span class="material-symbols-rounded">delete</span>
       </button>
     {:else}
       {#if _waterShowInDiary}
-        <button class="btn-icon accent" on:click={() => showWaterQuickAdd = true} aria-label="Log water" title="Water — log your water intake">
+        <button class="btn-icon accent" on:click={() => showWaterQuickAdd = true} aria-label={$_('diary.actions.log_water')} title={$_('diary.actions.log_water_long')}>
           <span class="material-symbols-rounded">water_drop</span>
         </button>
       {/if}
-      <button class="btn-icon accent" on:click={() => diaryShowNutritionSummary.set(true)} aria-label="Nutrition summary" title="Nutrition Summary — full breakdown of today's nutrients">
+      <button class="btn-icon accent" on:click={() => diaryShowNutritionSummary.set(true)} aria-label={$_('diary.actions.nutrition_summary')} title={$_('diary.actions.nutrition_summary_long')}>
         <span class="material-symbols-rounded">monitoring</span>
       </button>
-      <button class="btn-icon accent" on:click={() => diaryShowBodyStats.set(true)} aria-label="Body stats" title="Body Stats — log weight, body fat, and measurements">
+      <button class="btn-icon accent" on:click={() => diaryShowBodyStats.set(true)} aria-label={$_('diary.actions.body_stats')} title={$_('diary.actions.body_stats_long')}>
         <span class="material-symbols-rounded">scale</span>
       </button>
     {/if}
@@ -845,10 +845,10 @@
 
   <!-- Date navigation — sticky sub-bar directly below the header -->
   <div class="diary-date-bar" class:has-banner={$pageBanners}>
-    <button class="btn-icon accent" on:click={prevDay} aria-label="Previous day" title="Previous day">
+    <button class="btn-icon accent" on:click={prevDay} aria-label={$_('diary.nav.previous_day')} title={$_('diary.nav.previous_day')}>
       <span class="material-symbols-rounded">chevron_left</span>
     </button>
-    <button class="date-btn" on:click={openDatePicker} title="Jump to date">
+    <button class="date-btn" on:click={openDatePicker} title={$_('diary.nav.jump_to_date')}>
       <span class="date-label">
         {formatDate($currentDate)}
         {#if $diaryShowNotes && (entry?.notes || '').trim()}
@@ -857,7 +857,7 @@
       </span>
       <span class="date-sub">{formatDateSub($currentDate, $dateFormat)}</span>
     </button>
-    <button class="btn-icon accent" on:click={nextDay} aria-label="Next day" title="Next day">
+    <button class="btn-icon accent" on:click={nextDay} aria-label={$_('diary.nav.next_day')} title={$_('diary.nav.next_day')}>
       <span class="material-symbols-rounded">chevron_right</span>
     </button>
   </div>
@@ -938,7 +938,7 @@
         {#if items.length > 0}
           <button class="meal-add-row" on:click={() => openAddFood(mealIdx)}>
             <span class="material-symbols-rounded">add</span>
-            <span>Add food</span>
+            <span>{$_('diary.add_food')}</span>
           </button>
         {/if}
         {#if $diaryShowMacroSummary && items.length > 0}
@@ -973,7 +973,7 @@
           <div class="diary-notes-body">
             <textarea class="diary-notes-textarea" bind:value={_notesText}
               on:blur={commitNotes}
-              placeholder="How did today feel? Sleep, energy, hunger, cravings…"
+              placeholder={$_('diary.notes_placeholder')}
               rows="3"></textarea>
             <div class="diary-notes-meta">
               <span class="text-3 text-sm">{_notesSaving ? 'Saving…' : (_notesText ? `${_notesText.length} characters` : '')}</span>

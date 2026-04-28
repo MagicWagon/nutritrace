@@ -92,7 +92,7 @@
     };
     goalTemplates.update(list => [...list, tpl]);
     showSaveSheet = false;
-    showSuccess('Template saved');
+    showSuccess($_('goals.toast.template_saved'));
   }
 
   function applyTemplate(tpl) {
@@ -100,7 +100,7 @@
     if (tpl.waterGoalMl != null) waterGoalMl.set(tpl.waterGoalMl);
     showApplyConfirm = null;
     activeTab = 'yours';
-    showSuccess(`"${tpl.name}" applied`);
+    showSuccess($_('goals.toast.template_applied', { values: { name: tpl.name } }));
   }
 
   function deleteTemplate(id) {
@@ -177,7 +177,7 @@
   function saveWaterGoal() {
     waterGoalMl.set(displayToMl(editWaterVal, $waterUnit));
     editWaterOpen = false;
-    showSuccess('Water goal saved');
+    showSuccess($_('goals.toast.water_goal_saved'));
   }
 
   $: waterGoalDisplay = mlToDisplay($waterGoalMl, $waterUnit);
@@ -250,7 +250,7 @@
 
     goals.update(g => ({ ...g, [editStat.id]: entry }));
     editOpen = false;
-    showSuccess('Goal saved');
+    showSuccess($_('goals.toast.goal_saved'));
   }
 
   function deleteGoal() {
@@ -672,7 +672,7 @@
             Remove Goal
           </button>
         {/if}
-        <button class="btn btn-primary w-full" on:click={saveGoal}>Save Goal</button>
+        <button class="btn btn-primary w-full" on:click={saveGoal}>{$_('goals.save_goal')}</button>
       </div>
     </div>
   </div>
@@ -689,7 +689,7 @@
         <label class="form-label">Goal ({$waterUnit})</label>
         <input class="input" type="number" min="0" step="0.1" bind:value={editWaterVal}
           on:keydown={e => e.key === 'Enter' && saveWaterGoal()} />
-        <button class="btn btn-primary w-full" style="margin-top:16px" on:click={saveWaterGoal}>Save</button>
+        <button class="btn btn-primary w-full" style="margin-top:16px" on:click={saveWaterGoal}>{$_('common.save')}</button>
       </div>
     </div>
   </div>
