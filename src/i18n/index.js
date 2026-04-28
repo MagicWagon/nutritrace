@@ -13,6 +13,10 @@ export function initI18n(initialLocale) {
   init({
     fallbackLocale: 'en',
     initialLocale: initialLocale || pickInitialLocale(),
+    // Log missing-key warnings to the browser console only in dev — in
+    // production builds they'd spam the console for users running a locale
+    // that isn't fully translated yet.
+    warnOnMissingMessages: !!import.meta.env.DEV,
   });
 }
 
