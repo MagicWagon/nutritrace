@@ -195,6 +195,19 @@ When this ships, update PRIVACY.md "Third-Party Services" entry for AI Providers
 - Optional Prometheus endpoint (`/api/metrics`): request count, DB query times, sync success/fail
 - Admin-only; opt-in via env var
 
+### OIDC / SSO support (Authentik, Keycloak, Authelia, etc.)
+Add OpenID Connect as a sign-in option for multi-user instances. Lots of homelab self-hosters already run an identity provider (Authentik is the common one in the self-hosted scene; Keycloak / Authelia / Pocket-ID also come up) and want one set of credentials across all their apps. NutriTrace's existing username/password flow stays as the default and as the fallback when OIDC isn't configured.
+
+Implementation sketch:
+- Server: add `openid-client` (or equivalent) library. New env vars `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_REDIRECT_URI`. Optional `OIDC_AUTO_PROVISION=true` to create local user accounts on first login from claims.
+- Auth flow: new routes `/api/auth/oidc/login` (redirects to provider) and `/api/auth/oidc/callback` (validates token, looks up or creates user, mints JWT cookie). Reuses the existing JWT cookie session model.
+- Client: add a "Sign in with [provider name]" button on the Login page when OIDC env vars are detected (similar pattern to how SMTP env-lock surfaces in the UI today). Local username/password form stays present for fallback.
+- User mapping: pick a stable claim (email or sub) to identify users. On first login, either auto-provision a local user record (when enabled) or refuse and require an admin to invite.
+- Admin-controlled provider config — env vars only, not UI-editable, to prevent self-elevation.
+- Should compose cleanly with the existing user-management toggle: turning user management OFF disables OIDC entry too.
+
+Likely v1.x feature once self-hosters request it. Pairs naturally with a "deploy NutriTrace + Authentik in one stack" docker-compose example for the docs.
+
 ### ~~Security hardening~~ *(done)*
 - ~~Rate limiting on auth endpoints (10/15min)~~
 - ~~CORS middleware with allowed origins + Authorization header~~
