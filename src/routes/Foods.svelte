@@ -79,11 +79,11 @@
   let searchSource = 'local';
   const _mealieEnabled = DB.getSetting('mealieEnabled',  false);
   $: availableSources = [
-    { value: 'local',  label: 'Local'  },
-    { value: 'off',    label: 'OFF'    },
-    ...($usdaEnabled   ? [{ value: 'usda',   label: 'USDA'   }] : []),
+    { value: 'local',  label: $_('foods.sources.local')  },
+    { value: 'off',    label: 'OFF'                       },
+    ...($usdaEnabled   ? [{ value: 'usda',   label: 'USDA' }] : []),
     ...(_mealieEnabled ? [{ value: 'mealie', label: 'Mealie' }] : []),
-    ...(_tabHasShared  ? [{ value: 'shared', label: 'From Others' }] : []),
+    ...(_tabHasShared  ? [{ value: 'shared', label: $_('foods.sources.from_others') }] : []),
   ];
   $: _sourceLabel = availableSources.find(s => s.value === searchSource)?.label || '';
 
@@ -764,19 +764,19 @@
       {#if !search.trim()}
         <div class="empty-state">
           <span class="material-symbols-rounded empty-icon">search</span>
-          <p>Search {_sourceLabel}</p>
+          <p>{$_('foods.search_in', { values: { source: _sourceLabel } })}</p>
         </div>
 
       {:else if loading || mealieLoading}
         <div class="loading-row">
           <span class="material-symbols-rounded spin">refresh</span>
-          <span class="text-2 text-sm">Searching {_sourceLabel}…</span>
+          <span class="text-2 text-sm">{$_('foods.searching_in', { values: { source: _sourceLabel } })}</span>
         </div>
 
       {:else if apiResults.length === 0 && mealieResults.length === 0}
         <div class="empty-state">
           <span class="material-symbols-rounded empty-icon">search_off</span>
-          <p>No results in {_sourceLabel}</p>
+          <p>{$_('foods.no_results_in', { values: { source: _sourceLabel } })}</p>
         </div>
 
       {:else}

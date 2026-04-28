@@ -239,10 +239,26 @@
     "add_n":                   "Add {n}",
     "adding":                  "Adding…",
     "add_selected_to_diary":   "Add selected to diary",
+    "search_in":               "Search {source}",
+    "searching_in":            "Searching {source}…",
+    "no_results_in":           "No results in {source}",
+    "sources": {
+      "local":       "Local",
+      "from_others": "From Others"
+    },
     "toast": {
       "deleted": "Deleted",
       "cloned":  "Cloned"
     }
+  },
+  "trace": {
+    "panel_label":        "AI coach chat",
+    "ask_placeholder":    "Ask me anything…",
+    "clear_conversation": "Clear conversation",
+    "attach_image":       "Attach image"
+  },
+  "smart_log": {
+    "placeholder": "for breakfast I had 2 eggs and toast"
   },
   "goals": {
     "save_goal": "Save Goal",
