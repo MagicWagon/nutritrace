@@ -231,13 +231,18 @@
     setTimeout(() => window.location.reload(), 600);
   }
 
-  function logoutServer() {
+  async function logoutServer() {
     document.body.style.transition = 'opacity 0.3s';
     document.body.style.opacity = '0';
-    localStorage.removeItem('wl:userId');
-    localStorage.removeItem('nt:cachedUser');
-    localStorage.removeItem('nt:cachedUserMgmt');
-    if (isNative) setAuthToken(null);
+    // Use the proper logout flow so the server-side JWT cookie is invalidated.
+    // The previous version only cleared local Bearer + cache, but the cookie
+    // stayed valid; the next /api/auth/me fetch would silently re-authenticate
+    // and put the user right back in. Hits /api/auth/logout, clears Bearer
+    // token, clears local cache, resets the stores.
+    try {
+      const { logout } = await import('../stores/auth.js');
+      await logout();
+    } catch {}
     setTimeout(() => window.location.reload(), 300);
   }
 
