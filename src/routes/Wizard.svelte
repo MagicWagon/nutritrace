@@ -9,7 +9,7 @@
   import { currentUser, userMgmtActive, setupRequired, loadAuthState } from '../stores/auth.js';
   import { validatePassword, passwordStrength } from '../lib/validation.js';
   import { showError } from '../stores/toast.js';
-  import { isNative, getServerUrl } from '../lib/platform.js';
+  import { isNative, getServerUrl, apiUrl } from '../lib/platform.js';
   import Toggle from '../components/settings/Toggle.svelte';
 
   // In native local mode, skip user management step (single user, no server)
@@ -94,7 +94,7 @@
   $: if (currentStepName === 'integrations' && !intStatusLoaded) {
     intStatusLoaded = true;
     if (!_isNativeLocal) {
-      fetch('/api/app-config/env-locks', { credentials: 'include' })
+      fetch(apiUrl('/api/app-config/env-locks'), { credentials: 'include' })
         .then(r => r.ok ? r.json() : {})
         .then(d => {
           intAILocked = d.ai === true;
@@ -182,7 +182,7 @@
         // Register the admin account
         umLoading = true;
         try {
-          const res = await fetch('/api/auth/register', {
+          const res = await fetch(apiUrl('/api/auth/register'), {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
@@ -262,7 +262,7 @@
 
     // AI is admin-side: writes to app_config, not user_settings
     if (!intSkipped.ai && !intAILocked && intAIKey.trim()) {
-      const _putConfig = (key, value) => fetch('/api/app-config', {
+      const _putConfig = (key, value) => fetch(apiUrl('/api/app-config'), {
         method: 'PUT', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key, value }),

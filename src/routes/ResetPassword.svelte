@@ -5,6 +5,7 @@
   import { currentUser } from '../stores/auth.js';
   import { loadServerSettings } from '../stores/settings.js';
   import { validatePassword, passwordStrength } from '../lib/validation.js';
+  import { apiUrl } from '../lib/platform.js';
 
   $: pwScore = passwordStrength(password);
 
@@ -23,7 +24,7 @@
     token = params.get('token') || '';
     if (!token) { validating = false; return; }
     try {
-      const res  = await fetch(`/api/auth/validate-token?token=${token}&type=reset`, { credentials: 'include' });
+      const res  = await fetch(apiUrl(`/api/auth/validate-token?token=${token}&type=reset`), { credentials: 'include' });
       const data = await res.json();
       if (res.ok) { tokenValid = true; username = data.username || ''; }
     } finally {
@@ -38,7 +39,7 @@
     if (password !== confirm) { error = $_('reset_password.errors.mismatch'); return; }
     loading = true; error = '';
     try {
-      const res  = await fetch('/api/auth/reset-password', {
+      const res  = await fetch(apiUrl('/api/auth/reset-password'), {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
