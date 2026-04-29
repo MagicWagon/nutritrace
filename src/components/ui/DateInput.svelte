@@ -58,7 +58,7 @@
     if (iso && (!max || iso <= max) && (!min || iso >= min)) {
       value = iso;
     } else {
-      // Invalid or out of range — revert
+      // Invalid or out of range — revert to current value's formatted view
       textValue = _formatForDisplay(value);
     }
   }
@@ -72,12 +72,35 @@
     value = e.detail;
     showPicker = false;
   }
+
+  // Masked input — strip non-digits, auto-insert separators at the right
+  // positions for the user's chosen date format. Lets users type freely
+  // (or paste) without being able to enter junk like letters or symbols.
+  function onTextInput(e) {
+    const fmt = $dateFormat || 'ISO';
+    const raw = e.target.value.replace(/[^\d]/g, '').slice(0, 8);
+    let formatted;
+    if (fmt === 'ISO') {
+      // YYYY-MM-DD
+      formatted = raw.slice(0, 4);
+      if (raw.length > 4) formatted += '-' + raw.slice(4, 6);
+      if (raw.length > 6) formatted += '-' + raw.slice(6, 8);
+    } else {
+      // MM/DD/YYYY or DD/MM/YYYY
+      formatted = raw.slice(0, 2);
+      if (raw.length > 2) formatted += '/' + raw.slice(2, 4);
+      if (raw.length > 4) formatted += '/' + raw.slice(4, 8);
+    }
+    textValue = formatted;
+  }
 </script>
 
 <div class="date-input-wrap">
   <input class="input date-input-text" type="text"
+    inputmode="numeric"
     bind:value={textValue}
     placeholder={_placeholder()}
+    on:input={onTextInput}
     on:blur={applyText}
     on:keydown={e => { if (e.key === 'Enter') { e.preventDefault(); applyText(); e.target.blur(); } }} />
   <button type="button" class="btn-icon date-input-calendar"
