@@ -35,6 +35,11 @@
       localStorage.setItem('nt:cachedUser', JSON.stringify(data.user));
       localStorage.setItem('nt:cachedUserMgmt', '1');
       currentUser.set(data.user);
+      // Refresh CSRF token from /api/auth/me before any state-changing request
+      // can fire (otherwise reactive settings saves would use a stale csrf from
+      // a previous session and 403). loadAuthState() handles the fetch and
+      // populates localStorage.nt:csrf as a side effect.
+      await loadAuthState();
       await loadServerSettings();
       push('/');
     } catch(e) {
