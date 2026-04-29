@@ -285,5 +285,6 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     overflow: hidden;
+    max-width: 360px;
   }
 </style>

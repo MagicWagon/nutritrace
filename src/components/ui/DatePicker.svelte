@@ -3,25 +3,25 @@
   aesthetic. Caller decides whether to wrap in a Sheet/modal or render inline.
 
   Props:
-    value         (bindable) — selected date as 'YYYY-MM-DD'
-    min           — earliest selectable date as 'YYYY-MM-DD' (optional)
-    max           — latest selectable date as 'YYYY-MM-DD' (optional, e.g.
-                    pass `localDateStr()` to forbid future dates)
-    showManualInput — render the text-entry row at the bottom (default true)
+    value (bindable) — selected date as 'YYYY-MM-DD'
+    min              — earliest selectable date as 'YYYY-MM-DD' (optional)
+    max              — latest selectable date as 'YYYY-MM-DD' (optional, e.g.
+                       pass localDateStr() to forbid future dates)
 
   Events:
-    select { detail: 'YYYY-MM-DD' } — fires when the user taps a day or
-                                      submits a valid manual entry.
+    select { detail: 'YYYY-MM-DD' } — fires when the user taps a day.
+
+  Year range: derived from min/max when present, else ±10 years from today.
+  For birthday-style pickers (max set, no min) the year grid extends ~100
+  years back so a date 30+ years prior is reachable in two taps.
 -->
 <script>
   import { createEventDispatcher } from 'svelte';
-  import { dateFormat } from '../../stores/settings.js';
   import { localDateStr } from '../../lib/db.js';
 
   export let value = '';
   export let min = '';
   export let max = '';
-  export let showManualInput = true;
 
   const dispatch = createEventDispatcher();
 
@@ -54,12 +54,29 @@
   let showYearPicker  = false;
   let showMonthPicker = false;
   $: calMonthName = new Date(calYear, calMonth, 1).toLocaleDateString(undefined, { month: 'long' });
+
+  // Year-grid range: respect min/max if set, otherwise default ±10 years from
+  // today (suitable for date-jumping in Diary). When max is set without min
+  // (the birthday case), span ~100 years back so users picking a long-ago
+  // date can reach it in one tap on the year grid + one tap on the day grid.
   $: yearRange = (() => {
-    const center = max
-      ? Number(max.slice(0, 4))
-      : new Date().getFullYear();
-    return Array.from({ length: 22 }, (_, i) => (center - 10) + i);
+    const today = new Date().getFullYear();
+    if (min && max) {
+      const a = Number(min.slice(0, 4));
+      const b = Number(max.slice(0, 4));
+      return Array.from({ length: b - a + 1 }, (_, i) => a + i);
+    }
+    if (max) {
+      const b = Number(max.slice(0, 4));
+      return Array.from({ length: 105 }, (_, i) => (b - 100) + i);
+    }
+    if (min) {
+      const a = Number(min.slice(0, 4));
+      return Array.from({ length: 105 }, (_, i) => a + i);
+    }
+    return Array.from({ length: 22 }, (_, i) => (today - 10) + i);
   })();
+
   const monthNames = [
     {idx:0,short:'Jan'},{idx:1,short:'Feb'},{idx:2,short:'Mar'},
     {idx:3,short:'Apr'},{idx:4,short:'May'},{idx:5,short:'Jun'},
@@ -68,34 +85,6 @@
   ];
 
   function _todayStr() { return localDateStr(); }
-
-  // Manual-entry state — initial value reflects current `value` in user's
-  // chosen format. Updated when value changes externally.
-  let pickerDate = '';
-  $: pickerDate = _formatForDisplay(value);
-
-  function _formatForDisplay(v) {
-    if (!v || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return '';
-    const fmt = $dateFormat || 'ISO';
-    const [y, m, d] = v.split('-');
-    if (fmt === 'US') return `${m}/${d}/${y}`;
-    if (fmt === 'EU') return `${d}/${m}/${y}`;
-    return v;
-  }
-
-  function _parseManual(s) {
-    if (!s) return null;
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) {
-      const fmt = $dateFormat || 'ISO';
-      const parts = s.split('/');
-      const y = parts[2];
-      // US is M/D/Y, EU is D/M/Y
-      const [m, d] = fmt === 'EU' ? [parts[1], parts[0]] : [parts[0], parts[1]];
-      return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
-    }
-    return null;
-  }
 
   function calPrevMonth() {
     showYearPicker = false; showMonthPicker = false;
@@ -113,19 +102,6 @@
     if (min && ds < min) return;
     value = ds;
     dispatch('select', ds);
-  }
-
-  function applyManual() {
-    const iso = _parseManual(pickerDate);
-    if (!iso) return;
-    if (max && iso > max) return;
-    if (min && iso < min) return;
-    value = iso;
-    // Update calendar view to land on the picked month
-    const dt = new Date(iso + 'T12:00:00');
-    calYear  = dt.getFullYear();
-    calMonth = dt.getMonth();
-    dispatch('select', iso);
   }
 </script>
 
@@ -184,14 +160,6 @@
         </button>
       {/each}
     </div>
-    {#if showManualInput}
-      <div class="dp-manual">
-        <input class="input" type="text" bind:value={pickerDate}
-          placeholder={$dateFormat === 'US' ? 'MM/DD/YYYY' : $dateFormat === 'EU' ? 'DD/MM/YYYY' : 'YYYY-MM-DD'}
-          style="flex:1;font-size:14px;height:40px" />
-        <button class="btn btn-primary" style="height:40px;padding:0 18px" on:click={applyManual}>Go</button>
-      </div>
-    {/if}
   {/if}
 </div>
 
@@ -265,8 +233,4 @@
   .dp-day.dp-future:hover { background: var(--surface-2); color: var(--text-2); }
   .dp-day.dp-today { color: var(--accent); font-weight: 700; }
   .dp-day.dp-sel { background: var(--accent) !important; color: #fff; font-weight: 600; }
-  .dp-manual {
-    display: flex; gap: 8px; padding: 8px 16px 16px; align-items: center;
-    border-top: 1px solid var(--border); margin-top: 4px;
-  }
 </style>

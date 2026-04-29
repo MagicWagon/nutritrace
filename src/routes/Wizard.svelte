@@ -639,13 +639,13 @@
             {/if}
           </div>
 
-          <!-- AI Buddy -->
+          <!-- AI Assistant -->
           {#if intAILocked}
             <div class="int-card int-card-locked">
               <div class="int-card-head">
                 <div class="int-card-icon">🤖</div>
                 <div class="int-card-info">
-                  <div class="int-card-title">AI Buddy</div>
+                  <div class="int-card-title">AI Assistant</div>
                   <div class="int-card-sub int-locked-label">Configured via environment variables</div>
                 </div>
                 <span class="material-symbols-rounded int-lock-icon">lock</span>
@@ -656,8 +656,8 @@
               <div class="int-card-head">
                 <div class="int-card-icon">🤖</div>
                 <div class="int-card-info">
-                  <div class="int-card-title">AI Buddy</div>
-                  <div class="int-card-sub">A nutrition assistant powered by your own AI provider</div>
+                  <div class="int-card-title">AI Assistant</div>
+                  <div class="int-card-sub">Trace, your AI nutrition assistant — bring your own API key</div>
                 </div>
                 {#if intSkipped.ai}
                   <button class="int-restore-btn" on:click={() => intSkipped = {...intSkipped, ai: false}}>Configure</button>
