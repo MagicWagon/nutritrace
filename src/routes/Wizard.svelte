@@ -12,10 +12,18 @@
   import { isNative, getServerUrl, apiUrl } from '../lib/platform.js';
   import Toggle from '../components/settings/Toggle.svelte';
 
-  // In native local mode, skip user management step (single user, no server)
-  const _isNativeLocal = isNative && !getServerUrl();
-  // PWA: account creation is mandatory (server must have at least one user)
-  const _isPwa = !isNative;
+  // ── Wizard mode branching ────────────────────────────────────────────────
+  // Three variants of the user-management step:
+  //   1. Native local mode (Capacitor + no server URL): step is skipped entirely.
+  //      Single-device, single-user, no auth — nothing to configure.
+  //   2. PWA with no users yet on server: forces "Create Your Account". The user
+  //      must register an admin before the rest of the wizard can run; cookie-
+  //      based auth needs at least one user. No skip, no toggle.
+  //   3. PWA with users already present: shows "Multi-User Support" toggle.
+  //      Lets the user opt into multi-user mode (separate logins, password
+  //      resets), or stay single-user.
+  const _isNativeLocal       = isNative && !getServerUrl();
+  const _isPwa               = !isNative;
   const _forceAccountCreation = _isPwa && $setupRequired;
 
   // Steps: usermgmt (optional on native, mandatory on PWA), welcome, units, ...
@@ -26,18 +34,21 @@
   let dir  = 1;
 
   // ── User management step ─────────────────────────────────────────────────
-  // On PWA with no users: force account creation (no toggle, can't skip)
-  let enableUserMgmt  = _forceAccountCreation ? true : false;
-  let adminUsername   = '';
-  let adminPassword   = '';
-  let adminConfirm    = '';
-  let adminFullName   = '';
-  let adminNickname   = '';
-  let adminEmail      = '';
-  let adminBirthday   = '';
-  let adminGender     = '';
-  let umError         = '';
-  let umLoading       = false;
+  // Auth-only fields — birthday and gender intentionally NOT collected here.
+  // The dedicated `dob` and `gender` wizard steps later in the flow capture
+  // those into USER_PREFS where they live with the rest of the profile.
+  // Collecting them in two places previously created two sources of truth and
+  // mismatched gender option lists (auth form had M/F/Non-binary/Prefer-not,
+  // the dedicated step has only M/F because Mifflin-St Jeor is binary).
+  let enableUserMgmt = _forceAccountCreation ? true : false;
+  let adminUsername  = '';
+  let adminPassword  = '';
+  let adminConfirm   = '';
+  let adminFullName  = '';
+  let adminNickname  = '';
+  let adminEmail     = '';
+  let umError        = '';
+  let umLoading      = false;
 
   // ── Unit system ───────────────────────────────────────────────────────────
   let unitSystem = ''; // 'metric' | 'imperial'
@@ -120,11 +131,6 @@
   $: wUnit = $weightUnit || 'kg';
   $: hUnit = $heightUnit || 'cm';
 
-  // Sync gender from user mgmt step when user picks there
-  $: if (adminGender && !gender) gender = adminGender;
-  // Sync dob from user mgmt step
-  $: if (adminBirthday && dob === (new Date().getFullYear() - 25) + '-01-01') dob = adminBirthday;
-
   function toKg(v) {
     if (wUnit === 'lb') return v * 0.453592;
     if (wUnit === 'st') return v * 6.35029;
@@ -187,13 +193,11 @@
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              username:   adminUsername.trim(),
-              password:   adminPassword,
-              full_name:  adminFullName.trim() || undefined,
-              nickname:   adminNickname.trim() || undefined,
-              email:      adminEmail.trim()    || undefined,
-              birthday:   adminBirthday || undefined,
-              gender:     adminGender   || undefined,
+              username:  adminUsername.trim(),
+              password:  adminPassword,
+              full_name: adminFullName.trim() || undefined,
+              nickname:  adminNickname.trim() || undefined,
+              email:     adminEmail.trim()    || undefined,
             }),
           });
           const data = await res.json().catch(() => ({}));
@@ -347,7 +351,7 @@
   <!-- Skip button -->
   <div class="wizard-topbar">
     {#if step > 0 && step < ALL_STEPS.length - 1 && !(_forceAccountCreation && !$userMgmtActive)}
-      <button class="btn btn-ghost wizard-skip" on:click={skip}>{$_('wizard.nav.skip')}</button>
+      <button class="btn btn-ghost wizard-skip" on:click={() => skipSetupConfirm = true}>{$_('wizard.nav.skip')}</button>
     {:else}
       <div></div>
     {/if}
@@ -413,24 +417,6 @@
               <label class="form-label">Email address</label>
               <input class="input" type="email" bind:value={adminEmail}
                 placeholder="Used for password resets (optional)" autocomplete="email" />
-            </div>
-
-            <div class="form-row-2">
-              <div class="form-group">
-                <label class="form-label">Birthday</label>
-                <input class="input" type="date" bind:value={adminBirthday}
-                  max={localDateStr()} />
-              </div>
-              <div class="form-group">
-                <label class="form-label">Gender</label>
-                <select class="input" bind:value={adminGender}>
-                  <option value="">— skip —</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="other">Other</option>
-                  <option value="prefer_not">Prefer not to say</option>
-                </select>
-              </div>
             </div>
 
             <div class="form-row-2">
@@ -598,7 +584,7 @@
               {#if intSkipped.off}
                 <button class="int-restore-btn" on:click={() => intSkipped = {...intSkipped, off: false}}>Configure</button>
               {:else}
-                <button class="int-skip-btn" on:click={() => intSkipped = {...intSkipped, off: true}}>Skip</button>
+                <button class="int-skip-btn" on:click={() => intSkipped = {...intSkipped, off: true}}>Skip this</button>
               {/if}
             </div>
             {#if !intSkipped.off}
@@ -620,7 +606,7 @@
               {#if intSkipped.usda}
                 <button class="int-restore-btn" on:click={() => intSkipped = {...intSkipped, usda: false}}>Configure</button>
               {:else}
-                <button class="int-skip-btn" on:click={() => intSkipped = {...intSkipped, usda: true}}>Skip</button>
+                <button class="int-skip-btn" on:click={() => intSkipped = {...intSkipped, usda: true}}>Skip this</button>
               {/if}
             </div>
             {#if !intSkipped.usda}
@@ -641,7 +627,7 @@
               {#if intSkipped.mealie}
                 <button class="int-restore-btn" on:click={() => intSkipped = {...intSkipped, mealie: false}}>Configure</button>
               {:else}
-                <button class="int-skip-btn" on:click={() => intSkipped = {...intSkipped, mealie: true}}>Skip</button>
+                <button class="int-skip-btn" on:click={() => intSkipped = {...intSkipped, mealie: true}}>Skip this</button>
               {/if}
             </div>
             {#if !intSkipped.mealie}
@@ -675,7 +661,7 @@
                 {#if intSkipped.ai}
                   <button class="int-restore-btn" on:click={() => intSkipped = {...intSkipped, ai: false}}>Configure</button>
                 {:else}
-                  <button class="int-skip-btn" on:click={() => intSkipped = {...intSkipped, ai: true}}>Skip</button>
+                  <button class="int-skip-btn" on:click={() => intSkipped = {...intSkipped, ai: true}}>Skip this</button>
                 {/if}
               </div>
               {#if !intSkipped.ai}
