@@ -9,6 +9,7 @@
   import { cubicOut } from 'svelte/easing';
 
   import MacroRing    from '../components/diary/MacroRing.svelte';
+  import AddActivitySheet from '../components/diary/AddActivitySheet.svelte';
   import { mealIcon } from '../lib/mealIcon.js';
   import Sheet        from '../components/ui/Sheet.svelte';
   import Dialog       from '../components/ui/Dialog.svelte';
@@ -26,7 +27,9 @@
            diaryShowPortionSize, diaryShowNotes, diaryShowNutritionBar, diaryTotalsMode,
            diaryShowAllNutrients, diaryShowNutritionUnits, visibleNutriments, hiddenBodyStats,
            dateFormat, timeFormat, disableAnimations, goalCelebrations, pageBanners,
-           calorieGoalMode, calorieGoalFactor } from '../stores/settings.js';
+           calorieGoalMode, calorieGoalFactor,
+           diaryShowActivity, manualActivityPolicy } from '../stores/settings.js';
+  import { dayActivity, activitySummary, loadActivity, deleteActivity } from '../stores/activity.js';
   import DiaryBanner  from '../components/banners/DiaryBanner.svelte';
   import WaterBanner  from '../components/banners/WaterBanner.svelte';
   import { editorState } from '../stores/editorState.js';
@@ -37,6 +40,21 @@
 
   let addMealIdx = 0;
   let showAddAction = false;
+  // Activity logging state (gated on diaryShowActivity)
+  let showActivitySheet = false;
+  let editingActivity = null;
+  async function onActivityDelete(a) {
+    try {
+      await deleteActivity(a.id);
+      showSuccess('Activity removed');
+    } catch (e) {
+      showError(e?.message || 'Could not delete');
+    }
+  }
+  function onActivityLongPress(a) {
+    editingActivity = a;
+    showActivitySheet = true;
+  }
   let showDeleteDialog = false;
   let pendingDeleteIdx = null;
   // showBodyStats and showNutritionSummary now live in diary.js stores (controlled from topbar)
@@ -135,6 +153,15 @@
 
   $: if ($calorieGoalMode === 'dynamic' && $currentDate) _loadDynamicGoal($currentDate);
 
+  // Activity offset — load whenever date changes (gated on the toggle)
+  $: if ($diaryShowActivity && $currentDate) loadActivity($currentDate);
+
+  // Effective active calories from manual + wearable per policy.
+  // Adjusts the displayed calories budget; macro percentages keep using the
+  // base goal so protein/carbs/fat targets don't drift when you log a workout.
+  $: _effectiveActive = ($diaryShowActivity ? ($activitySummary?.effective || 0) : 0);
+  $: caloriesGoalAdjusted = caloriesGoal + _effectiveActive;
+
   $: _hasBottomNav = $navStyle === 'bottom' || $navStyle === 'both';
   $: barBottom     = _hasBottomNav ? 'calc(var(--nav-h) + env(safe-area-inset-bottom, 0px))' : 'env(safe-area-inset-bottom, 0px)';
 
@@ -209,7 +236,7 @@
   $: fatGoal   = _macroGoal('fat');
   $: carbGoal  = _macroGoal('carbohydrates');
   $: protGoal  = _macroGoal('proteins');
-  $: calPct    = Math.min(100, ((totals.calories||0) / caloriesGoal) * 100);
+  $: calPct    = Math.min(100, ((totals.calories||0) / caloriesGoalAdjusted) * 100);
 
   function formatDate(d) {
     if (!d) return '';
@@ -899,6 +926,61 @@
       </section>
     {/each}
 
+    {#if $diaryShowActivity}
+      {@const acts = $dayActivity || []}
+      {@const sum  = $activitySummary || { manual: 0, wearable: 0, effective: 0, policy: 'wearable_wins' }}
+      {@const policy = $manualActivityPolicy || 'wearable_wins'}
+      {@const wearablePresent = (sum.wearable || 0) > 0}
+      {@const manualCounted   = !wearablePresent || policy !== 'wearable_wins'}
+      <section class="meal-group card activity-group" id="activity-group" in:fly={{ y: 18, duration: 280, delay: 60 + meals.length * 55 }}>
+        <div class="meal-header" style="--meal-color:#4FFFB0">
+          <span class="meal-type-icon material-symbols-rounded">directions_run</span>
+          <span class="meal-name">Activity</span>
+          {#if acts.length > 0}
+            <span class="meal-kcal text-3 text-sm" style="color:#4FFFB0">
+              − {acts.reduce((s, a) => s + (a.kcal || 0), 0)} kcal
+            </span>
+          {/if}
+          {#if wearablePresent && !manualCounted && acts.length > 0}
+            <span class="activity-policy-chip text-3 text-sm" title="Policy: wearable wins. Toggle in Settings → Wellness.">not counted</span>
+          {/if}
+          <button class="btn-icon accent ml-auto" on:click={() => { editingActivity = null; showActivitySheet = true; }} aria-label="Add activity" title="Add activity">
+            <span class="material-symbols-rounded">add</span>
+          </button>
+        </div>
+
+        {#if acts.length === 0}
+          <button type="button" class="meal-empty" on:click={() => { editingActivity = null; showActivitySheet = true; }} aria-label="Add activity">
+            <span class="material-symbols-rounded meal-empty-icon" style="color:#4FFFB0">add_circle</span>
+            <span class="meal-empty-text">Tap to add activity</span>
+          </button>
+        {:else}
+          <div class="meal-items">
+            {#each acts as a (a.id)}
+              <div class="diary-item" in:fly={{ y: 6, duration: 180 }}
+                on:contextmenu|preventDefault={() => onActivityLongPress(a)}>
+                <button class="diary-item-btn" on:click={() => { editingActivity = a; showActivitySheet = true; }}>
+                  <div class="item-info">
+                    <span class="item-name truncate">{a.name}</span>
+                    <span class="item-meta text-3 text-sm">
+                      {#if a.duration_min}{a.duration_min} min{/if}{#if a.duration_min && a.distance} · {/if}{#if a.distance}{a.distance}{/if}{#if (a.duration_min || a.distance)} · {/if}<span style="color:#4FFFB0">−{a.kcal} kcal</span>{#if a.source === 'ai_estimated'} · <span class="text-3" title="Estimated by Trace">est.</span>{/if}
+                    </span>
+                  </div>
+                </button>
+                <button class="btn-icon" on:click={() => onActivityDelete(a)} aria-label="Delete activity" title="Delete">
+                  <span class="material-symbols-rounded">close</span>
+                </button>
+              </div>
+            {/each}
+          </div>
+          <button class="meal-add-row" on:click={() => { editingActivity = null; showActivitySheet = true; }}>
+            <span class="material-symbols-rounded">add</span>
+            <span>Add activity</span>
+          </button>
+        {/if}
+      </section>
+    {/if}
+
     {#if $diaryShowNotes}
       <section class="diary-notes card" class:expanded={notesExpanded || _notesText}>
         <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
@@ -977,7 +1059,7 @@
       <div class="dbb-detail-row">
         <div class="dbb-kcal">
           {#if _totalsMode === 'remaining'}
-            <span class="dbb-num">{Math.max(0, caloriesGoal - Math.round($_calTween)).toLocaleString()}</span>
+            <span class="dbb-num">{(caloriesGoalAdjusted - Math.round($_calTween)).toLocaleString()}</span>
             <span class="dbb-unit">{#if $calorieGoalMode === 'dynamic' && _dynamicCaloriesOut != null}⚡ {/if}kcal left</span>
           {:else}
             <span class="dbb-num">{Math.round($_calTween).toLocaleString()}</span>
@@ -986,15 +1068,15 @@
         </div>
         <div class="dbb-macros">
           <span class="dbb-macro" style="color:var(--macro-protein)">
-            {#if _totalsMode === 'remaining' && protGoal != null}{Math.max(0, Math.round((protGoal - $_protTween)*10)/10)}{:else}{Math.round($_protTween*10)/10}{/if}
+            {#if _totalsMode === 'remaining' && protGoal != null}{Math.round((protGoal - $_protTween)*10)/10}{:else}{Math.round($_protTween*10)/10}{/if}
             <span class="dbb-mlabel">g Protein</span>
           </span>
           <span class="dbb-macro" style="color:var(--macro-carbs)">
-            {#if _totalsMode === 'remaining' && carbGoal != null}{Math.max(0, Math.round((carbGoal - $_carbTween)*10)/10)}{:else}{Math.round($_carbTween*10)/10}{/if}
+            {#if _totalsMode === 'remaining' && carbGoal != null}{Math.round((carbGoal - $_carbTween)*10)/10}{:else}{Math.round($_carbTween*10)/10}{/if}
             <span class="dbb-mlabel">g Carbs</span>
           </span>
           <span class="dbb-macro" style="color:var(--macro-fat)">
-            {#if _totalsMode === 'remaining' && fatGoal != null}{Math.max(0, Math.round((fatGoal - $_fatTween)*10)/10)}{:else}{Math.round($_fatTween*10)/10}{/if}
+            {#if _totalsMode === 'remaining' && fatGoal != null}{Math.round((fatGoal - $_fatTween)*10)/10}{:else}{Math.round($_fatTween*10)/10}{/if}
             <span class="dbb-mlabel">g Fat</span>
           </span>
         </div>
@@ -1029,7 +1111,7 @@
               <div class="nb-bar"><div class="nb-fill" class:over={nb.over} style="width:{nb.pct}%;{nb.over ? '' : 'background:' + nutrientBarColor(nb.id)}"></div></div>
               <span class="nb-val" class:over={nb.over}>
                 {#if _totalsMode === 'remaining' && nb.tgt}
-                  {Math.max(0, Math.round((nb.tgt - nb.cur)*10)/10)}{#if $diaryShowNutritionUnits} {nb.unit}{/if}
+                  {Math.round((nb.tgt - nb.cur)*10)/10}{#if $diaryShowNutritionUnits} {nb.unit}{/if}
                 {:else}
                   {Math.round(nb.cur*10)/10}{#if $diaryShowNutritionUnits} {nb.unit}{/if}
                 {/if}
@@ -1465,7 +1547,7 @@
         <div class="ns-ring-wrap">
           <MacroRing
             calories={totals.calories || 0}
-            caloriesGoal={caloriesGoal}
+            caloriesGoal={caloriesGoalAdjusted}
             fat={totals.fat || 0}
             carbs={totals.carbohydrates || 0}
             protein={totals.proteins || 0}
@@ -1540,10 +1622,22 @@
   </div>
 </Sheet>
 
+<AddActivitySheet bind:open={showActivitySheet} date={$currentDate} entry={editingActivity} on:close={() => editingActivity = null} />
+
 
 <style>
   /* Date picker sheet wrapper — calendar UI lives in DatePicker.svelte */
   .dp-sheet { padding-bottom: 4px; }
+
+  /* Activity section — same shell as meal-group, accent in green to read as "offset" */
+  :global(.activity-policy-chip) {
+    background: var(--surface-2, rgba(255,255,255,0.06));
+    border-radius: 999px;
+    padding: 2px 8px;
+    margin-left: 6px;
+    font-size: 11px;
+    opacity: 0.85;
+  }
 
   /* diary-page no longer overrides page-shell padding-top — same as every other page */
 

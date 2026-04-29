@@ -5,6 +5,39 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.0-rc.7] — 2026-04-29 — Manual activity logging (issue #3)
+
+Adds an opt-in **Activity** section on the Diary, below the meal sections,
+where you can log exercises that offset your daily calorie goal — useful
+when you don't have a wearable integration.
+
+### Added
+- New `activity_log` table; CRUD endpoints under `/api/activity`.
+- `Settings → Diary → Show activity section` toggle (default off). When on,
+  the section renders below your meals with a green "− N kcal" sum chip.
+- `Settings → Diary → Wearable + manual policy` (visible when the section
+  is on): `wearable_wins` (default), `manual_wins`, or `additive`.
+  Decides how today's manual entries combine with Fitbit/Garmin/Withings/
+  Health Connect on days you have both.
+- Add Activity sheet — `name + calories burned`, plus optional duration
+  and free-text distance. Each entry shows on the Diary like a meal row.
+- Daily calorie budget on the Diary now adds the effective active-calories
+  offset (manual + wearable per policy). Macro % targets keep using the
+  base goal so protein/carbs/fat don't drift when you log a workout.
+- Trace gets a new `add_activity_entry` tool. You can say *"I hiked 10
+  miles, about 1000 calories"* in chat and Trace logs it. If you don't
+  give a number, Trace can estimate from your body profile (weight +
+  height + age + sex) — gated by a separate **Estimate activity calories**
+  toggle in Settings → AI Assistant. Missing any required profile field
+  pauses the estimator and Trace asks for a number instead.
+- Backups: `activity_log` is included in Full Backup ZIP, JSON export,
+  Capacitor local ZIP, and the Clear Data path.
+
+### Removed
+- Nothing.
+
+---
+
 ## [1.0.0-rc.6] — 2026-04-28 — i18n scaffolding, subpath support, wizard cleanup
 
 ### Added
