@@ -262,11 +262,15 @@
 
     // AI is admin-side: writes to app_config, not user_settings
     if (!intSkipped.ai && !intAILocked && intAIKey.trim()) {
-      const _putConfig = (key, value) => fetch(apiUrl('/api/app-config'), {
-        method: 'PUT', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key, value }),
-      }).catch(() => {});
+      const _putConfig = (key, value) => {
+        const headers = { 'Content-Type': 'application/json' };
+        const csrf = localStorage.getItem('nt:csrf');
+        if (csrf) headers['X-CSRF-Token'] = csrf;
+        return fetch(apiUrl('/api/app-config'), {
+          method: 'PUT', credentials: 'include', headers,
+          body: JSON.stringify({ key, value }),
+        }).catch(() => {});
+      };
       await Promise.all([
         _putConfig('ai_api_key',  intAIKey.trim()),
         _putConfig('ai_provider', intAIProvider),

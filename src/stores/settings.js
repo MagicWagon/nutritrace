@@ -86,8 +86,17 @@ function _settingsUrl() {
 function _authHeaders() {
   const h = { 'Content-Type': 'application/json' };
   if (isNative && getServerUrl()) {
+    // Native server-connected mode: Bearer auth (cookies don't persist across
+    // WebView reloads). Bearer requests are inherently CSRF-safe.
     const token = getAuthToken();
     if (token) h['Authorization'] = `Bearer ${token}`;
+  } else if (!isNative) {
+    // PWA cookie-based session: needs CSRF token on state-changing requests
+    // when the server has user management active. The token is populated by
+    // auth.js after /api/auth/me, and absent for unauthenticated / single-user
+    // mode (in which case the server's CSRF middleware also skips the check).
+    const csrf = localStorage.getItem('nt:csrf');
+    if (csrf) h['X-CSRF-Token'] = csrf;
   }
   return h;
 }
