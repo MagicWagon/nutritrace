@@ -77,11 +77,10 @@ export const DEVICE_PREFS = new Set([
 // touching every call site. Equivalent to USER_PREFS.
 const SERVER_SETTINGS = USER_PREFS;
 
-import { isNative, getServerUrl, getAuthToken } from '../lib/platform.js';
+import { isNative, getServerUrl, getAuthToken, apiUrl } from '../lib/platform.js';
 
 function _settingsUrl() {
-  if (isNative) { const url = getServerUrl(); if (url) return url + '/api/settings'; }
-  return '/api/settings';
+  return apiUrl('/api/settings');
 }
 
 function _authHeaders() {
