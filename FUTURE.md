@@ -208,6 +208,12 @@ Likely v1.1 or v1.2 feature. Doing this *before* v1.0 risks delaying launch and 
 
 ## Infrastructure
 
+### ~~Reverse proxy / subpath support~~ *(done — `BASE_URL` env var, see DEPLOY.md → Reverse Proxy with Subpath)*
+- Native subpath support via `BASE_URL=/your-prefix`. Server mounts everything under the prefix, client reads it from `__NT_CONFIG__` injected at HTML serve time, all asset/API URLs prefix at runtime.
+- Requested in #3 (tellis82). Verified locally end-to-end in both root and subpath modes (image upload, settings persistence, OAuth flow ready, service worker scope, PWA install).
+- Default `BASE_URL=''` keeps existing root-mounted deployments unchanged — no migration for current users.
+- Caveat: changing `BASE_URL` after data exists leaves stale image URLs in old diary item snapshots (the snapshotted `imgUrl` carries the prefix from when it was logged). Documentation in DEPLOY.md notes this as "pick at install time and don't change."
+
 ### Multi-instance sync (optional cloud relay)
 - For users running NutriTrace on multiple devices without a central server
 - Lightweight CouchDB-style sync (or manual export/import trigger)
@@ -278,4 +284,4 @@ Sync model going forward: develop in `nutritrace-dev` as today, then ship releas
 
 ---
 
-*Last updated: 2026-04-28 (added: Internationalization section — svelte-i18n + Weblate path, prompted by Lemmy translation request)*
+*Last updated: 2026-04-28 (added: Internationalization section — svelte-i18n + Weblate path, prompted by Lemmy translation request; marked done: Reverse proxy / subpath support via BASE_URL env var, prompted by tellis82 issue #3 and verified locally end-to-end)*
