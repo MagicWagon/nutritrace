@@ -85,7 +85,7 @@
   >
     <!-- App branding -->
     <div class="sidebar-brand">
-      <img class="brand-icon" src="/icons/logo.png" alt="NutriTrace" />
+      <img class="brand-icon" src={resolveAssetUrl('/icons/logo.png')} alt="NutriTrace" />
       <div class="brand-text">
         <span class="brand-name">NutriTrace</span>
         <span class="brand-tagline">Trace Every Bite — Personal Nutrition Tracker</span>

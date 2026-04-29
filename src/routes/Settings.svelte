@@ -40,7 +40,7 @@
   import { NtApi } from '../lib/api.js';
   import { NUTRIMENTS } from '../lib/nutrition.js';
   import { currentUser, userMgmtActive } from '../stores/auth.js';
-  import { isNative, getServerUrl, setServerUrl, setNativeMode, getNativeMode, setAuthToken, apiUrl, getAuthToken } from '../lib/platform.js';
+  import { isNative, getServerUrl, setServerUrl, setNativeMode, getNativeMode, setAuthToken, apiUrl, getAuthToken, resolveAssetUrl } from '../lib/platform.js';
   import { _ } from 'svelte-i18n';
   import { AVAILABLE_LOCALES } from '../i18n/index.js';
 
@@ -2245,7 +2245,7 @@
       <div class="section-body" transition:slide={{ duration: 180 }}>
         <div class="card settings-card">
           <div class="about-hero">
-            <img src="/icons/logo.png" alt="NutriTrace" class="about-icon" />
+            <img src={resolveAssetUrl('/icons/logo.png')} alt="NutriTrace" class="about-icon" />
             <div>
               <div class="about-name">NutriTrace</div>
               <div class="about-version text-3 text-sm">{APP_VERSION}</div>

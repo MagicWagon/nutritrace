@@ -5,7 +5,7 @@
   import { currentUser } from '../stores/auth.js';
   import { loadServerSettings } from '../stores/settings.js';
   import { validatePassword, passwordStrength } from '../lib/validation.js';
-  import { apiUrl } from '../lib/platform.js';
+  import { apiUrl, resolveAssetUrl } from '../lib/platform.js';
 
   $: pwScore = passwordStrength(password);
 
@@ -66,7 +66,7 @@
 <div class="login-page">
   <div class="login-card card">
     <div class="login-logo">
-      <img src="/icons/logo.png" alt="NutriTrace" class="logo-img" />
+      <img src={resolveAssetUrl('/icons/logo.png')} alt="NutriTrace" class="logo-img" />
       <h1 class="login-title">{$_('accept_invite.title')}</h1>
     </div>
 

@@ -1,7 +1,7 @@
 <script>
   import { push } from 'svelte-spa-router';
   import { _ } from 'svelte-i18n';
-  import { apiUrl } from '../lib/platform.js';
+  import { apiUrl, resolveAssetUrl } from '../lib/platform.js';
 
   let email   = '';
   let loading = false;
@@ -33,7 +33,7 @@
 <div class="login-page">
   <div class="login-card card">
     <div class="login-logo">
-      <img src="/icons/logo.png" alt="NutriTrace" class="logo-img" />
+      <img src={resolveAssetUrl('/icons/logo.png')} alt="NutriTrace" class="logo-img" />
       <h1 class="login-title">{$_('forgot_password.title')}</h1>
     </div>
 

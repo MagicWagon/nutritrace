@@ -135,7 +135,7 @@ export function resolveAssetUrl(path) {
   }
   // PWA: prefix server-relative paths with base path so they resolve under
   // the configured subpath instead of the document root.
-  if (_basePath && (path.startsWith('/uploads/') || path.startsWith('/api/'))) {
+  if (_basePath && (path.startsWith('/uploads/') || path.startsWith('/api/') || path.startsWith('/icons/') || path.startsWith('/fonts/'))) {
     return _basePath + path;
   }
   return path;
