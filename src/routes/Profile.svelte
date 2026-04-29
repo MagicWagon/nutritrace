@@ -6,6 +6,8 @@
   import { NtApi } from '../lib/api.js';
   import { apiUrl, isNative, getServerUrl, getAuthToken, resolveAssetUrl } from '../lib/platform.js';
   import { takePhoto } from '../lib/camera.js';
+  import { localDateStr } from '../lib/db.js';
+  import DatePicker from '../components/ui/DatePicker.svelte';
 
   function _headers(extra = {}) {
     const h = { 'Content-Type': 'application/json', ...extra };
@@ -173,7 +175,9 @@
       </div>
       <div class="form-group">
         <label class="form-label">{$_('profile.birthday')}</label>
-        <input class="input" type="date" bind:value={birthday} />
+        <div class="profile-date-wrap">
+          <DatePicker bind:value={birthday} max={localDateStr()} />
+        </div>
       </div>
       <div class="form-group">
         <label class="form-label">{$_('profile.gender')}</label>
@@ -276,4 +280,10 @@
   .pw-strength.s-4 .pw-label { color: var(--success, #22c55e); }
   .pw-strength.s-0 .pw-label, .pw-strength.s-1 .pw-label { color: var(--danger, #ef4444); }
   .pw-mismatch { color: var(--danger, #ef4444); font-size: 11px; margin: 4px 0 0; }
+  .profile-date-wrap {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
 </style>

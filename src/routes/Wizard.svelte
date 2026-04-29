@@ -11,6 +11,7 @@
   import { showError } from '../stores/toast.js';
   import { isNative, getServerUrl, apiUrl } from '../lib/platform.js';
   import Toggle from '../components/settings/Toggle.svelte';
+  import DatePicker from '../components/ui/DatePicker.svelte';
 
   // ── Wizard mode branching ────────────────────────────────────────────────
   // Three variants of the user-management step:
@@ -505,9 +506,9 @@
       {:else if currentStepName === 'dob'}
         <h2 class="step-title">{$_('wizard.dob.title')}</h2>
         <p class="step-desc">{$_('wizard.dob.desc')}</p>
-        <input class="input" type="date" bind:value={dob}
-          max={localDateStr()}
-          style="margin-top:24px;font-size:16px" />
+        <div class="dob-picker-wrap">
+          <DatePicker bind:value={dob} max={localDateStr()} />
+        </div>
 
       <!-- ── Height ── -->
       {:else if currentStepName === 'height'}
@@ -1046,4 +1047,13 @@
 
   @keyframes spin { to { transform: rotate(360deg); } }
   .spin { animation: spin 0.8s linear infinite; }
+
+  .dob-picker-wrap {
+    margin: 16px auto 0;
+    max-width: 360px;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
 </style>
