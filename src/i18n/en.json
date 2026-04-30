@@ -74,6 +74,9 @@
     "signing_in":           "Signing in…",
     "forgot_password":      "Forgot password?",
     "locked_out":           "Locked out?",
+    "sso_sign_in_with":     "Sign in with {provider}",
+    "sso_or":               "or",
+    "no_signin_methods":    "No sign-in methods available. Ask your administrator.",
     "errors": {
       "failed": "Login failed"
     },
@@ -130,10 +133,15 @@
     "gender":               "Gender",
     "gender_unset":         "Prefer not to say",
     "change_password":      "Change Password",
+    "set_password":         "Set Password",
     "current_password":     "Current Password",
     "confirm_new_password": "Confirm New Password",
     "saved":                "Profile saved",
     "password_changed":     "Password changed",
+    "linked_accounts":      "Linked accounts",
+    "no_linked_accounts":   "No identity providers linked yet.",
+    "link_with":            "Link with",
+    "unlink":               "Unlink",
     "errors": {
       "save_failed":            "Could not save profile",
       "upload_failed":          "Upload failed",
@@ -223,12 +231,46 @@
     "toast": {
       "body_stats_saved": "Body stats saved",
       "updated":          "Updated",
-      "item_removed":     "Item removed"
+      "item_removed":     "Item removed",
+      "activity_removed": "Activity removed"
     },
     "errors": {
-      "note_save_failed": "Note save failed",
-      "name_required":    "Please enter a name",
-      "nothing_to_save":  "Nothing to save"
+      "note_save_failed":     "Note save failed",
+      "name_required":        "Please enter a name",
+      "nothing_to_save":      "Nothing to save",
+      "activity_save_failed": "Could not save activity",
+      "activity_delete_failed": "Could not delete activity"
+    },
+    "activity": {
+      "section":              "Activity",
+      "tap_to_add":           "Tap to add activity",
+      "add":                  "Add activity",
+      "add_to_diary":         "Add to Diary",
+      "save_changes":         "Save Changes",
+      "title_add":            "Add Activity",
+      "title_edit":           "Edit Activity",
+      "field_name":           "Activity",
+      "field_name_placeholder": "e.g. Morning hike",
+      "field_kcal":           "Calories burned",
+      "field_kcal_placeholder": "kcal",
+      "field_duration":       "Duration",
+      "field_duration_placeholder": "minutes",
+      "field_distance":       "Distance",
+      "field_distance_placeholder": "e.g. 10 mi",
+      "field_optional":       "(optional)",
+      "saving":               "Adding…",
+      "estimated_short":      "est.",
+      "wellness_hint":        "Synced workouts from your device live in Wellness",
+      "not_counted":          "not counted — using wearable",
+      "policy_chip":          "Policy: wearable wins. Toggle in Settings → Diary.",
+      "actions": {
+        "edit":   "Edit",
+        "delete": "Delete"
+      },
+      "errors": {
+        "name_required": "Name required",
+        "kcal_required": "Calories required"
+      }
     }
   },
   "foods": {

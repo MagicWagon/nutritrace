@@ -10,7 +10,7 @@
   import { DB }    from './lib/db.js';
   import { navStyle, applyAccentColor, accentColor, applyAppearance, appearance, disableAnimations, sidebarPersistent, language } from './stores/settings.js';
   import { locale } from 'svelte-i18n';
-  import { currentUser, userMgmtActive, setupRequired, loadAuthState } from './stores/auth.js';
+  import { currentUser, userMgmtActive, setupRequired, loadAuthState, handleOidcCallback } from './stores/auth.js';
   import { needsNativeSetup, isNative, getNativeMode, getServerUrl } from './lib/platform.js';
   import { writable } from 'svelte/store';
 
@@ -186,6 +186,11 @@
 
     // Load auth state first (sets $currentUser and $userMgmtActive)
     await loadAuthState();
+
+    // OIDC post-callback: if the URL hash contains ?oidc=ok / ?oidc_error=…
+    // strip it, toast, and refresh auth state. Runs after loadAuthState so
+    // we don't double-fetch on cold load.
+    await handleOidcCallback();
 
     // Show wizard on first launch:
     // - Native server mode: NEVER show wizard (server is already configured)

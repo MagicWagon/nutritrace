@@ -34,6 +34,171 @@
   let sessionHours = '720';
   let sessionSaved = false;
 
+  // ── OIDC providers (admin) ───────────────────────────────────────────────
+  let oidcProviders = [];
+  let enablePasswordLogin = true;
+  let oidcExpanded = false;
+  let oidcEditing = null;     // null | { ...providerFields } (id present = edit; absent = create)
+  let oidcTestResult = null;
+  let oidcBusy = false;
+
+  function _csrfHeaders(extra = {}) {
+    const h = { 'Content-Type': 'application/json', ...extra };
+    if (isNative && getServerUrl()) {
+      const t = getAuthToken();
+      if (t) h['Authorization'] = `Bearer ${t}`;
+    } else {
+      const csrf = localStorage.getItem('nt:csrf');
+      if (csrf) h['X-CSRF-Token'] = csrf;
+    }
+    return h;
+  }
+
+  async function loadOidc() {
+    try {
+      const r = await fetch(apiUrl('/api/admin/oidc/providers'), { credentials: 'include', headers: _csrfHeaders() });
+      if (r.ok) {
+        const data = await r.json();
+        oidcProviders = data?.providers || [];
+        enablePasswordLogin = data?.enable_email_password_login !== false;
+      }
+    } catch {}
+  }
+
+  function startCreateProvider() {
+    oidcEditing = {
+      issuer_url: '',
+      client_id: '',
+      client_secret: '',
+      redirect_uris: [_defaultRedirectUri()],
+      scope: 'openid profile email',
+      token_endpoint_auth_method: 'client_secret_post',
+      auto_register: 0,
+      admin_group_claim: '',
+      admin_group_value: '',
+      display_name: '',
+      logo_url: '',
+      is_active: 1,
+    };
+    oidcTestResult = null;
+  }
+
+  function _defaultRedirectUri() {
+    if (typeof window === 'undefined') return '';
+    const basePath = window.__NT_CONFIG__?.basePath || '';
+    const id = oidcEditing?.id || ':providerId';
+    return `${window.location.origin}${basePath}/api/auth/oidc/callback/${id}`;
+  }
+
+  function startEditProvider(p) {
+    oidcEditing = {
+      ...p,
+      client_secret: '',                         // never echo back
+      redirect_uris: Array.isArray(p.redirect_uris) ? [...p.redirect_uris] : [],
+    };
+    oidcTestResult = null;
+  }
+
+  function cancelProviderEdit() {
+    oidcEditing = null;
+    oidcTestResult = null;
+  }
+
+  async function saveProvider() {
+    if (oidcBusy) return;
+    if (!oidcEditing.issuer_url?.trim() || !oidcEditing.client_id?.trim()) {
+      showError('Issuer URL and Client ID are required');
+      return;
+    }
+    if (!oidcEditing.redirect_uris?.filter(Boolean).length) {
+      showError('At least one redirect URI is required');
+      return;
+    }
+    oidcBusy = true;
+    try {
+      const isEdit = !!oidcEditing.id;
+      const url = isEdit
+        ? apiUrl(`/api/admin/oidc/providers/${oidcEditing.id}`)
+        : apiUrl(`/api/admin/oidc/providers`);
+      const body = { ...oidcEditing };
+      // Treat empty client_secret as "leave unchanged" on edit; required on create.
+      if (isEdit && !body.client_secret) delete body.client_secret;
+      const r = await fetch(url, {
+        method: isEdit ? 'PUT' : 'POST',
+        credentials: 'include',
+        headers: _csrfHeaders(),
+        body: JSON.stringify(body),
+      });
+      const data = await r.json();
+      if (!r.ok) { showError(data?.error || 'Save failed'); return; }
+      showSuccess(isEdit ? 'Provider updated' : 'Provider created');
+      oidcEditing = null;
+      await loadOidc();
+    } catch (e) {
+      showError('Could not reach server');
+    } finally {
+      oidcBusy = false;
+    }
+  }
+
+  async function testProvider(id) {
+    oidcBusy = true;
+    oidcTestResult = null;
+    try {
+      const r = await fetch(apiUrl(`/api/admin/oidc/providers/${id}/test`), {
+        method: 'POST', credentials: 'include', headers: _csrfHeaders(),
+      });
+      oidcTestResult = await r.json();
+    } catch (e) {
+      oidcTestResult = { ok: false, error: 'Could not reach server' };
+    } finally { oidcBusy = false; }
+  }
+
+  async function deleteProvider(p) {
+    if (!confirm(`Delete provider "${p.display_name || p.issuer_url}"? Linked users will lose this sign-in option.`)) return;
+    oidcBusy = true;
+    try {
+      const r = await fetch(apiUrl(`/api/admin/oidc/providers/${p.id}`), {
+        method: 'DELETE', credentials: 'include', headers: _csrfHeaders(),
+      });
+      if (!r.ok) {
+        const data = await r.json().catch(() => ({}));
+        showError(data?.error || 'Delete failed'); return;
+      }
+      showSuccess('Provider deleted');
+      await loadOidc();
+    } catch { showError('Could not reach server'); }
+    finally { oidcBusy = false; }
+  }
+
+  async function togglePasswordLogin() {
+    const next = !enablePasswordLogin;
+    if (!next && !oidcProviders.some(p => p.is_active)) {
+      showError('Add at least one active OIDC provider before disabling password login.');
+      return;
+    }
+    if (!next && !confirm('Disable password login? Users without an OIDC link will not be able to sign in until you re-enable it. RECOVERY_TOKEN will still work.')) return;
+    try {
+      const r = await fetch(apiUrl('/api/admin/oidc/password-login'), {
+        method: 'PUT', credentials: 'include', headers: _csrfHeaders(),
+        body: JSON.stringify({ enabled: next }),
+      });
+      const data = await r.json();
+      if (!r.ok) { showError(data?.error || 'Save failed'); return; }
+      enablePasswordLogin = !!data.enable_email_password_login;
+      showSuccess(enablePasswordLogin ? 'Password login enabled' : 'Password login disabled');
+    } catch { showError('Could not reach server'); }
+  }
+
+  function addRedirectUri() {
+    if (!oidcEditing) return;
+    oidcEditing.redirect_uris = [...(oidcEditing.redirect_uris || []), ''];
+  }
+  function removeRedirectUri(i) {
+    if (!oidcEditing) return;
+    oidcEditing.redirect_uris = oidcEditing.redirect_uris.filter((_, idx) => idx !== i);
+  }
+
   // Invite
   let inviteEmail  = '';
   let inviteRole   = 'user';
@@ -43,7 +208,10 @@
   export async function loadData() {
     if ($userMgmtActive) {
       await loadUsers();
-      if ($currentUser?.role === 'admin') await loadSessionConfig();
+      if ($currentUser?.role === 'admin') {
+        await loadSessionConfig();
+        await loadOidc();
+      }
     }
   }
 
@@ -288,6 +456,151 @@
           {/if}
         </div>
 
+        <!-- OIDC providers (admin) -->
+        <div class="setting-divider"></div>
+        <button class="setting-row setting-action" on:click={() => oidcExpanded = !oidcExpanded}>
+          <span class="material-symbols-rounded si" style="color:var(--accent)">badge</span>
+          <div style="flex:1;text-align:left">
+            <span class="setting-label">OIDC providers (Single Sign-On)</span>
+            <div class="setting-desc">Configure Authentik, Keycloak, Pocket ID, Auth0, Google, etc. Users sign in with their existing identity provider.</div>
+          </div>
+          <span class="material-symbols-rounded si">{oidcExpanded ? 'expand_less' : 'expand_more'}</span>
+        </button>
+        {#if oidcExpanded}
+          <div class="setting-row" style="display:flex;flex-direction:column;align-items:stretch;gap:10px">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+              <span class="text-3 text-sm">{oidcProviders.length} configured</span>
+              <button class="btn btn-secondary" style="height:32px;font-size:12px;padding:0 12px" on:click={startCreateProvider}>
+                + Add provider
+              </button>
+            </div>
+
+            {#each oidcProviders as p (p.id)}
+              <div class="oidc-row">
+                {#if p.logo_url}<img src={p.logo_url} alt="" class="oidc-logo" />{:else}<span class="material-symbols-rounded oidc-icon">verified_user</span>{/if}
+                <div class="oidc-info">
+                  <span class="oidc-name">{p.display_name || p.issuer_url}</span>
+                  <span class="text-3 text-sm">{p.issuer_url} · auto-register {p.auto_register ? 'on' : 'off'}{!p.is_active ? ' · disabled' : ''}</span>
+                </div>
+                <div class="oidc-actions">
+                  <button class="btn-icon" title="Test discovery" on:click={() => testProvider(p.id)} disabled={oidcBusy}>
+                    <span class="material-symbols-rounded">network_check</span>
+                  </button>
+                  <button class="btn-icon" title="Edit" on:click={() => startEditProvider(p)} disabled={oidcBusy}>
+                    <span class="material-symbols-rounded">edit</span>
+                  </button>
+                  <button class="btn-icon" title="Delete" on:click={() => deleteProvider(p)} disabled={oidcBusy}>
+                    <span class="material-symbols-rounded" style="color:var(--danger)">delete</span>
+                  </button>
+                </div>
+              </div>
+            {/each}
+
+            {#if oidcTestResult}
+              <div class="oidc-test-result" class:ok={oidcTestResult.ok}>
+                {#if oidcTestResult.ok}
+                  <strong>Discovery OK</strong>
+                  <div class="text-3 text-sm">issuer: {oidcTestResult.issuer}</div>
+                  <div class="text-3 text-sm">authorization_endpoint: {oidcTestResult.authorization_endpoint || '—'}</div>
+                  <div class="text-3 text-sm">token_endpoint: {oidcTestResult.token_endpoint || '—'}</div>
+                  <div class="text-3 text-sm">end_session_endpoint: {oidcTestResult.end_session_endpoint || '—'}</div>
+                {:else}
+                  <strong style="color:var(--danger)">Discovery failed</strong>
+                  <div class="text-3 text-sm">{oidcTestResult.error}</div>
+                {/if}
+              </div>
+            {/if}
+
+            {#if oidcEditing}
+              <div class="oidc-form" transition:slide={{ duration: 180 }}>
+                <div class="form-group">
+                  <label class="form-label">Display name</label>
+                  <input class="input" bind:value={oidcEditing.display_name} placeholder="Authentik / Pocket ID / Google" />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Issuer URL *</label>
+                  <input class="input" bind:value={oidcEditing.issuer_url} placeholder="https://auth.example.com/application/o/nutritrace/" autocomplete="url" />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Client ID *</label>
+                  <input class="input" bind:value={oidcEditing.client_id} autocomplete="off" />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Client secret {oidcEditing.id ? '(leave blank to keep existing)' : '*'}</label>
+                  <input class="input" type="password" bind:value={oidcEditing.client_secret} autocomplete="off" />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Redirect URIs *</label>
+                  {#each oidcEditing.redirect_uris as uri, i}
+                    <div style="display:flex;gap:6px;margin-bottom:4px">
+                      <input class="input" style="flex:1" bind:value={oidcEditing.redirect_uris[i]} placeholder="https://nutritrace.app/api/auth/oidc/callback/{oidcEditing.id || ':providerId'}" />
+                      {#if oidcEditing.redirect_uris.length > 1}
+                        <button class="btn-icon" on:click={() => removeRedirectUri(i)} title="Remove"><span class="material-symbols-rounded">close</span></button>
+                      {/if}
+                    </div>
+                  {/each}
+                  <button class="btn btn-ghost btn-sm" type="button" on:click={addRedirectUri}>+ Add redirect URI</button>
+                  <div class="text-3 text-sm" style="margin-top:4px">Must match exactly what your IdP has configured. The path is <code>/api/auth/oidc/callback/&lt;provider-id&gt;</code> under your NutriTrace base URL.</div>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Scope</label>
+                  <input class="input" bind:value={oidcEditing.scope} />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Token endpoint auth method</label>
+                  <select class="select" bind:value={oidcEditing.token_endpoint_auth_method}>
+                    <option value="client_secret_post">client_secret_post (default)</option>
+                    <option value="client_secret_basic">client_secret_basic</option>
+                    <option value="none">none (PKCE-only public client)</option>
+                  </select>
+                </div>
+                <div class="setting-row" style="padding:0">
+                  <div>
+                    <span class="setting-label">Auto-register new users</span>
+                    <div class="setting-desc">When on, users with verified email matching an existing local account auto-link, and brand-new emails create new accounts. Off = admin must invite first.</div>
+                  </div>
+                  <Toggle checked={!!oidcEditing.auto_register} on:change={e => oidcEditing.auto_register = e.detail ? 1 : 0} />
+                </div>
+                <div class="setting-row" style="padding:0">
+                  <div>
+                    <span class="setting-label">Provider active</span>
+                    <div class="setting-desc">Inactive providers won't show on the Login page.</div>
+                  </div>
+                  <Toggle checked={!!oidcEditing.is_active} on:change={e => oidcEditing.is_active = e.detail ? 1 : 0} />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Admin group claim (optional)</label>
+                  <input class="input" bind:value={oidcEditing.admin_group_claim} placeholder="groups" />
+                  <div class="text-3 text-sm">Name of the claim that lists user groups. Common: <code>groups</code>.</div>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Admin group value (optional)</label>
+                  <input class="input" bind:value={oidcEditing.admin_group_value} placeholder="NutriTraceAdmins" />
+                  <div class="text-3 text-sm">If a user's groups claim contains this value, they're set to admin on each login.</div>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Logo URL (optional)</label>
+                  <input class="input" bind:value={oidcEditing.logo_url} placeholder="https://…/authentik.png" />
+                </div>
+                <div style="display:flex;gap:8px;margin-top:8px">
+                  <button class="btn btn-ghost" style="flex:1" on:click={cancelProviderEdit}>Cancel</button>
+                  <button class="btn btn-primary" style="flex:1" on:click={saveProvider} disabled={oidcBusy}>
+                    {oidcBusy ? 'Saving…' : (oidcEditing.id ? 'Save changes' : 'Create provider')}
+                  </button>
+                </div>
+              </div>
+            {/if}
+          </div>
+
+          <div class="setting-row">
+            <div>
+              <span class="setting-label">Allow password login</span>
+              <div class="setting-desc">When off, users sign in only via OIDC. Recovery still works via the <code>RECOVERY_TOKEN</code> env var.</div>
+            </div>
+            <Toggle checked={enablePasswordLogin} on:change={togglePasswordLogin} />
+          </div>
+        {/if}
+
         <div class="setting-divider"></div>
         <div class="setting-row">
           <div>
@@ -482,4 +795,24 @@
   .dialog-msg   { font-size: 13px; color: var(--text-3); margin: 0 0 20px; line-height: 1.5; }
   .dialog-actions { display: flex; gap: 10px; justify-content: flex-end; }
   .btn-danger { background: var(--danger, #ef4444); color: #fff; border: none; border-radius: var(--radius-md); padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; }
+
+  .oidc-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-md);
+  }
+  .oidc-logo { width: 22px; height: 22px; object-fit: contain; flex: 0 0 auto; }
+  .oidc-icon { font-size: 22px; flex: 0 0 auto; color: var(--text-3); }
+  .oidc-info { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .oidc-name { font-weight: 600; }
+  .oidc-actions { display: flex; gap: 4px; }
+  .oidc-test-result {
+    padding: 10px; border-radius: var(--radius-md);
+    background: var(--surface-2); border: 1px solid var(--border);
+  }
+  .oidc-test-result.ok { border-color: var(--success, #22c55e); }
+  .oidc-form {
+    display: flex; flex-direction: column; gap: 8px;
+    padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md);
+    background: var(--surface-2);
+  }
 </style>

@@ -152,6 +152,48 @@ async function _refreshAuthFromServer() {
   } catch {}
 }
 
+/**
+ * Inspect the URL hash for an OIDC callback marker and act on it:
+ *   - ?oidc=ok      → toast success, refresh auth + settings
+ *   - ?oidc=linked  → toast linked, refresh auth (Profile-page link flow)
+ *   - ?oidc_error=  → toast the (URL-decoded) error message
+ *
+ * Strips the marker from the URL after handling so a refresh doesn't repeat
+ * the side effects.
+ */
+export async function handleOidcCallback() {
+  if (typeof window === 'undefined' || !window.location?.hash) return false;
+  const hash = window.location.hash; // e.g. "#/?oidc=ok" or "#/profile?oidc_error=foo"
+  const qIdx = hash.indexOf('?');
+  if (qIdx < 0) return false;
+  const path = hash.slice(0, qIdx);
+  const params = new URLSearchParams(hash.slice(qIdx + 1));
+  const ok = params.get('oidc');
+  const err = params.get('oidc_error');
+  if (!ok && !err) return false;
+
+  // Strip marker(s) and leave the rest of the query intact.
+  params.delete('oidc');
+  params.delete('oidc_error');
+  const remaining = params.toString();
+  const cleanHash = remaining ? `${path}?${remaining}` : path;
+  history.replaceState(null, '', window.location.pathname + window.location.search + cleanHash);
+
+  const { showSuccess, showError } = await import('./toast.js');
+  if (err) {
+    showError(decodeURIComponent(err));
+    return true;
+  }
+  if (ok === 'ok') {
+    showSuccess('Signed in');
+    await _fetchAuthFromServer();
+  } else if (ok === 'linked') {
+    showSuccess('Linked');
+    await _fetchAuthFromServer();
+  }
+  return true;
+}
+
 export async function logout() {
   try { await fetch(_apiUrl('/api/auth/logout'), { method: 'POST', credentials: 'include', headers: _authHeaders() }); } catch {}
   // Clear auth state — but keep cached data (foods, images, server URL)

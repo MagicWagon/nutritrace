@@ -5,6 +5,52 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.0-rc.9] — 2026-04-30 — OIDC sign-on (Experimental)
+
+Adds optional Single Sign-On via any OpenID Connect provider —
+Authentik, Keycloak, Pocket ID, Auth0, Google, Zitadel, etc.
+Marked **Experimental** for this release. Existing password login
+keeps working; nothing changes for installs that don't configure
+a provider.
+
+### Added
+- **OIDC providers admin** under Settings → User Management → "OIDC
+  providers (Single Sign-On)". Add/edit/delete providers, test
+  discovery, set per-provider auto-register, branded display name,
+  and logo. Multiple providers supported. Client secrets stored
+  encrypted at rest (AES-GCM via the same key derivation NutriTrace
+  uses for wearable OAuth tokens).
+- **Login page** shows an SSO button per active provider above the
+  password form. Branded with each provider's display name + logo.
+- **Profile → Linked accounts**: see which providers your account
+  is linked to, link additional ones, unlink existing ones. The
+  app refuses to unlink your last sign-in method to prevent
+  lock-out.
+- **Auto-link policy**: when an OIDC user has a verified email
+  matching an existing local account, NutriTrace auto-links them —
+  but only when the matching provider has auto-register enabled.
+  Otherwise the user is prompted to sign in with their password
+  first and link the provider from their Profile.
+- **Admin role mapping (optional)**: per provider, set a claim name
+  (e.g. `groups`) and a value (e.g. `NutriTraceAdmins`). Users with
+  that value in the claim get admin role on every login; users who
+  no longer have it get demoted.
+- **Disable password login (optional)**: once at least one OIDC
+  provider is configured, admins can flip a toggle to make SSO the
+  only sign-in method. The `RECOVERY_TOKEN` env var still works as
+  the lockout escape hatch.
+- Set-password flow on Profile for OIDC-only users who want to add
+  a password later (no current-password required, since they don't
+  have one yet).
+
+### Storage
+- Two new tables: `oidc_providers` (one row per IdP) and
+  `user_oidc_links` (per-user provider links). The `users` table is
+  unchanged except that `password_hash` is now nullable for OIDC-only
+  accounts.
+
+---
+
 ## [1.0.0-rc.8] — 2026-04-30 — Manual activity logging (issue #3)
 
 Adds an opt-in **Activity** section to the Diary so you can log
