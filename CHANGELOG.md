@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.0-rc.10] — 2026-04-30 — Stress score recalibration
+
+### Changed
+- Stress score formula recalibrated against another week of ground-truth Fitbit data. The previous formula consistently came in ~3-4 points higher than Fitbit's own stress management score; the offset has been trimmed so calculated values track closer to what your wearable reports. No action needed — your scores will refresh on the next sync.
+
+---
+
 ## [1.0.0-rc.9] — 2026-04-30 — OIDC sign-on (Experimental)
 
 Adds optional Single Sign-On via any OpenID Connect provider —
