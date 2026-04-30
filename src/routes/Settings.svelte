@@ -24,7 +24,7 @@
     diaryShowBrands, diaryShowTimestamps, diaryShowThumbnails, diaryShowAllNutrients,
     diaryShowNutritionUnits, diaryShowMacroSummary, diaryPromptQuantity, diaryShowPortionSize,
     diaryShowNotes,
-    diaryShowActivity, manualActivityPolicy,
+    diaryShowActivity, manualActivityPolicy, calorieAdjustFromActivity,
     diaryShowNutritionBar,
     foodsShowCategories, foodsShowLabels, foodsShowNotes, foodsShowThumbnails, foodsShowYesterdayMeals, foodsSort,
     barcodeBeep, barcodeFlashlight, cropPhotos,
@@ -1359,15 +1359,22 @@
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <div><span class="setting-label">Show activity section</span><div class="setting-desc">Manually log exercise calories. Daily total offsets your calorie goal — useful if you don't have a wearable.</div></div>
+            <div><span class="setting-label">Show activity section</span><div class="setting-desc">A list-of-entries Activity section on the Diary for logging exercise. Each entry has a name + calories burned. Useful if you don't have a wearable integration.</div></div>
             <Toggle checked={$diaryShowActivity} on:change={e => diaryShowActivity.set(e.detail)} />
           </div>
           {#if $diaryShowActivity}
             <div class="setting-divider"></div>
             <div class="setting-row">
+              <div><span class="setting-label">Adjust calorie goal from activity</span><div class="setting-desc">When on, today's burn (manual + wearable per the policy below) raises your calorie remaining for the day — earn-back model. When off, activity entries still log and display but your goal stays at its base value.</div></div>
+              <Toggle checked={$calorieAdjustFromActivity} on:change={e => calorieAdjustFromActivity.set(e.detail)} />
+            </div>
+          {/if}
+          {#if $diaryShowActivity && $calorieAdjustFromActivity && (!isNativeLocal || $healthConnectEnabled)}
+            <div class="setting-divider"></div>
+            <div class="setting-row">
               <div style="flex:1">
                 <span class="setting-label">When wearable + manual entries both exist</span>
-                <div class="setting-desc">How to combine your manually-logged activity with calories from Fitbit / Garmin / Withings / Health Connect on days you have both.</div>
+                <div class="setting-desc">{isNativeLocal ? 'How to combine your manually-logged activity with Health Connect active calories on days you have both.' : 'How to combine your manually-logged activity with calories from Fitbit / Garmin / Withings / Health Connect on days you have both.'}</div>
                 <div style="margin-top:8px; display:flex; flex-direction:column; gap:6px;">
                   <label style="display:flex; gap:8px; align-items:flex-start;">
                     <input type="radio" name="activityPolicy" value="wearable_wins" checked={$manualActivityPolicy === 'wearable_wins'} on:change={() => manualActivityPolicy.set('wearable_wins')} />

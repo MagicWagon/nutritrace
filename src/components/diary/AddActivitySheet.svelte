@@ -15,13 +15,18 @@
   let distance = '';
   let saving = false;
   let error = '';
-
-  $: if (open) {
-    name        = entry?.name        ?? '';
-    kcal        = entry?.kcal        != null ? String(entry.kcal) : '';
-    durationMin = entry?.duration_min != null ? String(entry.duration_min) : '';
-    distance    = entry?.distance    ?? '';
-    error       = '';
+  // Reset fields only on the false→true open transition; otherwise typing
+  // in the inputs triggers a reactive cycle that wipes the user's edits.
+  let _wasOpen = false;
+  $: {
+    if (open && !_wasOpen) {
+      name        = entry?.name        ?? '';
+      kcal        = entry?.kcal        != null ? String(entry.kcal) : '';
+      durationMin = entry?.duration_min != null ? String(entry.duration_min) : '';
+      distance    = entry?.distance    ?? '';
+      error       = '';
+    }
+    _wasOpen = open;
   }
 
   $: titleText = entry ? 'Edit Activity' : 'Add Activity';
@@ -83,8 +88,7 @@
     {/if}
 
     <div class="actions">
-      <button class="btn ghost" on:click={() => open = false} disabled={saving}>Cancel</button>
-      <button class="btn primary" on:click={save} disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
+      <button class="btn btn-primary btn-block" on:click={save} disabled={saving}>{saving ? 'Adding…' : (entry ? 'Save Changes' : 'Add to Diary')}</button>
     </div>
   </div>
 </Sheet>
@@ -96,5 +100,6 @@
   .hint { font-weight: 400; opacity: 0.7; }
   .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .error { color: var(--danger, #e34); font-size: 13px; }
-  .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+  .actions { margin-top: 4px; }
+  .btn-block { width: 100%; }
 </style>
