@@ -28,7 +28,8 @@
            diaryShowAllNutrients, diaryShowNutritionUnits, visibleNutriments, hiddenBodyStats,
            dateFormat, timeFormat, disableAnimations, goalCelebrations, pageBanners,
            calorieGoalMode, calorieGoalFactor,
-           diaryShowActivity, manualActivityPolicy, calorieAdjustFromActivity } from '../stores/settings.js';
+           diaryShowActivity, manualActivityPolicy, calorieAdjustFromActivity,
+           wellnessEnabled } from '../stores/settings.js';
   import { dayActivity, activitySummary, loadActivity, deleteActivity } from '../stores/activity.js';
   import DiaryBanner  from '../components/banners/DiaryBanner.svelte';
   import WaterBanner  from '../components/banners/WaterBanner.svelte';
@@ -953,7 +954,12 @@
       <section class="meal-group card activity-group" id="activity-group" in:fly={{ y: 18, duration: 280, delay: 60 + meals.length * 55 }}>
         <div class="meal-header" style="--meal-color:#4FFFB0">
           <span class="meal-type-icon material-symbols-rounded">directions_run</span>
-          <span class="meal-name">Activity</span>
+          <div class="activity-name-stack">
+            <span class="meal-name">Activity</span>
+            {#if $wellnessEnabled}
+              <span class="activity-sub text-3 text-sm">Synced workouts from your device live in Wellness</span>
+            {/if}
+          </div>
           <button class="btn-icon accent ml-auto" on:click={() => { editingActivity = null; showActivitySheet = true; }} aria-label="Add activity" title="Add activity">
             <span class="material-symbols-rounded">add</span>
           </button>
@@ -1672,6 +1678,8 @@
 
   /* Activity section — same shell as meal-group, footer mirrors meal-macro-footer
      but with green segments per entry instead of P/C/F. */
+  .activity-name-stack { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+  .activity-sub { line-height: 1.2; opacity: 0.75; }
   .activity-footer { cursor: default; }
   .activity-footer:hover, .activity-footer:active { background: transparent; }
   .amb-seg {

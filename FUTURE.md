@@ -108,6 +108,25 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
 ### Recipe scaling from servings count
 - Input "I want 6 servings" → auto-scale all ingredient quantities
 
+### Nutrition CSV importer
+- Per-source CSV adapters for the most common nutrition trackers users
+  migrate from: **MyFitnessPal**, **LoseIt**, **Cronometer**,
+  **Waistline**, raw spreadsheet. Mirrors the LiftTrace
+  workout-import pattern: `server/lib/nutrition-import/{mfp,loseit,
+  cronometer,waistline,spreadsheet}.js` adapters → canonical
+  `{ date, meal, name, brand, portion, unit, quantity, nutrition,
+  body_stats?, water? }` rows → `/api/nutrition-import/{preview,commit}`
+  with skip/replace per-date semantics, surfaced via
+  `SettingsNutritionImport.svelte` in the DATA group with an
+  Experimental badge.
+- Today's workaround: hand-massaging into JSON backup format and
+  using the Settings → Backup → Import JSON path (works fine —
+  diary entries are self-contained snapshots; only catch is that
+  import does INSERT OR REPLACE per `(user, date)` so historical
+  imports must skip dates that already have data). Keeping the
+  CSV path on the roadmap because users keep asking.
+- Driving issue: community thread 2026-04-29.
+
 ---
 
 ## Goals
