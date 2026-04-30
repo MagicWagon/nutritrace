@@ -45,36 +45,22 @@
 
   // Presets for the most common self-hosted + public OIDC providers. Each
   // preset pre-fills sensible defaults and shows an inline help line so the
-  // admin doesn't have to look up issuer-URL syntax.
+  // admin doesn't have to look up issuer-URL syntax. Ordered alphabetically
+  // with Custom last as the catch-all fallback.
   const PROVIDER_PRESETS = [
     {
-      id: 'authentik',
-      name: 'Authentik',
-      icon: 'verified_user',
+      id: 'auth0',
+      name: 'Auth0',
+      icon: 'cloud',
       defaults: {
         scope: 'openid profile email',
         token_endpoint_auth_method: 'client_secret_post',
-        admin_group_claim: 'groups',
-        display_name: 'Authentik',
-        logo_url: '/icons/sso/authentik.svg',
+        admin_group_claim: '',  // Auth0 typically uses namespaced claims — user fills in their own
+        display_name: 'Auth0',
+        logo_url: 'https://cdn.simpleicons.org/auth0/EB5424',
       },
-      issuer_hint: 'https://auth.example.com/application/o/<your-app-slug>/',
-      help: 'Issuer URL is the "OpenID Configuration Issuer" shown on the Provider page in Authentik. Make sure your Application uses an OAuth2/OIDC Provider and you\'ve added the redirect URI shown above to its allowed list.',
-      hides: [],
-    },
-    {
-      id: 'keycloak',
-      name: 'Keycloak',
-      icon: 'shield',
-      defaults: {
-        scope: 'openid profile email',
-        token_endpoint_auth_method: 'client_secret_basic',
-        admin_group_claim: 'groups',
-        display_name: 'Keycloak',
-        logo_url: 'https://cdn.simpleicons.org/keycloak/4D4D4D',
-      },
-      issuer_hint: 'https://auth.example.com/realms/<your-realm>',
-      help: 'Add a "groups" mapper to your client\'s default scope so the groups claim is included in the ID token.',
+      issuer_hint: 'https://<your-tenant>.auth0.com/',
+      help: 'Auth0 adds custom claims under a namespaced URL like "https://nutritrace.app/roles" — leave the admin claim blank for now and contact your tenant admin to set up a rule that exposes role membership.',
       hides: [],
     },
     {
@@ -93,33 +79,18 @@
       hides: [],
     },
     {
-      id: 'pocket-id',
-      name: 'Pocket ID',
-      icon: 'fingerprint',
-      defaults: {
-        scope: 'openid profile email groups',
-        token_endpoint_auth_method: 'client_secret_post',
-        admin_group_claim: 'groups',
-        display_name: 'Pocket ID',
-        logo_url: '/icons/sso/pocket-id.svg',
-      },
-      issuer_hint: 'https://id.example.com',
-      help: 'Pocket ID uses passkeys for primary auth — your users won\'t need a password at the IdP either. Add the redirect URI shown above to the OIDC client in Pocket ID admin.',
-      hides: [],
-    },
-    {
-      id: 'auth0',
-      name: 'Auth0',
-      icon: 'cloud',
+      id: 'authentik',
+      name: 'Authentik',
+      icon: 'verified_user',
       defaults: {
         scope: 'openid profile email',
         token_endpoint_auth_method: 'client_secret_post',
-        admin_group_claim: '',  // Auth0 typically uses namespaced claims — user fills in their own
-        display_name: 'Auth0',
-        logo_url: 'https://cdn.simpleicons.org/auth0/EB5424',
+        admin_group_claim: 'groups',
+        display_name: 'Authentik',
+        logo_url: '/icons/sso/authentik.svg',
       },
-      issuer_hint: 'https://<your-tenant>.auth0.com/',
-      help: 'Auth0 adds custom claims under a namespaced URL like "https://nutritrace.app/roles" — leave the admin claim blank for now and contact your tenant admin to set up a rule that exposes role membership.',
+      issuer_hint: 'https://auth.example.com/application/o/<your-app-slug>/',
+      help: 'Issuer URL is the "OpenID Configuration Issuer" shown on the Provider page in Authentik. Make sure your Application uses an OAuth2/OIDC Provider and you\'ve added the redirect URI shown above to its allowed list.',
       hides: [],
     },
     {
@@ -137,6 +108,36 @@
       issuer_hint: 'https://accounts.google.com',
       help: 'Google\'s issuer URL is fixed. Group/role claims are not available with standard scopes — admin role mapping is hidden for this provider; promote Google users manually after first login.',
       hides: ['admin_group_claim', 'admin_group_value'],
+    },
+    {
+      id: 'keycloak',
+      name: 'Keycloak',
+      icon: 'shield',
+      defaults: {
+        scope: 'openid profile email',
+        token_endpoint_auth_method: 'client_secret_basic',
+        admin_group_claim: 'groups',
+        display_name: 'Keycloak',
+        logo_url: 'https://cdn.simpleicons.org/keycloak/4D4D4D',
+      },
+      issuer_hint: 'https://auth.example.com/realms/<your-realm>',
+      help: 'Add a "groups" mapper to your client\'s default scope so the groups claim is included in the ID token.',
+      hides: [],
+    },
+    {
+      id: 'pocket-id',
+      name: 'Pocket ID',
+      icon: 'fingerprint',
+      defaults: {
+        scope: 'openid profile email groups',
+        token_endpoint_auth_method: 'client_secret_post',
+        admin_group_claim: 'groups',
+        display_name: 'Pocket ID',
+        logo_url: '/icons/sso/pocket-id.svg',
+      },
+      issuer_hint: 'https://id.example.com',
+      help: 'Pocket ID uses passkeys for primary auth — your users won\'t need a password at the IdP either. Add the redirect URI shown above to the OIDC client in Pocket ID admin.',
+      hides: [],
     },
     {
       id: 'custom',
@@ -211,7 +212,8 @@
       client_id: '',
       client_secret: '',
       redirect_uris: [_defaultRedirectUri()],
-      auto_register: 0,
+      auto_link_verified_email: 1,  // safe default — silently link existing users
+      auto_register_new_users:  0,  // careful default — admin invites new users
       admin_group_value: '',
       is_active: 1,
       ...p.defaults,
@@ -468,12 +470,30 @@
     } catch(e) { showError(e.message); }
   }
 
-  function logoutServer() {
+  async function logoutServer() {
     document.body.style.transition = 'opacity 0.3s';
     document.body.style.opacity = '0';
+    // Tell the server to clear the auth cookie — it's httpOnly so the
+    // client can't drop it directly. Without this round-trip the page
+    // reload below would silently re-authenticate and leave the user in.
+    try {
+      const csrf = localStorage.getItem('nt:csrf');
+      const headers = {};
+      if (isNative && getServerUrl()) {
+        const t = getAuthToken();
+        if (t) headers['Authorization'] = `Bearer ${t}`;
+      } else if (csrf) {
+        headers['X-CSRF-Token'] = csrf;
+      }
+      await fetch(apiUrl('/api/auth/logout'), {
+        method: 'POST', credentials: 'include', headers,
+      });
+    } catch {}
     localStorage.removeItem('wl:userId');
     localStorage.removeItem('nt:cachedUser');
-    localStorage.removeItem('nt:cachedUserMgmt');
+    localStorage.removeItem('nt:csrf');
+    // Keep nt:cachedUserMgmt — user-management is a server-wide flag, not
+    // a per-session one, so don't flicker the post-reload boot into wizard.
     if (isNative) setAuthToken(null);
     setTimeout(() => window.location.reload(), 300);
   }
@@ -632,7 +652,7 @@
                 {#if p.logo_url}<img src={resolveAssetUrl(p.logo_url)} alt="" class="oidc-logo" />{:else}<span class="material-symbols-rounded oidc-icon">verified_user</span>{/if}
                 <div class="oidc-info">
                   <span class="oidc-name">{p.display_name || p.issuer_url}</span>
-                  <span class="text-3 text-sm">{p.issuer_url} · auto-register {p.auto_register ? 'on' : 'off'}{!p.is_active ? ' · disabled' : ''}</span>
+                  <span class="text-3 text-sm">{p.issuer_url} · link {p.auto_link_verified_email ? 'on' : 'off'} · register {p.auto_register_new_users ? 'on' : 'off'}{!p.is_active ? ' · disabled' : ''}</span>
                 </div>
                 <div class="oidc-actions">
                   <button class="btn-icon" title="Test discovery" on:click={() => testProvider(p.id)} disabled={oidcBusy}>
@@ -737,10 +757,17 @@
                 </div>
                 <div class="setting-row" style="padding:0">
                   <div>
-                    <span class="setting-label">Auto-register new users</span>
-                    <div class="setting-desc">When on, users with verified email matching an existing local account auto-link, and brand-new emails create new accounts. Off = admin must invite first.</div>
+                    <span class="setting-label">Auto-link existing users (verified email)</span>
+                    <div class="setting-desc">When the IdP says <code>email_verified=true</code> and the email matches an existing NutriTrace user, link them silently on first SSO sign-in. Recommended ON for any IdP you trust to verify emails.</div>
                   </div>
-                  <Toggle checked={!!oidcEditing.auto_register} on:change={e => oidcEditing.auto_register = e.detail ? 1 : 0} />
+                  <Toggle checked={!!oidcEditing.auto_link_verified_email} on:change={e => oidcEditing.auto_link_verified_email = e.detail ? 1 : 0} />
+                </div>
+                <div class="setting-row" style="padding:0">
+                  <div>
+                    <span class="setting-label">Auto-register new users</span>
+                    <div class="setting-desc">Allow anyone with an account at this IdP to create a brand-new NutriTrace account on first sign-in. OFF = admin must invite first. Leave OFF for shared IdPs (Google, work SSO) unless you actually want blanket onboarding.</div>
+                  </div>
+                  <Toggle checked={!!oidcEditing.auto_register_new_users} on:change={e => oidcEditing.auto_register_new_users = e.detail ? 1 : 0} />
                 </div>
                 <div class="setting-row" style="padding:0">
                   <div>

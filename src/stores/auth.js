@@ -203,8 +203,11 @@ export async function logout() {
   }
   localStorage.removeItem('wl:userId');
   localStorage.removeItem('nt:cachedUser');
-  localStorage.removeItem('nt:cachedUserMgmt');
   localStorage.removeItem('nt:csrf');
   currentUser.set(null);
-  userMgmtActive.set(false);
+  // Note: userMgmtActive is a server-wide flag, not per-session. Don't flip
+  // it on logout — that hides the Login gate in App.svelte (needsLogin =
+  // userMgmtActive && !currentUser) and leaves the user stuck in a half-
+  // rendered app. Keep the cached value too so a post-logout reload doesn't
+  // briefly flicker into the wizard before the server confirms.
 }

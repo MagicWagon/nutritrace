@@ -55,7 +55,8 @@ function _coerceProvider(body, existing) {
     id_token_signed_response_alg: String(get('id_token_signed_response_alg', 'RS256')),
     userinfo_signed_response_alg: String(get('userinfo_signed_response_alg', 'none')),
     request_timeout_ms: Math.max(1000, Math.min(120000, Number(get('request_timeout_ms', 30000)) || 30000)),
-    auto_register: get('auto_register', 0) ? 1 : 0,
+    auto_link_verified_email: get('auto_link_verified_email', 1) ? 1 : 0,
+    auto_register_new_users:  get('auto_register_new_users',  0) ? 1 : 0,
     admin_group_claim: get('admin_group_claim', '') ? String(get('admin_group_claim')).trim() : null,
     admin_group_value: get('admin_group_value', '') ? String(get('admin_group_value')).trim() : null,
     display_name: get('display_name', '') ? String(get('display_name')).trim().slice(0, 80) : null,
@@ -79,19 +80,32 @@ router.post('/providers', wrap((req, res) => {
        issuer_url, client_id, client_secret, redirect_uris, scope,
        token_endpoint_auth_method, response_types,
        id_token_signed_response_alg, userinfo_signed_response_alg, request_timeout_ms,
-       auto_register, admin_group_claim, admin_group_value,
+       auto_link_verified_email, auto_register_new_users,
+       admin_group_claim, admin_group_value,
        display_name, logo_url, is_active
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     fields.issuer_url, fields.client_id, encSecret,
     fields.redirect_uris, fields.scope,
     fields.token_endpoint_auth_method, fields.response_types,
     fields.id_token_signed_response_alg, fields.userinfo_signed_response_alg, fields.request_timeout_ms,
-    fields.auto_register, fields.admin_group_claim, fields.admin_group_value,
+    fields.auto_link_verified_email, fields.auto_register_new_users,
+    fields.admin_group_claim, fields.admin_group_value,
     fields.display_name, fields.logo_url, fields.is_active
   );
-  invalidateDiscovery(r.lastInsertRowid);
-  const created = getProvider(r.lastInsertRowid);
+  // The admin form uses ":providerId" as a placeholder when creating, since
+  // the real ID isn't known until INSERT. Substitute it now so the saved
+  // redirect URI is immediately usable without an extra Edit step.
+  const newId = r.lastInsertRowid;
+  try {
+    const stored = JSON.parse(fields.redirect_uris);
+    const fixed  = stored.map(u => typeof u === 'string' ? u.replace(/:providerId/g, String(newId)) : u);
+    if (JSON.stringify(fixed) !== fields.redirect_uris) {
+      db.prepare(`UPDATE oidc_providers SET redirect_uris = ? WHERE id = ?`).run(JSON.stringify(fixed), newId);
+    }
+  } catch {}
+  invalidateDiscovery(newId);
+  const created = getProvider(newId);
   logger.info(`[oidc-admin] created provider ${created.id} (${created.display_name || created.issuer_url})`);
   res.status(201).json(adminProvider(created));
 }));
@@ -117,7 +131,8 @@ router.put('/providers/:id', wrap((req, res) => {
     redirect_uris = ?, scope = ?,
     token_endpoint_auth_method = ?, response_types = ?,
     id_token_signed_response_alg = ?, userinfo_signed_response_alg = ?, request_timeout_ms = ?,
-    auto_register = ?, admin_group_claim = ?, admin_group_value = ?,
+    auto_link_verified_email = ?, auto_register_new_users = ?,
+    admin_group_claim = ?, admin_group_value = ?,
     display_name = ?, logo_url = ?, is_active = ?,
     updated_at = datetime('now')
     ${secretClause}
@@ -127,7 +142,8 @@ router.put('/providers/:id', wrap((req, res) => {
     fields.redirect_uris, fields.scope,
     fields.token_endpoint_auth_method, fields.response_types,
     fields.id_token_signed_response_alg, fields.userinfo_signed_response_alg, fields.request_timeout_ms,
-    fields.auto_register, fields.admin_group_claim, fields.admin_group_value,
+    fields.auto_link_verified_email, fields.auto_register_new_users,
+    fields.admin_group_claim, fields.admin_group_value,
     fields.display_name, fields.logo_url, fields.is_active,
   ];
   if (secretArg !== null) args.push(secretArg);

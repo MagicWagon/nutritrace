@@ -53,7 +53,9 @@ export function adminProvider(p) {
     redirect_uris:  _safeJsonArray(p.redirect_uris),
     response_types: _safeJsonArray(p.response_types),
     is_active:      !!p.is_active,
-    auto_register:  !!p.auto_register,
+    auto_link_verified_email: p.auto_link_verified_email != null ? !!p.auto_link_verified_email : !!p.auto_register,
+    auto_register_new_users:  p.auto_register_new_users  != null ? !!p.auto_register_new_users  : !!p.auto_register,
+    auto_register:  !!p.auto_register, // legacy field — kept for older clients
   };
 }
 
@@ -169,8 +171,20 @@ export function resolveUser(provider, claims) {
   const email = claims.email ? String(claims.email).trim().toLowerCase() : null;
   const emailVerified = !!claims.email_verified;
 
-  // 2. Verified-email auto-link to existing local user (gated on auto_register)
-  if (email && emailVerified && provider.auto_register) {
+  // Split flags (rc.12+):
+  //   auto_link_verified_email — silently link verified-email match to existing
+  //     local user. Defaults ON (trust the IdP you configured).
+  //   auto_register_new_users — auto-create a NutriTrace account for first-time
+  //     OIDC users. Defaults OFF (admin must invite first).
+  const autoLink = provider.auto_link_verified_email != null
+    ? !!provider.auto_link_verified_email
+    : !!provider.auto_register;        // legacy fallback
+  const autoCreate = provider.auto_register_new_users != null
+    ? !!provider.auto_register_new_users
+    : !!provider.auto_register;        // legacy fallback
+
+  // 2. Verified-email auto-link to existing local user
+  if (email && emailVerified && autoLink) {
     const localByEmail = db.prepare(`SELECT * FROM users WHERE email = ?`).get(email);
     if (localByEmail) {
       db.prepare(
@@ -180,17 +194,17 @@ export function resolveUser(provider, claims) {
       return { user: localByEmail, created: false, linked: true };
     }
   }
-  // 2b. Email collision but auto_register off → reject so the user can link
+  // 2b. Email collision but auto-link is off → reject so the user can link
   // via Profile after a password login.
   if (email) {
     const collision = db.prepare(`SELECT id FROM users WHERE email = ?`).get(email);
-    if (collision && !provider.auto_register) {
-      throw new Error('An account with this email already exists. Sign in with your password and link this provider from your Profile, or ask your admin to enable auto-register.');
+    if (collision && !autoLink) {
+      throw new Error(`Your ${provider.display_name || 'OIDC'} account matches an existing NutriTrace user. Sign in once with your password and link this provider from Profile → Linked accounts. After that, SSO will sign you in directly.`);
     }
   }
 
   // 3. Auto-create new user
-  if (provider.auto_register) {
+  if (autoCreate) {
     const username = _deriveUsername(claims);
     const emailVal = email || null;
     const fullName = claims.name || [claims.given_name, claims.family_name].filter(Boolean).join(' ') || null;
@@ -209,7 +223,7 @@ export function resolveUser(provider, claims) {
   }
 
   // 4. Reject
-  throw new Error('No matching account. Ask your admin to enable auto-register on this provider, or have them invite you first.');
+  throw new Error('No NutriTrace account is linked to this identity. Ask your admin to enable Auto-register new users on this provider, or have them invite you first.');
 }
 
 /**

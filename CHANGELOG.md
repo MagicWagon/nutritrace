@@ -5,6 +5,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.0-rc.12] — 2026-04-30 — Auth fixes + finer OIDC controls
+
+### Fixed
+- **Sign out now actually signs you out.** Previously the Sign out button cleared local cache and reloaded but never told the server to drop the auth cookie, so the page silently re-authenticated and left you in a broken half-state with no Login screen. Both Sign out paths (sidebar + Settings) now hit the server first.
+- **Database migration safety**: the user-table rebuild that landed in rc.9 has been hardened against an SQLite foreign-key cascade that could wipe per-user data on first upgrade. Future installs are protected; existing deploys that already migrated are unaffected going forward.
+
+### Changed
+- **OIDC provider preset list** is now alphabetical (Auth0, Authelia, Authentik, Google, Keycloak, Pocket ID) with Custom / Generic at the end.
+- **OIDC auto-register split into two toggles** for finer control:
+  - **Auto-link existing users (verified email)** — silently link an OIDC sign-in to an existing NutriTrace user when the IdP says the email is verified. Defaults ON. This is the toggle most users actually want — your IdP says "this is verified-bob@example.com", NutriTrace logs in your existing Bob account.
+  - **Auto-register new users** — let anyone with an account at the IdP create a brand-new NutriTrace account on first sign-in. Defaults OFF. Leave off for shared IdPs (Google, work SSO) unless you actually want blanket onboarding.
+
+  Existing providers keep their previous behavior — both new flags inherit the value of the old single flag.
+
+---
+
 ## [1.0.0-rc.11] — 2026-04-30 — OIDC provider picker
 
 ### Changed
