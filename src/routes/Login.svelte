@@ -110,7 +110,7 @@
           {#each oidcProviders as p (p.id)}
             <button class="btn btn-secondary sso-btn" on:click={() => startOidc(p.id)} type="button">
               {#if p.logo_url}
-                <img src={p.logo_url} alt="" class="sso-logo" />
+                <img src={resolveAssetUrl(p.logo_url)} alt="" class="sso-logo" />
               {:else}
                 <span class="material-symbols-rounded sso-icon">login</span>
               {/if}

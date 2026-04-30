@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.0-rc.11] — 2026-04-30 — OIDC provider picker
+
+### Changed
+- Setting up Single Sign-On is now a guided flow. **Settings → User Management → OIDC providers → Add provider** opens with a card grid of the most common identity providers — **Authentik**, **Keycloak**, **Authelia**, **Pocket ID**, **Auth0**, **Google**, plus **Custom / Generic OIDC**. Pick one and the form pre-fills sensible defaults (scope, auth method, default claim names, logo) and shows the right issuer-URL format for that IdP plus a one-line tip on anything provider-specific. Picking *Google* hides the admin-group fields entirely since Google doesn't expose those in standard scopes. The Custom card behaves exactly like the previous flow for any provider not on the list.
+
+---
+
 ## [1.0.0-rc.10] — 2026-04-30 — Stress score recalibration
 
 ### Changed

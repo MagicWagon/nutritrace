@@ -41,6 +41,144 @@
   let oidcEditing = null;     // null | { ...providerFields } (id present = edit; absent = create)
   let oidcTestResult = null;
   let oidcBusy = false;
+  let oidcSelectedPreset = 'custom'; // dropdown state during create
+
+  // Presets for the most common self-hosted + public OIDC providers. Each
+  // preset pre-fills sensible defaults and shows an inline help line so the
+  // admin doesn't have to look up issuer-URL syntax.
+  const PROVIDER_PRESETS = [
+    {
+      id: 'authentik',
+      name: 'Authentik',
+      icon: 'verified_user',
+      defaults: {
+        scope: 'openid profile email',
+        token_endpoint_auth_method: 'client_secret_post',
+        admin_group_claim: 'groups',
+        display_name: 'Authentik',
+        logo_url: '/icons/sso/authentik.svg',
+      },
+      issuer_hint: 'https://auth.example.com/application/o/<your-app-slug>/',
+      help: 'Issuer URL is the "OpenID Configuration Issuer" shown on the Provider page in Authentik. Make sure your Application uses an OAuth2/OIDC Provider and you\'ve added the redirect URI shown above to its allowed list.',
+      hides: [],
+    },
+    {
+      id: 'keycloak',
+      name: 'Keycloak',
+      icon: 'shield',
+      defaults: {
+        scope: 'openid profile email',
+        token_endpoint_auth_method: 'client_secret_basic',
+        admin_group_claim: 'groups',
+        display_name: 'Keycloak',
+        logo_url: 'https://cdn.simpleicons.org/keycloak/4D4D4D',
+      },
+      issuer_hint: 'https://auth.example.com/realms/<your-realm>',
+      help: 'Add a "groups" mapper to your client\'s default scope so the groups claim is included in the ID token.',
+      hides: [],
+    },
+    {
+      id: 'authelia',
+      name: 'Authelia',
+      icon: 'lock',
+      defaults: {
+        scope: 'openid profile email groups',
+        token_endpoint_auth_method: 'client_secret_post',
+        admin_group_claim: 'groups',
+        display_name: 'Authelia',
+        logo_url: 'https://cdn.simpleicons.org/authelia/000000',
+      },
+      issuer_hint: 'https://auth.example.com',
+      help: 'Authelia\'s issuer URL is the root URL where Authelia is served — no path suffix.',
+      hides: [],
+    },
+    {
+      id: 'pocket-id',
+      name: 'Pocket ID',
+      icon: 'fingerprint',
+      defaults: {
+        scope: 'openid profile email groups',
+        token_endpoint_auth_method: 'client_secret_post',
+        admin_group_claim: 'groups',
+        display_name: 'Pocket ID',
+        logo_url: '/icons/sso/pocket-id.svg',
+      },
+      issuer_hint: 'https://id.example.com',
+      help: 'Pocket ID uses passkeys for primary auth — your users won\'t need a password at the IdP either. Add the redirect URI shown above to the OIDC client in Pocket ID admin.',
+      hides: [],
+    },
+    {
+      id: 'auth0',
+      name: 'Auth0',
+      icon: 'cloud',
+      defaults: {
+        scope: 'openid profile email',
+        token_endpoint_auth_method: 'client_secret_post',
+        admin_group_claim: '',  // Auth0 typically uses namespaced claims — user fills in their own
+        display_name: 'Auth0',
+        logo_url: 'https://cdn.simpleicons.org/auth0/EB5424',
+      },
+      issuer_hint: 'https://<your-tenant>.auth0.com/',
+      help: 'Auth0 adds custom claims under a namespaced URL like "https://nutritrace.app/roles" — leave the admin claim blank for now and contact your tenant admin to set up a rule that exposes role membership.',
+      hides: [],
+    },
+    {
+      id: 'google',
+      name: 'Google',
+      icon: 'account_circle',
+      defaults: {
+        scope: 'openid profile email',
+        token_endpoint_auth_method: 'client_secret_post',
+        admin_group_claim: '',
+        admin_group_value: '',
+        display_name: 'Google',
+        logo_url: 'https://cdn.simpleicons.org/google/4285F4',
+      },
+      issuer_hint: 'https://accounts.google.com',
+      help: 'Google\'s issuer URL is fixed. Group/role claims are not available with standard scopes — admin role mapping is hidden for this provider; promote Google users manually after first login.',
+      hides: ['admin_group_claim', 'admin_group_value'],
+    },
+    {
+      id: 'custom',
+      name: 'Custom / Generic OIDC',
+      icon: 'badge',
+      defaults: {
+        scope: 'openid profile email',
+        token_endpoint_auth_method: 'client_secret_post',
+        admin_group_claim: '',
+        display_name: '',
+        logo_url: '',
+      },
+      issuer_hint: 'https://your-idp.example.com',
+      help: 'Any OpenID Connect 1.0 compliant provider that supports Authorization Code Flow + PKCE + Discovery should work here.',
+      hides: [],
+    },
+  ];
+
+  function _getPreset(id) {
+    return PROVIDER_PRESETS.find(p => p.id === id) || PROVIDER_PRESETS[PROVIDER_PRESETS.length - 1];
+  }
+
+  $: oidcPreset = _getPreset(oidcSelectedPreset);
+
+  // When the preset changes during create, re-apply its defaults to the form
+  // (overwriting anything the user typed in the affected fields).
+  function applyPreset() {
+    if (!oidcEditing || oidcEditing.id) return; // edit mode — don't clobber existing
+    const p = _getPreset(oidcSelectedPreset);
+    oidcEditing = {
+      ...oidcEditing,
+      ...p.defaults,
+      // preserve user-entered fields that aren't preset-managed
+      issuer_url: oidcEditing.issuer_url,
+      client_id: oidcEditing.client_id,
+      client_secret: oidcEditing.client_secret,
+      redirect_uris: oidcEditing.redirect_uris,
+      auto_register: oidcEditing.auto_register,
+      is_active: oidcEditing.is_active,
+    };
+  }
+  $: if (oidcSelectedPreset && oidcEditing && !oidcEditing.id) applyPreset();
 
   function _csrfHeaders(extra = {}) {
     const h = { 'Content-Type': 'application/json', ...extra };
@@ -66,19 +204,17 @@
   }
 
   function startCreateProvider() {
+    oidcSelectedPreset = 'custom';
+    const p = _getPreset('custom');
     oidcEditing = {
       issuer_url: '',
       client_id: '',
       client_secret: '',
       redirect_uris: [_defaultRedirectUri()],
-      scope: 'openid profile email',
-      token_endpoint_auth_method: 'client_secret_post',
       auto_register: 0,
-      admin_group_claim: '',
       admin_group_value: '',
-      display_name: '',
-      logo_url: '',
       is_active: 1,
+      ...p.defaults,
     };
     oidcTestResult = null;
   }
@@ -96,7 +232,23 @@
       client_secret: '',                         // never echo back
       redirect_uris: Array.isArray(p.redirect_uris) ? [...p.redirect_uris] : [],
     };
+    // Detect which preset (if any) this provider matches — useful for
+    // showing the right help text + hiding irrelevant fields.
+    oidcSelectedPreset = _detectPreset(p);
     oidcTestResult = null;
+  }
+
+  function _detectPreset(p) {
+    // Best-effort match by display_name first, then issuer_url substring.
+    const dn = (p.display_name || '').toLowerCase();
+    const issuer = (p.issuer_url || '').toLowerCase();
+    if (dn.includes('authentik') || issuer.includes('/application/o/')) return 'authentik';
+    if (dn.includes('keycloak')  || issuer.includes('/realms/'))         return 'keycloak';
+    if (dn.includes('authelia'))                                          return 'authelia';
+    if (dn.includes('pocket'))                                            return 'pocket-id';
+    if (dn.includes('auth0')     || issuer.includes('.auth0.com'))       return 'auth0';
+    if (dn.includes('google')    || issuer.includes('accounts.google'))  return 'google';
+    return 'custom';
   }
 
   function cancelProviderEdit() {
@@ -477,7 +629,7 @@
 
             {#each oidcProviders as p (p.id)}
               <div class="oidc-row">
-                {#if p.logo_url}<img src={p.logo_url} alt="" class="oidc-logo" />{:else}<span class="material-symbols-rounded oidc-icon">verified_user</span>{/if}
+                {#if p.logo_url}<img src={resolveAssetUrl(p.logo_url)} alt="" class="oidc-logo" />{:else}<span class="material-symbols-rounded oidc-icon">verified_user</span>{/if}
                 <div class="oidc-info">
                   <span class="oidc-name">{p.display_name || p.issuer_url}</span>
                   <span class="text-3 text-sm">{p.issuer_url} · auto-register {p.auto_register ? 'on' : 'off'}{!p.is_active ? ' · disabled' : ''}</span>
@@ -513,13 +665,42 @@
 
             {#if oidcEditing}
               <div class="oidc-form" transition:slide={{ duration: 180 }}>
+                {#if !oidcEditing.id}
+                  <div class="form-group">
+                    <label class="form-label">Provider type</label>
+                    <div class="oidc-preset-grid">
+                      {#each PROVIDER_PRESETS as preset (preset.id)}
+                        <button
+                          type="button"
+                          class="oidc-preset-card"
+                          class:selected={oidcSelectedPreset === preset.id}
+                          on:click={() => oidcSelectedPreset = preset.id}
+                          title={preset.name}
+                        >
+                          {#if preset.defaults.logo_url}
+                            <img src={resolveAssetUrl(preset.defaults.logo_url)} alt="" class="oidc-preset-logo" />
+                          {:else}
+                            <span class="material-symbols-rounded oidc-preset-icon">{preset.icon}</span>
+                          {/if}
+                          <span class="oidc-preset-name">{preset.name}</span>
+                        </button>
+                      {/each}
+                    </div>
+                    {#if oidcPreset.help}
+                      <div class="text-3 text-sm" style="margin-top:8px;line-height:1.4">
+                        <span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">info</span>
+                        {oidcPreset.help}
+                      </div>
+                    {/if}
+                  </div>
+                {/if}
                 <div class="form-group">
                   <label class="form-label">Display name</label>
-                  <input class="input" bind:value={oidcEditing.display_name} placeholder="Authentik / Pocket ID / Google" />
+                  <input class="input" bind:value={oidcEditing.display_name} placeholder={oidcPreset.defaults.display_name || 'Authentik / Pocket ID / Google'} />
                 </div>
                 <div class="form-group">
                   <label class="form-label">Issuer URL *</label>
-                  <input class="input" bind:value={oidcEditing.issuer_url} placeholder="https://auth.example.com/application/o/nutritrace/" autocomplete="url" />
+                  <input class="input" bind:value={oidcEditing.issuer_url} placeholder={oidcPreset.issuer_hint} autocomplete="url" />
                 </div>
                 <div class="form-group">
                   <label class="form-label">Client ID *</label>
@@ -568,16 +749,20 @@
                   </div>
                   <Toggle checked={!!oidcEditing.is_active} on:change={e => oidcEditing.is_active = e.detail ? 1 : 0} />
                 </div>
-                <div class="form-group">
-                  <label class="form-label">Admin group claim (optional)</label>
-                  <input class="input" bind:value={oidcEditing.admin_group_claim} placeholder="groups" />
-                  <div class="text-3 text-sm">Name of the claim that lists user groups. Common: <code>groups</code>.</div>
-                </div>
-                <div class="form-group">
-                  <label class="form-label">Admin group value (optional)</label>
-                  <input class="input" bind:value={oidcEditing.admin_group_value} placeholder="NutriTraceAdmins" />
-                  <div class="text-3 text-sm">If a user's groups claim contains this value, they're set to admin on each login.</div>
-                </div>
+                {#if !oidcPreset.hides?.includes('admin_group_claim')}
+                  <div class="form-group">
+                    <label class="form-label">Admin group claim (optional)</label>
+                    <input class="input" bind:value={oidcEditing.admin_group_claim} placeholder="groups" />
+                    <div class="text-3 text-sm">Name of the claim that lists user groups. Common: <code>groups</code>.</div>
+                  </div>
+                {/if}
+                {#if !oidcPreset.hides?.includes('admin_group_value')}
+                  <div class="form-group">
+                    <label class="form-label">Admin group value (optional)</label>
+                    <input class="input" bind:value={oidcEditing.admin_group_value} placeholder="NutriTraceAdmins" />
+                    <div class="text-3 text-sm">If a user's groups claim contains this value, they're set to admin on each login.</div>
+                  </div>
+                {/if}
                 <div class="form-group">
                   <label class="form-label">Logo URL (optional)</label>
                   <input class="input" bind:value={oidcEditing.logo_url} placeholder="https://…/authentik.png" />
@@ -815,4 +1000,26 @@
     padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md);
     background: var(--surface-2);
   }
+  .oidc-preset-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 8px;
+  }
+  .oidc-preset-card {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 12px 8px;
+    border: 1.5px solid var(--border); border-radius: var(--radius-md);
+    background: var(--surface-1, var(--bg));
+    cursor: pointer;
+    color: inherit; font: inherit;
+    transition: border-color 120ms, background 120ms;
+  }
+  .oidc-preset-card:hover { border-color: var(--accent); }
+  .oidc-preset-card.selected {
+    border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent);
+  }
+  .oidc-preset-logo, .oidc-preset-icon { width: 28px; height: 28px; }
+  .oidc-preset-icon { font-size: 28px !important; color: var(--text-3); }
+  .oidc-preset-card.selected .oidc-preset-icon { color: var(--accent); }
+  .oidc-preset-name { font-size: 12px; font-weight: 600; text-align: center; }
 </style>

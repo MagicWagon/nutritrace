@@ -248,7 +248,7 @@
             {#each linkedProviders as l (l.id)}
               <div class="oidc-link-row">
                 {#if l.logo_url}
-                  <img src={l.logo_url} alt="" class="oidc-link-logo" />
+                  <img src={resolveAssetUrl(l.logo_url)} alt="" class="oidc-link-logo" />
                 {:else}
                   <span class="material-symbols-rounded oidc-link-icon">verified_user</span>
                 {/if}
@@ -272,7 +272,7 @@
             {#each availableToLink as p (p.id)}
               <button class="btn btn-secondary" on:click={() => startLink(p.id)}>
                 {#if p.logo_url}
-                  <img src={p.logo_url} alt="" class="oidc-link-logo" />
+                  <img src={resolveAssetUrl(p.logo_url)} alt="" class="oidc-link-logo" />
                 {:else}
                   <span class="material-symbols-rounded oidc-link-icon">add_link</span>
                 {/if}
