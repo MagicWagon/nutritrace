@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.0-rc.13] — 2026-04-30 — Disaster-recovery: push device data to server
+
+### Added
+- **Settings → Backup → Recovery → Push everything from this device to server** (Android, server-connected mode only). Re-uploads every food, meal, recipe, diary entry, activity entry, and setting from the app's local cache to the server. Existing rows on the server stay intact and just get updated; missing ones are re-created. Use after a server restore, accidental wipe, or any situation where the server is missing data your phone still remembers. Pictures referenced by /uploads/ paths are preserved (they live on the server's filesystem, separately from the database).
+
+### Fixed
+- **Sync push handler** now creates a fresh row when an incoming change references a server row that no longer exists, instead of silently dropping the change. This makes the sync engine resilient to a partial server-side data loss — your device's cache can repopulate the server cleanly.
+
+---
+
 ## [1.0.0-rc.12] — 2026-04-30 — Auth fixes + finer OIDC controls
 
 ### Fixed

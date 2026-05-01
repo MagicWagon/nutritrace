@@ -180,15 +180,21 @@ export async function handleOidcCallback() {
   history.replaceState(null, '', window.location.pathname + window.location.search + cleanHash);
 
   const { showSuccess, showError } = await import('./toast.js');
+  const { get } = await import('svelte/store');
+  const { _ } = await import('svelte-i18n');
+  const t = (key, fallback) => {
+    try { const v = get(_)(key); return (v && v !== key) ? v : fallback; }
+    catch { return fallback; }
+  };
   if (err) {
     showError(decodeURIComponent(err));
     return true;
   }
   if (ok === 'ok') {
-    showSuccess('Signed in');
+    showSuccess(t('common.signed_in', 'Signed in'));
     await _fetchAuthFromServer();
   } else if (ok === 'linked') {
-    showSuccess('Linked');
+    showSuccess(t('common.linked', 'Linked'));
     await _fetchAuthFromServer();
   }
   return true;

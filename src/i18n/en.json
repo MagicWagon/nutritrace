@@ -28,9 +28,14 @@
     "done":         "Done",
     "close":        "Close",
     "loading":      "Loading…",
+    "signed_in":    "Signed in",
+    "signed_out":   "Signed out",
+    "linked":       "Linked",
+    "unlinked":     "Unlinked",
     "errors": {
       "cant_reach_server": "Could not reach server",
-      "failed":            "Failed"
+      "failed":            "Failed",
+      "unlink_failed":     "Could not unlink"
     }
   },
   "settings": {

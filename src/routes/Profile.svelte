@@ -136,11 +136,11 @@
         headers: _headers(csrf ? { 'X-CSRF-Token': csrf } : {}),
       });
       const data = await r.json();
-      if (!r.ok) { showError(data?.error || 'Could not unlink'); return; }
+      if (!r.ok) { showError(data?.error || $_('common.errors.unlink_failed')); return; }
       linkedProviders = data.links || [];
-      showSuccess('Unlinked');
+      showSuccess($_('common.unlinked'));
     } catch (e) {
-      showError('Could not reach server');
+      showError($_('common.errors.cant_reach_server'));
     } finally { unlinking = null; }
   }
   $: linkedProviderIds = new Set(linkedProviders.map(l => l.oidc_provider_id));
