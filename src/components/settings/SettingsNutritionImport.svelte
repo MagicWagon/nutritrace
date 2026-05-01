@@ -98,10 +98,7 @@
 <div class="section-body">
   <div class="card settings-card">
     <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:6px">
-      <div style="display:flex;align-items:center;gap:8px;width:100%">
-        <span class="setting-label" style="font-weight:600">Import nutrition history</span>
-        <span class="experimental-badge">Experimental</span>
-      </div>
+      <span class="setting-label" style="font-weight:600">Import nutrition history</span>
       <p class="setting-desc" style="margin:0">
         Bring in past days from another tracker. Your existing diary is left alone unless you pick "replace" below.
       </p>

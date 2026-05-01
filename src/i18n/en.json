@@ -57,7 +57,7 @@
     "goals":              { "section": "Goals" },
     "body_stats":         { "section": "Body Stats" },
     "statistics":         { "section": "Statistics" },
-    "connected_services": { "section": "Connected Services" },
+    "connected_services": { "section": "Food Sources" },
     "ai":                 { "section": "AI Assistant" },
     "notifications":      { "section": "Notifications" },
     "wellness":           { "section": "Wellness" },
