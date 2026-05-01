@@ -274,6 +274,23 @@ export async function loadServerSettings() {
     }
 
     _suppressSync = false;
+
+    // After settings are written to localStorage, force-apply the theme
+    // settings directly to the DOM. The reactive `$: applyAccentColor(…)`
+    // in App.svelte only fires when Svelte sees the store value change —
+    // if the in-memory store value matches what the server returned, the
+    // reactive skips, leaving the document still styled with whatever was
+    // applied previously (or defaults, on the post-login first-paint).
+    // Calling apply* here guarantees the document picks up the right
+    // values whether or not Svelte's reactive system fires.
+    try {
+      if (typeof window !== 'undefined') {
+        const accent = DB.getSetting('accentColor', 'mint');
+        const appearanceVal = DB.getSetting('appearance', 'system');
+        applyAccentColor(accent);
+        applyAppearance(appearanceVal);
+      }
+    } catch {}
   } catch { _suppressSync = false; }
 }
 

@@ -73,33 +73,6 @@
 
   // ── Local Full Backup (.zip with embedded images) ──────────────────────────
   let localZipBusy = false;
-
-  // Push-everything-to-server (disaster recovery for native server mode)
-  let pushAllBusy = false;
-  let pushAllStatus = '';
-  async function pushAllToServer() {
-    if (pushAllBusy) return;
-    if (!confirm(
-      'Re-upload everything from this device to the server?\n\n' +
-      'This re-creates any foods, meals, recipes, diary entries, activity, ' +
-      'and settings that the server may have lost. Existing rows on the ' +
-      'server stay intact and just get updated. Safe to run.'
-    )) return;
-    pushAllBusy = true;
-    pushAllStatus = 'Marking everything for upload…';
-    try {
-      const { pushAllFromDevice } = await import('../../lib/sync.js');
-      const result = await pushAllFromDevice();
-      const c = result.pushed || {};
-      pushAllStatus = `Done — pushed ${c.foods||0} foods, ${c.meals||0} meals, ${c.diary||0} diary days, ${c.activity_log||0} activity, ${c.user_settings||0} settings.`;
-      showSuccess('Re-upload complete');
-    } catch (e) {
-      pushAllStatus = '';
-      showError(e?.message || 'Re-upload failed');
-    } finally {
-      pushAllBusy = false;
-    }
-  }
   let localZipStatus = '';
   let localBackups = [];
   const LOCAL_BACKUP_DIR = 'nutritrace-backups';
@@ -664,29 +637,6 @@
       <p style="padding:12px 16px;font-size:13px;color:var(--text-3);margin:0">No backups yet — tap Create Backup to get started.</p>
     {/if}
   </div>
-  {/if}
-
-  {#if isNative && !isNativeLocal}
-    <p class="sub-label">Recovery</p>
-    <div class="card settings-card">
-      <button class="setting-row setting-action" on:click={pushAllToServer} disabled={pushAllBusy}>
-        <span class="material-symbols-rounded si" style="color:var(--accent)">cloud_upload</span>
-        <div>
-          <span class="setting-label">Push everything from this device to server</span>
-          <div class="setting-desc">If the server lost data and your device still has it cached, this re-uploads every food, meal, recipe, diary entry, activity, and setting from this device's local copy. Existing matching rows on the server are kept and updated; missing ones are re-created. Use after a server restore or accidental wipe.</div>
-        </div>
-        <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
-      </button>
-      {#if pushAllStatus}
-        <div class="setting-divider"></div>
-        <div class="restore-progress" style="padding:10px 16px">
-          <div class="restore-progress-label">
-            {#if pushAllBusy}<span class="material-symbols-rounded spin" style="font-size:15px;flex-shrink:0">autorenew</span>{:else}<span class="material-symbols-rounded" style="font-size:15px;flex-shrink:0;color:var(--success,#22c55e)">check_circle</span>{/if}
-            {pushAllStatus}
-          </div>
-        </div>
-      {/if}
-    </div>
   {/if}
 
   <!-- Portable JSON export/import (legacy) -->
