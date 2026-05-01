@@ -331,7 +331,17 @@ function createSettingStore(key, defaultValue) {
 
   window.addEventListener('wl:setting', (e) => {
     if (e.detail && e.detail.key === key) {
-      store.set(DB.getSetting(key, defaultValue));
+      const next = DB.getSetting(key, defaultValue);
+      const prev = get(store);
+      // Only update if the value actually changed. Without this guard,
+      // the 30s settings poll (loadServerSettings dispatches force=true
+      // on every key) would re-set every store with identical values,
+      // firing all subscribers, which makes reactive blocks like
+      // `$: meals = $mealNames` re-evaluate and any in:transition'd
+      // children flash on every poll.
+      if (JSON.stringify(prev) !== JSON.stringify(next)) {
+        store.set(next);
+      }
     }
   });
 
