@@ -418,7 +418,17 @@ export const offUploadCountry       = createSettingStore('offUploadCountry',    
 export const accentColor = createSettingStore('accentColor', 'mint');
 
 /** Apply accent color — supports named presets and custom hex (#rrggbb) */
+// Track what's currently applied so periodic re-applies (every 30s settings
+// poll, on tab visibilitychange, after login) don't unnecessarily mutate the
+// DOM and cause a visible flash. Only the first call OR a real change does
+// the work.
+let _lastAppliedAccent = null;
 export function applyAccentColor(value) {
+  if (value === _lastAppliedAccent) {
+    accentColor.set(value);
+    return;
+  }
+  _lastAppliedAccent = value;
   const isHex = /^#[0-9a-fA-F]{6}$/.test(value);
   // Clear any previously injected custom vars
   ['--accent','--accent-2','--accent-dim','--accent-text'].forEach(v =>
@@ -443,7 +453,13 @@ export function applyAccentColor(value) {
 }
 
 /** Apply an appearance change and update the DOM + theme-color meta */
+let _lastAppliedAppearance = null;
 export function applyAppearance(value) {
+  if (value === _lastAppliedAppearance) {
+    appearance.set(value);
+    return;
+  }
+  _lastAppliedAppearance = value;
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   const dark = value === 'dark' || (value === 'system' && prefersDark);
   document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
