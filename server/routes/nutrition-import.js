@@ -15,7 +15,7 @@ import multer from 'multer';
 import AdmZip from 'adm-zip';
 import db from '../db.js';
 import { wrap, logger } from '../logger.js';
-import { requireAuth, uid } from '../middleware/auth.js';
+import { requireAuth, userMgmtActive } from '../middleware/auth.js';
 import { mapMeal } from '../lib/nutrition-import/common.js';
 import { parseSpreadsheet } from '../lib/nutrition-import/spreadsheet.js';
 import { parseCronometer }  from '../lib/nutrition-import/cronometer.js';
@@ -24,6 +24,8 @@ import { parseMfp, pickMealCsv } from '../lib/nutrition-import/mfp.js';
 
 const router = Router();
 router.use(requireAuth);
+
+const uid = req => userMgmtActive() ? req.user.id : null;
 
 const upload = multer({
   storage: multer.memoryStorage(),
