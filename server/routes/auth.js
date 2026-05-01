@@ -244,6 +244,26 @@ router.put('/users/:id/password', requireAuth, requireAdmin, wrap((req, res) => 
   res.json({ ok: true });
 }));
 
+// ── Admin: change another user's role (user | admin) ──────────────────────
+router.put('/users/:id/role', requireAuth, requireAdmin, wrap((req, res) => {
+  const id = parseInt(req.params.id);
+  const { role } = req.body;
+  if (!['admin', 'user'].includes(role)) return res.status(400).json({ error: 'Invalid role' });
+  if (id === req.user.id) return res.status(400).json({ error: 'Cannot change your own role' });
+  // Last-admin guard — refuse to demote the only admin and lock the instance out.
+  if (role !== 'admin') {
+    const target = db.prepare('SELECT role FROM users WHERE id = ?').get(id);
+    if (target?.role === 'admin') {
+      const admins = db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'admin'").get();
+      if (admins.count <= 1) {
+        return res.status(400).json({ error: 'Cannot demote the only admin. Promote another user to admin first.' });
+      }
+    }
+  }
+  db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, id);
+  res.json({ ok: true });
+}));
+
 // ── Admin: disable user management (delete all users) ─────────────────────
 router.delete('/management', requireAuth, requireAdmin, wrap((req, res) => {
   db.prepare('DELETE FROM users').run();

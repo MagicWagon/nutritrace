@@ -7,6 +7,7 @@
   import BottomNav from './components/layout/BottomNav.svelte';
   import Sidebar   from './components/layout/Sidebar.svelte';
   import Toast     from './components/ui/Toast.svelte';
+  import ConfirmDialogMount from './components/ui/ConfirmDialogMount.svelte';
   import { DB }    from './lib/db.js';
   import { navStyle, applyAccentColor, accentColor, applyAppearance, appearance, disableAnimations, sidebarPersistent, language } from './stores/settings.js';
   import { locale } from 'svelte-i18n';
@@ -370,6 +371,8 @@
 
 <!-- Toast must also render outside the login gate so errors show on the login screen -->
 {#if needsLogin}<Toast />{/if}
+<!-- ConfirmDialog is always-mounted so it works on every screen including login + native setup -->
+<ConfirmDialogMount />
 
 <style>
   :global(body) { overflow-x: hidden; }

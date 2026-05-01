@@ -1,5 +1,6 @@
 <script>
   import { slide } from 'svelte/transition';
+  import { _ } from 'svelte-i18n';
   import Toggle from './Toggle.svelte';
   import { showSuccess, showError } from '../../stores/toast.js';
   import { DB } from '../../lib/db.js';
@@ -8,6 +9,7 @@
   import { isNative, getServerUrl, resolveAssetUrl, apiUrl, getAuthToken, setAuthToken } from '../../lib/platform.js';
   import { push } from 'svelte-spa-router';
   import { validatePassword } from '../../lib/validation.js';
+  import { confirmDialog } from '../../stores/confirmDialog.js';
 
   // ── User Management state ────────────────────────────────────────────────────
   let umUsers        = [];
@@ -19,7 +21,7 @@
   let newFullName    = '';
   let newRole        = 'user';
   let umError        = '';
-  let showDisableUmDialog = false;
+  // showDisableUmDialog removed — use confirmDialog() store instead
 
   // Enable user management from Settings
   let showEnableUm    = false;
@@ -44,6 +46,15 @@
   let oidcBusy = false;
   let oidcSelectedPreset = 'custom'; // dropdown state during create
 
+  // ────────────────────────────────────────────────────────────────────────
+  // ⚠ KEEP IN LOCKSTEP WITH LIFTTRACE
+  //   sister file: ../../../../lifttrace/src/components/settings/SettingsUserManagement.svelte
+  //   This PROVIDER_PRESETS array, _getPreset, applyPreset, _detectPreset,
+  //   and the OIDC editor template are intentionally identical across the two
+  //   apps. When you add/remove a preset, change a default, or fix a bug
+  //   here, mirror the change to LiftTrace's copy in the same commit.
+  //   See `feedback_traceapps_brand.md` for the cohesion principle.
+  // ────────────────────────────────────────────────────────────────────────
   // Presets for the most common self-hosted + public OIDC providers. Each
   // preset pre-fills sensible defaults and shows an inline help line so the
   // admin doesn't have to look up issuer-URL syntax. Ordered alphabetically
@@ -454,20 +465,74 @@
     umLoading = false;
   }
 
-  async function deleteUser(id) {
+  async function changeUserRole(u, newRole) {
+    if (newRole === u.role) return;
+    const name = u.full_name || u.username;
+    if (!await confirmDialog({
+      title: $_(newRole === 'admin' ? 'settings.users.promote_title' : 'settings.users.demote_title', { values: { name } }),
+      message: $_(newRole === 'admin' ? 'settings.users.promote_message' : 'settings.users.demote_message'),
+      confirmText: $_(newRole === 'admin' ? 'settings.users.promote_confirm' : 'settings.users.demote_confirm'),
+      dangerous: newRole !== 'admin',
+    })) return;
     try {
-      await NtApi.del(`/api/auth/users/${id}`);
+      const res = await fetch(apiUrl(`/api/auth/users/${u.id}/role`), {
+        method: 'PUT',
+        credentials: 'include',
+        headers: _csrfHeaders(),
+        body: JSON.stringify({ role: newRole }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { showError(data?.error || 'Could not change role'); return; }
+      showSuccess($_('settings.users.toast_role_changed', { values: { name, role: newRole } }));
       await loadUsers();
-      showSuccess('User deleted');
+    } catch (e) { showError('Could not reach server'); }
+  }
+
+  async function resetUserPassword(u) {
+    const name = u.full_name || u.username;
+    const pw = prompt($_('settings.users.reset_password_prompt', { values: { name } }));
+    if (!pw) return;
+    const pwErr = validatePassword(pw);
+    if (pwErr) { showError(pwErr); return; }
+    try {
+      const res = await fetch(apiUrl(`/api/auth/users/${u.id}/password`), {
+        method: 'PUT',
+        credentials: 'include',
+        headers: _csrfHeaders(),
+        body: JSON.stringify({ new_password: pw }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { showError(data?.error || 'Could not reset password'); return; }
+      showSuccess($_('settings.users.toast_password_reset'));
+    } catch (e) { showError('Could not reach server'); }
+  }
+
+  async function deleteUser(u) {
+    const name = u.full_name || u.username;
+    if (!await confirmDialog({
+      title: $_('settings.users.delete_user_title', { values: { name } }),
+      message: $_('settings.users.delete_user_message'),
+      confirmText: $_('settings.users.delete'),
+      dangerous: true,
+    })) return;
+    try {
+      await NtApi.del(`/api/auth/users/${u.id}`);
+      await loadUsers();
+      showSuccess($_('settings.users.toast_user_deleted'));
     } catch(e) { showError(e.message); }
   }
 
   async function disableUserManagement() {
+    if (!await confirmDialog({
+      title: $_('settings.users.disable_um_title'),
+      message: $_('settings.users.disable_um_message'),
+      confirmText: $_('settings.users.disable_um_confirm'),
+      dangerous: true,
+    })) return;
     try {
       await NtApi.del('/api/auth/management');
       localStorage.removeItem('wl:userId');
       await loadAuthState();
-      showDisableUmDialog = false;
       showSuccess('User management disabled');
       await loadUsers();
     } catch(e) { showError(e.message); }
@@ -593,11 +658,26 @@
                 </div>
                 <div class="um-user-info">
                   <div class="um-user-name">{u.nickname || u.full_name || u.username}</div>
-                  <div class="um-user-sub">@{u.username}{u.role === 'admin' ? ' · admin' : ''}</div>
+                  <div class="um-user-sub">@{u.username}</div>
+                  <div class="um-user-role">
+                    {#if u.id === $currentUser?.id}
+                      <span class="um-role-self">{u.role} (you)</span>
+                    {:else}
+                      <select class="um-role-select" value={u.role}
+                        on:change={e => changeUserRole(u, e.target.value)}>
+                        <option value="user">user</option>
+                        <option value="admin">admin</option>
+                      </select>
+                    {/if}
+                  </div>
                 </div>
                 {#if u.id !== $currentUser?.id}
+                  <button class="btn btn-ghost um-del-btn" title="Reset password"
+                    on:click={() => resetUserPassword(u)}>
+                    <span class="material-symbols-rounded" style="font-size:18px;color:var(--text-3)">lock_reset</span>
+                  </button>
                   <button class="btn btn-ghost um-del-btn" title="Delete user"
-                    on:click={() => deleteUser(u.id)}>
+                    on:click={() => deleteUser(u)}>
                     <span class="material-symbols-rounded" style="font-size:18px;color:var(--danger)">person_remove</span>
                   </button>
                 {/if}
@@ -849,7 +929,7 @@
         </div>
 
         <div class="setting-divider"></div>
-        <button class="setting-row setting-action danger" on:click={() => showDisableUmDialog = true}>
+        <button class="setting-row setting-action danger" on:click={disableUserManagement}>
           <span class="material-symbols-rounded si" style="color:var(--danger)">no_accounts</span>
           <div>
             <span class="setting-label" style="color:var(--danger)">Disable user management</span>
@@ -906,22 +986,6 @@
     {/if}
   </div>
 </div>
-
-<!-- Disable user management dialog -->
-{#if showDisableUmDialog}
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <!-- svelte-ignore a11y-no-static-element-interactions -->
-  <div class="dialog-overlay" on:click|self={() => showDisableUmDialog = false}>
-    <div class="dialog-box">
-      <h3 class="dialog-title">Disable user management</h3>
-      <p class="dialog-msg">This will remove all user accounts and their data cannot be recovered. The app will return to single-user mode.</p>
-      <div class="dialog-actions">
-        <button class="btn btn-ghost" on:click={() => showDisableUmDialog = false}>Cancel</button>
-        <button class="btn btn-danger" on:click={disableUserManagement}>Disable &amp; delete all users</button>
-      </div>
-    </div>
-  </div>
-{/if}
 
 <style>
   /* My Profile shortcut — gradient avatar + role pill, matches LiftTrace */
@@ -1010,6 +1074,19 @@
   .um-user-info { flex: 1; min-width: 0; }
   .um-user-name { font-size: 14px; font-weight: 500; color: var(--text-1); }
   .um-user-sub  { font-size: 12px; color: var(--text-3); }
+  .um-user-role { margin-top: 4px; }
+  .um-role-self {
+    font-size: 11px; font-weight: 600; color: var(--text-3);
+    background: var(--surface-2); padding: 3px 8px; border-radius: var(--radius-sm);
+    text-transform: capitalize;
+  }
+  .um-role-select {
+    background: var(--surface-2); border: 1px solid var(--border);
+    color: var(--text-1); font-size: 11px; font-family: inherit;
+    border-radius: var(--radius-sm); padding: 3px 6px; height: 24px;
+    outline: none; cursor: pointer;
+  }
+  .um-role-select:focus { border-color: var(--accent); }
   .um-del-btn   { padding: 4px 8px; }
   .um-error     { color: var(--danger); font-size: 13px; margin: 0; }
   .um-section-label { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); }

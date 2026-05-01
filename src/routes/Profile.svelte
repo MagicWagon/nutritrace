@@ -19,6 +19,31 @@
   }
   import { showSuccess, showError } from '../stores/toast.js';
   import { validatePassword, passwordStrength } from '../lib/validation.js';
+  import { confirmDialog } from '../stores/confirmDialog.js';
+  import { loadAuthState } from '../stores/auth.js';
+
+  let deletingAccount = false;
+  async function deleteMyAccount() {
+    if (!await confirmDialog({
+      title: $_('profile.delete_account_title'),
+      message: $_('profile.delete_account_message'),
+      confirmText: $_('profile.delete_account_confirm'),
+      dangerous: true,
+    })) return;
+    deletingAccount = true;
+    try {
+      const res = await fetch(apiUrl('/api/auth/me'), { method: 'DELETE', credentials: 'include', headers: _headers() });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { showError(data?.error || $_('profile.errors.delete_account_failed')); deletingAccount = false; return; }
+      localStorage.removeItem('wl:userId');
+      await loadAuthState();
+      showSuccess($_('profile.account_deleted'));
+      pop();
+    } catch (e) {
+      showError($_('common.errors.cant_reach_server'));
+      deletingAccount = false;
+    }
+  }
 
   $: pwScore = passwordStrength(new_password);
 
@@ -325,11 +350,25 @@
         </div>
       {/if}
     </div>
+
+    <!-- Danger zone: delete my account -->
+    <div class="card settings-card danger-zone-card">
+      <div class="editor-card-title" style="color:var(--danger)">{$_('profile.danger_zone')}</div>
+      <p class="text-3 text-sm" style="margin:0;line-height:1.5">
+        {$_('profile.delete_account_explainer')}
+      </p>
+      <button class="btn btn-secondary" style="color:var(--danger);border-color:color-mix(in srgb,var(--danger) 40%, transparent)"
+        on:click={deleteMyAccount} disabled={deletingAccount}>
+        <span class="material-symbols-rounded" style="font-size:16px;vertical-align:middle">delete_forever</span>
+        {deletingAccount ? $_('profile.deleting') : $_('profile.delete_account')}
+      </button>
+    </div>
   </div>
 </div>
 
 <style>
   .page-wrap { display: flex; flex-direction: column; height: 100dvh; overflow: hidden; }
+  .danger-zone-card { border-color: color-mix(in srgb, var(--danger) 25%, transparent) !important; }
   .profile-body { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
   .avatar-section {
     display: flex;
