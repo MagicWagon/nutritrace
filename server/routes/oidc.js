@@ -128,7 +128,7 @@ router.get('/callback/:providerId', wrap(async (req, res) => {
     claims = tokenSet.claims();
   } catch (e) {
     logger.warn(`[oidc] callback failed for provider ${provider.id}: ${e?.message || e}`);
-    if (stored.mobile) return res.redirect(`nutritrace://oidc-callback?error=callback_failed`);
+    if (stored.mobile) return res.redirect(`nutritrace://oidc-callback/?error=callback_failed`);
     return _redirectToLogin(res, stored.returnPath, 'callback_failed');
   }
 
@@ -138,10 +138,10 @@ router.get('/callback/:providerId', wrap(async (req, res) => {
       linkUser(stored.linkUserId, provider.id, claims.sub, !!claims.email_verified);
     } catch (e) {
       const msg = encodeURIComponent(e?.message || 'link_failed');
-      if (stored.mobile) return res.redirect(`nutritrace://oidc-callback?error=${msg}`);
+      if (stored.mobile) return res.redirect(`nutritrace://oidc-callback/?error=${msg}`);
       return _redirectToLogin(res, stored.returnPath, msg);
     }
-    if (stored.mobile) return res.redirect(`nutritrace://oidc-callback?linked=1`);
+    if (stored.mobile) return res.redirect(`nutritrace://oidc-callback/?linked=1`);
     return _redirectToLogin(res, stored.returnPath, null, 'linked');
   }
 
@@ -151,7 +151,7 @@ router.get('/callback/:providerId', wrap(async (req, res) => {
   } catch (e) {
     logger.info(`[oidc] resolveUser rejected for sub=${claims.sub}: ${e.message}`);
     const msg = encodeURIComponent(e.message);
-    if (stored.mobile) return res.redirect(`nutritrace://oidc-callback?error=${msg}`);
+    if (stored.mobile) return res.redirect(`nutritrace://oidc-callback/?error=${msg}`);
     return _redirectToLogin(res, stored.returnPath, msg);
   }
   applyAdminMapping(provider, result.user, claims);
@@ -174,7 +174,7 @@ router.get('/callback/:providerId', wrap(async (req, res) => {
     // custom-scheme deep link; the in-app browser closes when the URL fires
     // and Android routes the launch intent to NutriTrace's appUrlOpen
     // listener (see src/App.svelte).
-    return res.redirect(`nutritrace://oidc-callback?token=${encodeURIComponent(token)}`);
+    return res.redirect(`nutritrace://oidc-callback/?token=${encodeURIComponent(token)}`);
   }
   res.cookie('nt_token', token, { ...COOKIE_OPTS, maxAge: sessionMaxAge() });
   return _redirectToLogin(res, stored.returnPath, null, 'ok');

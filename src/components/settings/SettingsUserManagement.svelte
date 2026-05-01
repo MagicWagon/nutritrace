@@ -1015,8 +1015,11 @@
   .oidc-logo { width: 22px; height: 22px; object-fit: contain; flex: 0 0 auto; }
   .oidc-icon { font-size: 22px; flex: 0 0 auto; color: var(--text-3); }
   .oidc-info { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  /* Long issuer URLs and display names have no spaces — let them wrap
+     anywhere so they don't push into the action icons on narrow viewports. */
+  .oidc-info > * { min-width: 0; word-break: break-word; overflow-wrap: anywhere; }
   .oidc-name { font-weight: 600; }
-  .oidc-actions { display: flex; gap: 4px; }
+  .oidc-actions { display: flex; gap: 4px; flex-shrink: 0; }
   .oidc-test-result {
     padding: 10px; border-radius: var(--radius-md);
     background: var(--surface-2); border: 1px solid var(--border);
