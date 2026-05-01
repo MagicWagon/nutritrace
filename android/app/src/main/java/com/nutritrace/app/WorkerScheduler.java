@@ -27,10 +27,20 @@ public class WorkerScheduler {
     public static final String HC_SYNC_WORK = "nutritrace_hc_sync";
 
     public static void reschedule(Context context) {
-        // Reminder worker — always enqueued; the worker itself reads each
-        // notification toggle internally and skips checks for disabled types.
-        // (No outer gate so toggling any one reminder takes effect immediately.)
+        // Reminder worker — always enqueued as a 15-min safety-net sweep.
+        // The PRIMARY firing mechanism is now AlarmManager (see
+        // ReminderAlarmScheduler) because WorkManager periodics get
+        // throttled by Doze when the app hasn't been foregrounded recently.
+        // Worker is the backup that catches missed alarms (e.g. between a
+        // reboot and the first BootReceiver tick).
         enqueueReminderWorker(context);
+
+        // Exact-time alarms — primary firing path for time-specific reminders.
+        try {
+            ReminderAlarmScheduler.scheduleAll(context);
+        } catch (Exception e) {
+            Log.w(TAG, "alarm reschedule failed: " + e.getMessage());
+        }
 
         // HC sync worker — only enqueued when healthConnectEnabled = true
         boolean hcEnabled = readBoolSetting(context, "healthConnectEnabled");
@@ -43,9 +53,11 @@ public class WorkerScheduler {
     }
 
     private static void enqueueReminderWorker(Context context) {
+        // No setRequiresBatteryNotLow — reminders are lightweight and should
+        // fire regardless of battery level. The previous constraint silently
+        // suppressed every reminder when the user dropped below 15%.
         Constraints constraints = new Constraints.Builder()
             .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
-            .setRequiresBatteryNotLow(true)
             .build();
 
         PeriodicWorkRequest request = new PeriodicWorkRequest.Builder(

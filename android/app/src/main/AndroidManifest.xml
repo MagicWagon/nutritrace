@@ -79,13 +79,42 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
+
+        <!-- Reminder alarm receiver — fires when AlarmManager wakes the device
+             at exact reminder times (meal/weigh-in/bedtime/water). Not exported
+             (only the OS broadcasts to it). -->
+        <receiver
+            android:name=".ReminderAlarmReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
+        <!-- Boot/update receiver — re-arms reminder alarms after device reboot
+             or app update. Without this, all alarms are wiped on reboot. -->
+        <receiver
+            android:name=".BootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
     </application>
 
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- SCHEDULE_EXACT_ALARM (Android 12, S+): user must grant via system settings;
+         can be revoked. USE_EXACT_ALARM (Android 13+): granted at install for
+         "calendar/alarm/reminder" use cases — no system-settings prompt needed.
+         Both are declared so we get whichever the OS honors. -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <!-- Re-arm alarms after device reboot (BootReceiver). -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
