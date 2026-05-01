@@ -233,6 +233,27 @@
 </div>
 
 <style>
+  /* Mirror Settings.svelte's scoped classes — Svelte scopes per component
+     so each sub-component re-declares the same shapes. */
+  .section-body { padding: 12px var(--page-px); display: flex; flex-direction: column; gap: 10px; }
+  .settings-card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .setting-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 13px 16px;
+    min-height: 50px;
+  }
+  .setting-label { font-size: 14px; font-weight: 500; }
+  .setting-divider { height: 1px; background: var(--border); margin: 0 16px; }
+
   .experimental-badge {
     font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
     background: var(--accent-dim); color: var(--accent);
