@@ -485,6 +485,14 @@
     }
   }
 
+  // Barcode normalizer — strips whitespace + leading zeros so a UPC-A saved
+  // as "0036000291452" matches a scan that returns "36000291452" (and vice
+  // versa). Different scanners (ML Kit on Android, Quagga on web) and
+  // different OFF entries don't agree on whether to keep the leading zero.
+  function _normBarcode(b) {
+    return String(b || '').trim().replace(/^0+/, '');
+  }
+
   async function handleScan({ detail }) {
     const code = detail.code;
     if (!code) return;
@@ -493,7 +501,8 @@
       //    barcode, the quick-add card (pickMode) or the existing food page
       //    (browse mode) is what they want — no point hitting OFF + showing
       //    a fresh-import editor for something they've already vetted.
-      const existing = (localFoods || []).find(f => f.barcode && f.barcode === code);
+      const codeN = _normBarcode(code);
+      const existing = (localFoods || []).find(f => f.barcode && _normBarcode(f.barcode) === codeN);
       if (existing) {
         if (pickMode) await pickFood(existing);
         else          openEditor(existing, 'foodList');
