@@ -18,6 +18,10 @@
   let recoveryToken = '';
 
   // OIDC providers + password-login flag are returned by /api/auth/status.
+  // Native (Capacitor) doesn't yet have the deep-link callback flow wired
+  // up, so hide SSO buttons in the native app for now — users can still sign
+  // in with their password. Once Phase 2 lands (nutritrace://oidc-callback
+  // + @capacitor/browser), the gate flips on.
   let oidcProviders = [];
   let passwordLoginEnabled = true;
   onMount(async () => {
@@ -25,8 +29,12 @@
       const r = await fetch(apiUrl('/api/auth/status'), { credentials: 'include' });
       if (r.ok) {
         const data = await r.json();
-        if (data?.oidc) {
+        if (data?.oidc && !isNative) {
           oidcProviders = Array.isArray(data.oidc.providers) ? data.oidc.providers : [];
+          passwordLoginEnabled = data.oidc.enable_email_password_login !== false;
+        } else if (data?.oidc) {
+          // Native: keep password-login flag (still honored) but suppress
+          // SSO buttons until the Capacitor deep-link flow is in place.
           passwordLoginEnabled = data.oidc.enable_email_password_login !== false;
         }
       }
