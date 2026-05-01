@@ -18,31 +18,39 @@
   let recoveryToken = '';
 
   // OIDC providers + password-login flag are returned by /api/auth/status.
-  // Native (Capacitor) doesn't yet have the deep-link callback flow wired
-  // up, so hide SSO buttons in the native app for now — users can still sign
-  // in with their password. Once Phase 2 lands (nutritrace://oidc-callback
-  // + @capacitor/browser), the gate flips on.
+  // Native (Capacitor server-mode) routes the auth flow through
+  // @capacitor/browser; the IdP redirects back via a nutritrace://oidc-callback
+  // deep link which App.svelte handles. Native local mode skips OIDC entirely
+  // since there's no server to talk to.
   let oidcProviders = [];
   let passwordLoginEnabled = true;
   onMount(async () => {
+    if (isNative && !getServerUrl()) return; // standalone — skip
     try {
       const r = await fetch(apiUrl('/api/auth/status'), { credentials: 'include' });
       if (r.ok) {
         const data = await r.json();
-        if (data?.oidc && !isNative) {
+        if (data?.oidc) {
           oidcProviders = Array.isArray(data.oidc.providers) ? data.oidc.providers : [];
-          passwordLoginEnabled = data.oidc.enable_email_password_login !== false;
-        } else if (data?.oidc) {
-          // Native: keep password-login flag (still honored) but suppress
-          // SSO buttons until the Capacitor deep-link flow is in place.
           passwordLoginEnabled = data.oidc.enable_email_password_login !== false;
         }
       }
     } catch {}
   });
 
-  function startOidc(providerId) {
+  async function startOidc(providerId) {
     const ret = encodeURIComponent(window.location.hash || '#/');
+    if (isNative) {
+      // Capacitor: open in @capacitor/browser. The mobile=1 flag tells
+      // the server to redirect via the nutritrace://oidc-callback deep
+      // link instead of setting an HttpOnly cookie + SPA hash redirect.
+      const { Browser } = await import('@capacitor/browser');
+      await Browser.open({
+        url: apiUrl(`/api/auth/oidc/login/${providerId}?mobile=1&return=${ret}`),
+        presentationStyle: 'popover',
+      });
+      return;
+    }
     window.location.href = apiUrl(`/api/auth/oidc/login/${providerId}?return=${ret}`);
   }
 

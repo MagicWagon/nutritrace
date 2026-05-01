@@ -74,31 +74,18 @@ router.get('/login/:providerId', wrap(async (req, res) => {
 
   const checks = generateAuthChecks();
   const linkMode = req.query.link === '1' && !!req.user;
-  const data = {
-    providerId: provider.id,
-    redirectUri,
-    returnPath: typeof req.query.return === 'string' ? req.query.return.slice(0, 256) : '',
-    codeVerifier: checks.codeVerifier,
-    nonce: checks.nonce,
-  };
-  if (linkMode) {
-    data.linkUserId = req.user.id;
-    data.returnPath = data.returnPath || '/profile';
-  }
+  const isMobile = req.query.mobile === '1';
+  const returnPath = typeof req.query.return === 'string' ? req.query.return.slice(0, 256) : '';
   persistState({
     providerId: provider.id,
     redirectUri,
-    returnPath: data.returnPath,
-    codeVerifier: data.codeVerifier,
+    returnPath: linkMode ? (returnPath || '/profile') : returnPath,
+    codeVerifier: checks.codeVerifier,
     state: checks.state,
-    nonce: data.nonce,
+    nonce: checks.nonce,
+    mobile: isMobile,
+    linkUserId: linkMode ? req.user.id : null,
   });
-  // Re-persist with linkUserId merged in (state is the key)
-  if (linkMode) {
-    db.prepare(
-      `UPDATE oauth_state SET data = ? WHERE state = ?`
-    ).run(JSON.stringify(data), checks.state);
-  }
 
   const url = client.authorizationUrl({
     redirect_uri: redirectUri,
@@ -141,6 +128,7 @@ router.get('/callback/:providerId', wrap(async (req, res) => {
     claims = tokenSet.claims();
   } catch (e) {
     logger.warn(`[oidc] callback failed for provider ${provider.id}: ${e?.message || e}`);
+    if (stored.mobile) return res.redirect(`nutritrace://oidc-callback?error=callback_failed`);
     return _redirectToLogin(res, stored.returnPath, 'callback_failed');
   }
 
@@ -149,8 +137,11 @@ router.get('/callback/:providerId', wrap(async (req, res) => {
     try {
       linkUser(stored.linkUserId, provider.id, claims.sub, !!claims.email_verified);
     } catch (e) {
-      return _redirectToLogin(res, stored.returnPath, encodeURIComponent(e?.message || 'link_failed'));
+      const msg = encodeURIComponent(e?.message || 'link_failed');
+      if (stored.mobile) return res.redirect(`nutritrace://oidc-callback?error=${msg}`);
+      return _redirectToLogin(res, stored.returnPath, msg);
     }
+    if (stored.mobile) return res.redirect(`nutritrace://oidc-callback?linked=1`);
     return _redirectToLogin(res, stored.returnPath, null, 'linked');
   }
 
@@ -159,7 +150,9 @@ router.get('/callback/:providerId', wrap(async (req, res) => {
     result = resolveUser(provider, claims);
   } catch (e) {
     logger.info(`[oidc] resolveUser rejected for sub=${claims.sub}: ${e.message}`);
-    return _redirectToLogin(res, stored.returnPath, encodeURIComponent(e.message));
+    const msg = encodeURIComponent(e.message);
+    if (stored.mobile) return res.redirect(`nutritrace://oidc-callback?error=${msg}`);
+    return _redirectToLogin(res, stored.returnPath, msg);
   }
   applyAdminMapping(provider, result.user, claims);
 
@@ -175,6 +168,14 @@ router.get('/callback/:providerId', wrap(async (req, res) => {
 
   // Mint identical nt_token to password path
   const token = signToken(result.user);
+  if (stored.mobile) {
+    // Native (Capacitor) flow — Bearer token cannot be set as a cookie that
+    // crosses back into the WebView. Hand the token off to the app via a
+    // custom-scheme deep link; the in-app browser closes when the URL fires
+    // and Android routes the launch intent to NutriTrace's appUrlOpen
+    // listener (see src/App.svelte).
+    return res.redirect(`nutritrace://oidc-callback?token=${encodeURIComponent(token)}`);
+  }
   res.cookie('nt_token', token, { ...COOKIE_OPTS, maxAge: sessionMaxAge() });
   return _redirectToLogin(res, stored.returnPath, null, 'ok');
 }));

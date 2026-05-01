@@ -164,10 +164,28 @@
             await closeBrowser();
           } catch {}
           // Parse the deep link URL: nutritrace://callback?fitbit=connected
+          // OR for OIDC flow: nutritrace://oidc-callback?token=… / ?error=… / ?linked=1
           try {
             const u = new URL(url);
             const params = u.searchParams;
-            if (params.get('fitbit') === 'connected' || params.get('withings') === 'connected' || params.get('garmin') === 'connected') {
+            const host = (u.hostname || u.host || '').toLowerCase();
+            if (host === 'oidc-callback') {
+              const errMsg = params.get('error');
+              const linked = params.get('linked');
+              const token = params.get('token');
+              if (errMsg) {
+                import('./stores/toast.js').then(({ showError }) => showError(decodeURIComponent(errMsg)));
+              } else if (linked) {
+                import('./stores/toast.js').then(({ showSuccess }) => showSuccess('Linked'));
+                await loadAuthState();
+              } else if (token) {
+                const { setAuthToken } = await import('./lib/platform.js');
+                setAuthToken(token);
+                import('./stores/toast.js').then(({ showSuccess }) => showSuccess('Signed in'));
+                await loadAuthState();
+                window.location.hash = '#/';
+              }
+            } else if (params.get('fitbit') === 'connected' || params.get('withings') === 'connected' || params.get('garmin') === 'connected') {
               const provider = params.get('fitbit') ? 'fitbit' : params.get('withings') ? 'withings' : 'garmin';
               import('./stores/toast.js').then(({ showSuccess }) => showSuccess(`${provider.charAt(0).toUpperCase() + provider.slice(1)} connected!`));
               // Navigate to Wellness page to pick up new connection

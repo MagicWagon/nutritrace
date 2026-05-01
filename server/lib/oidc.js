@@ -100,8 +100,11 @@ export function invalidateDiscovery(providerId) {
 
 // ── PKCE / state persistence (reuses oauth_state) ─────────────────────────
 
-export function persistState({ providerId, redirectUri, returnPath, codeVerifier, state, nonce }) {
+export function persistState({ providerId, redirectUri, returnPath, codeVerifier, state, nonce, mobile, linkUserId }) {
   const expiresAt = new Date(Date.now() + STATE_TTL_MS).toISOString();
+  const data = { providerId, redirectUri, returnPath, codeVerifier, nonce };
+  if (mobile)      data.mobile = true;
+  if (linkUserId)  data.linkUserId = linkUserId;
   db.prepare(
     `INSERT OR REPLACE INTO oauth_state (state, user_id, provider, data, expires_at)
      VALUES (?, ?, ?, ?, ?)`
@@ -109,7 +112,7 @@ export function persistState({ providerId, redirectUri, returnPath, codeVerifier
     state,
     null,
     `oidc:${providerId}`,
-    JSON.stringify({ providerId, redirectUri, returnPath, codeVerifier, nonce }),
+    JSON.stringify(data),
     expiresAt
   );
 }
