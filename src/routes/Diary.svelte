@@ -749,7 +749,22 @@
     const today = localDateStr();
     let storedDate;
     currentDate.subscribe(v => storedDate = v)();
-    await loadEntry(storedDate || today);
+    const targetDate = storedDate || today;
+    // Skip the network round-trip when the store already holds this date —
+    // App.svelte's {#key $location} unmounts + remounts Diary on every nav,
+    // and refetching here causes a visible empty-then-populated flicker
+    // every time you switch to /diary. The store retains data across the
+    // remount; the reactive `$: entry = ...` shows it immediately. We still
+    // call loadEntry when the date in the store doesn't match (first load,
+    // or user picked a different day).
+    let cur = null;
+    currentEntry.subscribe(v => cur = v)();
+    if (!cur || cur.date !== targetDate) {
+      await loadEntry(targetDate);
+    } else {
+      // Make sure currentDate matches what's displayed (may be stale).
+      currentDate.set(targetDate);
+    }
 
     // Handle replace flow — food picker added the new item, now delete the old one
     const replaceData = sessionStorage.getItem('nt:replaceItem');
