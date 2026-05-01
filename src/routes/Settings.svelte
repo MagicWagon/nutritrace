@@ -2744,14 +2744,18 @@
     padding: 13px 16px;
     min-height: 50px;
   }
-  /* Layout guard for the common pattern (text-block + control). The first
-     child flexes/grows but is allowed to shrink (min-width:0) so long labels
-     don't bleed into the right-side control on narrow viewports — Toggle /
-     buttons / chevrons after it stay put because they're flex-shrink:0.
-     :global() so the rule reaches sub-component rows (SettingsBackup,
-     SettingsTrace, SettingsWellness, etc.) too. */
-  :global(.setting-row > :first-child:not(.material-symbols-rounded)) { flex: 1 1 0; min-width: 0; }
-  :global(.setting-row > :not(:first-child)) { flex-shrink: 0; }
+  /* Layout guard for the common .setting-row pattern. The text-block
+     (a <div> or a bare <span class="setting-label">) grows and is allowed
+     to shrink (min-width:0) so long labels wrap/truncate instead of
+     bleeding into icons or controls beside it. Icons (.material-symbols-
+     rounded) and right-side controls stay pinned via flex-shrink:0. The
+     text-block can be in any position (some rows have leading icon + text
+     + chevron; others have just text + Toggle), so we target it by tag/
+     class instead of :first-child. :global() so sub-components inherit. */
+  :global(.setting-row > *) { flex-shrink: 0; }
+  :global(.setting-row > div), :global(.setting-row > span.setting-label) {
+    flex: 1 1 0; min-width: 0;
+  }
   :global(.setting-label), :global(.setting-desc) { word-break: break-word; overflow-wrap: anywhere; }
   /* Allow dragged items to visually escape the card boundary */
   .drag-list { overflow: visible; }
