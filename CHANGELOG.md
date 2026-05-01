@@ -5,89 +5,43 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [1.0.0-rc.13] — 2026-04-30 — Disaster-recovery: push device data to server
+## [1.0.0-rc.9] — 2026-05-01
 
-### Added
-- **Settings → Backup → Recovery → Push everything from this device to server** (Android, server-connected mode only). Re-uploads every food, meal, recipe, diary entry, activity entry, and setting from the app's local cache to the server. Existing rows on the server stay intact and just get updated; missing ones are re-created. Use after a server restore, accidental wipe, or any situation where the server is missing data your phone still remembers. Pictures referenced by /uploads/ paths are preserved (they live on the server's filesystem, separately from the database).
+### Single Sign-On (OIDC)
+- Sign in with your existing identity provider — Authentik, Keycloak, Pocket ID, Authelia, Auth0, Google, or any OIDC 1.0 provider. Settings → User Management → OIDC providers, with a guided picker that pre-fills sensible defaults per IdP.
+- Auto-link verified-email accounts on first sign-in (default ON) and an opt-in auto-register-new-users toggle for blanket onboarding.
+- Admin role mapping via group claims, runtime password-login disable for OIDC-only instances, and Profile → Linked accounts to attach SSO to an existing password account.
+- Client secrets encrypted at rest. Discovery cached, PKCE + state + nonce validated on every callback.
 
-### Fixed
-- **Sync push handler** now creates a fresh row when an incoming change references a server row that no longer exists, instead of silently dropping the change. This makes the sync engine resilient to a partial server-side data loss — your device's cache can repopulate the server cleanly.
+### Import from another app *(experimental)*
+- Bring past days into NutriTrace from **MyFitnessPal**, **Lose It!**, **Cronometer**, or a generic spreadsheet. Settings → Import from another app.
+- Preview shows day count, date range, and any unmapped meal labels before commit. Per-date conflict policy: skip, merge, or replace.
 
----
+### Settings reorganization
+- Cleaner group structure with renamed sections (Integrations / Food Sources) so labels don't collide.
+- Long labels no longer push toggles or icons off-screen on narrower viewports.
 
-## [1.0.0-rc.12] — 2026-04-30 — Auth fixes + finer OIDC controls
+### User Management polish
+- Inline role change on the user list (with a last-admin guard that refuses to demote the only admin).
+- Admin row action to reset another user's password.
+- "Delete my account" Danger zone on the Profile page.
+- Invite-by-email is now the primary "Add user" path; direct-add stays as a quieter secondary option for environments without SMTP.
+- Profile shortcut redesigned with a gradient avatar + role pill.
 
-### Fixed
-- **Sign out now actually signs you out.** Previously the Sign out button cleared local cache and reloaded but never told the server to drop the auth cookie, so the page silently re-authenticated and left you in a broken half-state with no Login screen. Both Sign out paths (sidebar + Settings) now hit the server first.
-- **Database migration safety**: the user-table rebuild that landed in rc.9 has been hardened against an SQLite foreign-key cascade that could wipe per-user data on first upgrade. Future installs are protected; existing deploys that already migrated are unaffected going forward.
+### Reliability + security
+- Sign-out actually signs you out — previously the server cookie wasn't cleared, leaving you in a half-state.
+- Theme no longer flashes to defaults every 30 seconds when settings poll.
+- Diary doesn't briefly flash meal cards on every tab switch.
+- Database migration hardened against a foreign-key cascade that could wipe per-user data on upgrade. Existing deploys are unaffected going forward.
+- Sync engine repopulates server-side rows that go missing, instead of silently dropping the change.
+- Photo uploads downscale before saving, so phone photos no longer silently fail to save when they exceed the server's payload limit.
+- Forgot-password endpoint timing-padded so response time can no longer be used to enumerate registered emails.
+- JWT rotates on password change, so old sessions on other devices stop working.
+- Stress score recalibrated against accumulated calibration data.
 
-### Changed
-- **OIDC provider preset list** is now alphabetical (Auth0, Authelia, Authentik, Google, Keycloak, Pocket ID) with Custom / Generic at the end.
-- **OIDC auto-register split into two toggles** for finer control:
-  - **Auto-link existing users (verified email)** — silently link an OIDC sign-in to an existing NutriTrace user when the IdP says the email is verified. Defaults ON. This is the toggle most users actually want — your IdP says "this is verified-bob@example.com", NutriTrace logs in your existing Bob account.
-  - **Auto-register new users** — let anyone with an account at the IdP create a brand-new NutriTrace account on first sign-in. Defaults OFF. Leave off for shared IdPs (Google, work SSO) unless you actually want blanket onboarding.
-
-  Existing providers keep their previous behavior — both new flags inherit the value of the old single flag.
-
----
-
-## [1.0.0-rc.11] — 2026-04-30 — OIDC provider picker
-
-### Changed
-- Setting up Single Sign-On is now a guided flow. **Settings → User Management → OIDC providers → Add provider** opens with a card grid of the most common identity providers — **Authentik**, **Keycloak**, **Authelia**, **Pocket ID**, **Auth0**, **Google**, plus **Custom / Generic OIDC**. Pick one and the form pre-fills sensible defaults (scope, auth method, default claim names, logo) and shows the right issuer-URL format for that IdP plus a one-line tip on anything provider-specific. Picking *Google* hides the admin-group fields entirely since Google doesn't expose those in standard scopes. The Custom card behaves exactly like the previous flow for any provider not on the list.
-
----
-
-## [1.0.0-rc.10] — 2026-04-30 — Stress score recalibration
-
-### Changed
-- Stress score formula recalibrated against another week of ground-truth Fitbit data. The previous formula consistently came in ~3-4 points higher than Fitbit's own stress management score; the offset has been trimmed so calculated values track closer to what your wearable reports. No action needed — your scores will refresh on the next sync.
-
----
-
-## [1.0.0-rc.9] — 2026-04-30 — OIDC sign-on (Experimental)
-
-Adds optional Single Sign-On via any OpenID Connect provider —
-Authentik, Keycloak, Pocket ID, Auth0, Google, Zitadel, etc.
-Marked **Experimental** for this release. Existing password login
-keeps working; nothing changes for installs that don't configure
-a provider.
-
-### Added
-- **OIDC providers admin** under Settings → User Management → "OIDC
-  providers (Single Sign-On)". Add/edit/delete providers, test
-  discovery, set per-provider auto-register, branded display name,
-  and logo. Multiple providers supported. Client secrets stored
-  encrypted at rest (AES-GCM via the same key derivation NutriTrace
-  uses for wearable OAuth tokens).
-- **Login page** shows an SSO button per active provider above the
-  password form. Branded with each provider's display name + logo.
-- **Profile → Linked accounts**: see which providers your account
-  is linked to, link additional ones, unlink existing ones. The
-  app refuses to unlink your last sign-in method to prevent
-  lock-out.
-- **Auto-link policy**: when an OIDC user has a verified email
-  matching an existing local account, NutriTrace auto-links them —
-  but only when the matching provider has auto-register enabled.
-  Otherwise the user is prompted to sign in with their password
-  first and link the provider from their Profile.
-- **Admin role mapping (optional)**: per provider, set a claim name
-  (e.g. `groups`) and a value (e.g. `NutriTraceAdmins`). Users with
-  that value in the claim get admin role on every login; users who
-  no longer have it get demoted.
-- **Disable password login (optional)**: once at least one OIDC
-  provider is configured, admins can flip a toggle to make SSO the
-  only sign-in method. The `RECOVERY_TOKEN` env var still works as
-  the lockout escape hatch.
-- Set-password flow on Profile for OIDC-only users who want to add
-  a password later (no current-password required, since they don't
-  have one yet).
-
-### Storage
-- Two new tables: `oidc_providers` (one row per IdP) and
-  `user_oidc_links` (per-user provider links). The `users` table is
-  unchanged except that `password_hash` is now nullable for OIDC-only
-  accounts.
+### For self-hosters
+- Backups now include OIDC providers and per-user links. `client_secret` is encrypted in the dump; restoring to a host with a different `JWT_SECRET` (and no `TOKEN_ENC_KEY` override) requires re-entering secrets.
+- New env var `TOKEN_ENC_KEY` for independent rotation of at-rest encryption keys.
 
 ---
 
