@@ -724,7 +724,10 @@
   .photo-preview-img {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    /* Show the whole picture letterboxed against the surface — no cropping.
+       List thumbnails elsewhere still use object-fit:cover; this is just
+       the editor preview where the user is verifying their picture. */
+    object-fit: contain;
     background: var(--surface-2);
   }
   .photo-placeholder { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
