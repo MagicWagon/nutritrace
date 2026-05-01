@@ -12,6 +12,7 @@
   import { takePhoto } from '../lib/camera.js';
   import { isNative } from '../lib/platform.js';
   import Dialog from '../components/ui/Dialog.svelte';
+  import BarcodeScanner from '../components/foods/BarcodeScanner.svelte';
   import { foodsShowCategories, foodsShowLabels, foodsShowNotes, foodCategories, visibleNutriments, nutrimentsOrder, customNutriments, cropPhotos, offUsername, offPassword, offUploadCountry, catName as _catName, catDisplay as _catDisplay } from '../stores/settings.js';
   import { fitImageDataUrl } from '../lib/image-fit.js';
 
@@ -174,8 +175,29 @@
   let _snapshot = null;       // snapshot of all values when editor was opened (never changes during edit)
   let downloading = false;
   let downloadSuccess = false;
+  let editorScannerOpen = false;
   $: isNewFood = !(params && params.id);
   $: hasBarcode = !!(food.barcode && food.barcode.trim());
+
+  // Inline scan handler — populate the barcode field, then auto-prefill the
+  // form from OFF if the user hasn't typed anything substantive yet. Skips
+  // the auto-prefill when the user has already filled name + nutrition so
+  // we don't clobber curated data.
+  async function onEditorScan({ detail }) {
+    const code = detail?.code;
+    if (!code) return;
+    food.barcode = code;
+    food = food;
+    const looksEmpty = !food.name?.trim() && !food.brand?.trim() &&
+      (food.nutrition == null || Object.keys(food.nutrition || {}).length === 0) &&
+      !NUTRIMENTS.some(n => food[n.id] != null && food[n.id] !== '');
+    if (looksEmpty) {
+      // Re-use the existing smart-fill that only writes empty fields.
+      await downloadFromOFF();
+    } else {
+      showSuccess('Barcode set');
+    }
+  }
 
 
   let offVerified    = null;  // null = unchecked, true = confirmed, false = not found yet
@@ -558,7 +580,14 @@
       </div>
       <div class="form-group">
         <label class="form-label">Barcode</label>
-        <input class="input" type="text" inputmode="numeric" placeholder="Optional" bind:value={food.barcode} />
+        <div style="display:flex;gap:8px;align-items:stretch">
+          <input class="input" type="text" inputmode="numeric" placeholder="Optional" bind:value={food.barcode} style="flex:1" />
+          <button type="button" class="btn-icon" title="Scan barcode" aria-label="Scan barcode"
+            on:click={() => editorScannerOpen = true}
+            style="flex-shrink:0;width:42px;height:42px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface-2);display:flex;align-items:center;justify-content:center">
+            <span class="material-symbols-rounded" style="font-size:20px">barcode_scanner</span>
+          </button>
+        </div>
         {#if hasBarcode}
           <div class="form-row" style="gap:8px;margin-top:8px">
             {#if isNewFood}
@@ -661,6 +690,9 @@
   confirmText="Update anyway"
   on:confirm={confirmOffOverwrite}
 />
+
+<!-- Inline barcode scanner — fired by the scan button next to the Barcode field -->
+<BarcodeScanner bind:open={editorScannerOpen} on:scan={onEditorScan} on:close={() => editorScannerOpen = false} />
 
 <style>
   .link-btn { color: var(--text-3); margin-bottom: 2px; }

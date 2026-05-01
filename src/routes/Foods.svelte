@@ -489,14 +489,27 @@
     const code = detail.code;
     if (!code) return;
     try {
+      // 1. Check the user's library first. If they've already saved this
+      //    barcode, the quick-add card (pickMode) or the existing food page
+      //    (browse mode) is what they want — no point hitting OFF + showing
+      //    a fresh-import editor for something they've already vetted.
+      const existing = (localFoods || []).find(f => f.barcode && f.barcode === code);
+      if (existing) {
+        if (pickMode) await pickFood(existing);
+        else          openEditor(existing, 'foodList');
+        return;
+      }
+
+      // 2. Not in library — fetch from Open Food Facts and open the full
+      //    FoodEditor with OFF data prefilled (picture, full nutrition,
+      //    brand). In pickMode the editor saves to the library AND adds
+      //    to the diary on save via foodDiaryCtx; in browse mode it just
+      //    saves. Bypassing the quick-add card here so the user can verify
+      //    OFF data + see the picture before committing it to their library.
       const { API } = await import('../lib/api.js');
       const result = await API.lookupBarcode(code);
       if (result) {
-        if (pickMode) {
-          await pickFood(result);
-        } else {
-          openEditor(result, 'foodList');
-        }
+        openEditor(result, 'foodList');
       } else {
         const { showError: se } = await import('../stores/toast.js');
         se('Barcode not found: ' + code);
