@@ -724,10 +724,10 @@
   .photo-preview-img {
     width: 100%;
     height: 100%;
-    /* Show the whole picture letterboxed against the surface — no cropping.
-       List thumbnails elsewhere still use object-fit:cover; this is just
-       the editor preview where the user is verifying their picture. */
-    object-fit: contain;
+    /* cover = scale to fill, center-cropped on overflow edges. Looks
+       better than letterboxing for food photos where the subject is
+       typically centered in the frame. */
+    object-fit: cover;
     background: var(--surface-2);
   }
   .photo-placeholder { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
