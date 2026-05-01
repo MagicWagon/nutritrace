@@ -411,10 +411,10 @@
 
   async function enableUserManagement() {
     enableUmError = '';
-    if (!enableAdminUser.trim()) { enableUmError = 'Username is required'; return; }
+    if (!enableAdminUser.trim()) { enableUmError = $_('settings.users.err_username_required'); return; }
     const pwErr = validatePassword(enableAdminPass);
     if (pwErr) { enableUmError = pwErr; return; }
-    if (enableAdminPass !== enableAdminConf) { enableUmError = 'Passwords do not match'; return; }
+    if (enableAdminPass !== enableAdminConf) { enableUmError = $_('settings.users.err_passwords_mismatch'); return; }
     enableUmLoading = true;
     try {
       const res = await fetch(apiUrl('/api/auth/register'), {
@@ -427,14 +427,14 @@
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { enableUmError = data.error || 'Registration failed'; enableUmLoading = false; return; }
+      if (!res.ok) { enableUmError = data.error || $_('settings.users.err_registration_failed'); enableUmLoading = false; return; }
       localStorage.setItem('wl:userId', data.user.id);
       await loadAuthState();
       showEnableUm = false;
       enableAdminUser = ''; enableAdminPass = ''; enableAdminConf = ''; enableAdminName = '';
       await loadUsers();
-      showSuccess('User management enabled');
-    } catch(e) { enableUmError = 'Could not connect to server'; }
+      showSuccess($_('settings.users.toast_um_enabled'));
+    } catch(e) { enableUmError = $_('settings.users.err_could_not_reach_server'); }
     enableUmLoading = false;
   }
 
@@ -446,7 +446,7 @@
 
   async function addUser() {
     umError = '';
-    if (!newUsername.trim() || !newPassword.trim()) { umError = 'Username and password required'; return; }
+    if (!newUsername.trim() || !newPassword.trim()) { umError = $_('settings.users.err_username_password_required'); return; }
     umLoading = true;
     try {
       const res = await fetch(apiUrl('/api/auth/register'), {
@@ -455,11 +455,11 @@
         body: JSON.stringify({ username: newUsername.trim(), password: newPassword, full_name: newFullName.trim() || undefined, role: newRole }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { umError = data.error || 'Failed to add user'; } else {
+      if (!res.ok) { umError = data.error || $_('settings.users.err_failed_to_add'); } else {
         newUsername = ''; newPassword = ''; newFullName = ''; newRole = 'user';
         showAddUser = false;
         await loadUsers();
-        showSuccess('User added');
+        showSuccess($_('settings.users.toast_user_created'));
       }
     } catch(e) { umError = e.message; }
     umLoading = false;
@@ -482,10 +482,10 @@
         body: JSON.stringify({ role: newRole }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { showError(data?.error || 'Could not change role'); return; }
+      if (!res.ok) { showError(data?.error || $_('settings.users.err_could_not_change_role')); return; }
       showSuccess($_('settings.users.toast_role_changed', { values: { name, role: newRole } }));
       await loadUsers();
-    } catch (e) { showError('Could not reach server'); }
+    } catch (e) { showError($_('settings.users.err_could_not_reach_server')); }
   }
 
   async function resetUserPassword(u) {
@@ -502,9 +502,9 @@
         body: JSON.stringify({ new_password: pw }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { showError(data?.error || 'Could not reset password'); return; }
+      if (!res.ok) { showError(data?.error || $_('settings.users.err_could_not_reset_password')); return; }
       showSuccess($_('settings.users.toast_password_reset'));
-    } catch (e) { showError('Could not reach server'); }
+    } catch (e) { showError($_('settings.users.err_could_not_reach_server')); }
   }
 
   async function deleteUser(u) {
@@ -533,7 +533,7 @@
       await NtApi.del('/api/auth/management');
       localStorage.removeItem('wl:userId');
       await loadAuthState();
-      showSuccess('User management disabled');
+      showSuccess($_('settings.users.toast_um_disabled'));
       await loadUsers();
     } catch(e) { showError(e.message); }
   }
@@ -609,42 +609,7 @@
       <!-- User list (admin only) -->
       {#if $currentUser?.role === 'admin'}
         <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px;padding:12px 16px">
-          <div style="display:flex;justify-content:space-between;align-items:center;width:100%">
-            <span class="setting-label">Users</span>
-            <button class="btn btn-secondary" style="height:30px;font-size:12px;padding:0 10px"
-              on:click={() => { showAddUser = !showAddUser; umError = ''; }}>
-              {showAddUser ? 'Cancel' : '+ Add User'}
-            </button>
-          </div>
-
-          {#if showAddUser}
-            <div class="um-add-form" transition:slide={{ duration: 160 }}>
-              <div class="um-form-row">
-                <input class="input" type="text" bind:value={newUsername} placeholder="Username *" autocomplete="off" />
-                <div style="display:flex;gap:4px;align-items:center;flex:1">
-                  {#if newShowPass}
-                    <input class="input" style="flex:1" type="text" bind:value={newPassword} placeholder="Password *" autocomplete="new-password" />
-                  {:else}
-                    <input class="input" style="flex:1" type="password" bind:value={newPassword} placeholder="Password *" autocomplete="new-password" />
-                  {/if}
-                  <button class="btn-icon" on:click={() => newShowPass = !newShowPass} style="flex-shrink:0">
-                    <span class="material-symbols-rounded" style="font-size:18px">{newShowPass ? 'visibility_off' : 'visibility'}</span>
-                  </button>
-                </div>
-              </div>
-              <div class="um-form-row">
-                <input class="input" type="text" bind:value={newFullName} placeholder="Full name (optional)" />
-                <select class="input" bind:value={newRole}>
-                  <option value="user">User</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </div>
-              {#if umError}<p class="um-error">{umError}</p>{/if}
-              <button class="btn btn-primary" style="width:100%" on:click={addUser} disabled={umLoading}>
-                {umLoading ? 'Adding...' : 'Create User'}
-              </button>
-            </div>
-          {/if}
+          <span class="setting-label">{$_('settings.users.users_heading')}</span>
 
           <div class="um-user-list">
             {#each umUsers as u}
@@ -661,7 +626,7 @@
                   <div class="um-user-sub">@{u.username}</div>
                   <div class="um-user-role">
                     {#if u.id === $currentUser?.id}
-                      <span class="um-role-self">{u.role} (you)</span>
+                      <span class="um-role-self">{u.role} {$_('settings.users.role_self_suffix')}</span>
                     {:else}
                       <select class="um-role-select" value={u.role}
                         on:change={e => changeUserRole(u, e.target.value)}>
@@ -672,11 +637,11 @@
                   </div>
                 </div>
                 {#if u.id !== $currentUser?.id}
-                  <button class="btn btn-ghost um-del-btn" title="Reset password"
+                  <button class="btn btn-ghost um-del-btn" title={$_('settings.users.reset_password')}
                     on:click={() => resetUserPassword(u)}>
                     <span class="material-symbols-rounded" style="font-size:18px;color:var(--text-3)">lock_reset</span>
                   </button>
-                  <button class="btn btn-ghost um-del-btn" title="Delete user"
+                  <button class="btn btn-ghost um-del-btn" title={$_('settings.users.delete')}
                     on:click={() => deleteUser(u)}>
                     <span class="material-symbols-rounded" style="font-size:18px;color:var(--danger)">person_remove</span>
                   </button>
@@ -687,37 +652,75 @@
         </div>
         <div class="setting-divider"></div>
 
-        <!-- Invite user -->
+        <!-- Primary path: invite -->
         <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px;padding:12px 16px">
-          <span class="setting-label">Invite user</span>
+          <div>
+            <span class="setting-label">{$_('settings.users.invite_user')}</span>
+            <div class="setting-desc" style="margin-top:2px">{$_('settings.users.invite_user_explainer')}</div>
+          </div>
           <div class="um-form-row">
-            <input class="input" type="email" bind:value={inviteEmail} placeholder="Email (optional)" />
+            <input class="input" type="email" bind:value={inviteEmail} placeholder={$_('settings.users.email_optional')} />
             <select class="input" bind:value={inviteRole}>
-              <option value="user">User</option>
-              <option value="admin">Admin</option>
+              <option value="user">{$_('settings.users.role_user')}</option>
+              <option value="admin">{$_('settings.users.role_admin')}</option>
             </select>
           </div>
-          <button class="btn btn-secondary" style="width:100%" on:click={createInvite} disabled={inviteLoading}>
-            {inviteLoading ? 'Creating…' : 'Generate invite link'}
+          <button class="btn btn-primary" style="width:100%" on:click={createInvite} disabled={inviteLoading}>
+            {inviteLoading ? $_('settings.users.creating') : (inviteEmail.trim() ? $_('settings.users.send_invite') : $_('settings.users.generate_link'))}
           </button>
           {#if inviteResult}
             <div class="invite-result" transition:slide={{ duration: 160 }}>
               {#if inviteResult.sent}
                 <span class="material-symbols-rounded" style="color:var(--accent);font-size:18px">mark_email_read</span>
-                <span style="font-size:13px">Invite sent to <strong>{inviteEmail || 'user'}</strong></span>
+                <span style="font-size:13px">{$_('settings.users.invite_sent_to', { values: { email: inviteEmail || $_('settings.users.user_fallback') } })}</span>
               {:else}
-                <span style="font-size:13px;color:var(--text-2)">Share this link:</span>
+                <span style="font-size:13px;color:var(--text-2)">{$_('settings.users.share_link_intro')}</span>
                 <div class="invite-link-row">
                   <input class="input" style="flex:1;font-size:12px" readonly value={inviteResult.inviteUrl} />
                   <button class="btn btn-secondary" style="height:36px;padding:0 12px;font-size:12px"
-                    on:click={() => { navigator.clipboard?.writeText(inviteResult.inviteUrl); showSuccess('Copied!'); }}>
-                    Copy
+                    on:click={() => { navigator.clipboard?.writeText(inviteResult.inviteUrl); showSuccess($_('settings.users.toast_link_copied')); }}>
+                    {$_('settings.users.copy')}
                   </button>
                 </div>
               {/if}
             </div>
           {/if}
         </div>
+
+        <!-- Secondary path: add user directly (escape hatch for no-SMTP / offline setups) -->
+        <button class="um-secondary-toggle" on:click={() => { showAddUser = !showAddUser; umError = ''; }}>
+          <span class="material-symbols-rounded" style="font-size:14px">{showAddUser ? 'expand_less' : 'expand_more'}</span>
+          {showAddUser ? $_('settings.users.add_user_hide') : $_('settings.users.add_user_show')}
+        </button>
+        {#if showAddUser}
+          <div class="um-add-form" transition:slide={{ duration: 160 }} style="padding:0 16px 14px">
+            <p class="setting-desc" style="margin:0 0 8px">{$_('settings.users.add_user_explainer')}</p>
+            <div class="um-form-row">
+              <input class="input" type="text" bind:value={newUsername} placeholder={$_('settings.users.username_required')} autocomplete="off" />
+              <div style="display:flex;gap:4px;align-items:center;flex:1">
+                {#if newShowPass}
+                  <input class="input" style="flex:1" type="text" bind:value={newPassword} placeholder={$_('settings.users.password_required')} autocomplete="new-password" />
+                {:else}
+                  <input class="input" style="flex:1" type="password" bind:value={newPassword} placeholder={$_('settings.users.password_required')} autocomplete="new-password" />
+                {/if}
+                <button class="btn-icon" on:click={() => newShowPass = !newShowPass} style="flex-shrink:0">
+                  <span class="material-symbols-rounded" style="font-size:18px">{newShowPass ? 'visibility_off' : 'visibility'}</span>
+                </button>
+              </div>
+            </div>
+            <div class="um-form-row">
+              <input class="input" type="text" bind:value={newFullName} placeholder={$_('settings.users.full_name')} />
+              <select class="input" bind:value={newRole}>
+                <option value="user">{$_('settings.users.role_user')}</option>
+                <option value="admin">{$_('settings.users.role_admin')}</option>
+              </select>
+            </div>
+            {#if umError}<p class="um-error">{umError}</p>{/if}
+            <button class="btn btn-secondary" style="width:100%" on:click={addUser} disabled={umLoading}>
+              {umLoading ? $_('settings.users.creating') : $_('settings.users.create_directly')}
+            </button>
+          </div>
+        {/if}
 
         <!-- OIDC providers (admin) -->
         <div class="setting-divider"></div>
@@ -1087,6 +1090,19 @@
     outline: none; cursor: pointer;
   }
   .um-role-select:focus { border-color: var(--accent); }
+
+  /* Secondary 'Or add directly' toggle — quieter than a button, leads
+     into the escape-hatch direct-add form. */
+  .um-secondary-toggle {
+    display: flex; align-items: center; gap: 4px;
+    width: 100%;
+    background: none; border: none; cursor: pointer;
+    padding: 8px 16px;
+    color: var(--text-3); font-size: 12px; font-family: inherit;
+    text-align: left;
+    transition: color var(--dur-fast);
+  }
+  .um-secondary-toggle:hover { color: var(--text-2); }
   .um-del-btn   { padding: 4px 8px; }
   .um-error     { color: var(--danger); font-size: 13px; margin: 0; }
   .um-section-label { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); }
