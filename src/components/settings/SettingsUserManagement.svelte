@@ -7,6 +7,7 @@
   import { currentUser, userMgmtActive, loadAuthState } from '../../stores/auth.js';
   import { isNative, getServerUrl, resolveAssetUrl, apiUrl, getAuthToken, setAuthToken } from '../../lib/platform.js';
   import { push } from 'svelte-spa-router';
+  import { validatePassword } from '../../lib/validation.js';
 
   // ── User Management state ────────────────────────────────────────────────────
   let umUsers        = [];
@@ -175,7 +176,8 @@
       client_id: oidcEditing.client_id,
       client_secret: oidcEditing.client_secret,
       redirect_uris: oidcEditing.redirect_uris,
-      auto_register: oidcEditing.auto_register,
+      auto_link_verified_email: oidcEditing.auto_link_verified_email,
+      auto_register_new_users: oidcEditing.auto_register_new_users,
       is_active: oidcEditing.is_active,
     };
   }
@@ -399,7 +401,8 @@
   async function enableUserManagement() {
     enableUmError = '';
     if (!enableAdminUser.trim()) { enableUmError = 'Username is required'; return; }
-    if (enableAdminPass.length < 6) { enableUmError = 'Password must be at least 6 characters'; return; }
+    const pwErr = validatePassword(enableAdminPass);
+    if (pwErr) { enableUmError = pwErr; return; }
     if (enableAdminPass !== enableAdminConf) { enableUmError = 'Passwords do not match'; return; }
     enableUmLoading = true;
     try {
@@ -519,14 +522,22 @@
 <div class="section-body" transition:slide={{ duration: 180 }}>
   <div class="card settings-card">
     {#if $userMgmtActive}
-      <!-- Current user row -->
-      <button class="setting-row setting-action" on:click={() => push('/profile')}>
-        <span class="material-symbols-rounded si" style="color:var(--accent)">manage_accounts</span>
-        <div>
-          <span class="setting-label">My Profile</span>
-          <div class="setting-desc">{$currentUser?.nickname || $currentUser?.full_name || $currentUser?.username || ''}</div>
+      <!-- Current user — visual hero card with gradient avatar + role pill -->
+      <button class="my-profile-row" on:click={() => push('/profile')}>
+        <div class="my-profile-avatar">
+          {#if $currentUser?.avatar_url}
+            <img src={resolveAssetUrl($currentUser.avatar_url)} alt="" />
+          {:else}
+            {($currentUser?.full_name || $currentUser?.nickname || $currentUser?.username || '?')[0]?.toUpperCase() || '?'}
+          {/if}
         </div>
-        <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
+        <div class="my-profile-info">
+          <span class="my-profile-name">{$currentUser?.nickname || $currentUser?.full_name || $currentUser?.username || ''}</span>
+          {#if $currentUser?.role}
+            <span class="my-profile-role">{$currentUser.role}</span>
+          {/if}
+        </div>
+        <span class="material-symbols-rounded my-profile-chev">chevron_right</span>
       </button>
       <div class="setting-divider"></div>
 
@@ -847,11 +858,6 @@
         </button>
       {/if}
 
-      <div class="setting-divider"></div>
-      <button class="setting-row setting-action" on:click={logoutServer}>
-        <span class="material-symbols-rounded si" style="color:var(--text-3)">logout</span>
-        <span class="setting-label">Sign out</span>
-      </button>
     {:else}
       <button class="setting-row setting-action" on:click={() => { showEnableUm = !showEnableUm; enableUmError = ''; }}>
         <span class="material-symbols-rounded si" style="color:var(--accent)">group_add</span>
@@ -865,6 +871,9 @@
       {#if showEnableUm}
         <div class="section-body" style="padding:0 16px 16px" transition:slide={{ duration: 160 }}>
           <p class="um-section-label" style="margin-bottom:8px">Create admin account</p>
+          <p class="text-3 text-sm" style="margin:0 0 12px;line-height:1.5">
+            The first account is always admin. All existing food, meal, and diary data on this server will be assigned to it.
+          </p>
           <div class="um-add-form">
             <div class="um-form-row">
               <input class="input" type="text" bind:value={enableAdminUser} placeholder="Username *" autocomplete="username" />
@@ -915,6 +924,34 @@
 {/if}
 
 <style>
+  /* My Profile shortcut — gradient avatar + role pill, matches LiftTrace */
+  .my-profile-row {
+    display: flex; align-items: center; gap: 14px;
+    width: 100%; padding: 14px 16px;
+    background: none; border: none; cursor: pointer;
+    font-family: inherit; text-align: left;
+    transition: background var(--dur-fast);
+  }
+  .my-profile-row:hover { background: var(--surface-2); }
+  .my-profile-avatar {
+    width: 44px; height: 44px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2, var(--accent)));
+    color: #fff;
+    font-size: 18px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; overflow: hidden;
+  }
+  .my-profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .my-profile-info { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .my-profile-name { font-size: 15px; font-weight: 700; color: var(--text-1); }
+  .my-profile-role {
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--accent); background: var(--accent-dim);
+    padding: 2px 8px; border-radius: var(--radius-full);
+    align-self: flex-start;
+  }
+  .my-profile-chev { color: var(--text-3); }
+
   /* Mirror Settings.svelte scoped styles */
   .section-body { padding: 12px var(--page-px); display: flex; flex-direction: column; gap: 10px; }
   .settings-card {
