@@ -108,23 +108,22 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
 ### Recipe scaling from servings count
 - Input "I want 6 servings" → auto-scale all ingredient quantities
 
-### Nutrition CSV importer
-- Per-source CSV adapters for the most common nutrition trackers users
-  migrate from: **MyFitnessPal**, **LoseIt**, **Cronometer**,
-  **Waistline**, raw spreadsheet. Mirrors the LiftTrace
-  workout-import pattern: `server/lib/nutrition-import/{mfp,loseit,
-  cronometer,waistline,spreadsheet}.js` adapters → canonical
-  `{ date, meal, name, brand, portion, unit, quantity, nutrition,
-  body_stats?, water? }` rows → `/api/nutrition-import/{preview,commit}`
-  with skip/replace per-date semantics, surfaced via
-  `SettingsNutritionImport.svelte` in the DATA group with an
-  Experimental badge.
-- Today's workaround: hand-massaging into JSON backup format and
-  using the Settings → Backup → Import JSON path (works fine —
-  diary entries are self-contained snapshots; only catch is that
-  import does INSERT OR REPLACE per `(user, date)` so historical
-  imports must skip dates that already have data). Keeping the
-  CSV path on the roadmap because users keep asking.
+### Nutrition CSV importer (v1 SHIPPED 2026-04-30, dev)
+- v1 supports MyFitnessPal, LoseIt, Cronometer, and a generic
+  spreadsheet shape. Adapters in `server/lib/nutrition-import/`,
+  route at `/api/nutrition-import/{preview,commit}`, UI is
+  `SettingsNutritionImport.svelte` mounted under Settings → Backup
+  with an EXPERIMENTAL badge. Skip / Merge / Replace per-date
+  semantics. Auto-detects locale (US M/D vs EU D/M), CSV
+  delimiter (comma vs semicolon), and meal-name aliases; falls
+  back to the user's last meal slot for unmatched labels.
+- v2 candidates: **MacroFactor** (no published schema — needs real
+  user export samples to pin against; ship as "experimental — bring
+  your own export" once we have 2-3 samples), **FatSecret** (no
+  user-facing CSV; would need OAuth API connector, separate
+  feature), **YAZIO** (unverified schema — defer until a user
+  sends a sample). Waistline import was deprioritized at user
+  request (not a migration audience NT shares).
 - Driving issue: community thread 2026-04-29.
 
 ---

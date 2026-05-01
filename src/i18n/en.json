@@ -65,6 +65,7 @@
     "users":              { "section": "User Management" },
     "email":              { "section": "Email (SMTP)" },
     "backup":             { "section": "Backup & Restore" },
+    "nutritionImport":    { "section": "Import from another app" },
     "server":             { "section": "Server Connection" },
     "diagnostics":        { "section": "Diagnostics" },
     "about":              { "section": "About" }

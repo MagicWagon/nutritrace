@@ -11,6 +11,7 @@
   import SettingsNotifications from '../components/settings/SettingsNotifications.svelte';
   import SettingsUserManagement from '../components/settings/SettingsUserManagement.svelte';
   import SettingsBackup from '../components/settings/SettingsBackup.svelte';
+  import SettingsNutritionImport from '../components/settings/SettingsNutritionImport.svelte';
   import { APP_VERSION } from '../lib/version.js';
   import Sheet  from '../components/ui/Sheet.svelte';
   import SettingsBanner from '../components/banners/SettingsBanner.svelte';
@@ -62,7 +63,7 @@
   let openSections = { serverConnection: false, appearance: false, regional: false, diary: false, foods: false, water: false,
                        categories: false, nutrients: false, goals: false, bodyStats: false, statistics: false,
                        connectedServices: false, ai: false, notifications: false, wellness: false, sharing: false,
-                       backup: false, email: false, users: false, helpImprove: false, about: false };
+                       backup: false, nutritionImport: false, email: false, users: false, helpImprove: false, about: false };
 
   // ── Server Connection (native only) ─────────────────────────────────────
   let serverUrlInput = getServerUrl() || '';
@@ -275,6 +276,7 @@
     wellness:          ['wellness','activity tracking','fitbit','withings','garmin','health connect','steps','sleep','heart rate','hrv','spo2','sync mode','sync range','connect','disconnect','connected devices','fitness tracker','body battery','stress'],
     sharing:           ['sharing','share','group','catalogue','catalog','visibility','private','members','food sharing'],
     backup:            ['backup','export','import','restore','csv','clear data','json','full backup','images','zip','reset','defaults','clear settings','danger zone'],
+    nutritionImport:   ['import','nutrition import','myfitnesspal','mfp','loseit','lose it','cronometer','spreadsheet','csv','migrate','migration','from another app'],
     email:             ['email','smtp','mail','password reset','invites','notifications'],
     users:             ['users','user management','accounts','login','password','admin','register','profile'],
     helpImprove:       ['diagnostics','logs','verbose','calibration','export','bug','report','troubleshoot'],
@@ -2153,6 +2155,19 @@
     </button>
     {#if sectionOpen(openSections, settingsQuery, 'backup') && sectionVisible(settingsQuery, 'backup')}
       <SettingsBackup bind:this={backupRef} />
+    {/if}
+
+    <!-- ── Nutrition Import (from MFP / LoseIt / Cronometer / spreadsheet) ── -->
+    <!-- Hidden in native standalone (no server to receive the upload). -->
+    {#if !isNativeLocal}
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'nutritionImport')} on:click={() => toggleSection('nutritionImport')}>
+      <span class="material-symbols-rounded si">file_upload</span>
+      <span>{$_('settings.nutritionImport.section')} <span class="labs-badge" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">{$_('common.experimental')}</span></span>
+      <span class="material-symbols-rounded chevron" class:rotated={openSections.nutritionImport}>expand_more</span>
+    </button>
+    {#if sectionOpen(openSections, settingsQuery, 'nutritionImport') && sectionVisible(settingsQuery, 'nutritionImport')}
+      <SettingsNutritionImport />
+    {/if}
     {/if}
 
     <!-- ── Server Connection (native app only, after Backup) ────────────── -->
