@@ -65,6 +65,41 @@
                        connectedServices: false, ai: false, notifications: false, wellness: false, sharing: false,
                        backup: false, nutritionImport: false, email: false, users: false, helpImprove: false, about: false };
 
+  // ── Sync state + manual trigger ────────────────────────────────────────
+  // Native server mode only. lastSyncAt comes from sync_meta on mount and is
+  // kept in sync with the live syncState.lastSync as background syncs fire.
+  let lastSyncAt = null;
+  let _nowTick = Date.now(); // re-render the "X ago" label every 30s
+  let _syncing = false;
+
+  async function manualSync() {
+    if (_syncing) return;
+    _syncing = true;
+    try {
+      const { fullSync } = await import('../lib/sync.js');
+      await fullSync(); // visible mode (shows the sync bar in App.svelte)
+    } catch (e) {
+      showError(e.message || 'Sync failed');
+    } finally {
+      _syncing = false;
+    }
+  }
+
+  function _fmtTimeAgo(iso) {
+    if (!iso) return 'never';
+    const ms = _nowTick - new Date(iso).getTime();
+    if (ms < 0) return 'just now';
+    const s = Math.floor(ms / 1000);
+    if (s < 10)  return 'just now';
+    if (s < 60)  return `${s}s ago`;
+    const m = Math.floor(s / 60);
+    if (m < 60)  return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24)  return `${h}h ago`;
+    const d = Math.floor(h / 24);
+    return `${d}d ago`;
+  }
+
   // ── Server Connection (native only) ─────────────────────────────────────
   let serverUrlInput = getServerUrl() || '';
   let serverUsername = '';
@@ -1084,6 +1119,31 @@
       const res = await fetch(apiUrl('/api/app-config/env-locks'), _fetchOpts());
       if (res.ok) envLocks = await res.json();
     } catch {}
+
+    // Native server mode: surface last-sync time in Server Connection card.
+    // Pull the persisted timestamp from sync_meta (survives across sessions),
+    // then keep it live by subscribing to the in-memory syncState store.
+    let _syncStoreUnsub = null;
+    let _tickInterval = null;
+    if (isNative && getServerUrl()) {
+      try {
+        const { dbGetSyncMeta } = await import('../lib/db-native.js');
+        lastSyncAt = await dbGetSyncMeta('last_sync_at');
+      } catch {}
+      try {
+        const { syncState } = await import('../lib/sync.js');
+        _syncStoreUnsub = syncState.subscribe(s => {
+          if (s.lastSync) lastSyncAt = s.lastSync;
+        });
+      } catch {}
+      // Re-render the "X ago" label every 30s so it stays accurate without
+      // requiring a manual refresh.
+      _tickInterval = setInterval(() => { _nowTick = Date.now(); }, 30000);
+    }
+    return () => {
+      if (_syncStoreUnsub) _syncStoreUnsub();
+      if (_tickInterval) clearInterval(_tickInterval);
+    };
   });
 </script>
 
@@ -1994,6 +2054,19 @@
                 <div class="setting-desc">{getServerUrl()}</div>
               </div>
               <span class="material-symbols-rounded" style="color:var(--success, #22c55e);font-size:22px">cloud_done</span>
+            </div>
+            <div class="setting-divider"></div>
+            <div class="setting-row">
+              <div>
+                <span class="setting-label">Last synced</span>
+                <div class="setting-desc">
+                  {#key _nowTick}{_fmtTimeAgo(lastSyncAt)}{/key}
+                </div>
+              </div>
+              <button class="btn btn-secondary" style="height:32px;font-size:12px;padding:0 12px;display:flex;align-items:center;gap:6px" on:click={manualSync} disabled={_syncing}>
+                <span class="material-symbols-rounded" class:spin={_syncing} style="font-size:16px">{_syncing ? 'autorenew' : 'sync'}</span>
+                {_syncing ? 'Syncing…' : 'Sync now'}
+              </button>
             </div>
             <div class="setting-divider"></div>
             <div style="padding:12px 16px;display:flex;flex-direction:column;gap:8px">
@@ -3094,4 +3167,5 @@
     transition: width 0.2s ease;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
+  .spin { animation: spin 1s linear infinite; display: inline-block; }
 </style>
