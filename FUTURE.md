@@ -256,6 +256,44 @@ Settings → User Management → OIDC providers. Multi-provider, admin-managed (
 
 ---
 
+## Authentication — Biometric re-auth
+
+Add biometric (fingerprint / face) unlock for re-authentication flows
+in server mode. Pure UX improvement: the user logs in once with
+username + password, and on subsequent JWT expiries (or app reopens
+after a session timeout) the app prompts a biometric instead of
+making them retype the password.
+
+Implementation sketch:
+- **Android**: AndroidX Biometric library (`androidx.biometric:biometric`)
+  + Android Keystore. On successful password login, save the JWT (or
+  a refresh token) encrypted with a Keystore key whose access requires
+  biometric authentication. On re-auth, `BiometricPrompt.authenticate()`
+  → `Cipher` → decrypt the saved token → silent re-auth against server.
+  Wrap in a Capacitor plugin or use `@capacitor-community/biometric-auth`.
+- **PWA**: WebAuthn / Passkeys via the Credential Management API. More
+  involved — requires server-side passkey registration / authentication
+  endpoints (RP ID, challenge, attestation verification). Higher value
+  long-term since it's phishing-resistant and survives password
+  rotation, but more work than the Android-side plugin path.
+
+Scope:
+- Server mode only. Local-only mode has no auth flow to gate.
+- Opt-in via Settings → Account → "Use biometric for sign-in".
+- Fallback to password always available — biometric never replaces the
+  password, only saves the user from typing it on re-auth.
+
+Threat model: this is a UX / convenience layer, not an added security
+boundary. The server still authenticates by password / JWT; biometric
+just unlocks the locally-saved credential. Doesn't change anything
+about Android FBE protecting data at rest.
+
+Likely v1.1 — Android-side first (smaller surface, immediate UX win),
+PWA WebAuthn as a follow-up once we want to invest in passkey infra
+on the server side.
+
+---
+
 ## Engagement / Achievements (maybe-never)
 
 A small, restrained set of cross-domain badges (Diary + Wellness) that
@@ -299,7 +337,7 @@ real user feedback on what (if anything) they ask for here.
 Items to land before flipping `traceapps/nutritrace` public and submitting to Play Store:
 
 - ~~**Android network security lockdown**~~ *(done 2026-05-02)* — `android/app/src/main/res/xml/network_security_config.xml` is now strict (`cleartextTrafficPermitted="false"` + system + user CA trust). Debug-signed APKs get a permissive resource overlay at `android/app/src/debug/res/xml/` that re-enables cleartext for `http://192.168.x.x` LAN dev. `explainConnectError()` in `src/lib/platform.js` translates the cleartext-blocked failure into a friendly "this build only allows HTTPS" message pointing at DEPLOY.md. Documented in three places: README "Coming soon" Android line, new DEPLOY.md "Connecting from Android" section (covers Let's Encrypt, Cloudflare/Tailscale tunnels, self-signed CA install on device, and the build-it-yourself escape hatch), and the in-app error toast.
-- **Native SQLite encryption (revisit)** — `@capacitor-community/sqlite` v8 SQLCipher integration was rolled back in v0.39.23 because `setEncryptionSecret`'s secure-store semantics produced "state not correct" / SQLITE_NOTADB failures on subsequent launches. Defer to v1.1; investigate alternatives: (a) Android Keystore-backed key + per-row encryption in JS, (b) different SQLite plugin with stable encryption story, (c) just rely on Android's OS-level data-directory encryption (file-based encryption, default since Android 7) and document that as sufficient.
+- ~~**Native SQLite encryption (revisit)**~~ *(decided 2026-05-02 — won't ship, position is "rely on Android FBE")* — SQLCipher integration via `@capacitor-community/sqlite` v8 was rolled back in v0.39.23 due to flaky `setEncryptionSecret` secure-store semantics that locked users out of their own data. After surveying comparable apps (Immich, Joplin, Obsidian, AnkiDroid, Mealie, Tandoor, Wger — none encrypt their local SQLite either), decided NutriTrace's threat model doesn't justify the operational risk. Android's file-based encryption (default since Android 7) already encrypts the app data directory using a key tied to the device PIN/biometric — a locked phone is encrypted at rest. PRIVACY.md "Local data at rest" section documents the position explicitly and corrects the previous misleading "encrypted SQLite database" claim.
 - **Public demo instance** — host `demo.nutritrace.app` on the existing Oracle Cloud Always Free machine. Pattern (standard for self-hosted demos — Mealie, Penpot, Vikunja all do this): single shared instance, signup disabled, pre-seeded with a realistic sample week of foods/meals/diary/wellness, cron resets the DB every 6–24h. Implementation: `DEMO_MODE=1` env flag that (a) blocks signup, (b) auto-signs in as the demo user, (c) returns 503 from AI/SMTP/upload routes (don't burn API keys, don't email random addresses), (d) renders a sticky banner "DEMO — data resets daily, don't enter real info". Add `server/scripts/seed-demo.js` to wipe + reseed; cron via systemd timer on the Oracle box. Demo URL is the single biggest conversion lever for awesome-selfhosted submission and r/selfhosted launch posts — defer to just before launch so the demo shows the v1.0 surface, not a beta.
 - **Sync to public repo** — run `nutritrace-dev-sync.sh` to land latest beta in `traceapps/nutritrace`.
 - ~~**Pre-flight scrub**~~ *(done 2026-04-26 — full audit ran in v0.39.35-beta cycle: zero personal email/name leaks, `.env` properly gitignored, no hardcoded URLs/IPs in shipping files, all OAuth credentials user-configurable, sync script handles `thebigjoe1` → `traceapps` rewrites, Ko-fi handle migrated to `traceapps`)*
