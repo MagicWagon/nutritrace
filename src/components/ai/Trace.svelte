@@ -8,7 +8,7 @@
   import { DB, localDateStr } from '../../lib/db.js';
   import { Nutrition } from '../../lib/nutrition.js';
   import { callAI, callAIProxy, TOOLS, setToolHandler } from '../../lib/aiChat.js';
-  import { aiEnabled, aiAssistantName, aiApiKey, aiProvider, aiModel, goals, mealNames, energyUnit, dateFormat, timeFormat, tempUnit, quickLogEnabled, aiGoalInsights, healthConnectEnabled } from '../../stores/settings.js';
+  import { aiEnabled, aiAssistantName, aiApiKey, aiProvider, aiModel, aiBaseUrl, goals, mealNames, energyUnit, dateFormat, timeFormat, tempUnit, quickLogEnabled, aiGoalInsights, healthConnectEnabled } from '../../stores/settings.js';
   import SmartLogModal from '../diary/SmartLogModal.svelte';
   import { showError } from '../../stores/toast.js';
   import { isNative } from '../../lib/platform.js';
@@ -1082,8 +1082,13 @@ Water: ${ctx.waterText}`
     const key      = $aiApiKey;
     const provider = aiProvider.get() || 'claude';
     const model    = aiModel.get()    || undefined;
+    const baseUrl  = aiBaseUrl.get()  || undefined;
 
-    if (!aiEnvLocked && !key) { showError('Add your API key in Settings → AI Assistant'); return; }
+    // OpenAI-compatible endpoints (Ollama etc.) don't need an API key —
+    // skip the key gate for that provider only.
+    if (!aiEnvLocked && !key && provider !== 'oai-compat') {
+      showError('Add your API key in Settings → AI Assistant'); return;
+    }
 
     const image = attachedImage;
     const userMsg = { role: 'user', content: content || '(image)', time: fmtTime(), image: image?.preview };
@@ -1111,7 +1116,7 @@ Water: ${ctx.waterText}`
       }
       const reply = aiEnvLocked
         ? await callAIProxy({ messages: apiMessages, systemPrompt })
-        : await callAI({ provider, apiKey: key, model, messages: apiMessages, systemPrompt, tools: TOOLS,
+        : await callAI({ provider, apiKey: key, model, baseUrl, messages: apiMessages, systemPrompt, tools: TOOLS,
             onToolCall: (toolName) => { _toolStatus = `Fetching ${toolName.replace(/_/g, ' ')}…`; },
           });
       messages = [...messages, { role: 'assistant', content: reply, time: fmtTime() }];
