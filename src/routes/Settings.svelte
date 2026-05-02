@@ -4,7 +4,7 @@
   import { slide, fade } from 'svelte/transition';
   import { push } from 'svelte-spa-router';
   import { portal } from '../lib/portal.js';
-  import { getLogBufferText, clearLogBuffer, isVerboseLogging, setVerboseLogging } from '../lib/log-capture.js';
+  import { getLogBufferText, clearLogBuffer, isVerboseLogging, setVerboseLogging, getLogFileUri, getLastCrashFileUri, hasCrashReport, clearCrashReport } from '../lib/log-capture.js';
   import Toggle from '../components/settings/Toggle.svelte';
 
   import SettingsWellness from '../components/settings/SettingsWellness.svelte';
@@ -948,10 +948,12 @@
   let _logsText = '';
   let _logsCopied = false;
   let _verboseLogging = isVerboseLogging();
+  let _hasCrashReport = false;
 
   function _openLogsSheet() {
     _logsText = getLogBufferText() || '(no log lines captured yet)';
     _logsCopied = false;
+    _hasCrashReport = hasCrashReport();
     _logsSheet = true;
   }
   async function _copyLogs() {
@@ -980,6 +982,45 @@
     } catch (e) {
       // User cancelled — silent.
     }
+  }
+  // Share the persistent log file as a real file attachment (native only,
+  // and only useful when verbose / diagnostic mode has been on long enough
+  // to write something to disk).
+  async function _shareLogFile() {
+    try {
+      const f = await getLogFileUri();
+      if (!f) { showError('No log file yet — turn on Verbose logs and reproduce the issue first'); return; }
+      const { Share } = await import('@capacitor/share');
+      await Share.share({
+        title: 'NutriTrace diagnostic logs',
+        text: 'NutriTrace log file',
+        url: f.uri,
+        dialogTitle: 'Share NutriTrace log file',
+      });
+    } catch (e) {
+      // User cancelled or share unsupported — silent.
+    }
+  }
+  // Share the most recent crash report file. Only visible when one exists
+  // (cleared on next successful share or via the explicit Clear button).
+  async function _shareCrashReport() {
+    try {
+      const f = await getLastCrashFileUri();
+      if (!f) { _hasCrashReport = false; return; }
+      const { Share } = await import('@capacitor/share');
+      await Share.share({
+        title: 'NutriTrace crash report',
+        text: 'NutriTrace crash report',
+        url: f.uri,
+        dialogTitle: 'Share NutriTrace crash report',
+      });
+    } catch (e) {
+      // User cancelled — silent.
+    }
+  }
+  function _clearCrashReport() {
+    clearCrashReport();
+    _hasCrashReport = false;
   }
   function _clearLogs() {
     clearLogBuffer();
@@ -2337,8 +2378,8 @@
         <div class="card settings-card">
           <div class="setting-row">
             <div>
-              <span class="setting-label">Verbose diagnostic logging</span>
-              <div class="setting-desc">Enables detailed app-internal logs (sync, settings, notifications, Health Connect). Off by default — turn on while reproducing a bug, then export below.</div>
+              <span class="setting-label">Diagnostic mode</span>
+              <div class="setting-desc">Enables detailed app-internal logs (sync, settings, notifications, Health Connect) and{isNative ? ' writes them to a daily log file on disk so they survive crashes and reloads.' : ' enables verbose console output.'} Off by default — turn on while reproducing a bug, then export below.</div>
             </div>
             <Toggle checked={_verboseLogging} on:change={e => _toggleVerbose(e.detail)} />
           </div>
@@ -2346,11 +2387,11 @@
           <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px">
             <span class="setting-label">View diagnostic logs</span>
             <p class="setting-desc" style="line-height:1.5">
-              Last 500 lines from the app's console. Useful for bug reports — copy and paste into a <a href="https://github.com/traceapps/nutritrace/issues" target="_blank" rel="noopener" class="about-link">GitHub issue</a>. The buffer holds in-memory only; nothing is sent anywhere automatically.
+              Recent log lines from the app's console. Useful for bug reports — copy / share into a <a href="https://github.com/traceapps/nutritrace/issues" target="_blank" rel="noopener" class="about-link">GitHub issue</a>.{isNative ? ' On Android with Diagnostic mode on, you can also share the persisted log file or any captured crash report.' : ''} Nothing is sent anywhere automatically.
             </p>
             <button class="btn btn-secondary" style="height:40px;font-size:13px" on:click={_openLogsSheet}>
               <span class="material-symbols-rounded" style="font-size:16px">terminal</span>
-              View logs
+              View logs{hasCrashReport() ? ' · crash report available' : ''}
             </button>
           </div>
           <div class="setting-divider"></div>
@@ -2644,24 +2685,53 @@
 <Sheet bind:open={_logsSheet} title="Diagnostic Logs">
   <div style="padding:0 4px 8px">
     <p class="setting-desc" style="line-height:1.5;margin-bottom:10px">
-      Last 500 lines captured. Copy and paste into a bug report. <strong>Redact</strong> any HRV / RHR / weight / calorie values before posting publicly — they're personal health data.
+      Recent log lines (capped at 500 normally, 1000 in verbose mode). Header shows app version + platform so the recipient knows what they're looking at. <strong>Redact</strong> any HRV / RHR / weight / calorie values before posting publicly — they're personal health data.
     </p>
     <textarea readonly style="width:100%;height:280px;font-family:monospace;font-size:11px;padding:8px;border:1px solid var(--border);border-radius:var(--radius-sm,6px);background:var(--surface-2);color:var(--text-1);resize:vertical;white-space:pre">{_logsText}</textarea>
-    <div style="display:flex;gap:8px;margin-top:10px">
-      <button class="btn btn-primary" style="flex:1;height:40px;font-size:13px" on:click={_copyLogs}>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <button class="btn btn-primary" style="flex:1;min-width:120px;height:40px;font-size:13px" on:click={_copyLogs}>
         {#if _logsCopied}
           <span class="material-symbols-rounded" style="font-size:16px">check</span> Copied
         {:else}
           <span class="material-symbols-rounded" style="font-size:16px">content_copy</span> Copy
         {/if}
       </button>
-      <button class="btn btn-secondary" style="flex:1;height:40px;font-size:13px" on:click={_shareLogs}>
-        <span class="material-symbols-rounded" style="font-size:16px">share</span> Share
+      <button class="btn btn-secondary" style="flex:1;min-width:120px;height:40px;font-size:13px" on:click={_shareLogs}>
+        <span class="material-symbols-rounded" style="font-size:16px">share</span> Share text
       </button>
-      <button class="btn btn-secondary" style="flex:1;height:40px;font-size:13px" on:click={_clearLogs}>
+      <button class="btn btn-secondary" style="flex:1;min-width:120px;height:40px;font-size:13px" on:click={_clearLogs}>
         <span class="material-symbols-rounded" style="font-size:16px">delete</span> Clear
       </button>
     </div>
+    {#if isNative && _verboseLogging}
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn btn-secondary" style="flex:1;height:40px;font-size:13px" on:click={_shareLogFile}>
+          <span class="material-symbols-rounded" style="font-size:16px">description</span> Share log file
+        </button>
+      </div>
+      <p class="setting-desc" style="margin-top:6px;font-size:11px">
+        Today's persisted log on disk (rotates daily, last 7 days kept). Better for long sessions or after a crash — the in-memory buffer above resets every reload.
+      </p>
+    {/if}
+    {#if isNative && _hasCrashReport}
+      <div style="margin-top:14px;padding:10px;background:color-mix(in srgb,var(--danger) 8%, transparent);border-left:3px solid var(--danger);border-radius:var(--radius-sm,6px)">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span class="material-symbols-rounded" style="font-size:18px;color:var(--danger)">warning</span>
+          <strong style="color:var(--danger);font-size:14px">Crash report available</strong>
+        </div>
+        <p class="setting-desc" style="margin:0 0 8px;font-size:12px">
+          The app captured an uncaught error. Share the report to help track it down, then dismiss it.
+        </p>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-secondary" style="flex:1;height:36px;font-size:12px" on:click={_shareCrashReport}>
+            <span class="material-symbols-rounded" style="font-size:14px">share</span> Share crash report
+          </button>
+          <button class="btn btn-ghost" style="flex:1;height:36px;font-size:12px" on:click={_clearCrashReport}>
+            Dismiss
+          </button>
+        </div>
+      </div>
+    {/if}
   </div>
 </Sheet>
 
