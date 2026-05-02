@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { get } from 'svelte/store';
   import { slide, fade } from 'svelte/transition';
+  import { push } from 'svelte-spa-router';
   import { portal } from '../lib/portal.js';
   import { getLogBufferText, clearLogBuffer, isVerboseLogging, setVerboseLogging } from '../lib/log-capture.js';
   import Toggle from '../components/settings/Toggle.svelte';
@@ -2141,6 +2142,17 @@
     {#if sectionOpen(openSections, settingsQuery, 'nutritionImport') && sectionVisible(settingsQuery, 'nutritionImport')}
       <SettingsNutritionImport />
     {/if}
+    {/if}
+
+    <!-- ── My Profile (native local mode only — simpler than the full
+         User Management section, just gives the user a way to edit
+         name/gender/dob/avatar after the wizard) ──────────────────────── -->
+    {#if isNativeLocal}
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'users')} on:click={() => push('/profile')}>
+      <span class="material-symbols-rounded si">person</span>
+      <span>My Profile</span>
+      <span class="material-symbols-rounded chevron">chevron_right</span>
+    </button>
     {/if}
 
     <!-- ── User Management (hidden in native local mode — single user) ────── -->
