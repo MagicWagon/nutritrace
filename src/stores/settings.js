@@ -40,6 +40,10 @@ export const USER_PREFS = new Set([
   // User profile (collected by Wizard, used for goal calculation; sync so multi-device
   // users see the same body profile)
   'gender','dob','height_cm','weight_kg','target_weight','activity','tdee',
+  // Native local-mode profile fields (no auth → no users table; these stand in for
+  // the server's full_name / nickname / avatar_url). In USER_PREFS so they're
+  // captured by the local full-backup ZIP. In server mode they're unused.
+  'localUserName','localUserNickname','localUserAvatar',
   'aiEnabled','aiProvider','aiApiKey','aiModel','aiBaseUrl','aiAssistantName','quickLogEnabled','aiGoalInsights',
   'usdaEnabled','usdaApiKey','offUsername','offPassword',
   'mealieEnabled','mealieBaseUrl','mealieApiToken',

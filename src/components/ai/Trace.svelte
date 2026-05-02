@@ -9,6 +9,7 @@
   import { Nutrition } from '../../lib/nutrition.js';
   import { callAI, callAIProxy, TOOLS, setToolHandler } from '../../lib/aiChat.js';
   import { aiEnabled, aiAssistantName, aiApiKey, aiProvider, aiModel, aiBaseUrl, goals, mealNames, energyUnit, dateFormat, timeFormat, tempUnit, quickLogEnabled, aiGoalInsights, healthConnectEnabled } from '../../stores/settings.js';
+  import { currentUser } from '../../stores/auth.js';
   import SmartLogModal from '../diary/SmartLogModal.svelte';
   import { showError } from '../../stores/toast.js';
   import { isNative } from '../../lib/platform.js';
@@ -825,6 +826,13 @@
     const g      = goals.get();
     const mNames = mealNames.get();
     const eUnit  = energyUnit.get();
+    // Prefer nickname → full_name. Skip the synthetic 'Local User' default
+    // and the 'local' username so we don't tell the AI to greet someone by
+    // a placeholder.
+    const u       = $currentUser || {};
+    const _nick   = (u.nickname || '').trim();
+    const _full   = (u.full_name || '').trim();
+    const userName = (_nick || (_full && _full !== 'Local User' ? _full : '')) || '';
 
     let diaryText = 'No food logged today yet.';
     if (entry && entry.items?.length) {
@@ -1010,7 +1018,7 @@
       }
     } catch {}
 
-    return { today, diaryText, goalsText, statsText, wellnessText, waterText,
+    return { today, userName, diaryText, goalsText, statsText, wellnessText, waterText,
       weightUnit: DB.getSetting('weightUnit', 'lb'),
       distUnit: DB.getSetting('distUnit', 'km'),
       heightUnit: DB.getSetting('heightUnit', 'ft'),
@@ -1058,7 +1066,7 @@ IMPORTANT — User's preferred units (ALWAYS use these when presenting data):
 - Energy: ${ctx.energyUnit === 'kJ' ? 'kilojoules (kJ)' : 'kilocalories (kcal)'}
 Convert all values to these units before presenting. ONLY show the preferred unit — do NOT show both or include the original metric/imperial value.
 
-Be warm, encouraging, and concise. Give practical, evidence-based advice. Use the data to personalize your responses.
+Be warm, encouraging, and concise. Give practical, evidence-based advice. Use the data to personalize your responses.${ctx.userName ? `\n\nThe user's name is ${ctx.userName}. Use it naturally — greet them by name occasionally, reference it when celebrating progress — but don't overdo it (every other sentence is too much).` : ''}
 
 Current date: ${ctx.today}
 
