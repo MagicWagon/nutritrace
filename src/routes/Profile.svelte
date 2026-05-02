@@ -411,7 +411,20 @@
 <style>
   .page-wrap { display: flex; flex-direction: column; height: 100dvh; overflow: hidden; }
   .danger-zone-card { border-color: color-mix(in srgb, var(--danger) 25%, transparent) !important; }
-  .profile-body { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+  /* Desktop: cap width so cards don't stretch to 1900px on wide monitors;
+     mobile (<= 720px viewport) uses full width via the calc fallback. */
+  .profile-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    padding-bottom: 80px; /* clear nav / FAB on mobile */
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+    max-width: 720px;
+    margin: 0 auto;
+  }
   .avatar-section {
     display: flex;
     flex-direction: column;
@@ -442,7 +455,20 @@
   }
   .avatar-btn:hover .avatar-overlay { opacity: 1; }
   .avatar-meta { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-  .profile-body .settings-card { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  /* Override the base .card { overflow: hidden } — the rounded corners
+     don't have any internal overflow to clip here, and `hidden` was
+     trimming icon descenders + button content on the bottom rows. Also
+     drop the hover transform — Profile is a settings page, not a
+     dashboard tile, the lift effect just nudges things 2px out of place
+     when the cursor passes through. */
+  .profile-body .settings-card {
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    overflow: visible;
+  }
+  .profile-body .settings-card:hover { transform: none; box-shadow: none; }
   .profile-body .editor-card-title { font-size: 16px; font-weight: 600; margin: 0; }
 
   /* Password strength indicator — shared pattern */
@@ -463,8 +489,9 @@
      competing with the outer card and clipping the meta line). */
   .oidc-link-row {
     display: flex; align-items: center; gap: 12px;
-    padding: 10px 4px;
+    padding: 12px 8px;
     border-bottom: 1px solid var(--border);
+    min-height: 52px;
   }
   .oidc-link-row:last-child { border-bottom: none; }
   .oidc-link-logo { width: 24px; height: 24px; object-fit: contain; flex: 0 0 auto; }
@@ -480,7 +507,8 @@
      rest of the app. */
   .security-row {
     display: flex; align-items: center; gap: 12px;
-    width: 100%; padding: 10px 4px;
+    width: 100%; padding: 14px 8px;
+    min-height: 52px;
     background: none; border: none; cursor: pointer;
     color: var(--text-1); font-family: inherit; font-size: 14px;
     text-align: left;
@@ -492,10 +520,14 @@
   .security-label { flex: 1; font-weight: 500; }
   .security-chev { font-size: 20px; color: var(--text-3); flex-shrink: 0; }
 
-  /* Danger zone button — full width, danger-tinted, icon + label centered. */
+  /* Danger zone button — full width, danger-tinted, icon + label centered.
+     Explicit min-height to ensure the icon + label aren't visually pinched.
+     Material Symbols at 18px need ~28px line-box, plus padding. */
   .danger-zone-btn {
     display: flex; align-items: center; justify-content: center; gap: 8px;
     width: 100%;
+    min-height: 48px;
+    padding: 10px 16px;
     color: var(--danger);
     border-color: color-mix(in srgb, var(--danger) 40%, transparent);
   }
