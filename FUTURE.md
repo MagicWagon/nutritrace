@@ -256,6 +256,38 @@ Settings → User Management → OIDC providers. Multi-provider, admin-managed (
 
 ---
 
+## Engagement / Achievements (maybe-never)
+
+A small, restrained set of cross-domain badges (Diary + Wellness) that
+reinforce real behavior milestones, not trivia. Idea-stage only — may
+not ever ship if it ends up feeling gamified or out of character for
+the self-hosted/serious audience.
+
+If we did ship it:
+- 8–12 badges total, not 50. Resist the urge to add "logged your first
+  food!" trivial ones.
+- Opt-in via Settings toggle (likely default off). The app should feel
+  adult/clean for users who don't want gamification.
+- Surface in Profile as a "Trophies" panel — slow-burn record, not
+  another in-the-moment popup. Goal Celebrations already cover the
+  dopamine-hit moment; achievements would be the cumulative log.
+- Candidate milestones (cross-domain, real-behavior):
+  - Diary: 7/30/90/365-day logging streak, first 1000 unique foods
+    logged, 30 days hitting protein goal, 30 days under TDEE
+  - Wellness: 7 consecutive nights ≥80 sleep score, 30 days with HRV
+    data, 7-day readiness ≥80 streak, first month with body stats
+- Data model: single `achievements_unlocked` table with
+  `(user_id, badge_id, unlocked_at)`. Server computes on goal-tick or
+  daily wellness sync; cheap to evaluate and persist.
+
+Tradeoff: gamification creep is the real risk. Too many badges or
+too-easy unlocks turn the app into a kids' game. Self-hosted nutrition
+trackers tend toward austere — most users would rather see a sparkline
+than a trophy. Defer until after the v1.0 surface settles and we have
+real user feedback on what (if anything) they ask for here.
+
+---
+
 ## Post-1.0 follow-ups
 
 - **Nutrition card filter behavior** — the per-meal totals popup and the day Nutrition Summary both respect the `diaryShowAllNutrients` toggle (default 9 nutrients vs all). Decide: should the per-meal popup ALWAYS show all available nutrients (since user opted in by tapping the macro bar) regardless of the toggle, or stay consistent with the day summary? Three options: (a) leave as-is, (b) always show all in the popup, (c) add an in-popup expand toggle. Defer the call until we have user feedback on what they reach for.
@@ -266,7 +298,7 @@ Settings → User Management → OIDC providers. Multi-provider, admin-managed (
 
 Items to land before flipping `traceapps/nutritrace` public and submitting to Play Store:
 
-- **Android network security lockdown** — `android/app/src/main/res/xml/network_security_config.xml` currently allows cleartext + user-installed CAs in production. Restructure to `<base-config cleartextTrafficPermitted="false">` (locked down for Play Store release builds) + `<debug-overrides>` keeping cleartext + user CAs (for sideloaded debug APKs). Document the HTTPS expectation for Play Store users in 3 places: README Android section, DEPLOY.md "Connecting from Android" subsection, and in-app error message when Play Store build hits an HTTP server.
+- ~~**Android network security lockdown**~~ *(done 2026-05-02)* — `android/app/src/main/res/xml/network_security_config.xml` is now strict (`cleartextTrafficPermitted="false"` + system + user CA trust). Debug-signed APKs get a permissive resource overlay at `android/app/src/debug/res/xml/` that re-enables cleartext for `http://192.168.x.x` LAN dev. `explainConnectError()` in `src/lib/platform.js` translates the cleartext-blocked failure into a friendly "this build only allows HTTPS" message pointing at DEPLOY.md. Documented in three places: README "Coming soon" Android line, new DEPLOY.md "Connecting from Android" section (covers Let's Encrypt, Cloudflare/Tailscale tunnels, self-signed CA install on device, and the build-it-yourself escape hatch), and the in-app error toast.
 - **Native SQLite encryption (revisit)** — `@capacitor-community/sqlite` v8 SQLCipher integration was rolled back in v0.39.23 because `setEncryptionSecret`'s secure-store semantics produced "state not correct" / SQLITE_NOTADB failures on subsequent launches. Defer to v1.1; investigate alternatives: (a) Android Keystore-backed key + per-row encryption in JS, (b) different SQLite plugin with stable encryption story, (c) just rely on Android's OS-level data-directory encryption (file-based encryption, default since Android 7) and document that as sufficient.
 - **Public demo instance** — host `demo.nutritrace.app` on the existing Oracle Cloud Always Free machine. Pattern (standard for self-hosted demos — Mealie, Penpot, Vikunja all do this): single shared instance, signup disabled, pre-seeded with a realistic sample week of foods/meals/diary/wellness, cron resets the DB every 6–24h. Implementation: `DEMO_MODE=1` env flag that (a) blocks signup, (b) auto-signs in as the demo user, (c) returns 503 from AI/SMTP/upload routes (don't burn API keys, don't email random addresses), (d) renders a sticky banner "DEMO — data resets daily, don't enter real info". Add `server/scripts/seed-demo.js` to wipe + reseed; cron via systemd timer on the Oracle box. Demo URL is the single biggest conversion lever for awesome-selfhosted submission and r/selfhosted launch posts — defer to just before launch so the demo shows the v1.0 surface, not a beta.
 - **Sync to public repo** — run `nutritrace-dev-sync.sh` to land latest beta in `traceapps/nutritrace`.
