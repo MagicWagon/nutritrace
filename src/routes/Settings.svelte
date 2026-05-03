@@ -11,6 +11,7 @@
   import SettingsTrace from '../components/settings/SettingsTrace.svelte';
   import SettingsNotifications from '../components/settings/SettingsNotifications.svelte';
   import SettingsUserManagement from '../components/settings/SettingsUserManagement.svelte';
+  import SettingsAuth from '../components/settings/SettingsAuth.svelte';
   import SettingsBackup from '../components/settings/SettingsBackup.svelte';
   import SettingsNutritionImport from '../components/settings/SettingsNutritionImport.svelte';
   import { APP_VERSION } from '../lib/version.js';
@@ -943,6 +944,10 @@
   // ── User Management ref ────────────────────────────────────────────────────
   let userMgmtRef;
   $: if (openSections.users && $userMgmtActive) userMgmtRef?.loadData();
+
+  // ── Authentication (OIDC SSO) ref ─────────────────────────────────────────
+  let authRef;
+  $: if (openSections.authentication && $userMgmtActive && $currentUser?.role === 'admin') authRef?.loadData();
 
   // ── Diagnostics: in-app log capture ──────────────────────────────────────
   let _logsSheet = false;
@@ -2226,6 +2231,18 @@
     </button>
     {#if sectionOpen(openSections, settingsQuery, 'users') && sectionVisible(settingsQuery, 'users')}
       <SettingsUserManagement bind:this={userMgmtRef} />
+    {/if}
+    {/if}
+
+    <!-- ── Authentication (OIDC SSO + password-login toggle) ──────────────── -->
+    {#if !isNativeLocal && $userMgmtActive && $currentUser?.role === 'admin'}
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'authentication')} on:click={() => toggleSection('authentication')}>
+      <span class="material-symbols-rounded si">vpn_key</span>
+      <span>Authentication</span>
+      <span class="material-symbols-rounded chevron" class:rotated={openSections.authentication}>expand_more</span>
+    </button>
+    {#if sectionOpen(openSections, settingsQuery, 'authentication') && sectionVisible(settingsQuery, 'authentication')}
+      <SettingsAuth bind:this={authRef} />
     {/if}
     {/if}
 
