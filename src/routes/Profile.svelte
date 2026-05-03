@@ -412,7 +412,7 @@
     <div class="card settings-card">
       <button class="security-row" on:click={doLogout} disabled={loggingOut}>
         <span class="material-symbols-rounded security-icon">logout</span>
-        <span class="security-label">{loggingOut ? 'Signing out…' : 'Log Out'}</span>
+        <span class="security-label">{loggingOut ? $_('common.signing_out') : $_('common.log_out')}</span>
         <span class="material-symbols-rounded security-chev">chevron_right</span>
       </button>
     </div>

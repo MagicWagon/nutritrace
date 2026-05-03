@@ -1215,6 +1215,39 @@
 
   <div class="page-content settings-content">
 
+    <!-- ── Profile hero — identity card at the top of Settings.
+         Avatar + name (nickname → full name → "My Profile" fallback) +
+         optional admin pill. Click → /profile. Hidden during search
+         when no profile keyword matches so it doesn't dilute results. -->
+    {#if sectionVisible(settingsQuery, 'profile')}
+    {@const _u = $currentUser || {}}
+    {@const _nick = (_u.nickname || '').trim()}
+    {@const _full = (_u.full_name || '').trim()}
+    {@const _displayName = _nick || (_full && _full !== 'Local User' ? _full : '') || $_('settings.profile_hero.label_fallback')}
+    {@const _hasName = _displayName !== $_('settings.profile_hero.label_fallback')}
+    {@const _initial = (_displayName[0] || '?').toUpperCase()}
+    <button class="profile-hero" on:click={() => push('/profile')}>
+      <div class="profile-hero-avatar">
+        {#if _u.avatar_url}
+          <img src={resolveAssetUrl(_u.avatar_url)} alt="" />
+        {:else if _hasName}
+          <span class="profile-hero-initial">{_initial}</span>
+        {:else}
+          <span class="material-symbols-rounded">person</span>
+        {/if}
+      </div>
+      <div class="profile-hero-info">
+        <span class="profile-hero-name">{_displayName}</span>
+        {#if _hasName && _u.role === 'admin' && $userMgmtActive}
+          <span class="profile-hero-role">{$_('common.admin')}</span>
+        {:else if !_hasName}
+          <span class="profile-hero-sub">{$_('settings.profile_hero.subtitle_empty')}</span>
+        {/if}
+      </div>
+      <span class="material-symbols-rounded profile-hero-chev">chevron_right</span>
+    </button>
+    {/if}
+
     <p class="settings-group-label">Display</p>
     <!-- ── Appearance ──────────────────────────────────────────────────────── -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'appearance')} on:click={() => toggleSection('appearance')}>
@@ -2194,15 +2227,8 @@
     {/if}
     {/if}
 
-    <!-- ── My Profile (always visible — name, dob, gender, avatar, and
-         Log Out when there's a server session). Profile.svelte itself
-         decides between the local-storage editor (single-user / native
-         standalone) and the full server-backed editor. -->
-    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'profile')} on:click={() => push('/profile')}>
-      <span class="material-symbols-rounded si">person</span>
-      <span>My Profile</span>
-      <span class="material-symbols-rounded chevron">chevron_right</span>
-    </button>
+    <!-- My Profile lives at the top of Settings as the profile-hero card;
+         User Management (admin features) follows here. -->
 
     <!-- ── User Management (hidden in native local mode — single user) ────── -->
     {#if !isNativeLocal}
@@ -2220,7 +2246,7 @@
     {#if !isNativeLocal && $userMgmtActive && $currentUser?.role === 'admin'}
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'authentication')} on:click={() => toggleSection('authentication')}>
       <span class="material-symbols-rounded si">vpn_key</span>
-      <span>Authentication</span>
+      <span>{$_('settings.authentication.section')}</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.authentication}>expand_more</span>
     </button>
     {#if sectionOpen(openSections, settingsQuery, 'authentication') && sectionVisible(settingsQuery, 'authentication')}
@@ -2810,6 +2836,47 @@
   }
   .settings-search-input:focus { border-color: var(--accent); }
   .settings-search-clear { color: var(--text-3); }
+
+  /* Profile hero — identity card at the top of Settings */
+  .profile-hero {
+    display: flex; align-items: center; gap: 14px;
+    width: 100%;
+    margin: 4px var(--page-px) 14px;
+    padding: 14px 16px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg, 14px);
+    color: var(--text-1);
+    cursor: pointer;
+    font-family: inherit; text-align: left;
+    transition: background var(--dur-fast), transform var(--dur-fast);
+    width: calc(100% - var(--page-px) * 2);
+  }
+  .profile-hero:hover  { background: var(--surface-3); }
+  .profile-hero:active { transform: scale(0.99); }
+  .profile-hero-avatar {
+    width: 48px; height: 48px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2, var(--accent)));
+    color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; overflow: hidden;
+  }
+  .profile-hero-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .profile-hero-avatar :global(.material-symbols-rounded) { font-size: 26px; }
+  .profile-hero-initial { font-size: 20px; font-weight: 700; line-height: 1; }
+  .profile-hero-info { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .profile-hero-name {
+    font-size: 17px; font-weight: 700; color: var(--text-1);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .profile-hero-role {
+    align-self: flex-start;
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--accent); background: var(--accent-dim);
+    padding: 2px 8px; border-radius: var(--radius-full, 999px);
+  }
+  .profile-hero-sub { font-size: 13px; color: var(--text-3); }
+  .profile-hero-chev { color: var(--text-3); flex-shrink: 0; }
 
   /* Section toggle button */
   .section-toggle {
