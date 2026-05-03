@@ -40,6 +40,18 @@
   // OIDC providers + password-login toggle live in SettingsAuth.svelte
   // (its own top-level Settings section).
 
+  function _csrfHeaders(extra = {}) {
+    const h = { 'Content-Type': 'application/json', ...extra };
+    if (isNative && getServerUrl()) {
+      const t = getAuthToken();
+      if (t) h['Authorization'] = `Bearer ${t}`;
+    } else {
+      const csrf = localStorage.getItem('nt:csrf');
+      if (csrf) h['X-CSRF-Token'] = csrf;
+    }
+    return h;
+  }
+
   // Invite
   let inviteEmail  = '';
   let inviteRole   = 'user';
@@ -101,7 +113,30 @@
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { enableUmError = data.error || $_('settings.users.err_registration_failed'); enableUmLoading = false; return; }
+      // Migrate previously-anonymous settings (`wl_<key>`) to the new admin's
+      // per-user prefix BEFORE flipping wl:userId, so the wizard-configured
+      // mealNames/dob/gender/goals/etc. survive the mode switch instead of
+      // looking blank to the freshly-created admin.
+      try { DB.migrateSettingsPrefix(null, data.user.id); } catch {}
       localStorage.setItem('wl:userId', data.user.id);
+      // Persist any localUser* profile fields onto the admin's users-row so
+      // they don't get re-discovered as null on next loadAuthState.
+      const profile = {
+        full_name: DB.getSetting('localUserName',     null) || enableAdminName.trim() || undefined,
+        nickname:  DB.getSetting('localUserNickname', null) || undefined,
+        birthday:  DB.getSetting('dob',               null) || undefined,
+        gender:    DB.getSetting('gender',            null) || undefined,
+        avatar_url:DB.getSetting('localUserAvatar',   null) || undefined,
+      };
+      if (Object.values(profile).some(v => v != null)) {
+        try {
+          await fetch(apiUrl('/api/auth/profile'), {
+            method: 'PUT', credentials: 'include',
+            headers: _csrfHeaders(),
+            body: JSON.stringify(profile),
+          });
+        } catch {}
+      }
       await loadAuthState();
       showEnableUm = false;
       enableAdminUser = ''; enableAdminPass = ''; enableAdminConf = ''; enableAdminName = '';
@@ -203,7 +238,26 @@
       dangerous: true,
     })) return;
     try {
+      // Snapshot the current admin's profile + per-user settings BEFORE the
+      // server wipes the users table — once disabled, we drop back to the
+      // anonymous `wl_<key>` prefix and the synthetic LOCAL_USER. Without
+      // this, the admin's name / dob / gender / mealNames / goals / etc.
+      // would silently disappear with no recovery path.
+      const u = $currentUser;
+      const oldId = u?.id;
+      if (u) {
+        if (u.full_name)  DB.setSetting('localUserName',     u.full_name);
+        if (u.nickname)   DB.setSetting('localUserNickname', u.nickname);
+        if (u.birthday)   DB.setSetting('dob',               u.birthday);
+        if (u.gender)     DB.setSetting('gender',            u.gender);
+        if (u.avatar_url) DB.setSetting('localUserAvatar',   u.avatar_url);
+      }
       await NtApi.del('/api/auth/management');
+      // Move per-user settings back to the anonymous prefix so they're
+      // visible after the prefix flip below.
+      if (oldId != null) {
+        try { DB.migrateSettingsPrefix(oldId, null); } catch {}
+      }
       localStorage.removeItem('wl:userId');
       await loadAuthState();
       showSuccess($_('settings.users.toast_um_disabled'));
