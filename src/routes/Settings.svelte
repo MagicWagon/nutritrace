@@ -64,7 +64,7 @@
   let openSections = { serverConnection: false, appearance: false, regional: false, diary: false, foods: false, water: false,
                        categories: false, nutrients: false, goals: false, bodyStats: false, statistics: false,
                        connectedServices: false, ai: false, notifications: false, wellness: false, sharing: false,
-                       backup: false, nutritionImport: false, email: false, users: false, helpImprove: false, about: false };
+                       authentication: false, backup: false, nutritionImport: false, email: false, users: false, helpImprove: false, about: false };
 
   // ── Sync state + manual trigger ────────────────────────────────────────
   // Native server mode only. lastSyncAt comes from sync_meta on mount and is
@@ -296,6 +296,7 @@
 
   const SECTION_KEYWORDS = {
     serverConnection:  ['server','connection','sync','cloud','local','remote','connect','disconnect','url'],
+    authentication:    ['authentication','auth','sso','single sign-on','single sign on','oidc','openid','authentik','keycloak','authelia','pocket id','auth0','google','password login','admin group'],
     appearance:        ['appearance','theme','dark','light','accent','color','navigation','sidebar','persistent','start page','animations','celebrations','reduce motion','banner','page banner'],
     regional:          ['regional','language','translation','date format','time format','locale','date','time','12h','24h','units','energy unit','weight unit','height','circumference','distance','temperature','imperial','metric'],
     diary:             ['diary','brands','timestamps','thumbnails','nutrients','nutrition units','macros','macro summary','prompt quantity','portion size','nutrition bar','goals progress','meal names','meals'],
@@ -2079,17 +2080,37 @@
 
     <p class="settings-group-label">App</p>
 
-    <!-- ── Server Connection (native app only — most fundamental on Android) ── -->
-    {#if isNative}
+    <!-- ── Server Connection / Account ──────────────────────────────────────
+         Native: full server-connect flow (connect / disconnect / sync /
+                 logout). PWA: just a session card with Log Out — there's
+                 no "connect to server" concept on PWA since the PWA IS
+                 the server, but users still need a discoverable Logout. -->
+    {#if isNative || ($userMgmtActive && $currentUser)}
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'serverConnection')} on:click={() => toggleSection('serverConnection')}>
-      <span class="material-symbols-rounded si">cloud_sync</span>
-      <span>{$_('settings.server.section')}</span>
+      <span class="material-symbols-rounded si">{isNative ? 'cloud_sync' : 'person'}</span>
+      <span>{isNative ? $_('settings.server.section') : 'Account'}</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.serverConnection}>expand_more</span>
     </button>
     {#if sectionOpen(openSections, settingsQuery, 'serverConnection') && sectionVisible(settingsQuery, 'serverConnection')}
       <div class="section-body" transition:slide={{ duration: 180 }}>
         <div class="card settings-card">
-          {#if serverMode === 'server' && getServerUrl()}
+          {#if !isNative}
+            <!-- ── PWA: signed-in card + Log Out ── -->
+            <div class="setting-row">
+              <div>
+                <span class="setting-label">Signed in as</span>
+                <div class="setting-desc">{$currentUser?.full_name || $currentUser?.nickname || $currentUser?.username || ''}</div>
+              </div>
+              <span class="material-symbols-rounded" style="color:var(--success, #22c55e);font-size:22px">verified_user</span>
+            </div>
+            <div class="setting-divider"></div>
+            <div style="padding:12px 16px">
+              <button class="btn btn-ghost w-full" on:click={logoutServer}>
+                <span class="material-symbols-rounded" style="font-size:18px">logout</span>
+                Log Out
+              </button>
+            </div>
+          {:else if serverMode === 'server' && getServerUrl()}
             <div class="setting-row">
               <div>
                 <span class="setting-label">Connected</span>

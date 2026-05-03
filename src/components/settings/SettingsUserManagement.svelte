@@ -757,19 +757,33 @@
               <div class="oidc-row">
                 {#if p.logo_url}<img src={resolveAssetUrl(p.logo_url)} alt="" class="oidc-logo" />{:else}<span class="material-symbols-rounded oidc-icon">verified_user</span>{/if}
                 <div class="oidc-info">
-                  <span class="oidc-name">{p.display_name || p.issuer_url}</span>
+                  <span class="oidc-name">
+                    {p.display_name || p.issuer_url}
+                    {#if p.env_locked}
+                      <span class="env-lock-badge" title="Configured via environment variables — edit your .env / docker-compose to change">
+                        <span class="material-symbols-rounded" style="font-size:12px">lock</span>
+                        env
+                      </span>
+                    {/if}
+                  </span>
                   <span class="text-3 text-sm">{p.issuer_url} · link {p.auto_link_verified_email ? 'on' : 'off'} · register {p.auto_register_new_users ? 'on' : 'off'}{!p.is_active ? ' · disabled' : ''}</span>
                 </div>
                 <div class="oidc-actions">
                   <button class="btn-icon" title="Test discovery" on:click={() => testProvider(p.id)} disabled={oidcBusy}>
                     <span class="material-symbols-rounded">network_check</span>
                   </button>
-                  <button class="btn-icon" title="Edit" on:click={() => startEditProvider(p)} disabled={oidcBusy}>
-                    <span class="material-symbols-rounded">edit</span>
-                  </button>
-                  <button class="btn-icon" title="Delete" on:click={() => deleteProvider(p)} disabled={oidcBusy}>
-                    <span class="material-symbols-rounded" style="color:var(--danger)">delete</span>
-                  </button>
+                  {#if p.env_locked}
+                    <button class="btn-icon" title="Configured via environment — read-only" disabled>
+                      <span class="material-symbols-rounded" style="opacity:0.4">lock</span>
+                    </button>
+                  {:else}
+                    <button class="btn-icon" title="Edit" on:click={() => startEditProvider(p)} disabled={oidcBusy}>
+                      <span class="material-symbols-rounded">edit</span>
+                    </button>
+                    <button class="btn-icon" title="Delete" on:click={() => deleteProvider(p)} disabled={oidcBusy}>
+                      <span class="material-symbols-rounded" style="color:var(--danger)">delete</span>
+                    </button>
+                  {/if}
                 </div>
               </div>
             {/each}
@@ -1239,8 +1253,17 @@
   /* Long issuer URLs and display names have no spaces — let them wrap
      anywhere so they don't push into the action icons on narrow viewports. */
   .oidc-info > * { min-width: 0; word-break: break-word; overflow-wrap: anywhere; }
-  .oidc-name { font-weight: 600; }
+  .oidc-name { font-weight: 600; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .oidc-actions { display: flex; gap: 4px; flex-shrink: 0; }
+  .env-lock-badge {
+    display: inline-flex; align-items: center; gap: 2px;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: var(--radius-sm, 4px);
+    background: color-mix(in srgb, var(--text-3) 18%, transparent);
+    color: var(--text-3);
+  }
   .oidc-test-result {
     padding: 10px; border-radius: var(--radius-md);
     background: var(--surface-2); border: 1px solid var(--border);
