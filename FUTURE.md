@@ -65,6 +65,12 @@ A dedicated **Dashboard** page that correlates data across all domains (nutritio
 - ~~**Local full backup (ZIP)** — create full backup on device (JSZip) including images, for phone-to-phone transfer without a server~~ *(done — v0.35.2-beta)*
 - **iOS app** — Capacitor already supports iOS; need HealthKit integration + App Store setup
 
+### Phase 3 — Distribution
+- **Obtainium** — list NutriTrace as an Obtainium-discoverable app so users can auto-track new GitHub Releases without checking manually. Requires the GitHub Releases page to consistently attach a signed APK with a stable filename pattern.
+- **IzzyOnDroid F-Droid repo** — lower bar than F-Droid main (no reproducible builds required). Path to broader F-Droid eventually.
+- **F-Droid main repo** — requires reproducible builds. Larger lift; defer until 1.0+ has had a few public releases.
+- **Play Store** — gated on 1.0 GA. Needs developer account, listing assets (icon, screenshots, description), privacy policy URL, content rating, target SDK compliance.
+
 ---
 
 ## ~~Shared Food Database~~ *(done — Food Sharing, experimental)*
