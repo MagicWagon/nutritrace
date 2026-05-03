@@ -1329,7 +1329,7 @@
           <div class="setting-row">
             <div>
               <span class="setting-label">Goal pulse animation</span>
-              <div class="setting-desc">Pulse effect on the diary nutrition bar when you hit a goal. (For "celebration" notifications, see Notifications.)</div>
+              <div class="setting-desc">Pulse the diary's nutrition bar when you hit a daily goal. For push notifications on goal hits, see Notifications.</div>
             </div>
             <Toggle checked={$goalCelebrations} on:change={e => goalCelebrations.set(e.detail)} />
           </div>
@@ -1337,7 +1337,7 @@
           <div class="setting-row">
             <div>
               <span class="setting-label">Page banners</span>
-              <div class="setting-desc">Animated page header illustrations</div>
+              <div class="setting-desc">Decorative animated illustrations at the top of every page</div>
             </div>
             <Toggle checked={$pageBanners} on:change={e => pageBanners.set(e.detail)} />
           </div>
@@ -1689,7 +1689,7 @@
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <div><span class="setting-label">Show yesterday's meals</span><div class="setting-desc">In the Meals tab, surface yesterday's meals as quick-add cards (with item-list info button)</div></div>
+            <div><span class="setting-label">Show yesterday's meals</span><div class="setting-desc">Pin yesterday's meals as quick-add cards in the Meals tab. Tap the info icon to see what's in each one.</div></div>
             <Toggle checked={$foodsShowYesterdayMeals} on:change={e => foodsShowYesterdayMeals.set(e.detail)} />
           </div>
           <div class="setting-divider"></div>
