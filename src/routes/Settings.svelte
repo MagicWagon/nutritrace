@@ -316,7 +316,8 @@
     backup:            ['backup','export','import','restore','csv','clear data','json','full backup','images','zip','reset','defaults','clear settings','danger zone'],
     nutritionImport:   ['import','nutrition import','myfitnesspal','mfp','loseit','lose it','cronometer','spreadsheet','csv','migrate','migration','from another app'],
     email:             ['email','smtp','mail','password reset','invites','notifications'],
-    users:             ['users','user management','accounts','login','password','admin','register','profile'],
+    profile:           ['profile','my profile','account','name','nickname','birthday','dob','gender','sex','avatar','log out','logout','sign out','password','change password'],
+    users:             ['users','user management','accounts','login','admin','register','invite'],
     helpImprove:       ['diagnostics','logs','verbose','calibration','export','bug','report','troubleshoot'],
     about:             ['about','version','nutritrace'],
   };
@@ -2085,37 +2086,19 @@
 
     <p class="settings-group-label">App</p>
 
-    <!-- ── Server Connection / Account ──────────────────────────────────────
-         Native: full server-connect flow (connect / disconnect / sync /
-                 logout). PWA: just a session card with Log Out — there's
-                 no "connect to server" concept on PWA since the PWA IS
-                 the server, but users still need a discoverable Logout. -->
-    {#if isNative || ($userMgmtActive && $currentUser)}
+    <!-- ── Server Connection (native only — manages connection to a remote
+         NutriTrace server). PWA users have no "server connection" concept;
+         their Log Out lives in My Profile. -->
+    {#if isNative}
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'serverConnection')} on:click={() => toggleSection('serverConnection')}>
-      <span class="material-symbols-rounded si">{isNative ? 'cloud_sync' : 'person'}</span>
-      <span>{isNative ? $_('settings.server.section') : 'Account'}</span>
+      <span class="material-symbols-rounded si">cloud_sync</span>
+      <span>{$_('settings.server.section')}</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.serverConnection}>expand_more</span>
     </button>
     {#if sectionOpen(openSections, settingsQuery, 'serverConnection') && sectionVisible(settingsQuery, 'serverConnection')}
       <div class="section-body" transition:slide={{ duration: 180 }}>
         <div class="card settings-card">
-          {#if !isNative}
-            <!-- ── PWA: signed-in card + Log Out ── -->
-            <div class="setting-row">
-              <div>
-                <span class="setting-label">Signed in as</span>
-                <div class="setting-desc">{$currentUser?.full_name || $currentUser?.nickname || $currentUser?.username || ''}</div>
-              </div>
-              <span class="material-symbols-rounded" style="color:var(--success, #22c55e);font-size:22px">verified_user</span>
-            </div>
-            <div class="setting-divider"></div>
-            <div style="padding:12px 16px">
-              <button class="btn btn-ghost w-full" on:click={logoutServer}>
-                <span class="material-symbols-rounded" style="font-size:18px">logout</span>
-                Log Out
-              </button>
-            </div>
-          {:else if serverMode === 'server' && getServerUrl()}
+          {#if serverMode === 'server' && getServerUrl()}
             <div class="setting-row">
               <div>
                 <span class="setting-label">Connected</span>
@@ -2211,16 +2194,15 @@
     {/if}
     {/if}
 
-    <!-- ── My Profile (native local mode only — simpler than the full
-         User Management section, just gives the user a way to edit
-         name/gender/dob/avatar after the wizard) ──────────────────────── -->
-    {#if isNativeLocal}
-    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'users')} on:click={() => push('/profile')}>
+    <!-- ── My Profile (always visible — name, dob, gender, avatar, and
+         Log Out when there's a server session). Profile.svelte itself
+         decides between the local-storage editor (single-user / native
+         standalone) and the full server-backed editor. -->
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'profile')} on:click={() => push('/profile')}>
       <span class="material-symbols-rounded si">person</span>
       <span>My Profile</span>
       <span class="material-symbols-rounded chevron">chevron_right</span>
     </button>
-    {/if}
 
     <!-- ── User Management (hidden in native local mode — single user) ────── -->
     {#if !isNativeLocal}

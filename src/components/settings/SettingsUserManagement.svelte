@@ -260,28 +260,8 @@
 <div class="section-body" transition:slide={{ duration: 180 }}>
   <div class="card settings-card">
     {#if $userMgmtActive}
-      <!-- Current user — visual hero card with gradient avatar + role pill -->
-      <button class="my-profile-row" on:click={() => push('/profile')}>
-        <div class="my-profile-avatar">
-          {#if $currentUser?.avatar_url}
-            <img src={resolveAssetUrl($currentUser.avatar_url)} alt="" />
-          {:else}
-            {($currentUser?.full_name || $currentUser?.nickname || $currentUser?.username || '?')[0]?.toUpperCase() || '?'}
-          {/if}
-        </div>
-        <div class="my-profile-info">
-          <span class="my-profile-name">{$currentUser?.nickname || $currentUser?.full_name || $currentUser?.username || ''}</span>
-          {#if $currentUser?.role}
-            <span class="my-profile-role">{$currentUser.role}</span>
-          {/if}
-        </div>
-        <span class="material-symbols-rounded my-profile-chev">chevron_right</span>
-      </button>
-      <div class="setting-divider"></div>
-
-      <!-- User list (admin only) — hidden when there's only the admin viewing
-           themselves; the profile shortcut card above already represents that
-           user. The list earns its keep with ≥2 users. -->
+      <!-- User list (admin only) — your own profile lives in the dedicated
+           "My Profile" Settings entry above this section. -->
       {#if $currentUser?.role === 'admin'}
         {#if umUsers.length > 1}
         <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px;padding:12px 16px">
@@ -492,34 +472,6 @@
 </div>
 
 <style>
-  /* My Profile shortcut — gradient avatar + role pill, matches LiftTrace */
-  .my-profile-row {
-    display: flex; align-items: center; gap: 14px;
-    width: 100%; padding: 14px 16px;
-    background: none; border: none; cursor: pointer;
-    font-family: inherit; text-align: left;
-    transition: background var(--dur-fast);
-  }
-  .my-profile-row:hover { background: var(--surface-2); }
-  .my-profile-avatar {
-    width: 44px; height: 44px; border-radius: 50%;
-    background: linear-gradient(135deg, var(--accent), var(--accent-2, var(--accent)));
-    color: #fff;
-    font-size: 18px; font-weight: 800;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0; overflow: hidden;
-  }
-  .my-profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
-  .my-profile-info { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-  .my-profile-name { font-size: 15px; font-weight: 700; color: var(--text-1); }
-  .my-profile-role {
-    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
-    color: var(--accent); background: var(--accent-dim);
-    padding: 2px 8px; border-radius: var(--radius-full);
-    align-self: flex-start;
-  }
-  .my-profile-chev { color: var(--text-3); }
-
   /* Mirror Settings.svelte scoped styles */
   .section-body { padding: 12px var(--page-px); display: flex; flex-direction: column; gap: 10px; }
   .settings-card {
