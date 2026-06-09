@@ -31,6 +31,7 @@
   let lifttraceOverlapFillVal = DB.getSetting('lifttraceOverlapFill', true);
   let healthConnectAvailability = 'checking';
   let healthConnectPermissions = { read: [] };
+  let hcLastBgSyncAt = null;
 
   // Check Health Connect availability on mount
   if (isNative) {
@@ -40,6 +41,30 @@
         healthConnectPermissions = await getGrantedPermissions();
       }
     }).catch(() => { healthConnectAvailability = 'NotSupported'; });
+    // Read last background-sync timestamp the Kotlin worker stamps into
+    // sync_meta on each successful run. Surfaces "Last synced X ago" so users
+    // can verify the WorkManager job is actually firing.
+    import('../../lib/db-native.js').then(async ({ getDb }) => {
+      try {
+        const db = await getDb();
+        const r = await db.query(`SELECT value FROM sync_meta WHERE key = 'hc_last_bg_sync_at'`, []);
+        const v = r?.values?.[0]?.value;
+        if (v) hcLastBgSyncAt = v;
+      } catch {}
+    }).catch(() => {});
+  }
+
+  function _formatRelative(iso) {
+    if (!iso) return 'Never';
+    const then = new Date(iso).getTime();
+    if (!Number.isFinite(then)) return 'Never';
+    const mins = Math.max(0, Math.round((Date.now() - then) / 60000));
+    if (mins < 1)   return 'Just now';
+    if (mins < 60)  return `${mins} min ago`;
+    const hrs = Math.round(mins / 60);
+    if (hrs < 24)   return `${hrs} hr ago`;
+    const days = Math.round(hrs / 24);
+    return `${days} day${days === 1 ? '' : 's'} ago`;
   }
 
   // Auto-load config when component mounts (in case parent didn't call loadWellnessConfig)
@@ -1284,6 +1309,17 @@
               </div>
             {/if}
           {/if}
+          <div class="setting-divider"></div>
+          <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:6px">
+            <div style="display:flex;justify-content:space-between;width:100%;align-items:baseline;gap:8px">
+              <span class="setting-label">Background Sync</span>
+              <span style="color:var(--text-3);font-size:0.85em">{_formatRelative(hcLastBgSyncAt)}</span>
+            </div>
+            <div class="setting-desc">
+              Runs hourly in the background even when NutriTrace is closed, so today's wearable data is already on the server when you open NutriTrace elsewhere. If syncs stop running, check
+              <strong>Android Settings → Apps → NutriTrace → Battery</strong> and set it to <strong>Unrestricted</strong>. Some launchers (Samsung, Xiaomi, OnePlus) also need NutriTrace added to the "never sleeping apps" or auto-start whitelist.
+            </div>
+          </div>
           <div class="setting-divider"></div>
           <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px">
             <span class="setting-label">Visible Metrics</span>

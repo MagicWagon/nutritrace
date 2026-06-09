@@ -63,6 +63,7 @@ export function setServerUrl(url) {
     localStorage.removeItem('nt:serverUrl');
     // Don't remove lastServerUrl — needed for cached image resolution
   }
+  _mirrorAuthToSyncMeta();
 }
 
 
@@ -77,10 +78,47 @@ export function needsNativeSetup() {
 export function setAuthToken(token) {
   if (token) localStorage.setItem('nt:authToken', token);
   else localStorage.removeItem('nt:authToken');
+  _mirrorAuthToSyncMeta();
 }
 
 export function getAuthToken() {
   return localStorage.getItem('nt:authToken') || null;
+}
+
+/**
+ * Mirror serverUrl + authToken into the native SQLite sync_meta table so the
+ * Kotlin HealthConnectSyncWorker can read them when posting freshly-synced
+ * Health Connect metrics directly to the server (without needing the WebView
+ * to be open). #68 part 2.
+ *
+ * Plain text (same as localStorage) and same threat model: lives in the app's
+ * private data directory, not world-readable. Future improvement could swap
+ * the auth_token row for EncryptedSharedPreferences.
+ *
+ * Best-effort: silently skips on web, on local-only mode, on startup before
+ * the DB is initialized, or on any other failure. Each setter calls this; on
+ * app launch the auth store also fires it once via _bootMirror() below.
+ */
+function _mirrorAuthToSyncMeta() {
+  if (!isNative) return;
+  const url   = localStorage.getItem('nt:serverUrl')  || '';
+  const token = localStorage.getItem('nt:authToken')  || '';
+  (async () => {
+    try {
+      const { getDb } = await import('./db-native.js');
+      const db = await getDb();
+      const sql = `INSERT INTO sync_meta (key, value) VALUES (?, ?)
+                   ON CONFLICT(key) DO UPDATE SET value = excluded.value`;
+      await db.run(sql, ['server_url', url]);
+      await db.run(sql, ['auth_token', token]);
+    } catch { /* db not ready or local-only mode — fine */ }
+  })();
+}
+
+/** Fire once at app boot so a fresh install / reinstall has values written
+ *  immediately, not only after the next setServerUrl/setAuthToken call. */
+export function bootMirrorAuth() {
+  _mirrorAuthToSyncMeta();
 }
 
 /**

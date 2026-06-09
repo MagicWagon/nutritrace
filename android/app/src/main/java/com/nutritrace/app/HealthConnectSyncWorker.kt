@@ -24,7 +24,12 @@ import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import org.json.JSONArray
+import org.json.JSONObject
 import java.io.File
+import java.io.OutputStreamWriter
+import java.net.HttpURLConnection
+import java.net.URL
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -91,6 +96,23 @@ class HealthConnectSyncWorker(
             }
 
             writeToDb(ctx, todayStr, metrics)
+
+            // Push to server so users on browser / other devices see today's
+            // fresh metrics without needing to open the Android app first
+            // (the original bug behind #68). Best-effort: failures here don't
+            // surface to the user; the local SQLite write above already
+            // succeeded, and the JS-side sync will catch up on next app open.
+            val (serverUrl, authToken) = readServerCredentials(ctx)
+            if (!serverUrl.isNullOrBlank() && !authToken.isNullOrBlank()) {
+                pushToServer(serverUrl, authToken, todayStr, metrics)
+            } else {
+                Log.d(TAG, "no server credentials in sync_meta, skipping server push (local-mode install?)")
+            }
+
+            // Stamp the last-sync timestamp so the Settings UI can show
+            // "Last synced X minutes ago" without polling the worker.
+            writeSyncMeta(ctx, "hc_last_bg_sync_at", Instant.now().toString())
+
             Log.d(TAG, "synced ${metrics.size} metrics for $todayStr")
             Result.success()
         } catch (e: Exception) {
@@ -244,6 +266,110 @@ class HealthConnectSyncWorker(
 
     private inline fun tryRead(block: () -> Unit) {
         try { block() } catch (e: Exception) { Log.d(TAG, "read skipped: ${e.message}") }
+    }
+
+    /**
+     * Read serverUrl + authToken from the sync_meta table that JS keeps
+     * up to date via platform.js#_mirrorAuthToSyncMeta. Returns (null, null)
+     * if either is missing (local-mode install or pre-mirror app version).
+     */
+    private fun readServerCredentials(ctx: Context): Pair<String?, String?> {
+        val dbFile = ctx.getDatabasePath(DB_FILENAME)
+        if (!dbFile.exists()) return Pair(null, null)
+        var db: SQLiteDatabase? = null
+        return try {
+            db = SQLiteDatabase.openDatabase(dbFile.absolutePath, null, SQLiteDatabase.OPEN_READONLY)
+            val url = readSyncMeta(db, "server_url")
+            val token = readSyncMeta(db, "auth_token")
+            Pair(url, token)
+        } catch (e: Exception) {
+            Log.w(TAG, "credential read failed: ${e.message}")
+            Pair(null, null)
+        } finally {
+            db?.close()
+        }
+    }
+
+    private fun readSyncMeta(db: SQLiteDatabase, key: String): String? {
+        val cursor = db.rawQuery("SELECT value FROM sync_meta WHERE key = ? LIMIT 1", arrayOf(key))
+        return cursor.use { if (it.moveToFirst()) it.getString(0) else null }
+    }
+
+    /** Write a (key, value) row to sync_meta, upserting. Used for the
+     *  last-background-sync timestamp the Settings UI surfaces. */
+    private fun writeSyncMeta(ctx: Context, key: String, value: String) {
+        val dbFile = ctx.getDatabasePath(DB_FILENAME)
+        if (!dbFile.exists()) return
+        var db: SQLiteDatabase? = null
+        try {
+            db = SQLiteDatabase.openDatabase(dbFile.absolutePath, null, SQLiteDatabase.OPEN_READWRITE)
+            db.execSQL(
+                "INSERT INTO sync_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                arrayOf(key, value)
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "sync_meta write failed: ${e.message}")
+        } finally {
+            db?.close()
+        }
+    }
+
+    /**
+     * POST the freshly-synced metrics to the server's /api/sync/push endpoint.
+     * Payload matches what the JS sync engine sends:
+     *   { "wellness": [{"date", "source", "metric_type", "value", "metadata"}, ...] }
+     * Same authorization header pattern (Bearer + JWT) the JS app uses.
+     */
+    private fun pushToServer(
+        serverUrl: String,
+        authToken: String,
+        dateStr: String,
+        metrics: Map<String, Number>
+    ) {
+        var conn: HttpURLConnection? = null
+        try {
+            val wellnessArr = JSONArray()
+            for ((type, value) in metrics) {
+                wellnessArr.put(JSONObject().apply {
+                    put("date", dateStr)
+                    put("source", SOURCE)
+                    put("metric_type", type)
+                    put("value", value.toDouble())
+                    put("metadata", JSONObject())
+                })
+            }
+            val payload = JSONObject().apply {
+                put("foods", JSONArray())
+                put("meals", JSONArray())
+                put("diary", JSONArray())
+                put("activity", JSONArray())
+                put("fasts", JSONArray())
+                put("wellness", wellnessArr)
+                put("settings", JSONArray())
+            }.toString()
+
+            val url = URL("${serverUrl.trimEnd('/')}/api/sync/push")
+            conn = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                setRequestProperty("Content-Type", "application/json")
+                setRequestProperty("Authorization", "Bearer $authToken")
+                doOutput = true
+                connectTimeout = 10_000
+                readTimeout = 15_000
+            }
+            OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { it.write(payload) }
+
+            val code = conn.responseCode
+            if (code in 200..299) {
+                Log.d(TAG, "server push ok: $code (${metrics.size} metrics)")
+            } else {
+                Log.w(TAG, "server push failed: HTTP $code")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "server push failed: ${e.message}")
+        } finally {
+            conn?.disconnect()
+        }
     }
 
     private fun writeToDb(ctx: Context, dateStr: String, metrics: Map<String, Number>) {

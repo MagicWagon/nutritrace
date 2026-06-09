@@ -211,6 +211,13 @@ const API = {
     const portion = useServing ? servingQty : 100;
     const unit    = useServing ? (p.serving_quantity_unit || 'g') : 'g';
     const g = (baseKey, mult) => {
+      // Skip values OFF flags as "approximately/estimated" via the _modifier
+      // field. These don't appear on the product label table and are usually
+      // OFF-generated estimates from similar products or contributor guesses
+      // (saturated fat, fiber, added sugars often have this). Importing them
+      // as if they were measured values misled users into thinking a product
+      // had verified data when OFF itself doesn't display it.
+      if (n[baseKey + '_modifier'] === '~') return 0;
       const v = n[baseKey + suffix];
       if (v === undefined || v === null || v === '') return 0;
       return (parseFloat(v) || 0) * (mult || 1);

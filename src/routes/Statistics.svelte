@@ -100,6 +100,23 @@
     ...WELLNESS_METRICS,
   ];
 
+  // Metrics where the Y-axis should auto-fit to the data range regardless of
+  // the global "Lock Y-Axis To Zero" toggle. For body measurements and resting
+  // physiological vitals (weight, HRV, RHR, etc.), 0 is not a biologically
+  // meaningful baseline and forcing the chart to start there crushes the
+  // visible data range into a thin band at the top of the canvas, making
+  // day-to-day variation invisible (#67, reported by duplaja). Counted /
+  // consumed metrics (calories, nutrients, water, steps, active minutes) keep
+  // respecting the toggle since 0 is a real value for those.
+  const PHYSIOLOGICAL_METRICS = new Set([
+    'weight', 'neck', 'waist', 'hips', 'chest', 'thighs', 'biceps', 'calves',
+    'body_fat', 'body_water',
+    'wl_sleep', 'wl_rhr', 'wl_hrv', 'wl_spo2', 'wl_muscle',
+  ]);
+  function isPhysiologicalMetric(id) {
+    return PHYSIOLOGICAL_METRICS.has(id);
+  }
+
   const RANGES = [
     { value: '7',   label: '1W'  },
     { value: '14',  label: '2W'  },
@@ -391,30 +408,36 @@
       });
     }
 
-    // Goal line — always type 'line' even in bar chart mode
-    if ($statsGoalLine) {
+    // Goal value — computed up-front whether or not the Goal line itself is
+    // visible, so the y-axis auto-fit below can extend bounds to include it
+    // (so weight charts read as "progress toward goal" rather than scatter
+    // around current data when the goal is outside the range). #67 follow-up.
+    let _goalVal = null;
+    {
       const g = $goals && $goals[metric];
-      let goalVal = g ? (g.max ?? g.min ?? null) : null;
-      if (goalVal != null && g?.isPercent) {
+      _goalVal = g ? (g.max ?? g.min ?? null) : null;
+      if (_goalVal != null && g?.isPercent) {
         const density = {fat:9,'saturated-fat':9,carbohydrates:4,sugars:4,proteins:4}[metric];
         const calGoal = $goals.calories?.max ?? $goals.calories?.min ?? 2000;
-        if (density) goalVal = Math.round(calGoal * goalVal / 100 / density);
+        if (density) _goalVal = Math.round(calGoal * _goalVal / 100 / density);
       }
-      if (goalVal != null && metric === 'calories' && $energyUnit === 'kJ') goalVal = Math.round(Nutrition.kcalToKj(goalVal));
-      if (goalVal) {
-        const isAdaptiveOrDynamic = metric === 'calories' && ($calorieGoalMode === 'dynamic' || $calorieGoalMode === 'adaptive');
-        datasets.push({
-          type: 'line',
-          label: isAdaptiveOrDynamic ? 'Base Goal' : 'Goal',
-          data: displayData.map(() => goalVal),
-          borderColor: isDark ? 'rgba(129,140,248,0.8)' : 'rgba(99,102,241,0.8)',
-          borderWidth: 1.5,
-          borderDash: [4, 4],
-          pointRadius: 0,
-          fill: false,
-          spanGaps: true,
-        });
-      }
+      if (_goalVal != null && metric === 'calories' && $energyUnit === 'kJ') _goalVal = Math.round(Nutrition.kcalToKj(_goalVal));
+    }
+
+    // Goal line — always type 'line' even in bar chart mode
+    if ($statsGoalLine && _goalVal) {
+      const isAdaptiveOrDynamic = metric === 'calories' && ($calorieGoalMode === 'dynamic' || $calorieGoalMode === 'adaptive');
+      datasets.push({
+        type: 'line',
+        label: isAdaptiveOrDynamic ? 'Base Goal' : 'Goal',
+        data: displayData.map(() => _goalVal),
+        borderColor: isDark ? 'rgba(129,140,248,0.8)' : 'rgba(99,102,241,0.8)',
+        borderWidth: 1.5,
+        borderDash: [4, 4],
+        pointRadius: 0,
+        fill: false,
+        spanGaps: true,
+      });
     }
 
     // Trend line — always type 'line' even in bar chart mode
@@ -453,7 +476,21 @@
           legend: { display: datasets.length > 1, labels: { color: textColor, boxHeight: 2, usePointStyle: true } },
           tooltip: {
             displayColors: datasets.length > 1,
-            callbacks: { label: ctx => `${ctx.dataset.label || ''}: ${ctx.parsed.y.toLocaleString()} ${getMetricUnit()}`.trim() }
+            callbacks: {
+              // Returning an empty string suppresses the per-dataset line
+              // in the tooltip; needed when a series has gaps (skipped
+              // days on body-stat metrics where the user didn't weigh in,
+              // or hovering past the start of the user's data window).
+              // Without the null guard, .toLocaleString() throws and the
+              // entire tooltip freezes mid-paint (#66, reported by
+              // duplaja). The other datasets in the same hover (Average,
+              // Goal, Trend) still render normally.
+              label: ctx => {
+                const y = ctx.parsed?.y;
+                if (y == null) return '';
+                return `${ctx.dataset.label || ''}: ${y.toLocaleString()} ${getMetricUnit()}`.trim();
+              }
+            }
           }
         },
         scales: {
@@ -464,7 +501,21 @@
           y: {
             grid: { color: gridColor },
             ticks: { color: textColor, callback: v => v.toLocaleString() },
-            beginAtZero: $statsYZero,
+            // Force smart-range (auto-fit to data) for body stats + resting
+            // vitals where 0 isn't a meaningful baseline; respect the global
+            // toggle for nutrients + counted metrics where 0 is valid. See
+            // PHYSIOLOGICAL_METRICS above for the full list (#67).
+            beginAtZero: $statsYZero && !isPhysiologicalMetric(metric),
+            // On physiological metrics, extend the auto-fit range to include
+            // the goal value when one is set, so progress toward goal stays
+            // visible even when the goal is outside the actual data range
+            // (#67 follow-up, requested by duplaja). suggestedMin/Max only
+            // extend bounds, never shrink, so this is safe when data already
+            // brackets the goal.
+            ...(isPhysiologicalMetric(metric) && _goalVal != null ? {
+              suggestedMin: _goalVal,
+              suggestedMax: _goalVal,
+            } : {}),
           }
         }
       }

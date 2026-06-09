@@ -874,10 +874,17 @@ function _unfoldNutrimentsList(list) {
     const vSrv  = num(_readField(n, 'serving'));
     const vVal  = num(_readField(n, 'value'));
     const vUnit = _coerceString(_readField(n, 'unit'));
+    const vMod  = _coerceString(_readField(n, 'modifier'));
     if (v100  != null) out[`${name}_100g`]    = v100;
     if (vSrv  != null) out[`${name}_serving`] = vSrv;
     if (vVal  != null) out[`${name}_value`]   = vVal;
     if (vUnit)         out[`${name}_unit`]    = vUnit;
+    // Propagate OFF's per-nutrient modifier (`~`, `<`, `>`, etc.) so the
+    // client-side parser can filter out estimated values (`~`) the same
+    // way it does for live OFF API responses. Without this, local-mirror
+    // imports would surface "~" estimates as confirmed values even though
+    // OFF's web display hides them.
+    if (vMod)          out[`${name}_modifier`] = vMod;
   }
   return out;
 }

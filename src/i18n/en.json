@@ -52,8 +52,18 @@
       "navigation_style": "Navigation Style"
     },
     "regional":           {
-      "section":  "Regional & Units",
-      "language": "Language"
+      "section":       "Regional & Units",
+      "language":      "Language",
+      "date_format":   "Date Format",
+      "time_format":   "Time Format",
+      "energy":        "Energy",
+      "weight":        "Weight",
+      "height":        "Height",
+      "circumference": "Circumference",
+      "distance":      "Distance",
+      "temperature":   "Temperature",
+      "time_12h":      "12-hour (AM/PM)",
+      "time_24h":      "24-hour"
     },
     "diary":              {
       "section": "Diary",

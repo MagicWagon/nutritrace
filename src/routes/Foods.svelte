@@ -878,7 +878,7 @@
         placeholder={$_('foods.search_placeholder')}
         bind:value={search}
       />
-      <button class="scan-btn-inline" on:click={() => scannerOpen = true} aria-label={$_('foods.scan_barcode')} title={$_('foods.scan_barcode')}>
+      <button class="btn-scan-inline" on:click={() => scannerOpen = true} aria-label={$_('foods.scan_barcode')} title={$_('foods.scan_barcode')}>
         <span class="material-symbols-rounded">barcode_scanner</span>
       </button>
     </div>
@@ -1487,18 +1487,6 @@
     outline: none;
   }
   .foods-search-input:focus { border-color: var(--accent); }
-  .scan-btn-inline {
-    position: absolute;
-    right: 6px;
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: var(--text-3);
-    padding: 4px;
-    display: flex;
-    align-items: center;
-  }
-  .scan-btn-inline .material-symbols-rounded { font-size: 20px; }
 
   .food-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
   .food-item { overflow: hidden; }

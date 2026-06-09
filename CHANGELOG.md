@@ -9,6 +9,53 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.0-rc.49] - 2026-06-09
+
+### Added
+
+- **French language support.** Full UI translation contributed by
+  @antoinech2 (PR #72), switchable in Settings, Language. A handful of
+  less-common settings screens are still in English and will be
+  translated incrementally.
+- **Background Health Connect sync on Android.** Wearable data now
+  syncs to the server about once an hour in the background, even when
+  NutriTrace is closed, so today's steps show up when you open the
+  browser version on a desktop. A new Background Sync row in
+  Settings, Wellness, Health Connect shows when the last sync ran,
+  plus battery-optimization guidance if your phone shuts background
+  work down. (Issue #68, reported by duplaja)
+
+### Improved
+
+- **Body-stat charts auto-fit the Y-axis and keep your goal in view.**
+  Weight, body measurements, resting heart rate, HRV, and similar
+  charts now scale to your actual data range instead of pinning the
+  floor to zero, making day-to-day changes much easier to see. If
+  you have a goal set for the metric, the range extends to include
+  it too, so "progress toward goal" stays visible even when the goal
+  is outside your current data range. Nutrition charts (calories,
+  macros, water) still anchor to zero where that reading matters.
+  (Issue #67, reported by duplaja)
+- **Inline barcode scan icons are more discoverable.** The scan
+  buttons on the Foods search bar and the Food Editor are now
+  accent-coloured and meet the iOS and Android 44 x 44 tap-target
+  accessibility minimum. (Issue #71, reported by maxerbox)
+- **Open Food Facts: skip estimated nutrient values.** Nutrients OFF
+  flags as estimated (via the `_modifier` field) no longer pull rough
+  numbers into your totals.
+
+### Fixed
+
+- **Statistics tab JavaScript error on hover.** The chart tooltip no
+  longer throws when you hover over days with missing data (skipped
+  weigh-ins, before-you-started periods), and the "frozen half-faded"
+  tooltip behavior is gone. (Issue #66, reported by duplaja)
+- **Misleading "Health Connect synced" toast on browser.** The toast
+  only fires when an actual Health Connect sync runs on Android.
+  (Part of Issue #68, reported by duplaja)
+
+---
+
 ## [1.0.0-rc.48] - 2026-06-06
 
 ### Added

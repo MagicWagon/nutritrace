@@ -262,6 +262,16 @@
     // Load auth state first (sets $currentUser and $userMgmtActive)
     await loadAuthState();
 
+    // Mirror serverUrl + authToken from localStorage into the native SQLite
+    // sync_meta table so the Kotlin HealthConnectSyncWorker (background HC
+    // sync, #68 part 2) can read them without the WebView being open. Setters
+    // already trigger this on change; this boot-time call covers users who
+    // were already connected before this code shipped. No-op on web.
+    try {
+      const { bootMirrorAuth } = await import('./lib/platform.js');
+      bootMirrorAuth();
+    } catch {}
+
     // OIDC post-callback: if the URL hash contains ?oidc=ok / ?oidc_error=…
     // strip it, toast, and refresh auth state. Runs after loadAuthState so
     // we don't double-fetch on cold load.

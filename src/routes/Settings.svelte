@@ -1739,7 +1739,7 @@
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <span class="setting-label">Date Format</span>
+            <span class="setting-label">{$_('settings.regional.date_format')}</span>
             <div class="select-wrap" style="width:160px">
               <select class="select sel-sm" value={$dateFormat} on:change={e => dateFormat.set(e.target.value)}>
                 <option value="ISO">YYYY-MM-DD</option>
@@ -1751,17 +1751,17 @@
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <span class="setting-label">Time Format</span>
+            <span class="setting-label">{$_('settings.regional.time_format')}</span>
             <div class="select-wrap" style="width:160px">
               <select class="select sel-sm" value={$timeFormat} on:change={e => timeFormat.set(e.target.value)}>
-                <option value="12h">12-hour (AM/PM)</option>
-                <option value="24h">24-hour</option>
+                <option value="12h">{$_('settings.regional.time_12h')}</option>
+                <option value="24h">{$_('settings.regional.time_24h')}</option>
               </select>
             </div>
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <span class="setting-label">Energy</span>
+            <span class="setting-label">{$_('settings.regional.energy')}</span>
             <div class="select-wrap" style="width:160px">
               <select class="select sel-sm" value={$energyUnit} on:change={e => energyUnit.set(e.target.value)}>
                 {#each ENERGY_OPTS as o}<option value={o.value}>{o.label}</option>{/each}
@@ -1770,7 +1770,7 @@
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <span class="setting-label">Weight</span>
+            <span class="setting-label">{$_('settings.regional.weight')}</span>
             <div class="select-wrap" style="width:100px">
               <select class="select sel-sm" bind:value={weightUnit}>
                 <option value="kg">kg</option>
@@ -1781,7 +1781,7 @@
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <span class="setting-label">Height</span>
+            <span class="setting-label">{$_('settings.regional.height')}</span>
             <div class="select-wrap" style="width:100px">
               <select class="select sel-sm" bind:value={heightUnit}>
                 <option value="cm">cm</option>
@@ -1791,7 +1791,7 @@
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <span class="setting-label">Circumference</span>
+            <span class="setting-label">{$_('settings.regional.circumference')}</span>
             <div class="select-wrap" style="width:100px">
               <select class="select sel-sm" bind:value={lengthUnit}>
                 <option value="in">in</option>
@@ -1801,7 +1801,7 @@
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <span class="setting-label">Distance</span>
+            <span class="setting-label">{$_('settings.regional.distance')}</span>
             <div class="select-wrap" style="width:100px">
               <select class="select sel-sm" bind:value={distUnitVal}>
                 <option value="km">km</option>
@@ -1811,7 +1811,7 @@
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <span class="setting-label">Temperature</span>
+            <span class="setting-label">{$_('settings.regional.temperature')}</span>
             <div class="select-wrap" style="width:100px">
               <select class="select sel-sm" bind:value={tempUnitVal}>
                 <option value="F">°F</option>
@@ -2324,7 +2324,10 @@
             </div>
           </div>
           <div class="setting-divider"></div>
-          <div class="setting-row"><span class="setting-label">Lock Y-Axis To Zero</span><Toggle checked={statsYZero} on:change={e => { statsYZero = e.detail; set('statsYZero', e.detail); }} /></div>
+          <div class="setting-row">
+            <div><span class="setting-label">Lock Y-Axis To Zero</span><div class="setting-desc">Body stats (weight, HRV, RHR, etc.) always auto-fit. This toggle applies to nutrient and counted-metric charts.</div></div>
+            <Toggle checked={statsYZero} on:change={e => { statsYZero = e.detail; set('statsYZero', e.detail); }} />
+          </div>
           <div class="setting-divider"></div>
           <div class="setting-row"><span class="setting-label">Show Average Line</span><Toggle checked={statsAvgLine} on:change={e => { statsAvgLine = e.detail; set('statsAvgLine', e.detail); }} /></div>
           <div class="setting-divider"></div>

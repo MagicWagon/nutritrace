@@ -70,6 +70,42 @@
 .btn-icon:hover { background: var(--surface-3); }
 .btn-icon.accent { background: var(--accent-dim); color: var(--accent); border-color: transparent; }
 
+/* Inline barcode-scan button — used inside search bars and the FoodEditor
+   barcode field. Accent-tinted pill so the scan action is discoverable
+   without breaking the parent input's pill aesthetic. Visual size is 30px
+   to fit inside a 36px-tall search pill; a ::before pseudo-element extends
+   the touch target to 44x44 per WCAG / iOS HIG without bloating the
+   layout. Issue #71. */
+.btn-scan-inline {
+  position: absolute;
+  right: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent-dim);
+  color: var(--accent);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn-scan-inline::before {
+  content: "";
+  position: absolute;
+  inset: -7px;
+}
+.btn-scan-inline:hover {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+}
+.btn-scan-inline:active {
+  transform: translateY(-50%) scale(0.92);
+}
+.btn-scan-inline .material-symbols-rounded { font-size: 20px; }
+
 /* FAB */
 .fab {
   width: 56px;

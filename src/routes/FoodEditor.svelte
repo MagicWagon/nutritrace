@@ -862,7 +862,7 @@
         <label class="form-label">Barcode</label>
         <div class="barcode-input-wrap">
           <input class="input barcode-input" type="text" inputmode="numeric" placeholder="Optional" bind:value={food.barcode} />
-          <button type="button" class="barcode-scan-inline" title="Scan barcode" aria-label="Scan barcode"
+          <button type="button" class="btn-scan-inline" title="Scan barcode" aria-label="Scan barcode"
             on:click={() => editorScannerOpen = true}>
             <span class="material-symbols-rounded">barcode_scanner</span>
           </button>
@@ -1018,19 +1018,6 @@
     width: 100%;
     padding-right: 38px; /* leave room for the scan icon */
   }
-  .barcode-scan-inline {
-    position: absolute;
-    right: 6px;
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: var(--text-3);
-    padding: 4px;
-    display: flex;
-    align-items: center;
-  }
-  .barcode-scan-inline:hover { color: var(--text-1); }
-  .barcode-scan-inline .material-symbols-rounded { font-size: 20px; }
 
   .barcode-dup-warn {
     display: flex; align-items: center; gap: 8px;

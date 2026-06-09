@@ -45,6 +45,14 @@ services:
       # - TOKEN_ENC_KEY=${TOKEN_ENC_KEY:-}
       # Optional — lockout recovery token (required for login page recovery)
       - RECOVERY_TOKEN=${RECOVERY_TOKEN:-}
+      # Optional — set to 1 ONLY when running on plain HTTP (no TLS in front).
+      # Without TLS, auth cookies default to Secure and the browser silently
+      # drops them after login, so every request 401s and the login screen
+      # keeps re-appearing. Common gotcha for first-time self-hosters on a
+      # LAN (#41, #43). Cookies travel in cleartext when this is on, so use
+      # only on a trusted network; for anything internet-facing put TLS in
+      # front (Caddy, nginx with Let's Encrypt, Cloudflare Tunnel, etc.).
+      # - INSECURE_COOKIES=${INSECURE_COOKIES:-}
       # Optional — mount at a subpath instead of root (for reverse-proxy setups)
       # - BASE_URL=/nutritrace
       # Optional — log level: error | warn | info (default) | debug

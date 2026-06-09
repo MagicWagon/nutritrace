@@ -441,6 +441,12 @@
 
   async function syncHealthConnectManual() {
     if (!$healthConnectEnabled || hcSyncing) return;
+    // Health Connect is an on-device Android API. On browser the underlying
+    // plugin no-ops, so firing this from the auto-on-page-load path (or any
+    // other call site) produced a "Health Connect synced" toast that didn't
+    // reflect a real sync — confusing for users who hit Wellness on web with
+    // HC enabled in settings. Bail out before the toast for #68.
+    if (!isNative) return;
     hcSyncing = true;
     try {
       const { syncHealthConnect } = await import('../lib/health-connect.js');
