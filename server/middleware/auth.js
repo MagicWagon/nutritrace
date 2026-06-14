@@ -18,10 +18,18 @@ export function userMgmtActive() {
   return db.prepare('SELECT 1 FROM users LIMIT 1').get() != null;
 }
 
+// Default raised from 720h (30 days) to 8760h (1 year) on 2026-06-09 after
+// users with biometric sign-in hit the silent 30-day token expiry. With
+// biometric on, the JWT is essentially a refresh proxy — the actual auth
+// gate is fingerprint/face on app open — so a 30-day expiry forces a
+// password re-login every month without any security benefit. Admins who
+// want shorter sessions still set Settings, Users, Session Duration.
+const DEFAULT_SESSION_HOURS = 8760;
+
 /** Sign a JWT for a user row */
 export function signToken(user) {
   const cfg = db.prepare("SELECT value FROM app_config WHERE key = 'session_hours'").get();
-  const hours = cfg?.value != null && cfg.value !== '' ? parseInt(cfg.value) : 720;
+  const hours = cfg?.value != null && cfg.value !== '' ? parseInt(cfg.value) : DEFAULT_SESSION_HOURS;
   const opts = hours > 0 ? { expiresIn: `${hours}h` } : {};
   return jwt.sign(
     { id: user.id, username: user.username, role: user.role, csrf: crypto.randomBytes(16).toString('hex') },
@@ -34,7 +42,7 @@ export function signToken(user) {
 const MAX_SESSION_HOURS = parseInt(process.env.MAX_SESSION_HOURS || '8760'); // 1 year default cap
 export function sessionMaxAge() {
   const cfg = db.prepare("SELECT value FROM app_config WHERE key = 'session_hours'").get();
-  const raw = cfg?.value != null && cfg.value !== '' ? parseInt(cfg.value) : 720;
+  const raw = cfg?.value != null && cfg.value !== '' ? parseInt(cfg.value) : DEFAULT_SESSION_HOURS;
   const hours = raw > 0 ? Math.min(raw, MAX_SESSION_HOURS) : MAX_SESSION_HOURS;
   return hours * 60 * 60 * 1000;
 }

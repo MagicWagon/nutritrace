@@ -604,6 +604,25 @@ if (_favColumnsAdded) {
   }
 }
 
+// Issues #69 + #70: OFF unit metadata for accurate cross-system conversion
+// and discrete-portion logging (slice/cookie/bottle). All three columns are
+// nullable: old foods without these fields fall through to existing scaler
+// behavior unchanged.
+//   nutrition_basis : 'g' | 'ml' | null — what the per-100 values measure
+//   alt_units       : JSON [{abbr,grams}] — per-food grams-per-unit overrides
+//                     populated from OFF serving_size + user-edited
+//   density_g_ml    : REAL or null — only used when picked unit's system
+//                     differs from nutrition_basis
+if (!columnExists('foods', 'nutrition_basis')) {
+  db.exec(`ALTER TABLE foods ADD COLUMN nutrition_basis TEXT DEFAULT NULL`);
+}
+if (!columnExists('foods', 'alt_units')) {
+  db.exec(`ALTER TABLE foods ADD COLUMN alt_units TEXT DEFAULT NULL`);
+}
+if (!columnExists('foods', 'density_g_ml')) {
+  db.exec(`ALTER TABLE foods ADD COLUMN density_g_ml REAL DEFAULT NULL`);
+}
+
 // Indexes for sync queries
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_foods_updated ON foods(updated_at);

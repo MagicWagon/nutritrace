@@ -30,7 +30,7 @@ export const USER_PREFS = new Set([
   'diaryShowNutritionBar','diaryTotalsMode',
   'diaryShowBrands','diaryShowTimestamps','diaryShowThumbnails',
   'diaryShowAllNutrients','diaryShowNutritionUnits','diaryShowMacroSummary',
-  'diaryPromptQuantity','diaryShowPortionSize','diaryShowNotes',
+  'diaryPromptQuantity','diaryShowPortionSize','diaryShowNotes','warnUnitMismatch',
   'diaryShowActivity','manualActivityPolicy','activityAutoEstimate','calorieAdjustFromActivity',
   'showQuickCalories','quickCaloriesDisplay',
   'foodsShowCategories','foodsShowLabels','foodsShowNotes','foodsShowThumbnails',
@@ -138,6 +138,20 @@ export function scheduleSave(key, value) {
   _saveQueue[key] = setTimeout(async () => {
     // Try direct push to server (fast path when online)
     if (!_shouldSyncToServer()) return;
+
+    // Snapshot the row's updated_at BEFORE the network push so the
+    // mark-synced step afterward can detect if the user re-edited the same
+    // setting during the round-trip and leave the row pending for the next
+    // sync. Without this, mid-flight re-edits get silently overwritten by
+    // a later pull (see dbMarkSettingsSynced for the full race description).
+    let snapshotUpdatedAt = null;
+    if (isNative) {
+      try {
+        const { dbGetSettingUpdatedAt } = await import('../lib/db-native.js');
+        snapshotUpdatedAt = await dbGetSettingUpdatedAt(key);
+      } catch {}
+    }
+
     try {
       const url = _settingsUrl();
       _dlog(`[settings] pushing ${key}=${JSON.stringify(value)} to ${url}`);
@@ -150,11 +164,14 @@ export function scheduleSave(key, value) {
       });
       if (!res.ok) throw new Error(`Server responded ${res.status}`);
       _dlog(`[settings] pushed ${key} to server OK`);
-      // If direct push succeeded on native, mark as synced so differential sync skips it
-      if (isNative) {
+      // If direct push succeeded on native, mark as synced so differential
+      // sync skips it. Conditional on the snapshot updated_at matching the
+      // row's current updated_at — if the user re-edited during the push,
+      // the WHERE clause won't match and the row stays pending.
+      if (isNative && snapshotUpdatedAt) {
         try {
           const { dbMarkSettingsSynced } = await import('../lib/db-native.js');
-          await dbMarkSettingsSynced([key]);
+          await dbMarkSettingsSynced([{ key, updated_at: snapshotUpdatedAt }]);
         } catch {}
       }
     } catch (e) {
@@ -199,12 +216,16 @@ export async function bulkSet(settingsObj) {
     _suppressSync = false;
   }
 
-  // Step 2: native — write all USER_PREFS to local SQLite as pending
+  // Step 2: native — write all USER_PREFS to local SQLite as pending. Capture
+  // the per-key updated_at so the mark-synced step after the bulk push can
+  // detect mid-flight re-edits and leave them pending for the next sync.
+  const snapshotByKey = new Map();
   if (isNative && userPrefEntries.length > 0) {
     try {
       const { dbUpsertSetting } = await import('../lib/db-native.js');
       for (const [key, value] of userPrefEntries) {
-        await dbUpsertSetting(key, value);
+        const updatedAt = await dbUpsertSetting(key, value);
+        snapshotByKey.set(key, updatedAt);
       }
     } catch (e) {
       console.warn('[settings] bulk native upsert failed:', e.message);
@@ -226,11 +247,14 @@ export async function bulkSet(settingsObj) {
     });
     if (!res.ok) throw new Error(`Server responded ${res.status}`);
     _dlog(`[settings] bulk pushed ${userPrefEntries.length} keys OK`);
-    // Mark all keys as synced in native SQLite
-    if (isNative) {
+    // Mark all keys as synced in native SQLite, gated on the snapshot
+    // updated_at matching so any mid-flight re-edits stay pending.
+    if (isNative && snapshotByKey.size > 0) {
       try {
         const { dbMarkSettingsSynced } = await import('../lib/db-native.js');
-        await dbMarkSettingsSynced(userPrefEntries.map(([k]) => k));
+        await dbMarkSettingsSynced(
+          [...snapshotByKey.entries()].map(([key, updated_at]) => ({ key, updated_at }))
+        );
       } catch {}
     }
   } catch (e) {
@@ -282,13 +306,13 @@ export async function loadServerSettings() {
     if (isNative) {
       try {
         const { dbUpsertSetting, dbMarkSettingsSynced } = await import('../lib/db-native.js');
-        const keys = [];
+        const snapshots = [];
         for (const [key, value] of Object.entries(serverSettings)) {
           if (DEVICE_PREFS.has(key)) continue;
-          await dbUpsertSetting(key, value);
-          keys.push(key);
+          const updatedAt = await dbUpsertSetting(key, value);
+          snapshots.push({ key, updated_at: updatedAt });
         }
-        if (keys.length) await dbMarkSettingsSynced(keys);
+        if (snapshots.length) await dbMarkSettingsSynced(snapshots);
       } catch (e) {
         console.warn('[settings] native SQLite mirror failed:', e.message);
       }
@@ -443,6 +467,12 @@ export const diaryShowAllNutrients  = createSettingStore('diaryShowAllNutrients'
 export const diaryShowNutritionUnits= createSettingStore('diaryShowNutritionUnits', true);
 export const diaryShowMacroSummary  = createSettingStore('diaryShowMacroSummary',   true);
 export const diaryPromptQuantity    = createSettingStore('diaryPromptQuantity',     true);
+// Issues #69 + #70: opt-in warning when the picked unit's system (mass vs
+// volume) doesn't match the food's nutrition_basis AND no density is set
+// on the food. Default off so duplaja-style users who weigh everything in
+// grams don't get nagged; maxerbox-style accuracy-conscious users flip it
+// on for the guard.
+export const warnUnitMismatch       = createSettingStore('warnUnitMismatch',        false);
 export const diaryShowPortionSize   = createSettingStore('diaryShowPortionSize',    false);
 // Quick Calories — Fitbit-style "punch in just kcal" entry per meal. Bolt
 // button on each meal section opens the QuickCaloriesSheet. Default ON for

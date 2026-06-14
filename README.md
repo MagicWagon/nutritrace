@@ -212,6 +212,8 @@ services:
     volumes:
       - ${DATA_DB_PATH}:/data/db
       - ${DATA_UPLOADS_PATH}:/data/uploads
+    env_file:
+      - .env
     environment:
       - DB_PATH=/data/db/nutritrace.db
       - UPLOADS_PATH=/data/uploads
@@ -225,7 +227,7 @@ services:
     restart: unless-stopped
 ```
 
-No changes to this file are needed; everything is driven by `.env` (forwarded into the container via `env_file: .env`). If you want to pin to a specific version, change `latest` to a release tag.
+No changes to this file are needed; everything is driven by `.env`. The `env_file: .env` directive forwards every variable in your `.env` (including optional ones like `INSECURE_COOKIES` and `RECOVERY_TOKEN`) into the container. The explicit `environment:` block stays as live documentation of the common options. If you want to pin to a specific version, change `latest` to a release tag.
 
 2. Copy `.env.example` to `.env` and fill in your paths:
 
@@ -233,6 +235,13 @@ No changes to this file are needed; everything is driven by `.env` (forwarded in
 DATA_DB_PATH=/your/host/path/db
 DATA_UPLOADS_PATH=/your/host/path/uploads
 JWT_SECRET=your-long-random-secret
+
+# Set to 1 ONLY when running on plain HTTP (no TLS in front). Without TLS,
+# auth cookies default to Secure and the browser silently drops them after
+# login, so every request 401s and the login screen keeps re-appearing.
+# Common gotcha on a trusted LAN. For anything internet-facing, put TLS in
+# front (Caddy, Cloudflare Tunnel, Tailscale Funnel) and leave this unset.
+# INSECURE_COOKIES=1
 
 # Optional — SMTP for password reset emails and user invites
 # If omitted, invites fall back to a copyable link instead of email

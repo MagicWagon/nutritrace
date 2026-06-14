@@ -108,6 +108,21 @@ export function isMassConvertible(unit) {
   return Object.prototype.hasOwnProperty.call(UNIT_TO_G, String(unit).toLowerCase());
 }
 
+/**
+ * Classify a unit as mass-side or volume-side. Used by the Add to Diary
+ * sheet to surface the cross-system warning when the picked unit's system
+ * doesn't match the food's nutrition_basis and density is unset.
+ * Returns 'g' for mass units, 'ml' for volume units, null for opaque
+ * (cup/piece/custom). Issues #69 + #70.
+ */
+export function unitSystem(unit) {
+  if (!unit) return null;
+  const u = String(unit).toLowerCase();
+  if (u === 'g' || u === 'mg' || u === 'kg' || u === 'oz' || u === 'lb') return 'g';
+  if (_VOLUME_UNITS.has(u)) return 'ml';
+  return null;
+}
+
 /** Lookup factor; returns null for unknown / non-convertible units. */
 export function unitToGrams(unit) {
   if (!unit) return null;
@@ -116,28 +131,127 @@ export function unitToGrams(unit) {
 }
 
 /**
+ * Lookup grams-per-unit on a food-specific alt_units list. Used by
+ * scaleFactor to turn "1 slice" into "35 g" for an OFF-imported bread.
+ * Issues #69 + #70.
+ *
+ * `altUnits` is the array shape produced by db-native's _parseFoodRow:
+ *   [{ abbr: 'slice', grams: 35 }, ...]
+ * Returns null when not found or when the entry is malformed.
+ */
+function altUnitGrams(altUnits, unit) {
+  if (!Array.isArray(altUnits) || altUnits.length === 0 || !unit) return null;
+  const u = String(unit).toLowerCase();
+  for (const r of altUnits) {
+    if (r && String(r.abbr || '').toLowerCase() === u) {
+      const g = Number(r.grams);
+      if (Number.isFinite(g) && g > 0) return g;
+    }
+  }
+  return null;
+}
+
+/**
+ * True when the unit is a base mass/volume unit we know the gram ratio of.
+ * (Anything in UNIT_TO_G). Used to distinguish "slice/cookie/piece" from
+ * "g/ml/cup" for the density-required check below.
+ */
+function isBaseUnit(unit) {
+  return unitToGrams(unit) != null;
+}
+
+// Volume-system units in UNIT_TO_G. Anything not in this set is mass-side
+// (g/mg/kg/oz/lb). Used by toCanonicalAmount to decide whether density is
+// needed to bridge to the food's nutrition basis. Issues #69 + #70.
+const _VOLUME_UNITS = new Set(['ml','l','tsp','tbsp','fl oz','cup']);
+
+/**
+ * Express (portion, unit) as a single number in the food's nutrition_basis
+ * frame (g or ml).
+ *
+ * - When the unit and basis are in the same system → use UNIT_TO_G's
+ *   table value directly. (For volume units, UNIT_TO_G's ratio is the
+ *   water-blanket ml-per-unit, which is also the canonical-ml value.)
+ * - When they cross systems → multiply or divide by density to bridge.
+ *   No density → return null, signaling the caller to fall back to the
+ *   1 ml ≈ 1 g approximation (existing behavior) OR to surface the warning.
+ * - When the food has no basis → behave like the canonical UNIT_TO_G
+ *   conversion (treat g and ml as fungible, preserving today's math).
+ *
+ * Issues #69 + #70.
+ */
+function toCanonicalAmount(portion, unit, food) {
+  const baseG = unitToGrams(unit);
+  if (baseG == null) return null; // opaque unit (cup/piece without table entry)
+  const basis = food?.nutrition_basis;
+  if (!basis) return portion * baseG; // existing 1ml=1g behavior
+
+  const isVol = _VOLUME_UNITS.has(String(unit).toLowerCase());
+  const sameSystem = (basis === 'g' && !isVol) || (basis === 'ml' && isVol);
+  if (sameSystem) return portion * baseG;
+
+  // Cross-system — needs density. baseG carries the water-blanket
+  // approximation by default (mg=0.001, ml=1, tbsp=14.787, etc.). Density
+  // re-scales to the food's actual ratio.
+  const d = Number(food.density_g_ml);
+  if (!Number.isFinite(d) || d <= 0) return null;
+  if (basis === 'g'  && isVol)  return portion * baseG * d;   // ml→g
+  if (basis === 'ml' && !isVol) return portion * baseG / d;   // g→ml
+  return null;
+}
+
+/**
  * Compute the scaling factor between two (portion, unit) pairs.
  *
- * When BOTH units are mass-convertible: scale by mass ratio
- *   factor = (newPortion * gramsPerNewUnit) / (origPortion * gramsPerOrigUnit)
+ * Resolution order (issues #69 + #70):
+ *   1. Per-food alt_units row → grams for that specific portion (covers
+ *      "1 slice", "1 cookie", "1 bottle"). Wins because it's the most
+ *      explicit user signal.
+ *   2. Base unit table (UNIT_TO_G) extended by density when present:
+ *      both sides resolve to grams (or to the food's nutrition_basis when
+ *      density bridges across systems). Covers the standard
+ *      g/oz/lb/ml/l/tsp/tbsp/cup case plus the honey-tbsp-with-density case.
+ *   3. Pure numeric ratio fallback (unchanged): for opaque units we can't
+ *      convert (cup/piece/custom free-text without per-food data).
  *
- * When either side isn't mass-convertible (cup, piece, tbsp, custom
- * free-text, etc.): fall back to the pure numeric ratio
- *   factor = newPortion / origPortion
- *
- * This preserves the pre-fix behavior for opaque "1 piece" /
- * "1 serving" units while adding correct conversion for the
- * g/oz/lb/ml/l class.
+ * `food` is optional — callers can omit it and get the original behavior.
  */
-export function scaleFactor(origPortion, origUnit, newPortion, newUnit) {
+export function scaleFactor(origPortion, origUnit, newPortion, newUnit, food = null) {
   const op = parseFloat(origPortion);
   const np = parseFloat(newPortion);
   const origP = (Number.isFinite(op) && op > 0) ? op : 100;
   const newP  = (Number.isFinite(np) && np > 0) ? np : origP;
-  const og = unitToGrams(origUnit);
-  const ng = unitToGrams(newUnit);
-  if (og != null && ng != null) {
-    return (newP * ng) / (origP * og);
+
+  // Tier 1: per-food alt_units (slice/cookie/bottle = X grams). Each side
+  // independently resolves to grams via the alt list or the canonical
+  // table. When both sides resolve in the food's nutrition_basis frame
+  // (with density bridging if needed), we get an accurate ratio.
+  const origAlt = food ? altUnitGrams(food.alt_units, origUnit) : null;
+  const newAlt  = food ? altUnitGrams(food.alt_units, newUnit)  : null;
+
+  // Helper: resolve a (portion, unit) pair to the food's canonical basis
+  // amount. alt_units row (always grams) is consulted first; for a food
+  // whose basis is 'ml', the alt_units grams convert to ml via density.
+  // Returns null if conversion isn't possible (no density, opaque unit).
+  function _resolve(portion, unit, altGrams) {
+    if (altGrams != null) {
+      const basis = food?.nutrition_basis;
+      if (basis !== 'ml') return portion * altGrams; // basis g or unknown → use grams
+      const d = Number(food.density_g_ml);
+      if (Number.isFinite(d) && d > 0) return portion * altGrams / d; // g→ml
+      return null; // can't bridge without density on a per-100-ml food
+    }
+    return toCanonicalAmount(portion, unit, food);
   }
+
+  const origC = _resolve(origP, origUnit, origAlt);
+  const newC  = _resolve(newP,  newUnit,  newAlt);
+  if (origC != null && newC != null && origC > 0) {
+    return newC / origC;
+  }
+
+  // Tier 3: fall back to pure numeric ratio (preserves existing behavior
+  // for opaque units like "cup"/"piece" without per-food data, and for
+  // cross-system picks on foods without density).
   return newP / origP;
 }

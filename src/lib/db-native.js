@@ -19,27 +19,32 @@ let _initPromise = null;
 
 const SCHEMA = `
   CREATE TABLE IF NOT EXISTS foods (
-    id           INTEGER PRIMARY KEY AUTOINCREMENT,
-    server_id    INTEGER,
-    user_id      INTEGER DEFAULT 1,
-    name         TEXT NOT NULL,
-    brand        TEXT,
-    nutrition    TEXT DEFAULT '{}',
-    portion      REAL DEFAULT 100,
-    unit         TEXT DEFAULT 'g',
-    img_url      TEXT,
-    notes        TEXT,
-    category     TEXT,
-    barcode      TEXT,
-    visibility   TEXT NOT NULL DEFAULT 'private',
-    source_id    INTEGER,
-    favorite     INTEGER NOT NULL DEFAULT 0,
-    usage_count  INTEGER NOT NULL DEFAULT 0,
-    last_used_at TEXT DEFAULT NULL,
-    created_at   TEXT DEFAULT (datetime('now')),
-    updated_at   TEXT DEFAULT (datetime('now')),
-    deleted_at   TEXT DEFAULT NULL,
-    sync_status  TEXT DEFAULT 'synced'
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    server_id       INTEGER,
+    user_id         INTEGER DEFAULT 1,
+    name            TEXT NOT NULL,
+    brand           TEXT,
+    nutrition       TEXT DEFAULT '{}',
+    portion         REAL DEFAULT 100,
+    unit            TEXT DEFAULT 'g',
+    img_url         TEXT,
+    notes           TEXT,
+    category        TEXT,
+    barcode         TEXT,
+    visibility      TEXT NOT NULL DEFAULT 'private',
+    source_id       INTEGER,
+    favorite        INTEGER NOT NULL DEFAULT 0,
+    usage_count     INTEGER NOT NULL DEFAULT 0,
+    last_used_at    TEXT DEFAULT NULL,
+    -- Issues #69 + #70: OFF unit metadata. All three nullable; old rows
+    -- without these fields fall through to existing scaler behavior.
+    nutrition_basis TEXT DEFAULT NULL,
+    alt_units       TEXT DEFAULT NULL,
+    density_g_ml    REAL DEFAULT NULL,
+    created_at      TEXT DEFAULT (datetime('now')),
+    updated_at      TEXT DEFAULT (datetime('now')),
+    deleted_at      TEXT DEFAULT NULL,
+    sync_status     TEXT DEFAULT 'synced'
   );
 
   CREATE TABLE IF NOT EXISTS meals (
@@ -246,6 +251,24 @@ async function _applySchema(db) {
     }
   }
 
+  // foods.nutrition_basis + alt_units + density_g_ml — issues #69 + #70.
+  // All nullable; old rows fall through to existing scaler behavior.
+  try {
+    const info = await db.query(`PRAGMA table_info(foods)`);
+    const cols = (info?.values || []).map(r => r.name);
+    if (!cols.includes('nutrition_basis')) {
+      await db.execute(`ALTER TABLE foods ADD COLUMN nutrition_basis TEXT DEFAULT NULL`);
+    }
+    if (!cols.includes('alt_units')) {
+      await db.execute(`ALTER TABLE foods ADD COLUMN alt_units TEXT DEFAULT NULL`);
+    }
+    if (!cols.includes('density_g_ml')) {
+      await db.execute(`ALTER TABLE foods ADD COLUMN density_g_ml REAL DEFAULT NULL`);
+    }
+  } catch (e) {
+    console.debug('[db-native] foods OFF-units migration skipped:', e?.message);
+  }
+
   // wellness_data.sync_status: tracks which Health Connect rows need to be
   // pushed up to the server. Pre-existing rows default to 'pending' so the
   // first sync after this migration backfills any Health Connect data the
@@ -446,11 +469,28 @@ export async function dbGetFood(id) {
   return row ? _parseFoodRow(row) : null;
 }
 
+// Issues #69 + #70: helper to normalize alt_units into JSON-stringified
+// form for SQL writes. Accepts: null / [] / [{abbr, grams}, ...]. Filters
+// out malformed entries so a junk row from sync can't break the column.
+function _serializeAltUnits(v) {
+  if (v == null) return null;
+  if (typeof v === 'string') return v; // already serialized
+  if (!Array.isArray(v)) return null;
+  const clean = v
+    .filter(r => r && typeof r === 'object')
+    .map(r => ({
+      abbr: String(r.abbr || '').trim(),
+      grams: Number(r.grams),
+    }))
+    .filter(r => r.abbr && Number.isFinite(r.grams) && r.grams > 0);
+  return clean.length ? JSON.stringify(clean) : null;
+}
+
 export async function dbCreateFood(data) {
   const db = await getDb();
   const r = await db.run(
-    `INSERT INTO foods (user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, updated_at, sync_status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+    `INSERT INTO foods (user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, nutrition_basis, alt_units, density_g_ml, updated_at, sync_status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
     [
       LOCAL_USER_ID,
       data.name,
@@ -462,6 +502,11 @@ export async function dbCreateFood(data) {
       data.notes || null,
       data.category || null,
       data.barcode || null,
+      data.nutrition_basis || null,
+      _serializeAltUnits(data.alt_units),
+      data.density_g_ml != null && Number.isFinite(Number(data.density_g_ml))
+        ? Number(data.density_g_ml)
+        : null,
       _now(),
     ]
   );
@@ -471,7 +516,7 @@ export async function dbCreateFood(data) {
 export async function dbUpdateFood(id, data) {
   const db = await getDb();
   await db.run(
-    `UPDATE foods SET name=?, brand=?, nutrition=?, portion=?, unit=?, img_url=?, notes=?, category=?, barcode=?, updated_at=?, sync_status='pending'
+    `UPDATE foods SET name=?, brand=?, nutrition=?, portion=?, unit=?, img_url=?, notes=?, category=?, barcode=?, nutrition_basis=?, alt_units=?, density_g_ml=?, updated_at=?, sync_status='pending'
      WHERE id=? AND user_id=?`,
     [
       data.name,
@@ -483,6 +528,11 @@ export async function dbUpdateFood(id, data) {
       data.notes || null,
       data.category || null,
       data.barcode || null,
+      data.nutrition_basis || null,
+      _serializeAltUnits(data.alt_units),
+      data.density_g_ml != null && Number.isFinite(Number(data.density_g_ml))
+        ? Number(data.density_g_ml)
+        : null,
       _now(),
       id,
       LOCAL_USER_ID,
@@ -530,6 +580,9 @@ function _parseFoodRow(row) {
     nutrition: _parseJson(row.nutrition, {}),
     imgUrl: row.img_url || '',
     categories: row.category ? [row.category] : [],
+    // Issues #69 + #70: parse alt_units JSON; basis + density pass through.
+    // Defaults to [] so consumers can iterate without null-checking.
+    alt_units: _parseJson(row.alt_units, []),
   };
 }
 
@@ -807,14 +860,37 @@ export async function dbGetPendingChanges() {
   };
 }
 
-export async function dbMarkSynced(table, ids) {
-  if (!ids.length) return;
+/**
+ * Mark rows as synced AFTER a successful push. Only flips sync_status to
+ * 'synced' when the row's updated_at still matches the snapshot value that
+ * was actually sent to the server. Closes a mid-flight write race:
+ *
+ *   T0: user edits row A (sync_status='pending', updated_at=T0)
+ *   T1: pushChanges snapshots A, sends to server
+ *   T1.5: user edits row A again locally (updated_at=T1.5, still pending)
+ *   T2: push response arrives. Old dbMarkSynced(['A']) blanket-flips A to
+ *       'synced' even though the T1.5 edit was never pushed.
+ *   T3: pullChanges fetches A back from server (server only has T0 version),
+ *       sees local sync_status='synced', overwrites local with stale T0.
+ *       The T1.5 edit silently vanishes.
+ *
+ * With the updated_at predicate, if the row was edited mid-flight the WHERE
+ * clause won't match, the row stays 'pending', and the next sync re-pushes
+ * the fresh value. Server upserts are idempotent so no data corruption
+ * either way.
+ *
+ * `rows` is an array of `{id, updated_at}` taken from the push snapshot
+ * (i.e. dbGetPendingChanges return value).
+ */
+export async function dbMarkSynced(table, rows) {
+  if (!rows || !rows.length) return;
   const db = await getDb();
-  const placeholders = ids.map(() => '?').join(',');
-  await db.run(
-    `UPDATE ${table} SET sync_status = 'synced' WHERE id IN (${placeholders})`,
-    ids
-  );
+  for (const r of rows) {
+    await db.run(
+      `UPDATE ${table} SET sync_status = 'synced' WHERE id = ? AND updated_at = ?`,
+      [r.id, r.updated_at]
+    );
+  }
 }
 
 // ── Sync meta ─────────────────────────────────────────────────────────────
@@ -871,10 +947,15 @@ export async function dbUpsertFromServer(table, serverRecord) {
     // rank by stale local-only counters.
     if (table === 'foods') {
       await db.run(
-        `UPDATE foods SET name=?, brand=?, nutrition=?, portion=?, unit=?, img_url=?, notes=?, category=?, barcode=?, favorite=?, usage_count=MAX(usage_count, ?), last_used_at=MAX(COALESCE(last_used_at, ''), COALESCE(?, '')), updated_at=?, sync_status='synced' WHERE server_id=?`,
+        `UPDATE foods SET name=?, brand=?, nutrition=?, portion=?, unit=?, img_url=?, notes=?, category=?, barcode=?, favorite=?, usage_count=MAX(usage_count, ?), last_used_at=MAX(COALESCE(last_used_at, ''), COALESCE(?, '')), nutrition_basis=?, alt_units=?, density_g_ml=?, updated_at=?, sync_status='synced' WHERE server_id=?`,
         [data.name, data.brand, typeof data.nutrition === 'string' ? data.nutrition : JSON.stringify(data.nutrition || {}),
          data.portion ?? 100, data.unit || 'g', data.img_url, data.notes, data.category, data.barcode,
          data.favorite ? 1 : 0, data.usage_count || 0, data.last_used_at || null,
+         data.nutrition_basis || null,
+         _serializeAltUnits(data.alt_units),
+         data.density_g_ml != null && Number.isFinite(Number(data.density_g_ml))
+           ? Number(data.density_g_ml)
+           : null,
          data.updated_at, serverId]
       );
     } else if (table === 'meals') {
@@ -892,11 +973,17 @@ export async function dbUpsertFromServer(table, serverRecord) {
     // New from server — insert locally
     if (table === 'foods') {
       await db.run(
-        `INSERT INTO foods (server_id, user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, favorite, usage_count, last_used_at, updated_at, sync_status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced')`,
+        `INSERT INTO foods (server_id, user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, favorite, usage_count, last_used_at, nutrition_basis, alt_units, density_g_ml, updated_at, sync_status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced')`,
         [serverId, LOCAL_USER_ID, data.name, data.brand, typeof data.nutrition === 'string' ? data.nutrition : JSON.stringify(data.nutrition || {}),
          data.portion ?? 100, data.unit || 'g', data.img_url, data.notes, data.category, data.barcode,
-         data.favorite ? 1 : 0, data.usage_count || 0, data.last_used_at || null, data.updated_at]
+         data.favorite ? 1 : 0, data.usage_count || 0, data.last_used_at || null,
+         data.nutrition_basis || null,
+         _serializeAltUnits(data.alt_units),
+         data.density_g_ml != null && Number.isFinite(Number(data.density_g_ml))
+           ? Number(data.density_g_ml)
+           : null,
+         data.updated_at]
       );
     } else if (table === 'meals') {
       await db.run(
@@ -1050,26 +1137,59 @@ export async function dbGetPendingSettings() {
   return _rows(r);
 }
 
-export async function dbMarkSettingsSynced(keys) {
-  if (!keys.length) return;
+/**
+ * Read the current updated_at for a single user_settings row. Used by the
+ * direct-push debounce in stores/settings.js to snapshot updated_at right
+ * before the fetch, so dbMarkSettingsSynced afterward can detect if the
+ * user re-edited the same setting during the push round-trip and leave
+ * the row pending for the next sync.
+ */
+export async function dbGetSettingUpdatedAt(key) {
   const db = await getDb();
-  for (const key of keys) {
+  const r = await db.query(
+    `SELECT updated_at FROM user_settings WHERE key = ? AND user_id = ?`,
+    [key, LOCAL_USER_ID]
+  );
+  return _row(r)?.updated_at || null;
+}
+
+/**
+ * Mark settings as synced AFTER a successful push, gated on updated_at
+ * matching the snapshot. Same mid-flight write race as dbMarkSynced —
+ * if the user flipped a toggle again between push start and push response,
+ * the row's updated_at moved forward and the WHERE clause won't match, so
+ * the row stays 'pending' and the next sync re-pushes the fresh value.
+ *
+ * `rows` is an array of `{key, updated_at}` from the push snapshot.
+ */
+export async function dbMarkSettingsSynced(rows) {
+  if (!rows || !rows.length) return;
+  const db = await getDb();
+  for (const r of rows) {
     await db.run(
-      `UPDATE user_settings SET sync_status = 'synced' WHERE key = ? AND user_id = ?`,
-      [key, LOCAL_USER_ID]
+      `UPDATE user_settings SET sync_status = 'synced' WHERE key = ? AND user_id = ? AND updated_at = ?`,
+      [r.key, LOCAL_USER_ID, r.updated_at]
     );
   }
 }
 
+/**
+ * Upsert a user setting and return the updated_at timestamp written. The
+ * caller needs that timestamp to pass to dbMarkSettingsSynced after a
+ * successful server push, so the mark-synced step can detect mid-flight
+ * re-edits (see the race description on dbMarkSettingsSynced).
+ */
 export async function dbUpsertSetting(key, value) {
   const db = await getDb();
+  const updatedAt = _now();
   await db.run(
     `INSERT INTO user_settings (user_id, key, value, updated_at, sync_status)
      VALUES (?, ?, ?, ?, 'pending')
      ON CONFLICT(user_id, key) DO UPDATE SET
        value=excluded.value, updated_at=excluded.updated_at, sync_status='pending'`,
-    [LOCAL_USER_ID, key, JSON.stringify(value), _now()]
+    [LOCAL_USER_ID, key, JSON.stringify(value), updatedAt]
   );
+  return updatedAt;
 }
 
 export async function dbUpsertSettingFromServer(record) {

@@ -35,7 +35,7 @@
   let enableUmLoading = false;
 
   // Session Duration (admin-only)
-  let sessionHours = '720';
+  let sessionHours = '8760';
   let sessionSaved = false;
 
   // Password Policy (admin-only) — 'standard' | 'strong'
@@ -107,7 +107,7 @@
         return;
       }
       const cfg = await res.json();
-      sessionHours = cfg.session_hours ?? '720';
+      sessionHours = cfg.session_hours ?? '8760';
       passwordPolicy = cfg.password_policy || 'standard';
     } catch (e) {
       console.warn('[user-mgmt] loadSessionConfig threw', e);

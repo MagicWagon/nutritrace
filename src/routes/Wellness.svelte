@@ -692,7 +692,10 @@
     let interaction_penalty = 0;
     if (hrvRatio < 1.0 && rhrBaseline != null && todayRhr != null && todayRhr > rhrBaseline) {
       interaction_penalty = (1.0 - hrvRatio) * (todayRhr - rhrBaseline) * 35;
-      interaction_penalty = _clamp(interaction_penalty, 0, 10);
+      // Cap raised 10 → 15 on 2026-06-12 calibration pass — see
+      // server/lib/wellness-scores.js for the calibration evidence.
+      // Must stay in lockstep with server + local fallback formulas.
+      interaction_penalty = _clamp(interaction_penalty, 0, 15);
     }
 
     // Sleep score used for contribution (15% weight)

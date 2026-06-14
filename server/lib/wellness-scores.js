@@ -121,7 +121,15 @@ export function snapshotScores(userId, dateStr, { force = false } = {}) {
   let interaction_penalty = 0;
   if (hrvRatio < 1.0 && rhrBaseline != null && todayRhr != null && todayRhr > rhrBaseline) {
     interaction_penalty = (1.0 - hrvRatio) * (todayRhr - rhrBaseline) * 35;
-    interaction_penalty = _clamp(interaction_penalty, 0, 10);
+    // Cap raised 10 → 15 on 2026-06-12 calibration pass. Jun 7 (hrvRatio
+    // 0.890) and Jun 12 (hrvRatio 0.826) both saturated the prior 10-cap
+    // and still ran +13 / +15 over actual Fitbit readiness. The uncapped
+    // interaction value on these severe HRV+RHR days was 13–18, so the
+    // cap was clipping legitimate signal. Apr 11's exact-match day had
+    // interaction_pen=7.3 (below either cap), so previously-exact days
+    // are unaffected. May go further to 20 if the +13/+15 overshoot
+    // pattern persists after more data; holding at 15 as a measured step.
+    interaction_penalty = _clamp(interaction_penalty, 0, 15);
   }
 
   let readiness = (0.75 * hrv_score) + (0.05 * rhr_score) + (0.12 * sleepBase) + 4 - activity_penalty - interaction_penalty;

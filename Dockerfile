@@ -11,12 +11,16 @@ COPY . .
 RUN npm run build
 
 # ── Stage 2: Express server + static frontend ────────────────────────────────
-# Debian-slim base (not Alpine) — the @duckdb/node-bindings-linux-x64 native
-# library used by the OFF mirror feature is glibc-linked and won't load on
-# musl-based images. On Alpine, DuckDB fails with "Error loading shared
-# library ld-linux-x86-64.so.2: No such file or directory" because the
-# glibc dynamic linker isn't present. DuckDB does not ship a musl variant
-# of those node bindings, so a glibc base is required.
+# Debian-slim base (not Alpine) — the @duckdb/node-bindings-linux-* native
+# libraries used by the OFF mirror feature are glibc-linked and won't load
+# on musl-based images. On Alpine, DuckDB fails with "Error loading shared
+# library ld-linux-*.so.2: No such file or directory" because the glibc
+# dynamic linker isn't present. DuckDB does not ship a musl variant of
+# those node bindings, so a glibc base is required.
+#
+# Multi-arch note: this image builds for both linux/amd64 and linux/arm64
+# (Raspberry Pi 4 / 5). npm picks the right @duckdb/node-bindings-linux-<arch>
+# automatically during install based on the build platform.
 FROM node:20-slim
 RUN apt-get update \
  && apt-get install -y --no-install-recommends python3 build-essential \

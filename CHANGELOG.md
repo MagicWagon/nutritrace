@@ -9,6 +9,50 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.0-rc.50] - 2026-06-14
+
+### Added
+
+- **Open Food Facts Serving Sizes + Density.** Foods scanned or
+  searched from Open Food Facts now auto-import their serving units
+  (1 slice, 1 cookie, 1 bottle, etc.) and can be logged directly in
+  those units instead of converting to grams in your head. The Food
+  Editor lets you add, rename, or remove serving units on any food,
+  plus set an optional density (g/ml) for accurate cross-system
+  conversion on liquids like oil or honey. Optional warning toggle in
+  Settings → Diary surfaces when the picked unit doesn't match the
+  food's nutrition basis without a density set. (#69 reported by
+  duplaja, #70 reported by maxerbox)
+- **Raspberry Pi Support.** The Docker image now ships as a
+  multi-arch manifest (amd64 + arm64), so `docker pull` works on Pi
+  4 / Pi 5 without falling back to a source build. (#76 reported by
+  acaonweb)
+
+### Fixed
+
+- **Adding Foods with Photos to the Diary No Longer Fails.** A food
+  with a phone-camera photo could blow past the diary's body size
+  limit on a busy day, causing saves to silently fail with a 413
+  error. Photos now save as proper uploaded files instead of inline
+  base64 in the food record. Existing bloated diary entries get
+  trimmed automatically on their next save. (#74 reported by
+  kilkalabs)
+- **Removing a Food or Meal Photo Now Actually Removes It.** Tapping
+  the X to clear a photo, then saving, was leaving the old photo in
+  place. The clear is honored now. (kilkalabs follow-up on #74)
+- **Readiness on Severe HRV Crash Days Reads More Accurately.** Days
+  when both HRV and resting heart rate were significantly off
+  baseline were reading about 13-15 points higher than Fitbit.
+  Raised the interaction penalty cap so the formula fully reflects
+  the combined crash signal.
+- **README docker-compose Snippet Now Includes `env_file`.** The
+  copy-pastable snippet was missing the directive that forwards
+  `INSECURE_COOKIES` and other `.env` variables into the container,
+  so anyone copying from the README hit the login-loop bug. (#41
+  follow-up reported by drekkym)
+
+---
+
 ## [1.0.0-rc.49] - 2026-06-09
 
 ### Added

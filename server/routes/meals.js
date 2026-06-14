@@ -82,10 +82,18 @@ router.put('/:id', wrap((req, res) => {
   const srv = 'servings' in req.body
     ? (servings != null ? Math.max(1, parseInt(servings) || 1) : null)
     : existing.servings;
+  // Same idiom for img_url: undefined → keep existing, null/'' → clear.
+  // The old inline `img_url ?? existing.img_url` treated null as nullish and
+  // preserved the existing image, so the MealEditor X-remove-photo button
+  // silently failed to clear the photo on save. Parallel to the foods.js
+  // PUT fix for kilkalabs's report on #74 follow-up. Note: external-URL /
+  // data-URL localization on this route is a separate parity gap with the
+  // POST handler (line ~61) — out of scope for this fix.
+  const img = 'img_url' in req.body ? (img_url || null) : existing.img_url;
   db.prepare(
     `UPDATE meals SET name=?, nutrition=?, items=?, img_url=?, notes=?, is_recipe=?, portion=?, unit=?, servings=?, visibility=?, favorite=?, updated_at=datetime('now') WHERE id=?`
   ).run(name ?? existing.name, JSON.stringify(nutrition ?? JSON.parse(existing.nutrition || '{}')),
-    JSON.stringify(items ?? JSON.parse(existing.items || '[]')), img_url ?? existing.img_url,
+    JSON.stringify(items ?? JSON.parse(existing.items || '[]')), img,
     notes ?? existing.notes, is_recipe != null ? (is_recipe ? 1 : 0) : existing.is_recipe,
     portion ?? existing.portion, unit ?? existing.unit, srv,
     visibility ?? existing.visibility, fav, req.params.id);

@@ -49,6 +49,46 @@ function _headers() {
   return h;
 }
 
+/**
+ * Handle a 401 from any sync endpoint by clearing local auth state and
+ * forcing App.svelte's reactive gate to send the user to Login.
+ *
+ * Without this, an expired JWT (default session is 720 hours / 30 days,
+ * see server/middleware/auth.js#signToken) or a rotated server-side
+ * JWT_SECRET would have sync print "Push/Pull failed: 401" forever on
+ * every retry — the token stays in localStorage but is no longer
+ * accepted, and nothing in the sync loop ever notices the loop is
+ * unwinnable. Reported by user 2026-06-09.
+ *
+ * Mirrors the 401 handling already present in
+ * stores/auth.js#_refreshAuthFromServer for the /api/auth/me endpoint.
+ */
+async function _handleSyncAuthError() {
+  console.warn('[sync] received 401 — clearing local auth so the user can re-sign-in');
+  try {
+    const { setAuthToken } = await import('./platform.js');
+    setAuthToken(null);
+  } catch {}
+  try { localStorage.removeItem('wl:userId'); } catch {}
+  try { localStorage.removeItem('nt:cachedUser'); } catch {}
+  try { localStorage.removeItem('nt:csrf'); } catch {}
+  // Also wipe the biometric-saved JWT. It's a SEPARATE localStorage key
+  // (nt:biometric:token) that survives the regular auth-token clear,
+  // and Login.svelte#biometricLogin retrieves it then setAuthToken's it
+  // back into the regular slot. If we don't wipe it on 401, the user
+  // taps biometric → it fires correctly → restores the stale JWT →
+  // /me 401s silently → bounce back to Login. Looks like "biometric
+  // does nothing." Reported 2026-06-09.
+  try {
+    const { clearSavedToken } = await import('./biometric.js');
+    await clearSavedToken();
+  } catch {}
+  try {
+    const { currentUser } = await import('../stores/auth.js');
+    currentUser.set(null);
+  } catch {}
+}
+
 function _baseUrl() {
   // Returns empty string for PWA (so apiUrl() in callers picks up basePath
   // via the standard helper) or the server URL for native server-connected
@@ -105,6 +145,12 @@ async function pushChanges() {
       favorite: f.favorite || 0,
       usage_count: f.usage_count || 0,
       last_used_at: f.last_used_at || null,
+      // Issues #69 + #70: OFF unit metadata round-trip. Null on rows that
+      // pre-date the migration; server tolerates missing keys for clients
+      // that haven't updated yet.
+      nutrition_basis: f.nutrition_basis || null,
+      alt_units: f.alt_units || null,
+      density_g_ml: f.density_g_ml != null ? Number(f.density_g_ml) : null,
       updated_at: f.updated_at,
       deleted_at: f.deleted_at || null,
     })),
@@ -182,6 +228,7 @@ async function pushChanges() {
   if (!res.ok) {
     const errText = await res.text().catch(() => '');
     console.error(`[sync] push failed: ${res.status} ${errText}`);
+    if (res.status === 401) await _handleSyncAuthError();
     throw new Error(`Push failed: ${res.status}`);
   }
   const result = await res.json();
@@ -214,14 +261,20 @@ async function pushChanges() {
     }
   }
 
-  // Mark all as synced
-  await dbMarkSynced('foods', pending.foods.map(f => f.id));
-  await dbMarkSynced('meals', pending.meals.map(m => m.id));
-  await dbMarkSynced('diary', pending.diary.map(d => d.id));
-  await dbMarkSynced('activity_log', activity.map(a => a.id));
-  await dbMarkSynced('fasts', fasts.map(f => f.id));
-  await dbMarkSynced('wellness_data', wellness.map(w => w.id));
-  if (pendingSettings.length) await dbMarkSettingsSynced(pendingSettings.map(s => s.key));
+  // Mark all as synced. Pass {id, updated_at} (or {key, updated_at} for
+  // settings) so dbMarkSynced can detect rows that were edited again
+  // during the push round-trip and leave them pending for the next sync.
+  // Without this guard, mid-flight edits get silently demoted from
+  // 'pending' to 'synced' and then overwritten by the subsequent pull.
+  await dbMarkSynced('foods',        pending.foods.map(f => ({ id: f.id, updated_at: f.updated_at })));
+  await dbMarkSynced('meals',        pending.meals.map(m => ({ id: m.id, updated_at: m.updated_at })));
+  await dbMarkSynced('diary',        pending.diary.map(d => ({ id: d.id, updated_at: d.updated_at })));
+  await dbMarkSynced('activity_log', activity.map(a => ({ id: a.id, updated_at: a.updated_at })));
+  await dbMarkSynced('fasts',        fasts.map(f => ({ id: f.id, updated_at: f.updated_at })));
+  await dbMarkSynced('wellness_data', wellness.map(w => ({ id: w.id, updated_at: w.updated_at })));
+  if (pendingSettings.length) {
+    await dbMarkSettingsSynced(pendingSettings.map(s => ({ key: s.key, updated_at: s.updated_at })));
+  }
 
   // Purge soft-deleted records that have been confirmed pushed
   await dbPurgeSoftDeleted('foods');
@@ -244,7 +297,10 @@ async function pullChanges() {
     headers: _headers(),
   });
 
-  if (!res.ok) throw new Error(`Pull failed: ${res.status}`);
+  if (!res.ok) {
+    if (res.status === 401) await _handleSyncAuthError();
+    throw new Error(`Pull failed: ${res.status}`);
+  }
   const data = await res.json();
 
   // Apply foods
@@ -449,7 +505,13 @@ export async function fullSync(silent = false) {
     } catch {}
 
     const now = new Date().toISOString();
-    syncState.update(s => ({ ...s, syncing: false, phase: '', progress: '', lastSync: now, online: true }));
+    // Clear `error` explicitly. Without this an old sync failure (e.g. the
+    // 401 that just triggered a forced re-login) sticks in syncState even
+    // after a clean sync succeeded, so the UI keeps showing "Sync error"
+    // and "not connected" indicators forever. Reported by user 2026-06-09
+    // after the biometric expired-stash fix landed them back on Login,
+    // they re-signed in, sync succeeded, but the error banner stayed.
+    syncState.update(s => ({ ...s, syncing: false, phase: '', progress: '', lastSync: now, online: true, error: null }));
     // Notify the app that sync completed — pages should refresh data
     window.dispatchEvent(new CustomEvent('nt:sync-complete'));
   } catch (e) {

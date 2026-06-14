@@ -388,7 +388,7 @@
       const newQty      = parseFloat(item.qty) || 1;
       let scaledNutrition = item.food.nutrition;
       if (item.food.nutrition) {
-        const factor = _unitScaleFactor(origPortion, origUnit, newPortion, newUnit) * newQty;
+        const factor = _unitScaleFactor(origPortion, origUnit, newPortion, newUnit, item.food) * newQty;
         scaledNutrition = Object.fromEntries(
           Object.entries(item.food.nutrition).map(([k, v]) => [k, (parseFloat(v)||0) * factor])
         );
@@ -512,7 +512,10 @@
       const oldUnit    = item.unit || 'g';
       let newNutrition = item.nutrition;
       if (item.nutrition && oldPortion > 0) {
-        const factor = _unitScaleFactor(oldPortion, oldUnit, newTotal, portionUnit);
+        // item already carries the food's nutrition_basis / alt_units /
+        // density_g_ml via prior spread, so passing it gives accurate
+        // cross-system conversion. Issues #69 + #70.
+        const factor = _unitScaleFactor(oldPortion, oldUnit, newTotal, portionUnit, item);
         newNutrition = Object.fromEntries(
           Object.entries(item.nutrition).map(([k, v]) => [k, (parseFloat(v)||0) * factor])
         );
@@ -527,7 +530,7 @@
       const origUnit    = portionFood.unit || 'g';
       let scaledNutrition = portionFood.nutrition;
       if (portionFood.nutrition) {
-        const factor = _unitScaleFactor(origPortion, origUnit, newPortion, portionUnit) * newQty;
+        const factor = _unitScaleFactor(origPortion, origUnit, newPortion, portionUnit, portionFood) * newQty;
         scaledNutrition = Object.fromEntries(
           Object.entries(portionFood.nutrition).map(([k, v]) => [k, (parseFloat(v)||0) * factor])
         );

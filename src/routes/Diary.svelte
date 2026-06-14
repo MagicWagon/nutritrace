@@ -214,7 +214,10 @@
     const origPortion = parseFloat(editItem.portion) || 100;
     const origUnit    = editItem.unit || 'g';
     const newPortion  = parseFloat(editPortion)      || 100;
-    const portionFactor = _unitScaleFactor(origPortion, origUnit, newPortion, editUnit);
+    // Pass editItem as the food so the scaler can consult per-food alt_units
+    // (slice/cookie/bottle = X g) and density for cross-system conversion.
+    // Issues #69 + #70.
+    const portionFactor = _unitScaleFactor(origPortion, origUnit, newPortion, editUnit, editItem);
     let newNutrition = editItem.nutrition;
     if (editItem.nutrition && origPortion > 0) {
       newNutrition = Object.fromEntries(
@@ -244,7 +247,10 @@
     const origPortion   = parseFloat(editItem.portion) || 100;
     const origUnit      = editItem.unit || 'g';
     const newPortion    = parseFloat(editPortion)      || origPortion;
-    const portionFactor = _unitScaleFactor(origPortion, origUnit, newPortion, editUnit);
+    // editItem carries the food's nutrition_basis / alt_units / density_g_ml
+    // via the addDiaryItem spread, so passing it gives accurate cross-system
+    // conversion when those fields are set. Issues #69 + #70.
+    const portionFactor = _unitScaleFactor(origPortion, origUnit, newPortion, editUnit, editItem);
     const scaledNutrition = editItem.nutrition
       ? Object.fromEntries(Object.entries(editItem.nutrition).map(([k, v]) => [k, (parseFloat(v) || 0) * portionFactor]))
       : editItem.nutrition;

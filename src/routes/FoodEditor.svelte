@@ -154,6 +154,12 @@
   let food = {
     name:'', brand:'', barcode:'', imgUrl:'',
     portion: 100, unit: 'g', categories: [], notes: '',
+    // Issues #69 + #70: OFF unit metadata. nutrition_basis null = "unknown,
+    // treat as today's behavior"; alt_units empty = no per-food unit
+    // overrides; density null = no cross-system bridge available.
+    nutrition_basis: null,
+    alt_units: [],
+    density_g_ml: null,
     calories: '', kilojoules: '', fat: '', 'saturated-fat': '', 'trans-fat': '', 'polyunsaturated-fat': '', 'monounsaturated-fat': '', carbohydrates: '',
     sugars: '', 'added-sugars': '', proteins: '', salt: '', fiber: '',
     sodium: '', cholesterol: '', potassium: '', caffeine: '', alcohol: '',
@@ -858,6 +864,78 @@
           <span class="material-symbols-rounded" style="font-size:20px">{linked ? 'link' : 'link_off'}</span>
         </button>
       </div>
+
+      <!-- Issues #69 + #70: nutrition_basis toggle. Mass-based per-100-g
+           foods and volume-based per-100-ml foods need different default
+           units when logged to the diary. OFF imports populate this
+           automatically; users can edit it here to correct mis-tagged
+           records or to set it for manually-created foods. -->
+      <div class="form-group">
+        <label class="form-label">Nutrition Basis</label>
+        <div class="basis-toggle">
+          <button type="button" class="basis-opt" class:active={food.nutrition_basis === 'g'}
+            on:click={() => food.nutrition_basis = food.nutrition_basis === 'g' ? null : 'g'}>
+            Per 100 g
+          </button>
+          <button type="button" class="basis-opt" class:active={food.nutrition_basis === 'ml'}
+            on:click={() => food.nutrition_basis = food.nutrition_basis === 'ml' ? null : 'ml'}>
+            Per 100 ml
+          </button>
+        </div>
+        <div class="form-hint">
+          Defaults the unit picker when logging to the diary. Leave both off if unknown — math behaves like today's default.
+        </div>
+      </div>
+
+      <!-- Per-food serving units (e.g. "1 slice = 35 g"). OFF imports add
+           the first row from serving_size + serving_quantity; users can
+           edit, add, or remove rows. Issues #69 + #70. -->
+      <div class="form-group">
+        <label class="form-label">Serving Units</label>
+        <div class="alt-units">
+          {#each (food.alt_units || []) as row, i}
+            <div class="alt-unit-row">
+              <input class="input alt-unit-abbr" placeholder="e.g. slice"
+                bind:value={row.abbr} />
+              <span class="alt-unit-eq">=</span>
+              <input class="input alt-unit-grams" type="number" min="0" step="0.1"
+                placeholder="grams" bind:value={row.grams} />
+              <span class="alt-unit-suffix">g</span>
+              <button type="button" class="btn-icon alt-unit-del"
+                title="Remove" aria-label="Remove serving unit"
+                on:click={() => food.alt_units = food.alt_units.filter((_, j) => j !== i)}>
+                <span class="material-symbols-rounded">close</span>
+              </button>
+            </div>
+          {/each}
+          <button type="button" class="btn-link alt-unit-add"
+            on:click={() => food.alt_units = [...(food.alt_units || []), { abbr: '', grams: '' }]}>
+            <span class="material-symbols-rounded" style="font-size:18px;vertical-align:middle">add</span>
+            Add serving unit
+          </button>
+        </div>
+        <div class="form-hint">
+          Lets you log "1 slice", "1 cookie", "1 bottle" etc. with the right gram conversion.
+        </div>
+      </div>
+
+      <!-- Optional density for accurate cross-system (g ↔ ml) conversion.
+           Defaults blank; only matters when you log this food in a unit
+           that doesn't match the basis (g picked on a per-100-ml food).
+           Issues #69. -->
+      <div class="form-group">
+        <label class="form-label">Density (g/ml)</label>
+        <div style="display:flex;align-items:center;gap:6px">
+          <input class="input" type="number" min="0" step="0.01"
+            placeholder="Optional"
+            value={food.density_g_ml ?? ''}
+            on:input={e => food.density_g_ml = e.target.value === '' ? null : Number(e.target.value)} />
+          <span style="color:var(--text-3);font-size:13px">g/ml</span>
+        </div>
+        <div class="form-hint">
+          Only used when the picked unit's system (mass vs volume) doesn't match the nutrition basis. Common values: water 1.00, milk 1.03, olive oil 0.91, honey 1.42.
+        </div>
+      </div>
       <div class="form-group">
         <label class="form-label">Barcode</label>
         <div class="barcode-input-wrap">
@@ -1077,6 +1155,63 @@
   .editor-card { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
   .editor-card-title { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); margin-bottom: 4px; }
   .form-row { display: flex; gap: 12px; align-items: flex-end; }
+  /* Issues #69 + #70: nutrition basis + alt-unit + density UI */
+  .basis-toggle {
+    display: flex; gap: 8px;
+  }
+  .basis-opt {
+    flex: 1; padding: 8px 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-2);
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+  }
+  .basis-opt:hover { background: var(--surface-3); }
+  .basis-opt.active {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .form-hint {
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--text-3);
+    line-height: 1.4;
+  }
+  .alt-units {
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .alt-unit-row {
+    display: flex; align-items: center; gap: 6px;
+  }
+  .alt-unit-abbr { flex: 1; min-width: 0; }
+  .alt-unit-grams { width: 90px; }
+  .alt-unit-eq, .alt-unit-suffix { color: var(--text-3); font-size: 14px; }
+  .alt-unit-del {
+    width: 32px; height: 32px;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-3);
+  }
+  .alt-unit-del:hover {
+    color: var(--danger, #ef4444);
+    border-color: var(--border);
+  }
+  .alt-unit-del .material-symbols-rounded { font-size: 18px; }
+  .alt-unit-add {
+    align-self: flex-start;
+    color: var(--accent);
+    background: none;
+    border: none;
+    padding: 4px 0;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  .alt-unit-add:hover { text-decoration: underline; }
   .off-verify-row {
     display: flex; align-items: center; justify-content: space-between;
     gap: 8px; font-size: 12px; padding: 6px 2px 0;

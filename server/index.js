@@ -74,6 +74,13 @@ router.use('/api/sync/push',   express.json({ limit: '25mb' }));
 // Trace AI chat carries base64'd meal photos (phone camera shots inflate to
 // ~3-7 MB after base64), so its body needs more headroom than the global cap.
 router.use('/api/ai/chat',     express.json({ limit: '12mb' }));
+// Diary is an accumulating store — every PUT replays the full day's items,
+// each carrying the source food's nutrition object (~2 KB with full vitamins)
+// plus name / brand / barcode / category / now also nutrition_basis +
+// alt_units + density_g_ml (issues #69 + #70). 50+ items in a day on a
+// heavy logger or someone with photo URLs easily clears 1 MB. Bumped to
+// 5 MB after a user hit PayloadTooLargeError on 2026-06-10.
+router.use('/api/diary',       express.json({ limit: '5mb' }));
 // Global cap: 1 MB. Prevents a single authed user from filling memory with
 // repeated large requests. Anything above belongs on a per-route opt-in.
 router.use(express.json({ limit: '1mb' }));

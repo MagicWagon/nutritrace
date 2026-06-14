@@ -22,9 +22,26 @@ const uid = req => userMgmtActive() ? req.user?.id : null;
 
 import { freshenItemImages } from '../lib/diary-helpers.js';
 
+// Issues #69 + #70: normalize alt_units before storing. Accepts null /
+// already-serialized string / array of {abbr, grams}. Filters malformed
+// entries so a junk row from a misbehaving client can't break the column.
+function _serializeAltUnitsForServer(v) {
+  if (v == null) return null;
+  if (typeof v === 'string') return v;
+  if (!Array.isArray(v)) return null;
+  const clean = v
+    .filter(r => r && typeof r === 'object')
+    .map(r => ({
+      abbr: String(r.abbr || '').trim(),
+      grams: Number(r.grams),
+    }))
+    .filter(r => r.abbr && Number.isFinite(r.grams) && r.grams > 0);
+  return clean.length ? JSON.stringify(clean) : null;
+}
+
 function parse(row) {
   if (!row) return null;
-  for (const key of ['nutrition', 'items', 'body_stats', 'water', 'metadata']) {
+  for (const key of ['nutrition', 'items', 'body_stats', 'water', 'metadata', 'alt_units']) {
     if (typeof row[key] === 'string') {
       try { row[key] = JSON.parse(row[key]); } catch {}
     }
@@ -143,21 +160,34 @@ router.post('/push', wrap((req, res) => {
             db.prepare(`UPDATE foods SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`).run(f.server_id);
           } else {
             db.prepare(
-              `UPDATE foods SET name=?, brand=?, nutrition=?, portion=?, unit=?, img_url=?, notes=?, category=?, barcode=?, favorite=?, usage_count=MAX(usage_count, ?), last_used_at=MAX(COALESCE(last_used_at, ''), COALESCE(?, '')), updated_at=datetime('now') WHERE id=?`
+              `UPDATE foods SET name=?, brand=?, nutrition=?, portion=?, unit=?, img_url=?, notes=?, category=?, barcode=?, favorite=?, usage_count=MAX(usage_count, ?), last_used_at=MAX(COALESCE(last_used_at, ''), COALESCE(?, '')), nutrition_basis=?, alt_units=?, density_g_ml=?, updated_at=datetime('now') WHERE id=?`
             ).run(f.name, f.brand, JSON.stringify(f.nutrition || {}), f.portion ?? 100, f.unit || 'g',
               f.img_url || null, f.notes || null, f.category || null, f.barcode || null,
-              f.favorite ? 1 : 0, f.usage_count || 0, f.last_used_at || null, f.server_id);
+              f.favorite ? 1 : 0, f.usage_count || 0, f.last_used_at || null,
+              // Issues #69 + #70: OFF unit metadata. Clients that don't send
+              // these keys yet get null, which preserves existing behavior.
+              f.nutrition_basis || null,
+              _serializeAltUnitsForServer(f.alt_units),
+              f.density_g_ml != null && Number.isFinite(Number(f.density_g_ml))
+                ? Number(f.density_g_ml)
+                : null,
+              f.server_id);
           }
         }
         result.foods.push({ client_id: f.client_id, server_id: f.server_id });
       } else if (!f.deleted_at) {
         // New record (no server_id, OR server_id refs missing row → re-create)
         const r = db.prepare(
-          `INSERT INTO foods (user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, favorite, usage_count, last_used_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+          `INSERT INTO foods (user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, favorite, usage_count, last_used_at, nutrition_basis, alt_units, density_g_ml, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
         ).run(u, f.name, f.brand || null, JSON.stringify(f.nutrition || {}), f.portion ?? 100, f.unit || 'g',
           f.img_url || null, f.notes || null, f.category || null, f.barcode || null,
-          f.favorite ? 1 : 0, f.usage_count || 0, f.last_used_at || null);
+          f.favorite ? 1 : 0, f.usage_count || 0, f.last_used_at || null,
+          f.nutrition_basis || null,
+          _serializeAltUnitsForServer(f.alt_units),
+          f.density_g_ml != null && Number.isFinite(Number(f.density_g_ml))
+            ? Number(f.density_g_ml)
+            : null);
         result.foods.push({ client_id: f.client_id, server_id: r.lastInsertRowid });
       }
     }

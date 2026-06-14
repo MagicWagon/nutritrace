@@ -27,7 +27,7 @@
   import {
     appearance, accentColor, energyUnit, mealNames,
     diaryShowBrands, diaryShowTimestamps, diaryShowThumbnails, diaryShowAllNutrients,
-    diaryShowNutritionUnits, diaryShowMacroSummary, diaryPromptQuantity, diaryShowPortionSize,
+    diaryShowNutritionUnits, diaryShowMacroSummary, diaryPromptQuantity, diaryShowPortionSize, warnUnitMismatch,
     diaryShowNotes,
     diaryShowActivity, manualActivityPolicy, calorieAdjustFromActivity,
     showQuickCalories, quickCaloriesDisplay,
@@ -1865,6 +1865,15 @@
           <div class="setting-row">
             <div><span class="setting-label">Ask For Quantity When Adding</span><div class="setting-desc">Prompt for portion size before adding a food (otherwise use the food's default)</div></div>
             <Toggle checked={$diaryPromptQuantity} on:change={e => diaryPromptQuantity.set(e.detail)} />
+          </div>
+          <div class="setting-divider"></div>
+          <!-- Issues #69 + #70: opt-in warning when picked unit's system
+               doesn't match the food's nutrition basis and no density is
+               set. Default off so users who weigh everything in grams
+               aren't nagged on Open Food Facts per-100-ml drinks. -->
+          <div class="setting-row">
+            <div><span class="setting-label">Warn About Unit Conversions</span><div class="setting-desc">Show a warning when you pick a mass unit (g/oz) on a food whose nutrition is per 100 ml — or vice versa — without a density value set on the food. The fallback math assumes 1 ml ≈ 1 g, which is rough for oils, honey, etc.</div></div>
+            <Toggle checked={$warnUnitMismatch} on:change={e => warnUnitMismatch.set(e.detail)} />
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">

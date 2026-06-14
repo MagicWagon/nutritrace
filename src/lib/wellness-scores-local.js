@@ -104,7 +104,11 @@ export async function snapshotScoresLocal(dateStr, { force = false } = {}) {
   let interaction_penalty = 0;
   if (hrvRatio < 1.0 && rhrBaseline != null && todayRhr != null && todayRhr > rhrBaseline) {
     interaction_penalty = (1.0 - hrvRatio) * (todayRhr - rhrBaseline) * 35;
-    interaction_penalty = _clamp(interaction_penalty, 0, 10);
+    // Cap raised 10 → 15 on 2026-06-12 calibration pass — see
+    // server/lib/wellness-scores.js for the calibration evidence. Must
+    // stay in lockstep with the server formula so local-mode (Android)
+    // and server-mode readiness scores match.
+    interaction_penalty = _clamp(interaction_penalty, 0, 15);
   }
 
   let readiness = (0.75 * hrv_score) + (0.05 * rhr_score) + (0.12 * sleepBase) + 4 - activity_penalty - interaction_penalty;

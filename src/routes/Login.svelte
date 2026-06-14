@@ -61,10 +61,24 @@
       // Bring the auth state up by hitting /me — also refreshes CSRF token.
       await loadAuthState();
       const cached = JSON.parse(localStorage.getItem('nt:cachedUser') || 'null');
-      if (cached) currentUser.set(cached);
+      // If /me rejected the saved token (expired, JWT_SECRET rotated,
+      // backup restored, server URL changed), loadAuthState cleared the
+      // cached user. Without an explicit check the user would briefly
+      // land on '/' and bounce right back to Login — looks like
+      // biometric "did nothing." Surface the error + wipe the stale
+      // stash so the next tap doesn't repeat the loop. Confirmed by
+      // logcat 2026-06-09: token in biometric stash expired exactly at
+      // the 30-day mark while user kept tapping biometric.
+      if (!cached) {
+        showError('Your saved sign-in expired. Use your password to sign in.');
+        await bio.clearSavedToken();
+        return;
+      }
+      currentUser.set(cached);
       await loadServerSettings();
       push('/');
     } catch (e) {
+      console.warn('[login] biometric flow failed:', e);
       showError('Biometric sign-in failed. Use your password instead.');
     }
   }

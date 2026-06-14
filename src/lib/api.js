@@ -224,6 +224,41 @@ const API = {
     };
     const kcal = g('energy-kcal')
       || (n['energy' + suffix] ? (parseFloat(n['energy' + suffix])||0) / 4.184 : 0);
+    // Issues #69 + #70: capture nutrition_basis + first alt_units entry from
+    // OFF's serving metadata. Both fields are nullable; downstream code
+    // falls back to existing behavior when they're absent.
+    //   nutrition_basis = 'g' or 'ml' per p.nutrition_data_per ('100g' /
+    //     '100ml' / 'serving'). For 'serving' we can't know the basis without
+    //     a unit on serving_quantity, so we treat the unit field on the
+    //     serving as the hint; default null when unclear.
+    //   alt_units = first row built from serving_size + serving_quantity.
+    //     e.g. "1 slice (35 g)" with serving_quantity=35 + serving_size
+    //     "1 slice" → {abbr: "slice", grams: 35}. We only add the row when
+    //     the parsed abbr is a recognizable discrete portion (not "g"/"ml").
+    const basis = (() => {
+      const raw = String(p.nutrition_data_per || '').toLowerCase();
+      if (raw === '100g') return 'g';
+      if (raw === '100ml') return 'ml';
+      // Per-serving — fall back to the unit on serving_quantity if present.
+      const su = String(p.serving_quantity_unit || '').toLowerCase();
+      if (su === 'g' || su === 'kg') return 'g';
+      if (su === 'ml' || su === 'l') return 'ml';
+      return null;
+    })();
+    const altUnits = (() => {
+      const ss = String(p.serving_size || '').trim();
+      const sq = parseFloat(p.serving_quantity);
+      if (!ss || !Number.isFinite(sq) || sq <= 0) return null;
+      // OFF serving_size strings look like "1 slice (35 g)" or "2 biscuits
+      // (24 g)". Extract the discrete-portion label: first non-numeric word
+      // before any open paren. Skip if it's a base mass/volume unit (the
+      // serving_quantity itself already carries that case).
+      const m = ss.match(/^\s*\d+\s*([a-zA-ZÀ-ÿ]+)/);
+      const label = m ? m[1].toLowerCase() : '';
+      const BASE_UNITS = new Set(['g','mg','kg','ml','l','oz','lb','cup','tbsp','tsp']);
+      if (!label || BASE_UNITS.has(label)) return null;
+      return [{ abbr: label, grams: Math.round(sq * 10) / 10 }];
+    })();
     return {
       name:      (p.product_name || '').trim(),
       brand:     (Array.isArray(p.brands) ? (p.brands[0] || '') : (p.brands || '').split(',')[0] || '').trim(),
@@ -234,6 +269,8 @@ const API = {
       imgUrl: p.image_front_display_url || p.image_front_url || p.image_url || p.image_front_small_url || '',
       dateTime:  new Date().toISOString(),
       categories: [],
+      nutrition_basis: basis,
+      alt_units:       altUnits,
       nutrition: Nutrition.deriveSodiumSalt({
         calories:        Math.round(kcal * 10) / 10,
         kilojoules:      g('energy'),

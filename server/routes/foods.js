@@ -57,9 +57,28 @@ router.get('/:id', wrap((req, res) => {
   res.json(parse(row));
 }));
 
+// Issues #69 + #70: normalize alt_units for storage. Same shape as the sync
+// route helper; duplicated here so foods.js is self-contained.
+function _serializeAltUnitsForFood(v) {
+  if (v == null) return null;
+  if (typeof v === 'string') return v;
+  if (!Array.isArray(v)) return null;
+  const clean = v
+    .filter(r => r && typeof r === 'object')
+    .map(r => ({ abbr: String(r.abbr || '').trim(), grams: Number(r.grams) }))
+    .filter(r => r.abbr && Number.isFinite(r.grams) && r.grams > 0);
+  return clean.length ? JSON.stringify(clean) : null;
+}
+function _normalizeDensity(v) {
+  if (v == null) return null;
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 // ── POST / ────────────────────────────────────────────────────────────────
 router.post('/', wrap(async (req, res) => {
-  const { name, brand, nutrition, portion, unit, img_url, notes, category, barcode, visibility, source_id } = req.body;
+  const { name, brand, nutrition, portion, unit, img_url, notes, category, barcode, visibility, source_id,
+    nutrition_basis, alt_units, density_g_ml } = req.body;
   if (!name) return res.status(400).json({ error: 'Name required' });
   const u = uid(req);
   const vis = visibility || 'private';
@@ -79,10 +98,13 @@ router.post('/', wrap(async (req, res) => {
   // Download external images to /uploads/ for self-hosting
   const localImg = isExternalUrl(img_url) ? await localizeImage(img_url) : (img_url || null);
   const result = db.prepare(
-    `INSERT INTO foods (user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, visibility, source_id, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+    `INSERT INTO foods (user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, visibility, source_id, nutrition_basis, alt_units, density_g_ml, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
   ).run(u, name, brand || null, JSON.stringify(nutrition || {}), portion ?? 100, unit || 'g',
-    localImg, notes || null, category || null, barcode || null, vis, source_id || null);
+    localImg, notes || null, category || null, barcode || null, vis, source_id || null,
+    nutrition_basis || null,
+    _serializeAltUnitsForFood(alt_units),
+    _normalizeDensity(density_g_ml));
   res.status(201).json(parse(db.prepare('SELECT * FROM foods WHERE id = ?').get(result.lastInsertRowid)));
 }));
 
@@ -92,16 +114,33 @@ router.put('/:id', wrap(async (req, res) => {
   const existing = db.prepare('SELECT * FROM foods WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Not found' });
   if (u != null && existing.user_id !== u) return res.status(403).json({ error: 'Forbidden' });
-  const { name, brand, nutrition, portion, unit, img_url, notes, category, barcode, visibility, favorite } = req.body;
-  const localImg = (img_url && isExternalUrl(img_url)) ? await localizeImage(img_url) : (img_url ?? existing.img_url);
+  const { name, brand, nutrition, portion, unit, img_url, notes, category, barcode, visibility, favorite,
+    nutrition_basis, alt_units, density_g_ml } = req.body;
+  // For img_url: undefined → keep existing, null/'' → explicit clear,
+  // any other value → localize-if-external-or-data-URL-then-store. Without
+  // this distinction, the X-remove-photo button in FoodEditor doesn't
+  // actually clear the photo on save: the client maps food.imgUrl='' to
+  // img_url=null in _foodToApi, the old `img_url ?? existing.img_url`
+  // line treated null as nullish and preserved the existing image.
+  // Reported by kilkalabs on #74 follow-up. Matches the same idiom already
+  // used below for nutrition_basis / alt_units / density_g_ml.
+  const localImg = img_url === undefined
+    ? existing.img_url
+    : ((img_url && isExternalUrl(img_url)) ? await localizeImage(img_url) : (img_url || null));
   const fav = favorite != null ? (favorite ? 1 : 0) : existing.favorite;
+  // For the OFF metadata: undefined → keep existing, null → explicit clear,
+  // any other value → normalize-and-store. Lets the client patch one field
+  // without resetting the others.
+  const nb = nutrition_basis === undefined ? existing.nutrition_basis : (nutrition_basis || null);
+  const au = alt_units === undefined ? existing.alt_units : _serializeAltUnitsForFood(alt_units);
+  const dg = density_g_ml === undefined ? existing.density_g_ml : _normalizeDensity(density_g_ml);
   db.prepare(
-    `UPDATE foods SET name=?, brand=?, nutrition=?, portion=?, unit=?, img_url=?, notes=?, category=?, barcode=?, visibility=?, favorite=?, updated_at=datetime('now') WHERE id=?`
+    `UPDATE foods SET name=?, brand=?, nutrition=?, portion=?, unit=?, img_url=?, notes=?, category=?, barcode=?, visibility=?, favorite=?, nutrition_basis=?, alt_units=?, density_g_ml=?, updated_at=datetime('now') WHERE id=?`
   ).run(name ?? existing.name, brand ?? existing.brand,
     JSON.stringify(nutrition ?? JSON.parse(existing.nutrition || '{}')),
     portion ?? existing.portion, unit ?? existing.unit, localImg,
     notes ?? existing.notes, category ?? existing.category, barcode ?? existing.barcode,
-    visibility ?? existing.visibility, fav, req.params.id);
+    visibility ?? existing.visibility, fav, nb, au, dg, req.params.id);
   res.json(parse(db.prepare('SELECT * FROM foods WHERE id = ?').get(req.params.id)));
 }));
 
@@ -230,9 +269,18 @@ router.post('/bulk-share', wrap((req, res) => {
 }));
 
 function parse(row) {
+  // alt_units is stored as a JSON string; parse to array on read so the
+  // client gets a useable shape. Issues #69 + #70.
+  let altUnits = null;
+  if (typeof row.alt_units === 'string' && row.alt_units) {
+    try { altUnits = JSON.parse(row.alt_units); } catch { altUnits = null; }
+  } else if (Array.isArray(row.alt_units)) {
+    altUnits = row.alt_units;
+  }
   return {
     ...row,
     nutrition: JSON.parse(row.nutrition || '{}'),
+    alt_units: altUnits,
     _specific_users: row._specific_users || undefined,
   };
 }

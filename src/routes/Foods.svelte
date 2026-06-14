@@ -11,8 +11,8 @@
   import Sheet       from '../components/ui/Sheet.svelte';
   import FoodDetailSheet from '../components/ui/FoodDetailSheet.svelte';
   import UnitPicker  from '../components/ui/UnitPicker.svelte';
-  import { scaleFactor as _unitScaleFactor } from '../lib/units.js';
-  import { diaryPromptQuantity } from '../stores/settings.js';
+  import { scaleFactor as _unitScaleFactor, unitSystem as _unitSystem } from '../lib/units.js';
+  import { diaryPromptQuantity, warnUnitMismatch } from '../stores/settings.js';
   import { showSuccess, showError } from '../stores/toast.js';
   import { editorState, clearFoodEditorState } from '../stores/editorState.js';
   import { DB, localDateStr } from '../lib/db.js';
@@ -165,7 +165,9 @@
     const origPortion = parseFloat(promptFood.portion) || 100;
     const origUnit    = promptFood.unit || 'g';
     const newPortion  = parseFloat(promptPortion) || origPortion;
-    const factor      = _unitScaleFactor(origPortion, origUnit, newPortion, promptUnit || origUnit);
+    // Pass promptFood as the food so the scaler uses per-food alt_units and
+    // density when set. Issues #69 + #70.
+    const factor      = _unitScaleFactor(origPortion, origUnit, newPortion, promptUnit || origUnit, promptFood);
     const scaledNutrition = promptFood.nutrition
       ? Object.fromEntries(Object.entries(promptFood.nutrition).map(([k, v]) => [k, (parseFloat(v) || 0) * factor]))
       : promptFood.nutrition;
@@ -547,7 +549,7 @@
       const origPortion = parseFloat(item.food.portion) || 100;
       const origUnit    = item.food.unit || 'g';
       const newPortion  = parseFloat(item.portion) || origPortion;
-      const portionFactor = _unitScaleFactor(origPortion, origUnit, newPortion, item.unit || origUnit);
+      const portionFactor = _unitScaleFactor(origPortion, origUnit, newPortion, item.unit || origUnit, item.food);
       const scaledNutrition = item.food.nutrition
         ? Object.fromEntries(Object.entries(item.food.nutrition).map(([k,v]) => [k, (parseFloat(v)||0) * portionFactor]))
         : item.food.nutrition;
@@ -568,8 +570,10 @@
     const newUnit     = promptUnit || origUnit;
 
     // Scale by mass when both units are mass-convertible (g/oz/lb/ml/etc.),
-    // otherwise fall back to a pure portion ratio. See src/lib/units.js.
-    const portionFactor = _unitScaleFactor(origPortion, origUnit, newPortion, newUnit);
+    // otherwise fall back to a pure portion ratio. Passes promptFood so the
+    // scaler can use per-food alt_units (slice=35g etc.) + density when set.
+    // See src/lib/units.js. Issues #69 + #70.
+    const portionFactor = _unitScaleFactor(origPortion, origUnit, newPortion, newUnit, promptFood);
     const scaledNutrition = promptFood.nutrition ?
       Object.fromEntries(Object.entries(promptFood.nutrition).map(([k,v]) => [k, (parseFloat(v)||0) * portionFactor])) :
       promptFood.nutrition;
@@ -1023,7 +1027,7 @@
                   </span>
                   {#if activeTab === 0}
                     {#if food.brand}<span class="food-brand text-3 text-sm">{food.brand}</span>{/if}
-                    <span class="food-kcal text-sm">{food.portion || 100}{food.unit || 'g'}{#if food._shared_by} · <span style="color:var(--accent)">by {food._shared_by}</span>{/if}</span>
+                    <span class="food-kcal text-sm">{food.portion || 100}{food.unit || 'g'}{#if food.nutrition_basis} · <span class="food-basis text-3">per 100 {food.nutrition_basis}</span>{/if}{#if food._shared_by} · <span style="color:var(--accent)">by {food._shared_by}</span>{/if}</span>
                   {:else}
                     {@const _kcal = Math.round(Nutrition.sum((food.items||[]).map(i => Nutrition.calculate(i))).calories || food.nutrition?.calories || 0)}
                     {@const _mealEnergy = Nutrition.displayEnergy(_kcal, $energyUnit)}
@@ -1188,10 +1192,31 @@
 <!-- Quantity prompt sheet -->
 <Sheet bind:open={showQtyPrompt} title={promptFood ? promptFood.name : 'Add to Diary'}>
   <div style="display:flex;flex-direction:column;gap:16px;padding-top:8px">
+    <!-- Issues #69 + #70: surface the OFF nutrition basis so users know
+         whether values are per-100-g or per-100-ml at a glance. -->
+    {#if promptFood?.nutrition_basis}
+      <div class="qty-basis-label">
+        Nutrition per 100 {promptFood.nutrition_basis}
+      </div>
+    {/if}
     {#if promptFood && (promptFood.notes || '').trim()}
       <div class="qty-notes">
         <span class="material-symbols-rounded qty-notes-icon">sticky_note_2</span>
         <span class="qty-notes-text">{promptFood.notes}</span>
+      </div>
+    {/if}
+    <!-- Quick-pick chips for per-food alt_units (slice/cookie/bottle).
+         Tapping fills portion=1 + unit=abbr so the user gets the right
+         gram math via scaleFactor's tier-1 lookup. Issues #69 + #70. -->
+    {#if promptFood?.alt_units && promptFood.alt_units.length > 0}
+      <div class="qty-quickpicks">
+        {#each promptFood.alt_units as au}
+          <button type="button" class="qty-quickpick"
+            class:active={promptUnit === au.abbr && parseFloat(promptPortion) === 1}
+            on:click={() => { promptPortion = 1; promptUnit = au.abbr; }}>
+            1 {au.abbr} <span class="qty-quickpick-g">({au.grams} g)</span>
+          </button>
+        {/each}
       </div>
     {/if}
     <div style="display:flex;gap:12px">
@@ -1205,6 +1230,20 @@
         <UnitPicker bind:value={promptUnit} />
       </div>
     </div>
+    <!-- Mismatch warning: gated behind the warnUnitMismatch setting.
+         Fires when the picked unit's system doesn't match the food's
+         nutrition_basis AND no density is set, so the scaler is using the
+         1 ml = 1 g approximation that's rough for oils, honey, etc.
+         Issues #69 + #70. -->
+    {#if $warnUnitMismatch && promptFood?.nutrition_basis && !promptFood?.density_g_ml
+         && _unitSystem(promptUnit) && _unitSystem(promptUnit) !== promptFood.nutrition_basis}
+      <div class="qty-mismatch-warn">
+        <span class="material-symbols-rounded">warning</span>
+        <span>
+          Nutrition is per 100 {promptFood.nutrition_basis}. Converting from {_unitSystem(promptUnit) === 'g' ? 'grams' : 'milliliters'} uses 1 ml ≈ 1 g, rough for oils, honey, etc. Add a <strong>Density (g/ml)</strong> value to the food for accurate conversion.
+        </span>
+      </div>
+    {/if}
     <div>
       <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:6px">Number of Servings</label>
       <input class="input" type="number" min="0.1" step="0.1" bind:value={promptServings}
@@ -1377,6 +1416,54 @@
   /* Live-preview macro pills inside the qty-prompt sheet (#30).
      Mirrors the diary edit sheet's .edit-macro-pill styling. */
   .qty-macros { display: flex; gap: 8px; flex-wrap: wrap; }
+  /* Issues #69 + #70: basis label + alt-unit quick-picks + mismatch warning */
+  .qty-basis-label {
+    font-size: 12px;
+    color: var(--text-3);
+    text-align: center;
+    margin-top: -8px;
+  }
+  .qty-quickpicks {
+    display: flex; flex-wrap: wrap; gap: 8px;
+  }
+  .qty-quickpick {
+    padding: 6px 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-full);
+    color: var(--text-1);
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+  }
+  .qty-quickpick:hover { background: var(--surface-3); }
+  .qty-quickpick.active {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .qty-quickpick-g {
+    color: var(--text-3);
+    font-size: 12px;
+  }
+  .qty-mismatch-warn {
+    display: flex; align-items: flex-start; gap: 8px;
+    padding: 10px 12px;
+    background: color-mix(in srgb, var(--warning, #f59e0b) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--warning, #f59e0b) 35%, transparent);
+    border-radius: var(--radius-md);
+    font-size: 12px;
+    color: var(--text-1);
+    line-height: 1.5;
+  }
+  .qty-mismatch-warn .material-symbols-rounded {
+    color: var(--warning, #f59e0b);
+    font-size: 18px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
   .qty-macro-pill {
     flex: 1;
     min-width: 60px;

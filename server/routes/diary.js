@@ -29,8 +29,36 @@ router.get('/:date', wrap((req, res) => {
 }));
 
 // Save/replace entire diary entry for a date
+// Scrub inline base64 data URLs from diary items before storage. Foods
+// route accepts data URLs and converts them to /uploads/ via localizeImage,
+// but diary items receive a copy of the food via the addDiaryItem spread in
+// stores/diary.js. That copy carries whatever imgUrl was on the food at
+// pick time — historically a data URL (200-800 KB of base64) when a user
+// took a phone photo for a food. The same data URL then gets replicated
+// onto every diary item that references that food, and PUT /api/diary
+// hits PayloadTooLargeError after just a few logged items. Reported by
+// user 2026-06-10.
+//
+// freshenItemImages in lib/diary-helpers.js always overrides items[].imgUrl
+// at read time with the food/meal's current image, so the stored snapshot
+// is effectively unused for display. Dropping the data URL on store is
+// pure waste-reduction with no behavior change.
+function _stripDataUrlImages(items) {
+  if (!Array.isArray(items)) return items;
+  let changed = false;
+  const out = items.map(it => {
+    if (it && typeof it.imgUrl === 'string' && it.imgUrl.startsWith('data:')) {
+      changed = true;
+      return { ...it, imgUrl: '' };
+    }
+    return it;
+  });
+  return changed ? out : items;
+}
+
 router.put('/:date', wrap((req, res) => {
-  const { items, body_stats, water, notes } = req.body;
+  const { body_stats, water, notes } = req.body;
+  const items = _stripDataUrlImages(req.body.items);
   const notesVal = (typeof notes === 'string' && notes.trim()) ? notes : null;
   const u = uid(req);
   const itemsJson = JSON.stringify(items || []);
