@@ -318,6 +318,23 @@
       window.location.hash = '#/wizard';
     }
 
+    // Issues #69 + #70 — one-shot migration for the showUnitMetadata
+    // gate. Existing users on rc.50 saw the nutrition basis / serving
+    // units / density fields unconditionally; turning the new toggle on
+    // by default for them preserves continuity, while new installs get
+    // the cleaner default-off behavior. setupComplete is the signal: any
+    // user who has finished the wizard is an existing install. The
+    // migration is idempotent via the unitMetadataMigrationV1 flag, so
+    // it runs once per browser-per-user and never disturbs an explicit
+    // user choice on subsequent app loads.
+    if (!DB.getSetting('unitMetadataMigrationV1', false)) {
+      const isExistingUser = DB.getSetting('setupComplete', false);
+      if (isExistingUser) {
+        DB.setSetting('showUnitMetadata', true);
+      }
+      DB.setSetting('unitMetadataMigrationV1', true);
+    }
+
     // Start sync engine in native server-connected mode
     if (isNative && getNativeMode() === 'server') {
       import('./lib/sync.js').then((mod) => {

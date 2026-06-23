@@ -12,7 +12,7 @@
   import FoodDetailSheet from '../components/ui/FoodDetailSheet.svelte';
   import UnitPicker  from '../components/ui/UnitPicker.svelte';
   import { scaleFactor as _unitScaleFactor, unitSystem as _unitSystem } from '../lib/units.js';
-  import { diaryPromptQuantity, warnUnitMismatch } from '../stores/settings.js';
+  import { diaryPromptQuantity, warnUnitMismatch, showUnitMetadata } from '../stores/settings.js';
   import { showSuccess, showError } from '../stores/toast.js';
   import { editorState, clearFoodEditorState } from '../stores/editorState.js';
   import { DB, localDateStr } from '../lib/db.js';
@@ -1027,7 +1027,7 @@
                   </span>
                   {#if activeTab === 0}
                     {#if food.brand}<span class="food-brand text-3 text-sm">{food.brand}</span>{/if}
-                    <span class="food-kcal text-sm">{food.portion || 100}{food.unit || 'g'}{#if food.nutrition_basis} · <span class="food-basis text-3">per 100 {food.nutrition_basis}</span>{/if}{#if food._shared_by} · <span style="color:var(--accent)">by {food._shared_by}</span>{/if}</span>
+                    <span class="food-kcal text-sm">{food.portion || 100}{food.unit || 'g'}{#if food.nutrition_basis && ($showUnitMetadata || $warnUnitMismatch)} · <span class="food-basis text-3">per 100 {food.nutrition_basis}</span>{/if}{#if food._shared_by} · <span style="color:var(--accent)">by {food._shared_by}</span>{/if}</span>
                   {:else}
                     {@const _kcal = Math.round(Nutrition.sum((food.items||[]).map(i => Nutrition.calculate(i))).calories || food.nutrition?.calories || 0)}
                     {@const _mealEnergy = Nutrition.displayEnergy(_kcal, $energyUnit)}
@@ -1193,8 +1193,10 @@
 <Sheet bind:open={showQtyPrompt} title={promptFood ? promptFood.name : 'Add to Diary'}>
   <div style="display:flex;flex-direction:column;gap:16px;padding-top:8px">
     <!-- Issues #69 + #70: surface the OFF nutrition basis so users know
-         whether values are per-100-g or per-100-ml at a glance. -->
-    {#if promptFood?.nutrition_basis}
+         whether values are per-100-g or per-100-ml at a glance. Gated on
+         the showUnitMetadata opt-in (or the warn-about-conversions toggle
+         that implies it). -->
+    {#if promptFood?.nutrition_basis && ($showUnitMetadata || $warnUnitMismatch)}
       <div class="qty-basis-label">
         Nutrition per 100 {promptFood.nutrition_basis}
       </div>
@@ -1207,8 +1209,9 @@
     {/if}
     <!-- Quick-pick chips for per-food alt_units (slice/cookie/bottle).
          Tapping fills portion=1 + unit=abbr so the user gets the right
-         gram math via scaleFactor's tier-1 lookup. Issues #69 + #70. -->
-    {#if promptFood?.alt_units && promptFood.alt_units.length > 0}
+         gram math via scaleFactor's tier-1 lookup. Issues #69 + #70.
+         Gated on the showUnitMetadata opt-in (or warn-about-conversions). -->
+    {#if promptFood?.alt_units && promptFood.alt_units.length > 0 && ($showUnitMetadata || $warnUnitMismatch)}
       <div class="qty-quickpicks">
         {#each promptFood.alt_units as au}
           <button type="button" class="qty-quickpick"

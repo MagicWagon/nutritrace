@@ -158,12 +158,28 @@ export const TOOLS = [
     parameters: { type: 'object', properties: {} },
   },
   {
-    name: 'log_quick_calories',
-    description: 'Log a Fitbit/MFP-style "Quick Calories" entry to the user\'s diary — a row with calories and optionally protein/carbs/fat, but no food, no portion. Use this when the user says something like "log 200 calories for lunch", "add 1200 kJ to dinner", "punch in 350 quick calories", or "log 240 kcal with 20g protein and 30g carbs for snack". Only the calorie value is required; macros are optional and only stored when the user explicitly mentions them. Optional short name (e.g. "Office snack") helps the user remember the entry later. If the user gives kJ, convert to kcal yourself (1 kcal = 4.184 kJ) and pass the kcal number. Returns { error } if the user has disabled Quick Calories in Settings → Diary.',
+    name: 'log_food',
+    description: 'Log a REAL FOOD entry to the user\'s diary with full nutrition (protein, carbs, fat, fiber, sodium, vitamins, etc. — NOT just calories). USE THIS — not log_quick_calories — whenever the user NAMES a food they want to log. Typical phrasings: "add an apple to lunch", "log a banana to today\'s snacks", "add 200g of chicken to dinner", "I had Greek yogurt for breakfast", "two slices of bread for lunch".\n\nSEARCH ORDER: (1) the user\'s local food catalog first (their saved/scanned foods); (2) Open Food Facts if nothing local matches. If the user has the local OFF mirror enabled, OFF goes through that. USDA is NOT searched here (use a separate barcode/manual flow for USDA).\n\nRETURN SHAPES — branch on these:\n- {ok: true, meal_name, food_name, kcal, source, ...} — logged. Use meal_name (the actual name, not just an index) when you confirm to the user; do NOT assume the meal name from the index you passed.\n- {candidates: [...]} — multiple plausible matches. Show the names back to the user and ask which one. Then call again with the chosen name as the food field.\n- {no_match: true, suggestion} — nothing found. Tell the user to add the food via the Foods tab (barcode scan or manual entry) and then try again.\n- {error: "..."} — something else went wrong. Relay verbatim.',
     parameters: {
       type: 'object',
       properties: {
-        meal:      { type: 'number', description: 'Meal index: 0=breakfast, 1=lunch, 2=dinner, 3=snacks (or whatever custom meal names the user has set, by position). Defaults to 3 (snacks) if not clearly stated.' },
+        food:     { type: 'string', description: 'The food name as the user said it. Plain natural language: "apple", "Greek yogurt", "Honey Nut Cheerios", "chicken breast", "olive oil". Brand can be included if mentioned ("Chobani Greek yogurt").' },
+        meal:     { type: 'number', description: 'Meal index per the YOUR MEALS list in the system prompt. NEVER hardcode 0=breakfast/1=lunch/etc — that\'s only correct for the default meal layout. Match the user\'s named meal to its position in YOUR MEALS and pass that index. If the user did not name a meal and it isn\'t clearly implied, ASK them which meal.' },
+        portion:  { type: 'number', description: 'OPTIONAL portion amount. If omitted, the food\'s stored serving size is used (100g for fresh OFF lookups). Pass when the user specifies an amount: 200 for "200g of chicken", 150 for "150ml of milk", 1 for "1 cup of cereal".' },
+        unit:     { type: 'string', description: 'OPTIONAL portion unit (g, ml, oz, cup, tbsp, slice, piece). Defaults to the food\'s stored unit. Only pass if the user specified a unit DIFFERENT from grams.' },
+        quantity: { type: 'number', description: 'OPTIONAL number of servings, defaults to 1. Use for "two apples" (quantity=2) or "half a banana" (quantity=0.5). Most asks use the default; portion+unit handles grams/ml directly.' },
+        date:     { type: 'string', description: 'Optional YYYY-MM-DD; defaults to today.' },
+      },
+      required: ['food', 'meal'],
+    },
+  },
+  {
+    name: 'log_quick_calories',
+    description: 'Log a Fitbit/MFP-style "Quick Calories" entry to the user\'s diary — a row with ONLY a calorie number (and optionally protein/carbs/fat), no food, no portion. Use this STRICTLY when the user gives a kcal number WITHOUT naming a food: "log 200 calories for lunch", "add 1200 kJ to dinner", "punch in 350 quick calories", "log 240 kcal with 20g protein for snack". If the user names a food ("add an apple", "log Greek yogurt", "two slices of bread") use log_food INSTEAD — that path stores full nutrition and creates a reusable food row. If the user gives kJ, convert to kcal yourself (1 kcal = 4.184 kJ). Returns { error } if the user has disabled Quick Calories in Settings → Diary.',
+    parameters: {
+      type: 'object',
+      properties: {
+        meal:      { type: 'number', description: 'Meal index per YOUR MEALS in the system prompt. NEVER hardcode 0=breakfast etc — that\'s only correct for the default meal layout.' },
         kcal:      { type: 'number', description: 'Calories as a positive integer in kcal. If the user said kJ, convert: kcal = kj / 4.184.' },
         name:      { type: 'string', description: 'Optional short label (max 60 chars). Defaults to "Quick Calories" when omitted.' },
         protein_g: { type: 'number', description: 'OPTIONAL protein in grams. Only pass if the user explicitly mentioned a protein number; do not estimate from calories.' },

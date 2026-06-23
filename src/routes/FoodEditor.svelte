@@ -13,7 +13,7 @@
   import { takePhoto } from '../lib/camera.js';
   import { isNative } from '../lib/platform.js';
   import BarcodeScanner from '../components/foods/BarcodeScanner.svelte';
-  import { foodsShowCategories, foodsShowLabels, foodsShowNotes, foodCategories, visibleNutriments, nutrimentsOrder, customNutriments, cropPhotos, offUsername, offPassword, offUploadCountry, aiEffectivelyEnabled, envLocks, aiProvider, aiApiKey, aiModel, aiBaseUrl, energyUnit, catName as _catName, catDisplay as _catDisplay } from '../stores/settings.js';
+  import { foodsShowCategories, foodsShowLabels, foodsShowNotes, foodCategories, visibleNutriments, nutrimentsOrder, customNutriments, cropPhotos, offUsername, offPassword, offUploadCountry, aiEffectivelyEnabled, envLocks, aiProvider, aiApiKey, aiModel, aiBaseUrl, energyUnit, showUnitMetadata, warnUnitMismatch, catName as _catName, catDisplay as _catDisplay } from '../stores/settings.js';
   import { callAI, callAIProxy } from '../lib/aiChat.js';
   import { fitImageDataUrl } from '../lib/image-fit.js';
 
@@ -598,6 +598,20 @@
   // form that won't save and gives them a single clear action: Save a Copy.
   $: _readOnly = !!food._shared_by;
 
+  // Issues #69 + #70: gate the basis / serving units / density editor on
+  // an opt-in toggle so the fields stay hidden for users who never need
+  // them. Auto-on for anyone who turned on the warn-about-conversions
+  // toggle (the natural opt-in signal). ALSO show whenever the current
+  // food already has values populated in any of the three fields, so the
+  // user can never lose access to edit or clear data they previously set
+  // (or that an OFF import auto-populated). Without this last clause,
+  // turning the master toggle off would leave their existing food rows
+  // uneditable for those fields.
+  $: _showUnitMetadataUI = $showUnitMetadata || $warnUnitMismatch
+    || !!food.nutrition_basis
+    || (Array.isArray(food.alt_units) && food.alt_units.length > 0)
+    || (food.density_g_ml != null && food.density_g_ml !== '');
+
   async function saveAsCopy() {
     saving = true;
     try {
@@ -865,11 +879,13 @@
         </button>
       </div>
 
-      <!-- Issues #69 + #70: nutrition_basis toggle. Mass-based per-100-g
-           foods and volume-based per-100-ml foods need different default
-           units when logged to the diary. OFF imports populate this
-           automatically; users can edit it here to correct mis-tagged
-           records or to set it for manually-created foods. -->
+      <!-- Issues #69 + #70: nutrition_basis + alt_units + density editor.
+           Gated on _showUnitMetadataUI: visible only when the user opted
+           in via Settings, or when the current food already has values in
+           any of the three fields. OFF imports auto-populate these fields
+           on the underlying row regardless of UI visibility — the data
+           always flows in, just the editor is hidden by default. -->
+      {#if _showUnitMetadataUI}
       <div class="form-group">
         <label class="form-label">Nutrition Basis</label>
         <div class="basis-toggle">
@@ -883,7 +899,7 @@
           </button>
         </div>
         <div class="form-hint">
-          Defaults the unit picker when logging to the diary. Leave both off if unknown — math behaves like today's default.
+          Defaults the unit picker when logging to the diary. Leave both off if unknown; math behaves like today's default.
         </div>
       </div>
 
@@ -936,6 +952,7 @@
           Only used when the picked unit's system (mass vs volume) doesn't match the nutrition basis. Common values: water 1.00, milk 1.03, olive oil 0.91, honey 1.42.
         </div>
       </div>
+      {/if}
       <div class="form-group">
         <label class="form-label">Barcode</label>
         <div class="barcode-input-wrap">

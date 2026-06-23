@@ -30,7 +30,7 @@ export const USER_PREFS = new Set([
   'diaryShowNutritionBar','diaryTotalsMode',
   'diaryShowBrands','diaryShowTimestamps','diaryShowThumbnails',
   'diaryShowAllNutrients','diaryShowNutritionUnits','diaryShowMacroSummary',
-  'diaryPromptQuantity','diaryShowPortionSize','diaryShowNotes','warnUnitMismatch',
+  'diaryPromptQuantity','diaryShowPortionSize','diaryShowNotes','warnUnitMismatch','showUnitMetadata',
   'diaryShowActivity','manualActivityPolicy','activityAutoEstimate','calorieAdjustFromActivity',
   'showQuickCalories','quickCaloriesDisplay',
   'foodsShowCategories','foodsShowLabels','foodsShowNotes','foodsShowThumbnails',
@@ -467,11 +467,24 @@ export const diaryShowAllNutrients  = createSettingStore('diaryShowAllNutrients'
 export const diaryShowNutritionUnits= createSettingStore('diaryShowNutritionUnits', true);
 export const diaryShowMacroSummary  = createSettingStore('diaryShowMacroSummary',   true);
 export const diaryPromptQuantity    = createSettingStore('diaryPromptQuantity',     true);
-// Issues #69 + #70: opt-in warning when the picked unit's system (mass vs
-// volume) doesn't match the food's nutrition_basis AND no density is set
-// on the food. Default off so duplaja-style users who weigh everything in
-// grams don't get nagged; maxerbox-style accuracy-conscious users flip it
-// on for the guard.
+// Issues #69 + #70: opt-in master toggle that exposes the nutrition basis,
+// serving units, and density UI in the Food Editor + on the Add to Diary
+// sheet + on the Foods list row. Default off so users who don't need the
+// extra fields aren't distracted by them. Reactive gate at call sites:
+//   show = $showUnitMetadata || $warnUnitMismatch
+// so users who already opted into the warning toggle (the most likely
+// signal of intent for this feature) automatically keep the UI without a
+// migration. FoodEditor additionally shows the fields when the food being
+// edited already has any of them populated, so a user can never lose
+// access to edit or clear their own data.
+export const showUnitMetadata       = createSettingStore('showUnitMetadata',        false);
+// Sub-feature of showUnitMetadata: warning when the picked unit's system
+// (mass vs volume) doesn't match the food's nutrition_basis AND no density
+// is set on the food. Default off so duplaja-style users who weigh
+// everything in grams don't get nagged; maxerbox-style accuracy-conscious
+// users flip it on for the guard. This toggle is also the auto-on trigger
+// for showUnitMetadata above, so flipping warnUnitMismatch on lights up
+// the full editor UI without two separate toggles.
 export const warnUnitMismatch       = createSettingStore('warnUnitMismatch',        false);
 export const diaryShowPortionSize   = createSettingStore('diaryShowPortionSize',    false);
 // Quick Calories — Fitbit-style "punch in just kcal" entry per meal. Bolt

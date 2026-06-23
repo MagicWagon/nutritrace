@@ -9,6 +9,41 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.0-rc.51] - 2026-06-19
+
+### Added
+
+- **Trace AI Now Logs Real Foods.** Asking the AI Assistant to "add
+  an apple to snacks" or "log Greek yogurt for breakfast" now
+  creates a real food entry with full nutrition (protein, carbs,
+  fat, fiber, vitamins) instead of a Quick Calories row with just
+  kcal. Searches your local catalog first, then Open Food Facts.
+  Custom meal layouts (renamed or reordered meals) are honored too,
+  so "snacks" routes to the right meal even if you've moved it.
+  (#79 reported by acaonweb)
+
+### Changed
+
+- **Unit Metadata Is Now Opt-In.** The nutrition basis, serving
+  units, and density fields added in rc.50 are now hidden by
+  default in the Food Editor, Add to Diary sheet, and Foods list
+  rows. Flip Settings → Diary → "Show Unit Metadata" to bring
+  them back. Existing rc.50 users see no change (the toggle is
+  auto-enabled on upgrade); new installs get a cleaner default.
+  The Food Editor still shows the fields when a food has data
+  populated so you never lose access to your own values.
+
+### Fixed
+
+- **Settings Search Now Finds More Diary Toggles.** Show Unit
+  Metadata, Warn About Unit Conversions, Show Daily Notes, Show
+  Quick Calories Button, Adjust Calorie Goal From Activity, and
+  the wearable / manual entry policy were all missing from search
+  keyword lookup. Now findable via natural terms like "unit",
+  "density", "quick calories", "daily notes", "earn back".
+
+---
+
 ## [1.0.0-rc.50] - 2026-06-14
 
 ### Added

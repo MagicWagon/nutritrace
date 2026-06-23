@@ -534,6 +534,141 @@
             return { error: 'Failed to save activity: ' + (e?.message || String(e)) };
           }
         }
+        case 'log_food': {
+          // Issue #79: AI Assistant adds Quick Calories to wrong meal instead
+          // of creating a real food entry. Before this tool, the AI's only
+          // direct-write option was log_quick_calories (kcal-only) — so
+          // "add an apple to snacks" landed as a Quick Calories row with no
+          // macros, and any mealNames customization silently mismatched the
+          // hardcoded snack=3 default. log_food fixes both: real food + full
+          // nutrition, meal index validated against the user's actual
+          // mealNames, returned meal_name in the response so the AI cannot
+          // hallucinate a wrong meal in its confirmation.
+          const foodQuery = String(args?.food || '').trim();
+          if (!foodQuery) return { error: 'food name is required.' };
+          const mealIdxRaw = args?.meal;
+          if (mealIdxRaw == null) return { error: 'meal index is required. Match the user\'s named meal to the YOUR MEALS list in the system prompt.' };
+          const mNames = mealNames.get() || ['Breakfast','Lunch','Dinner','Snacks'];
+          const mealIdx = Math.max(0, Math.min(mNames.length - 1, Math.round(Number(mealIdxRaw))));
+          if (!Number.isFinite(Number(mealIdxRaw))) return { error: 'meal must be a numeric index.' };
+          const mealName = mNames[mealIdx] || `Meal ${mealIdx + 1}`;
+          const quantity = (() => {
+            const q = Number(args?.quantity);
+            return Number.isFinite(q) && q > 0 ? q : 1;
+          })();
+          const portionOverride = (() => {
+            const p = Number(args?.portion);
+            return Number.isFinite(p) && p > 0 ? p : null;
+          })();
+          const unitOverride = typeof args?.unit === 'string' && args.unit.trim() ? args.unit.trim() : null;
+          const date = (typeof args?.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(args.date)) ? args.date : localDateStr();
+
+          // Tier 1: local catalog. Exact name (case-insensitive) wins; if no
+          // exact, do a substring + brand-bias fuzzy match. The Foods.svelte
+          // fuzzy matcher uses edit distance but we want stricter behavior
+          // for AI-driven logging — fewer false positives matter more than
+          // typo tolerance, because the AI restates the user's word verbatim.
+          const _norm = s => String(s || '').toLowerCase().trim();
+          const qNorm = _norm(foodQuery);
+          let localFoods = [];
+          try { localFoods = await NtApi.getFoods(); } catch {}
+          const exactLocal = (localFoods || []).filter(f => _norm(f.name) === qNorm);
+          if (exactLocal.length === 1) {
+            // Single exact local hit — use it.
+            const food = exactLocal[0];
+            try {
+              const item = {
+                ...food,
+                portion: portionOverride ?? food.portion ?? 100,
+                unit:    unitOverride    ?? food.unit    ?? 'g',
+                quantity,
+              };
+              const { addDiaryItem } = await import('../../stores/diary.js');
+              await addDiaryItem(item, mealIdx, date);
+              const kcal = Math.round(((food.nutrition?.calories || 0) * (item.portion / (food.portion || 100))) * quantity);
+              return { ok: true, date, meal: mealIdx, meal_name: mealName, food_name: food.name, portion: item.portion, unit: item.unit, quantity, kcal, source: 'local' };
+            } catch (e) {
+              return { error: 'Failed to log food: ' + (e?.message || String(e)) };
+            }
+          }
+          // Multiple exact local matches — return them so the AI can ask
+          // the user which one (e.g. two "Apple" rows from different brands).
+          if (exactLocal.length > 1) {
+            return {
+              candidates: exactLocal.slice(0, 5).map(f => ({
+                name: f.name,
+                brand: f.brand || '',
+                portion: f.portion || 100,
+                unit: f.unit || 'g',
+                source: 'local',
+              })),
+              hint: `${exactLocal.length} local foods match "${foodQuery}" exactly. Ask the user which one (by brand or saved portion).`,
+            };
+          }
+          // Substring local matches (no exact). Returned as candidates so
+          // the AI can present them — we don't auto-pick because substring
+          // matches are noisier than the AI's verbatim user-word.
+          const substringLocal = (localFoods || []).filter(f => _norm(f.name).includes(qNorm));
+          if (substringLocal.length > 0 && substringLocal.length <= 5) {
+            return {
+              candidates: substringLocal.map(f => ({
+                name: f.name,
+                brand: f.brand || '',
+                portion: f.portion || 100,
+                unit: f.unit || 'g',
+                source: 'local',
+              })),
+              hint: `Found ${substringLocal.length} local food(s) containing "${foodQuery}". Ask the user which one (or none) before calling log_food again with the chosen name.`,
+            };
+          }
+          // Tier 2: Open Food Facts (uses local mirror if admin enabled it).
+          let offHits = [];
+          try {
+            const { API } = await import('../../lib/api.js');
+            offHits = await API.searchByName(foodQuery, 1);
+          } catch {}
+          if (Array.isArray(offHits) && offHits.length > 0) {
+            // Exact name match in OFF results — auto-pick and create in catalog.
+            const exactOff = offHits.find(h => _norm(h.name) === qNorm);
+            const pickedOff = exactOff || (offHits.length === 1 ? offHits[0] : null);
+            if (pickedOff) {
+              try {
+                // Create in local catalog so future asks hit local tier and
+                // the food row exists for the diary item to reference.
+                const saved = await NtApi.createFood({ ...pickedOff, created_at: new Date().toISOString() });
+                const item = {
+                  ...saved,
+                  portion: portionOverride ?? saved.portion ?? 100,
+                  unit:    unitOverride    ?? saved.unit    ?? 'g',
+                  quantity,
+                };
+                const { addDiaryItem } = await import('../../stores/diary.js');
+                await addDiaryItem(item, mealIdx, date);
+                const kcal = Math.round(((saved.nutrition?.calories || 0) * (item.portion / (saved.portion || 100))) * quantity);
+                return { ok: true, date, meal: mealIdx, meal_name: mealName, food_name: saved.name, portion: item.portion, unit: item.unit, quantity, kcal, source: 'off' };
+              } catch (e) {
+                return { error: 'Failed to log food after OFF lookup: ' + (e?.message || String(e)) };
+              }
+            }
+            // Multiple OFF hits, none exact — return top candidates for the
+            // user to disambiguate.
+            return {
+              candidates: offHits.slice(0, 5).map(h => ({
+                name: h.name,
+                brand: h.brand || '',
+                portion: h.portion || 100,
+                unit: h.unit || 'g',
+                source: 'off',
+              })),
+              hint: `Found ${offHits.length} Open Food Facts matches for "${foodQuery}". None is an exact name match — ask the user which one fits, then call log_food again with that exact name.`,
+            };
+          }
+          // Tier 3: nothing matched. Tell the user how to add it.
+          return {
+            no_match: true,
+            suggestion: `No local food and no Open Food Facts match for "${foodQuery}". The user should add it via the Foods tab — either scan a barcode or tap "+" to enter it manually — then ask again.`,
+          };
+        }
         case 'log_quick_calories': {
           // Permission gate — same shape as add_activity_entry: feature must
           // be on before the AI can log. Default is ON so this rarely trips
@@ -1405,7 +1540,18 @@
       else streakText = `0 (no recent logging${todayLogged ? '' : '; today not yet logged'})`;
     } catch {}
 
-    return { today, userName, profileText, diaryText, goalsText, statsText, wellnessText, waterText, streakText,
+    // Issue #79: meal-name mapping injected into the prompt so the AI can
+    // reliably translate "snacks", "lunch", etc. into the user's actual
+    // meal indices. Previously the system prompt hardcoded
+    // "snack/snacks=3", which silently mis-routed for users who had
+    // reordered or renamed their meals — the AI would pass meal=3
+    // thinking it was Snacks, but their index 3 might be Dinner. Listing
+    // the actual mapping eliminates the ambiguity.
+    const mealNamesText = mNames
+      .map((n, i) => `  ${i} = ${n}`)
+      .join('\n');
+
+    return { today, userName, profileText, diaryText, goalsText, statsText, wellnessText, waterText, streakText, mealNamesText,
       weightUnit: DB.getSetting('weightUnit', 'lb'),
       distUnit: DB.getSetting('distUnit', 'km'),
       heightUnit: DB.getSetting('heightUnit', 'ft'),
@@ -1438,10 +1584,26 @@ LOGGING ACTIVITY — When the user describes a workout, exercise, or physical ac
 - Do not call add_activity_entry without a kcal value. The tool refuses kcal=0.
 - The tool itself enforces user permission gates (Activity section toggle, auto-estimate toggle, body profile completeness) — if it returns an error, relay the explanation to the user verbatim and ask for what's missing.
 
-LOGGING QUICK CALORIES — When the user wants to log just a calorie number without a real food ("log 200 calories for lunch", "punch in 1200 kJ for dinner", "add 350 quick calories"), use log_quick_calories. This is the Fitbit-style quick-add path; no food row is created. Rules:
+YOUR MEALS (the user's meal slots, by position — pass these indices to any tool with a \`meal\` parameter):
+${ctx.mealNamesText}
+
+When the user names a meal ("lunch", "snacks", "second breakfast", anything they call it), find the matching entry in YOUR MEALS above and pass its index number. NEVER hardcode 0=breakfast / 1=lunch / 2=dinner / 3=snacks — that's only correct for the default meal layout, and users can rename or reorder meals. If the user's phrasing doesn't clearly map to one of YOUR MEALS, ASK them which meal they mean.
+
+LOGGING A REAL FOOD — When the user wants to add a NAMED food to their diary ("add an apple to snacks", "log Greek yogurt for breakfast", "add 200g of chicken to dinner", "two slices of bread for lunch", "I had a Chobani yogurt"), use log_food. This is the PRIMARY food-logging path and stores full nutrition (protein, carbs, fat, fiber, sodium, vitamins, etc.). Rules:
+- Pass the food name as the user said it. log_food searches the user's local catalog first, then Open Food Facts.
+- Pass the meal index per YOUR MEALS above.
+- For "1 apple", "a banana" — just pass food + meal; portion defaults to the food's stored serving size.
+- For "200g of X" — pass portion=200, unit="g". For "two apples" — pass quantity=2 (and leave portion/unit as defaults).
+- If the tool returns \`candidates\`, present the names back to the user and ask which one; then call log_food again with the chosen name as the \`food\` field.
+- If the tool returns \`no_match\`, tell the user to add it via the Foods tab (barcode scan or manual entry) and then try again.
+- DO NOT use log_quick_calories when the user names a food. Quick Calories is ONLY for kcal-number asks.
+- When the tool returns ok:true, confirm using the \`meal_name\` and \`food_name\` from the tool result — do not assume the meal name from the index you passed. This is how you avoid telling the user "I added X to snacks" when it actually went to a different meal.
+
+LOGGING QUICK CALORIES — When the user gives a kcal number WITH NO FOOD NAME ("log 200 calories for lunch", "punch in 1200 kJ for dinner", "add 350 quick calories"), use log_quick_calories. This is the Fitbit-style quick-add path; no food row is created. Rules:
 - If the user gave kJ, convert to kcal yourself: kcal = kj / 4.184. Pass the kcal number.
-- Map meal words to indices: breakfast=0, lunch=1, dinner=2, snack/snacks=3. If unclear, ask or default to snacks (3).
+- Pass the meal index per YOUR MEALS above.
 - Optional name field: if the user said "for office snack" or similar, pass that as name (max 60 chars).
+- If the user named a food ("apple", "banana", "chicken breast"), use log_food NOT log_quick_calories.
 - Tool refuses kcal=0 and refuses if the user has disabled Quick Calories in Settings — relay any error message verbatim.
 
 PHOTO MEAL HANDLING — When the user attaches a MEAL PHOTO, never write to the diary directly. The user's intent decides which of these four paths you take:

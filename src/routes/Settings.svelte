@@ -27,7 +27,7 @@
   import {
     appearance, accentColor, energyUnit, mealNames,
     diaryShowBrands, diaryShowTimestamps, diaryShowThumbnails, diaryShowAllNutrients,
-    diaryShowNutritionUnits, diaryShowMacroSummary, diaryPromptQuantity, diaryShowPortionSize, warnUnitMismatch,
+    diaryShowNutritionUnits, diaryShowMacroSummary, diaryPromptQuantity, diaryShowPortionSize, warnUnitMismatch, showUnitMetadata,
     diaryShowNotes,
     diaryShowActivity, manualActivityPolicy, calorieAdjustFromActivity,
     showQuickCalories, quickCaloriesDisplay,
@@ -311,7 +311,7 @@
     authentication:    ['authentication','auth','sso','single sign-on','single sign on','oidc','openid','authentik','keycloak','authelia','pocket id','auth0','google','password login','admin group'],
     appearance:        ['appearance','theme','dark','light','accent','color','navigation','sidebar','persistent','start page','animations','celebrations','reduce motion','banner','page banner'],
     regional:          ['regional','language','translation','date format','time format','locale','date','time','12h','24h','units','energy unit','weight unit','height','circumference','distance','temperature','imperial','metric'],
-    diary:             ['diary','brands','timestamps','thumbnails','nutrients','nutrition units','macros','macro summary','prompt quantity','portion size','nutrition bar','goals progress','meal names','meals','activity','activity section','exercise','fasting','fast','intermittent fasting','if','16:8','omad','time restricted'],
+    diary:             ['diary','brands','timestamps','thumbnails','nutrients','nutrition units','macros','macro summary','prompt quantity','portion size','nutrition bar','goals progress','meal names','meals','activity','activity section','exercise','fasting','fast','intermittent fasting','if','16:8','omad','time restricted','unit metadata','unit conversion','unit conversions','nutrition basis','basis','serving units','serving sizes','density','g/ml','slice','bottle','cookie','milliliter','milliliters','mass','volume','oil','honey','warn','daily notes','notes','quick calories','quick cal','bolt','adjust calorie','calorie adjustment','earn back','wearable activity','activity policy'],
     foods:             ['foods','thumbnails','category','notes','yesterday meals','sort order','sort','barcode','scan','beep','flashlight','crop photos'],
     water:             ['water','display unit','daily goal','containers','bottle','cup','glass'],
     categories:        ['categories','food categories','tags','labels'],
@@ -1867,12 +1867,23 @@
             <Toggle checked={$diaryPromptQuantity} on:change={e => diaryPromptQuantity.set(e.detail)} />
           </div>
           <div class="setting-divider"></div>
-          <!-- Issues #69 + #70: opt-in warning when picked unit's system
-               doesn't match the food's nutrition basis and no density is
-               set. Default off so users who weigh everything in grams
-               aren't nagged on Open Food Facts per-100-ml drinks. -->
+          <!-- Issues #69 + #70: master toggle for the nutrition basis,
+               serving units, and density fields. Default off so users
+               who don't need the extra fields aren't distracted by them.
+               Auto-on for anyone who turned on Warn About Unit
+               Conversions below (the natural signal of intent). -->
           <div class="setting-row">
-            <div><span class="setting-label">Warn About Unit Conversions</span><div class="setting-desc">Show a warning when you pick a mass unit (g/oz) on a food whose nutrition is per 100 ml — or vice versa — without a density value set on the food. The fallback math assumes 1 ml ≈ 1 g, which is rough for oils, honey, etc.</div></div>
+            <div><span class="setting-label">Show Unit Metadata</span><div class="setting-desc">Adds three fields in the Food Editor: Nutrition Basis (per 100 g vs per 100 ml), Serving Units (1 slice = 35 g, 1 bottle = 500 ml, etc.), and Density (g/ml) for accurate volume-to-mass math on liquids. Also surfaces quick-pick serving chips on the Add to Diary sheet and a "per 100 g/ml" suffix on food list rows. Off by default; turn on if you log Open Food Facts liquids in grams or want custom serving units like slice / cookie / bottle.</div></div>
+            <Toggle checked={$showUnitMetadata} on:change={e => showUnitMetadata.set(e.detail)} />
+          </div>
+          <div class="setting-divider"></div>
+          <!-- Sub-feature of Show Unit Metadata. Default off so users
+               who weigh everything in grams aren't nagged on Open Food
+               Facts per-100-ml drinks. Turning this on also implicitly
+               enables Show Unit Metadata at the call sites via the
+               reactive gate `$showUnitMetadata || $warnUnitMismatch`. -->
+          <div class="setting-row">
+            <div><span class="setting-label">Warn About Unit Conversions</span><div class="setting-desc">Show a warning when you pick a mass unit (g/oz) on a food whose nutrition is per 100 ml, or vice versa, without a density value set on the food. The fallback math assumes 1 ml ≈ 1 g, which is rough for oils, honey, etc.</div></div>
             <Toggle checked={$warnUnitMismatch} on:change={e => warnUnitMismatch.set(e.detail)} />
           </div>
           <div class="setting-divider"></div>
