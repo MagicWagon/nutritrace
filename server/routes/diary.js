@@ -62,8 +62,31 @@ router.put('/:date', wrap((req, res) => {
   const notesVal = (typeof notes === 'string' && notes.trim()) ? notes : null;
   const u = uid(req);
   const itemsJson = JSON.stringify(items || []);
-  const bsJson = JSON.stringify(body_stats || {});
   const waterJson = JSON.stringify(water || []);
+
+  // Issue #81 (data loss across mobile + PWA edits): the PWA's addDiaryItem
+  // path uses the cached currentEntry, appends a food, and PUTs the whole
+  // row back. If the cached entry was loaded before another device wrote
+  // body_stats, the PWA's PUT sends body_stats:{} and silently wipes the
+  // server's real values. Mobile then pulls the empty state and loses it
+  // locally too. Mitigation: when the incoming write carries empty
+  // body_stats AND the existing row has values, preserve the existing
+  // values. Empty-on-incoming has no legitimate "clear all body stats"
+  // semantics in any current UI flow (saveBodyStats merges over existing
+  // and explicit clears send {weight:null,fat:null,...} which is non-
+  // empty), so this is safe to treat as "client didn't intend to touch".
+  const existingRow = u == null
+    ? db.prepare(`SELECT body_stats FROM diary WHERE date = ? AND user_id IS NULL`).get(req.params.date)
+    : db.prepare(`SELECT body_stats FROM diary WHERE date = ? AND user_id = ?`).get(req.params.date, u);
+  const incomingBsEmpty = !body_stats || (typeof body_stats === 'object' && Object.keys(body_stats).length === 0);
+  let existingBsHasKeys = false;
+  if (existingRow && existingRow.body_stats) {
+    try { existingBsHasKeys = Object.keys(JSON.parse(existingRow.body_stats) || {}).length > 0; } catch {}
+  }
+  const bsJson = (incomingBsEmpty && existingBsHasKeys)
+    ? existingRow.body_stats
+    : JSON.stringify(body_stats || {});
+
   if (u == null) {
     // Single-user mode: SQLite UNIQUE(date, user_id) treats NULL user_id as
     // distinct per row, so the standard UPSERT never collides — each PUT

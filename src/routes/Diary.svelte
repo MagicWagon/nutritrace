@@ -39,7 +39,6 @@
            fastingEnabled,
            wellnessEnabled } from '../stores/settings.js';
   import { dayActivity, activitySummary, loadActivity, deleteActivity } from '../stores/activity.js';
-  import DiaryBanner  from '../components/banners/DiaryBanner.svelte';
   import WaterBanner  from '../components/banners/WaterBanner.svelte';
   import { editorState } from '../stores/editorState.js';
   import { NtApi } from '../lib/api.js';
@@ -1166,8 +1165,7 @@
   </div>
 
   <!-- Standard page-header — identical to every other page -->
-  <header class="page-header diary-header" class:has-banner={$pageBanners && !selectMode} class:banner-gradient={$bannerStyle === 'gradient' && !selectMode}>
-    {#if $bannerStyle === 'animated' && !selectMode}<DiaryBanner />{/if}
+  <header class="page-header diary-header" class:banner-gradient={$bannerStyle === 'gradient' && !selectMode} class:banner-animated={$bannerStyle === 'animated' && !selectMode}>
     {#if selectMode}
       <h1 class="select-mode-title">{selectedItems.size} selected</h1>
     {:else}
@@ -1176,7 +1174,7 @@
   </header>
 
   <!-- Date navigation — sticky sub-bar directly below the header -->
-  <div class="diary-date-bar" class:has-banner={$pageBanners}>
+  <div class="diary-date-bar">
     <button class="btn-icon accent" on:click={prevDay} aria-label={$_('diary.nav.previous_day')} title={$_('diary.nav.previous_day')}>
       <span class="material-symbols-rounded">chevron_left</span>
     </button>

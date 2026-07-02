@@ -47,3 +47,15 @@ jobs:
           tags: |
             ghcr.io/traceapps/nutritrace:latest
             ghcr.io/traceapps/nutritrace:${{ github.sha }}
+          # Buildx layer cache, backed by the GitHub Actions cache. Pulls
+          # any reusable layers from the previous run (npm install,
+          # Vite bundle, DuckDB native build, etc.) and pushes the
+          # completed layers back for the next run. mode=max exports all
+          # intermediate layers for the highest hit rate. Falls back to
+          # a clean build automatically if the cache is empty or stale,
+          # so this can't break anything.
+          # Drops typical source-only commits from ~7m down to ~2-3m,
+          # because the slow arm64-via-QEMU layers don't have to rebuild
+          # unless their inputs actually changed.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

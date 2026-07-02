@@ -72,7 +72,7 @@ export const USER_PREFS = new Set([
   'notifWellnessAlerts','notifWorkoutSummary','notifSyncFailures',
   'appriseUrl','appriseTag','gotifyUrl','gotifyToken','ntfyUrl','ntfyTopic','ntfyToken',
   // UI behavior prefs that should match across devices
-  'accentColor','startPage','goalCelebrations','pageBanners','bannerStyle','language',
+  'accentColor','startPage','goalCelebrations','pageBanners','bannerStyle','bannerAnimation','language',
 ]);
 
 // DEVICE_PREFS — local-only, never synced.
@@ -659,7 +659,13 @@ function _migrateBannerStyle() {
   return 'animated';
 }
 export const bannerStyle          = createSettingStore('bannerStyle',          _migrateBannerStyle());
-export const pageBanners          = derived(bannerStyle, $s => $s === 'animated');
+// pageBanners is now a legacy derived alias. The illustrated SVG banners
+// were retired (mirrors LiftTrace's banner rebuild). Kept around for any
+// downstream code still importing it as `bannerStyle !== 'off'`.
+export const pageBanners          = derived(bannerStyle, $s => $s !== 'off');
+// bannerAnimation picks which CSS animation applies when bannerStyle is
+// 'animated'. Four styles: 'shimmer' (default), 'drift', 'pulse', 'aurora'.
+export const bannerAnimation      = createSettingStore('bannerAnimation', 'shimmer');
 
 // Wellness (Activity Tracking)
 export const wellnessEnabled    = createSettingStore('wellnessEnabled',    false);

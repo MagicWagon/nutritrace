@@ -10,7 +10,7 @@
   import ConfirmDialogMount from './components/ui/ConfirmDialogMount.svelte';
   import { DB, localDateStr } from './lib/db.js';
   import { currentDate, loadEntry } from './stores/diary.js';
-  import { navStyle, applyAccentColor, accentColor, applyAppearance, appearance, disableAnimations, sidebarPersistent, language, pageBanners, bannerStyle } from './stores/settings.js';
+  import { navStyle, applyAccentColor, accentColor, applyAppearance, appearance, disableAnimations, sidebarPersistent, language, pageBanners, bannerStyle, bannerAnimation } from './stores/settings.js';
   import { locale } from 'svelte-i18n';
   import { currentUser, userMgmtActive, setupRequired, loadAuthState, handleOidcCallback } from './stores/auth.js';
   import { needsNativeSetup, isNative, getNativeMode, getServerUrl, apiUrl } from './lib/platform.js';
@@ -103,10 +103,9 @@
       '--hamburger-offset',
       showHamburger ? '12px' : '0px'
     );
-    document.documentElement.style.setProperty(
-      '--hamburger-row',
-      (showHamburger && $pageBanners) ? '48px' : '0px' // 40px button + 8px gap
-    );
+    // All three banner modes share the compact-header geometry (illustrated
+    // SVG banners were retired). --hamburger-row stays 0 in every mode.
+    document.documentElement.style.setProperty('--hamburger-row', '0px');
     // 12px (left margin) + 40px (button width) + 12px (gap before title)
     document.documentElement.style.setProperty(
       '--hamburger-clearance',
@@ -151,6 +150,13 @@
   // pill treatment that the in-header buttons get from base.css.
   $: if (typeof document !== 'undefined') {
     document.documentElement.classList.toggle('banner-gradient-mode', $bannerStyle === 'gradient');
+    document.documentElement.classList.toggle('banner-animated-mode', $bannerStyle === 'animated');
+    for (const cls of ['banner-animation-shimmer','banner-animation-drift','banner-animation-pulse','banner-animation-aurora']) {
+      document.documentElement.classList.remove(cls);
+    }
+    if ($bannerStyle === 'animated') {
+      document.documentElement.classList.add(`banner-animation-${$bannerAnimation || 'shimmer'}`);
+    }
   }
 
   onMount(async () => {

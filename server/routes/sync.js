@@ -242,8 +242,24 @@ router.post('/push', wrap((req, res) => {
       } else {
         const dNotes = (typeof d.notes === 'string' && d.notes.trim()) ? d.notes : null;
         const itemsJson = JSON.stringify(d.items || []);
-        const bsJson = JSON.stringify(d.body_stats || {});
         const waterJson = JSON.stringify(d.water || []);
+        // Issue #81 body_stats preservation: same logic as PUT /:date.
+        // If client pushes empty body_stats and server already has values,
+        // keep what's on the server. Prevents stale-cache writes from one
+        // device wiping data another device has already persisted. Sync
+        // push runs the same diff-and-replace pattern as the diary route
+        // PUT, so it's vulnerable to the same race in the same way.
+        const existingRowForBs = u == null
+          ? db.prepare(`SELECT body_stats FROM diary WHERE date = ? AND user_id IS NULL`).get(d.date)
+          : db.prepare(`SELECT body_stats FROM diary WHERE date = ? AND user_id = ?`).get(d.date, u);
+        const incomingBsEmpty = !d.body_stats || (typeof d.body_stats === 'object' && Object.keys(d.body_stats).length === 0);
+        let existingBsHasKeys = false;
+        if (existingRowForBs && existingRowForBs.body_stats) {
+          try { existingBsHasKeys = Object.keys(JSON.parse(existingRowForBs.body_stats) || {}).length > 0; } catch {}
+        }
+        const bsJson = (incomingBsEmpty && existingBsHasKeys)
+          ? existingRowForBs.body_stats
+          : JSON.stringify(d.body_stats || {});
         if (u == null) {
           // Single-user mode: NULL user_id never collides under SQLite UNIQUE
           // (see diary.js PUT for the same workaround, issue #37).

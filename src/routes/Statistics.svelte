@@ -19,7 +19,6 @@
            fastingEnabled } from '../stores/settings.js';
   import FastingInsights from '../components/diary/FastingInsights.svelte';
   import { isNative } from '../lib/platform.js';
-  import StatsBanner from '../components/banners/StatsBanner.svelte';
   let _waterShowInStats = DB.getSetting('waterShowInStats', true);
   let _waterUnit        = DB.getSetting('waterUnit', 'ml');
   // Reload when settings change
@@ -637,8 +636,7 @@
 </script>
 
 <div class="page-shell">
-  <header class="page-header" class:has-banner={$pageBanners} class:banner-gradient={$bannerStyle === 'gradient'}>
-    {#if $bannerStyle === 'animated'}<StatsBanner />{/if}
+  <header class="page-header" class:banner-gradient={$bannerStyle === 'gradient'} class:banner-animated={$bannerStyle === 'animated'}>
     <h1>{$_('routes.statistics.title')}</h1>
   </header>
 

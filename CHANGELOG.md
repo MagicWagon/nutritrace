@@ -9,6 +9,36 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.0-rc.52] - 2026-07-03
+
+### Fixed
+
+- **Data Loss When Editing From Mobile + PWA in the Same Day.**
+  Recording body stats on mobile, then editing the diary later on
+  the PWA (or vice versa), could silently wipe the earlier entry
+  when the two devices' sync windows overlapped. Every append and
+  save path now refetches the latest server state before writing,
+  so a stale cache can't overwrite fresh data from another device.
+  (#81 reported by tellis82)
+- **Browser Password Suggestions Now Pass Validation.** The signup,
+  invite, reset, and change-password fields now carry the
+  `passwordrules` HTML attribute. When you click "suggest strong
+  password" in Safari, 1Password, Bitwarden, or your browser's
+  built-in manager, the generated password will include a special
+  character so it passes on the first try. Previously the
+  generator would produce passwords without a special character
+  and the field would reject them. (#82 reported by CloCkWeRX)
+
+### Changed
+
+- **New Animated Page Banner Styles.** The illustrated SVG banner
+  headers are retired, replaced with four animated gradient styles
+  you can pick between: Shimmer, Drift, Pulse, and Aurora.
+  Settings → Appearance → Banner Style lets you switch. All four
+  honour the system's Reduce Motion preference.
+
+---
+
 ## [1.0.0-rc.51] - 2026-06-19
 
 ### Added

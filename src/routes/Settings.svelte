@@ -18,7 +18,6 @@
   import SettingsNutritionImport from '../components/settings/SettingsNutritionImport.svelte';
   import { APP_VERSION } from '../lib/version.js';
   import Sheet  from '../components/ui/Sheet.svelte';
-  import SettingsBanner from '../components/banners/SettingsBanner.svelte';
 
   import { showSuccess, showError } from '../stores/toast.js';
   import { applyAppearance, applyAccentColor } from '../stores/settings.js';
@@ -37,7 +36,7 @@
     foodCategories, customUnits, visibleNutriments, nutrimentsOrder, customNutriments,
     bodyStatsOrder, hiddenBodyStats,
     dateFormat, timeFormat,
-    sidebarPersistent, goalCelebrations, pageBanners, bannerStyle, language,
+    sidebarPersistent, goalCelebrations, pageBanners, bannerStyle, bannerAnimation, language,
     waterGoalMl, waterUnit, waterContainers, waterShowInStats, waterShowInDiary,
     calorieGoalMode, calorieGoalFactor,
     fitbitEnabled, garminEnabled, healthConnectEnabled, fitbitFamilyEnabled,
@@ -1565,8 +1564,7 @@
        assumed. Pinning them together as one unit removes the whole
        class of header-height vs sub-bar-top mismatch bugs. -->
   <div class="settings-sticky-top">
-    <header class="page-header" class:has-banner={$pageBanners} class:banner-gradient={$bannerStyle === 'gradient'}>
-      {#if $bannerStyle === 'animated'}<SettingsBanner />{/if}
+    <header class="page-header" class:banner-gradient={$bannerStyle === 'gradient'} class:banner-animated={$bannerStyle === 'animated'}>
       <h1>{$_('routes.settings.title')}</h1>
     </header>
 
@@ -1706,7 +1704,7 @@
           <div class="setting-row">
             <div>
               <span class="setting-label">Page Banners</span>
-              <div class="setting-desc">Decorative header at the top of every page. Animated shows the illustrated SVG, Gradient uses the active accent gradient (compact), Off hides the banner entirely.</div>
+              <div class="setting-desc">Header style at the top of every page. Animated is a compact accent-gradient bar with a chosen motion style; Gradient is the same bar, static; Off is a plain glass header.</div>
             </div>
             <div class="select-wrap" style="width:130px">
               <select class="select sel-sm" value={$bannerStyle} on:change={e => bannerStyle.set(e.currentTarget.value)}>
@@ -1716,6 +1714,22 @@
               </select>
             </div>
           </div>
+          {#if $bannerStyle === 'animated'}
+            <div class="setting-row">
+              <div>
+                <span class="setting-label">Animation Style</span>
+                <div class="setting-desc">Shimmer is a soft white sweep, Drift is a slow hue rotation, Pulse is a gentle breathing, Aurora is a soft accent-tinted cloud-of-light. All honour Reduce Motion.</div>
+              </div>
+              <div class="select-wrap" style="width:130px">
+                <select class="select sel-sm" value={$bannerAnimation} on:change={e => bannerAnimation.set(e.currentTarget.value)}>
+                  <option value="shimmer">Shimmer</option>
+                  <option value="drift">Drift</option>
+                  <option value="pulse">Pulse</option>
+                  <option value="aurora">Aurora</option>
+                </select>
+              </div>
+            </div>
+          {/if}
         </div>
       </div>
     {/if}

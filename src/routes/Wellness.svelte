@@ -5,7 +5,6 @@
   import { wellnessMetrics, wellnessSyncRange, distUnit, tempUnit, pageBanners, bannerStyle, dateFormat, withingsSyncRange as withingsSyncRangeSetting, fitbitEnabled, withingsEnabled, garminEnabled, googleHealthEnabled, fitbitFamilyEnabled, garminSyncRange as garminSyncRangeSetting, weightUnit, goals, goalCelebrations, disableAnimations,
     fitbitSyncMode, withingsSyncMode, garminSyncMode, healthConnectSyncMode, timeFormat } from '../stores/settings.js';
   import Chart from 'chart.js/auto';
-  import WellnessBanner from '../components/banners/WellnessBanner.svelte';
   import { showSuccess, showError } from '../stores/toast.js';
   import { localDateStr } from '../lib/db.js';
   import { NtApi } from '../lib/api.js';
@@ -1354,8 +1353,7 @@
 
 <div class="page-shell wl-shell">
   <!-- Header -->
-  <header class="page-header" class:has-banner={$pageBanners} class:banner-gradient={$bannerStyle === 'gradient'}>
-    {#if $bannerStyle === 'animated'}<WellnessBanner />{/if}
+  <header class="page-header" class:banner-gradient={$bannerStyle === 'gradient'} class:banner-animated={$bannerStyle === 'animated'}>
     <h1>{$_('routes.wellness.title')}</h1>
   </header>
 
@@ -1408,7 +1406,7 @@
   </div>
 
   <!-- Date navigation sub-bar — sticky below header, same pattern as Diary -->
-  <div class="wl-date-bar" class:has-banner={$pageBanners}>
+  <div class="wl-date-bar">
     <button class="btn-icon accent" on:click={prevDay} aria-label="Previous day" title="Previous day">
       <span class="material-symbols-rounded">chevron_left</span>
     </button>
@@ -1451,7 +1449,7 @@
       <!-- ── At least one integration configured — main UI ── -->
 
       <!-- Tab bar — only tabs for configured integrations -->
-      <div class="tab-bar-wrap" class:has-banner={$pageBanners}>
+      <div class="tab-bar-wrap">
       <div class="tab-bar" bind:this={_tabBarEl}>
         <div class="tab-pill" style="left:{_wlPillLeft};width:{_wlPillWidth}"></div>
         {#if fitbitAvailable || garminAvailable || healthConnectAvailable}

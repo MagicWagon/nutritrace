@@ -509,7 +509,7 @@
             <div class="form-row-2">
               <div class="form-group">
                 <label class="form-label">Password *</label>
-                <input class="input" type="password" bind:value={adminPassword} autocomplete="new-password" placeholder="8+ chars, upper, lower, number, symbol" />
+                <input class="input" type="password" bind:value={adminPassword} autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" placeholder="8+ chars, upper, lower, number, symbol" />
                 {#if adminPassword}
                   {@const pwScore = passwordStrength(adminPassword)}
                   <div class="pw-strength" class:s-0={pwScore.score === 0} class:s-1={pwScore.score === 1} class:s-2={pwScore.score === 2} class:s-3={pwScore.score === 3} class:s-4={pwScore.score === 4}>
@@ -520,7 +520,7 @@
               </div>
               <div class="form-group">
                 <label class="form-label">Confirm *</label>
-                <input class="input" type="password" bind:value={adminConfirm} autocomplete="new-password" />
+                <input class="input" type="password" bind:value={adminConfirm} autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
                 {#if adminConfirm && adminPassword !== adminConfirm}
                   <p class="pw-mismatch">Passwords don't match</p>
                 {/if}

@@ -111,6 +111,44 @@ export async function loadEntry(dateStr) {
   return entry || null;
 }
 
+/**
+ * Issue #81 — always refetch the server's current entry before applying
+ * a save mutation. The previous "use cached currentEntry" pattern silently
+ * wiped body_stats / items / water / notes when one device's write
+ * happened to land while another device's cache was still stale: the
+ * stale cache had empty defaults for fields the user hadn't touched, the
+ * full-row PUT echoed those empties, and the server's real values were
+ * overwritten. By refetching first, the mutator operates on the freshest
+ * possible server state and only the field the user actually touched
+ * changes; everything else passes through untouched.
+ *
+ * Trade-off: every diary write now costs one extra GET round-trip. On a
+ * typical session of 10–20 writes that's well under a second of total
+ * extra wall time, in exchange for closing the data-loss class.
+ *
+ * Use this for APPEND and SET style mutations (addDiaryItem, addWaterLog,
+ * saveBodyStats, saveDiaryNote, meal copy/move/clear). Index-based ops
+ * (removeDiaryItem, updateDiaryItem, split-child mutations) intentionally
+ * stay on the cached entry because their array indices are positional and
+ * a refetch could cause the wrong item to be acted on; they have a
+ * separate residual race that a stable per-item id would solve.
+ *
+ * The mutator returns the updated entry, or null to abort the save
+ * (useful for short-circuit cases like saveDiaryNote when the new value
+ * equals the existing one).
+ */
+async function _refetchAndSave(targetDate, mutator) {
+  let entry = _fromApi(await NtApi.getDiaryDate(targetDate));
+  if (!entry) entry = { date: targetDate, items: [], bodyStats: {}, water: [] };
+  const updated = mutator(entry);
+  if (updated == null) return null;
+  const saved = await _save(updated);
+  let viewDate = null;
+  currentDate.subscribe(v => viewDate = v)();
+  if (targetDate === viewDate) currentEntry.set(saved);
+  return saved;
+}
+
 async function _save(entry) {
   const saved = await NtApi.saveDiaryDate(entry.date, _toApi(entry));
   const result = _fromApi(saved);
@@ -142,15 +180,6 @@ export async function addDiaryItem(foodItem, meal, date) {
   currentDate.subscribe(v => viewDate = v)();
   const targetDate = date || viewDate || todayStr();
 
-  let entry = null;
-  if (targetDate === viewDate) {
-    currentEntry.subscribe(v => entry = v)();
-  }
-  if (!entry || entry.date !== targetDate) {
-    entry = _fromApi(await NtApi.getDiaryDate(targetDate));
-  }
-  if (!entry) entry = { date: targetDate, items: [], bodyStats: {}, water: [] };
-
   // food_server_id — the stable, cross-device identifier for the source
   // food. PWA's food rows omit a `server_id` key entirely and their `id`
   // IS the server's id. Android cache rows have an explicit `server_id`
@@ -168,8 +197,14 @@ export async function addDiaryItem(foodItem, meal, date) {
     addedAt: new Date().toISOString(),
     food_server_id,
   };
-  const updated = { ...entry, items: [...(entry.items || []), item] };
-  const saved = await _save(updated);
+
+  // Issue #81: refetch from server before write so the append doesn't
+  // wipe body_stats / water / notes that another device pushed in the
+  // window since this client's cache was loaded.
+  await _refetchAndSave(targetDate, (entry) => ({
+    ...entry,
+    items: [...(entry.items || []), item],
+  }));
 
   // Bump usage_count + last_used_at on the source food so it can rise in
   // the "Most Used" / "Recently Used" sort modes. Fire-and-forget; a failed
@@ -177,9 +212,6 @@ export async function addDiaryItem(foodItem, meal, date) {
   if (typeof item.id === 'number') {
     NtApi.markFoodUsed(item.id, targetDate).catch(() => {});
   }
-
-  currentDate.subscribe(v => viewDate = v)();
-  if (targetDate === viewDate) currentEntry.set(saved);
 }
 
 /** Add a "Quick Calories" entry to the diary — a calorie-(plus-optional-
@@ -217,6 +249,17 @@ export async function addQuickCalories({ kcal, name, meal, date, proteins, carbo
   return addDiaryItem(item, meal, date);
 }
 
+// NOTE: removeDiaryItem / updateDiaryItem / splitRecipeItem /
+// removeSplitChild / updateSplitChild all operate on a positional
+// array index from the rendered cached view. Issue #81's refactor
+// uses _refetchAndSave for append/set paths, but these index-based
+// paths intentionally stay on the cached entry: refetching first
+// could shift items in the array (another device added/removed
+// items) and cause the deletion / update to land on the WRONG
+// item. The residual race is that a concurrent write from another
+// device can still get wiped by these paths' full-row PUT. A
+// proper fix requires stable per-item identifiers; tracked for a
+// follow-up commit.
 export async function removeDiaryItem(index) {
   let entry = null;
   currentEntry.subscribe(v => entry = v)();
@@ -392,64 +435,76 @@ export async function updateSplitChild(parentIndex, childIndex, changes) {
 }
 
 export async function copyMealItems(fromMealIdx, toMealIdx) {
-  let entry = null;
-  currentEntry.subscribe(v => entry = v)();
-  if (!entry) return 0;
-  const src = (entry.items || []).filter(it => Number(it.meal ?? 0) === Number(fromMealIdx));
-  if (!src.length) return 0;
-  const now = new Date().toISOString();
-  const copies = src.map(it => ({ ...it, meal: Number(toMealIdx), addedAt: now }));
-  const updated = { ...entry, items: [...(entry.items || []), ...copies] };
-  currentEntry.set(await _save(updated));
-  return src.length;
+  let viewDate = null;
+  currentDate.subscribe(v => viewDate = v)();
+  if (!viewDate) return 0;
+  let copiedCount = 0;
+  await _refetchAndSave(viewDate, (entry) => {
+    const src = (entry.items || []).filter(it => Number(it.meal ?? 0) === Number(fromMealIdx));
+    if (!src.length) { copiedCount = 0; return null; }
+    copiedCount = src.length;
+    const now = new Date().toISOString();
+    const copies = src.map(it => ({ ...it, meal: Number(toMealIdx), addedAt: now }));
+    return { ...entry, items: [...(entry.items || []), ...copies] };
+  });
+  return copiedCount;
 }
 
 export async function moveMealItems(fromMealIdx, toMealIdx) {
-  let entry = null;
-  currentEntry.subscribe(v => entry = v)();
-  if (!entry) return 0;
-  let count = 0;
-  const items = (entry.items || []).map(it => {
-    if (Number(it.meal ?? 0) === Number(fromMealIdx)) {
-      count++;
-      return { ...it, meal: Number(toMealIdx) };
-    }
-    return it;
+  let viewDate = null;
+  currentDate.subscribe(v => viewDate = v)();
+  if (!viewDate) return 0;
+  let movedCount = 0;
+  await _refetchAndSave(viewDate, (entry) => {
+    let count = 0;
+    const items = (entry.items || []).map(it => {
+      if (Number(it.meal ?? 0) === Number(fromMealIdx)) {
+        count++;
+        return { ...it, meal: Number(toMealIdx) };
+      }
+      return it;
+    });
+    if (!count) { movedCount = 0; return null; }
+    movedCount = count;
+    return { ...entry, items };
   });
-  if (!count) return 0;
-  currentEntry.set(await _save({ ...entry, items }));
-  return count;
+  return movedCount;
 }
 
 export async function clearMealItems(mealIdx) {
-  let entry = null;
-  currentEntry.subscribe(v => entry = v)();
-  if (!entry) return 0;
-  const before = entry.items?.length || 0;
-  const items = (entry.items || []).filter(it => Number(it.meal ?? 0) !== Number(mealIdx));
-  if (items.length === before) return 0;
-  currentEntry.set(await _save({ ...entry, items }));
-  return before - items.length;
+  let viewDate = null;
+  currentDate.subscribe(v => viewDate = v)();
+  if (!viewDate) return 0;
+  let removedCount = 0;
+  await _refetchAndSave(viewDate, (entry) => {
+    const before = entry.items?.length || 0;
+    const items = (entry.items || []).filter(it => Number(it.meal ?? 0) !== Number(mealIdx));
+    if (items.length === before) { removedCount = 0; return null; }
+    removedCount = before - items.length;
+    return { ...entry, items };
+  });
+  return removedCount;
 }
 
 export async function copyMealToDate(fromMealIdx, targetDate, targetMealIdx) {
-  let entry = null;
-  currentEntry.subscribe(v => entry = v)();
-  if (!entry) return 0;
-  const src = (entry.items || []).filter(it => Number(it.meal ?? 0) === Number(fromMealIdx));
-  if (!src.length) return 0;
-
+  // Source mealItems read from the CURRENTLY-VIEWED date's freshest server
+  // state, target date gets its own refetch + append. Both sides use
+  // _refetchAndSave for consistent stale-cache-race protection (#81).
   let viewDate = null;
   currentDate.subscribe(v => viewDate = v)();
+  if (!viewDate) return 0;
 
-  let target = _fromApi(await NtApi.getDiaryDate(targetDate));
-  if (!target) target = { date: targetDate, items: [], bodyStats: {}, water: [] };
-
+  const srcEntry = _fromApi(await NtApi.getDiaryDate(viewDate));
+  if (!srcEntry) return 0;
+  const src = (srcEntry.items || []).filter(it => Number(it.meal ?? 0) === Number(fromMealIdx));
+  if (!src.length) return 0;
   const now = new Date().toISOString();
   const copies = src.map(it => ({ ...it, meal: Number(targetMealIdx), addedAt: now }));
-  const updated = { ...target, date: targetDate, items: [...(target.items || []), ...copies] };
-  const saved = _fromApi(await NtApi.saveDiaryDate(targetDate, _toApi(updated)));
-  if (targetDate === viewDate) currentEntry.set(saved);
+
+  await _refetchAndSave(targetDate, (target) => ({
+    ...target,
+    items: [...(target.items || []), ...copies],
+  }));
   return src.length;
 }
 
@@ -459,37 +514,34 @@ export async function addWaterLog(amountMl, date) {
   currentDate.subscribe(v => viewDate = v)();
   const targetDate = date || viewDate || todayStr();
 
-  let entry = null;
-  if (targetDate === viewDate) {
-    currentEntry.subscribe(v => entry = v)();
-  }
-  if (!entry || entry.date !== targetDate) {
-    entry = _fromApi(await NtApi.getDiaryDate(targetDate));
-  }
-  if (!entry) entry = { date: targetDate, items: [], bodyStats: {}, water: [] };
-
   const use24 = DB.getSetting('timeFormat', '12h') === '24h';
   const log = { amount: Math.round(amountMl), time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: !use24 }) };
-  const updated = { ...entry, water: [...(entry.water || []), log] };
-  const saved = await _save(updated);
-  if (targetDate === viewDate) currentEntry.set(saved);
+
+  await _refetchAndSave(targetDate, (entry) => ({
+    ...entry,
+    water: [...(entry.water || []), log],
+  }));
 }
 
 export async function saveDiaryNote(notes) {
-  let entry = null;
-  currentEntry.subscribe(v => entry = v)();
-  if (!entry) return;
+  let viewDate = null;
+  currentDate.subscribe(v => viewDate = v)();
+  if (!viewDate) return;
   const trimmed = (notes || '').replace(/\s+$/g, '');
-  if ((entry.notes || '') === trimmed) return;
-  currentEntry.set(await _save({ ...entry, notes: trimmed }));
+  await _refetchAndSave(viewDate, (entry) => {
+    if ((entry.notes || '') === trimmed) return null;
+    return { ...entry, notes: trimmed };
+  });
 }
 
 export async function saveBodyStats(stats) {
-  let entry = null;
-  currentEntry.subscribe(v => entry = v)();
-  if (!entry) return;
-  const updated = { ...entry, bodyStats: { ...entry.bodyStats, ...stats } };
-  currentEntry.set(await _save(updated));
+  let viewDate = null;
+  currentDate.subscribe(v => viewDate = v)();
+  if (!viewDate) return;
+  await _refetchAndSave(viewDate, (entry) => ({
+    ...entry,
+    bodyStats: { ...entry.bodyStats, ...stats },
+  }));
 }
 
 export function prevDay() {
