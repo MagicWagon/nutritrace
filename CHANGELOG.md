@@ -9,6 +9,35 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.0-rc.53] - 2026-07-05
+
+### Added
+
+- **Reorder + Hide Statistics Categories.**
+  You can now shape the Statistics page to your habits. Head to
+  Settings → Statistics → Categories, drag any metric row to
+  change the order it appears in the chip strip, or toggle it off
+  if you never look at it. Works across nutrients, body stats,
+  water, and wellness metrics in a single flat list. (#85)
+
+- **Bulk Delete on Foods, Meals, and Recipes.**
+  Long-press any item in your catalog and pick "Select Multiple"
+  from the menu. Tap other items to add them to the selection,
+  then hit delete for one confirmation instead of a dozen. Matches
+  the multi-select UX the Diary already uses. Diary entries that
+  reference deleted items keep their nutrition snapshot but lose
+  the link to the source.
+
+### Fixed
+
+- **Sync Icon Rotation Direction.**
+  The sync buttons on the Wellness page (Fitbit, Garmin, Withings,
+  Google Health) now rotate in the direction their arrows point.
+  Previously the arrowheads and the rotation ran in opposite
+  directions, which looked wrong every time. (#86)
+
+---
+
 ## [1.0.0-rc.52] - 2026-07-03
 
 ### Fixed
@@ -115,195 +144,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   `INSECURE_COOKIES` and other `.env` variables into the container,
   so anyone copying from the README hit the login-loop bug. (#41
   follow-up reported by drekkym)
-
----
-
-## [1.0.0-rc.49] - 2026-06-09
-
-### Added
-
-- **French language support.** Full UI translation contributed by
-  @antoinech2 (PR #72), switchable in Settings, Language. A handful of
-  less-common settings screens are still in English and will be
-  translated incrementally.
-- **Background Health Connect sync on Android.** Wearable data now
-  syncs to the server about once an hour in the background, even when
-  NutriTrace is closed, so today's steps show up when you open the
-  browser version on a desktop. A new Background Sync row in
-  Settings, Wellness, Health Connect shows when the last sync ran,
-  plus battery-optimization guidance if your phone shuts background
-  work down. (Issue #68, reported by duplaja)
-
-### Improved
-
-- **Body-stat charts auto-fit the Y-axis and keep your goal in view.**
-  Weight, body measurements, resting heart rate, HRV, and similar
-  charts now scale to your actual data range instead of pinning the
-  floor to zero, making day-to-day changes much easier to see. If
-  you have a goal set for the metric, the range extends to include
-  it too, so "progress toward goal" stays visible even when the goal
-  is outside your current data range. Nutrition charts (calories,
-  macros, water) still anchor to zero where that reading matters.
-  (Issue #67, reported by duplaja)
-- **Inline barcode scan icons are more discoverable.** The scan
-  buttons on the Foods search bar and the Food Editor are now
-  accent-coloured and meet the iOS and Android 44 x 44 tap-target
-  accessibility minimum. (Issue #71, reported by maxerbox)
-- **Open Food Facts: skip estimated nutrient values.** Nutrients OFF
-  flags as estimated (via the `_modifier` field) no longer pull rough
-  numbers into your totals.
-
-### Fixed
-
-- **Statistics tab JavaScript error on hover.** The chart tooltip no
-  longer throws when you hover over days with missing data (skipped
-  weigh-ins, before-you-started periods), and the "frozen half-faded"
-  tooltip behavior is gone. (Issue #66, reported by duplaja)
-- **Misleading "Health Connect synced" toast on browser.** The toast
-  only fires when an actual Health Connect sync runs on Android.
-  (Part of Issue #68, reported by duplaja)
-
----
-
-## [1.0.0-rc.48] - 2026-06-06
-
-### Added
-
-- **Tap a date in the Statistics History list to jump straight to that
-  day.** Nutrient, water, and body-stat metrics open the Diary on that
-  date (where you can drill into the Nutrition Summary to see what
-  contributed); wellness metrics like Steps, Sleep, HRV, and Resting HR
-  open the Wellness page on that date. Pairs with the rc.47 Diary
-  Nutrition Summary drill-down for an end-to-end "Statistics shows the
-  spike, day page shows the cause" flow. (Issue #64, reported by
-  duplaja)
-
-### Fixed
-
-- **Statistics charts were blank for users whose only wellness source
-  was Health Connect or Google Health.** Steps, Sleep, HRV, RHR,
-  Active Minutes, and other wellness metrics showed empty even on days
-  with synced data. Same shape as the rc.46 and rc.47 fixes for Goals
-  and the sidebar. Every wellness-source check across the app now
-  routes through a single shared gate, so adding a future source can
-  no longer silently leave another surface broken. (Issue #65,
-  reported by duplaja)
-
----
-
-## [1.0.0-rc.47] - 2026-06-05
-
-### Added
-
-- **Tap a food on the Foods tab to open a quick-view sheet** with the
-  full Nutrition Facts label, brand, and barcode, plus Add to Diary
-  and Edit buttons right on the sheet. Replaces the previous behavior
-  of jumping straight to the full Food Editor for a glance-at-info
-  action. The full Food Editor is still one tap away via the Edit
-  button when you want to change anything.
-- **Scheduled automatic backups.** Settings, Backup, Schedule lets you
-  pick a time and frequency (daily, weekly, monthly) and the app
-  writes a full backup on schedule. Server-side installs get an admin
-  UI with optional ENV-lock for managed deployments; the Android app
-  writes scheduled backups locally for offline-only users too.
-- **Copy diary items to another day.** A unified Copy sheet (one item
-  or a whole meal) lets you pick the target date and meal in one
-  flow. Reached from the item kebab menu and the meal action menu.
-  Handy for meal-prep weeks where the same lunch repeats.
-- **Nutrient drill-down in the Diary Nutrition Summary.** Tap any row
-  (Sodium, Protein, Fiber, etc.) to expand it in place and see the top
-  contributing foods sorted by contribution descending. "+ N more
-  items" is itself tappable to show the full list. Answers the "where
-  did today's sodium come from?" question without leaving the Diary.
-  (Issue #58, reported by duplaja)
-- **Recipe / saved meal ingredient picker now searches every food
-  source, not just your local catalog.** Source filter chips (Local,
-  OFF, USDA, Mealie, From Others) and a barcode scan button now appear
-  inside the picker, gated by what you have enabled in Settings.
-  Picking from a non-local source auto-saves the food to your local
-  catalog first. (Issue #59, reported by gnome161)
-
-### Fixed
-
-- **Sidebar was missing the Wellness link** for users whose only
-  wellness source was Health Connect or Google Health. Both the
-  sidebar and bottom nav now check the same set of sources, so the
-  link appears in both places consistently. (Issue #62, reported by
-  duplaja)
-- **Imported foods showed the wrong photo after a sync round** when
-  multiple Open Food Facts products had structurally identical image
-  filenames (very common, since most OFF images end with names like
-  "front_en.4.400.jpg"). The local image cache treated colliding
-  filenames as the same file. Cache keys are now derived from the full
-  URL, and existing installs will redownload cleanly on the next sync.
-  (Issue #61, reported by nomad64)
-- **Sharing a log file or crash report from Diagnostics only saved
-  the filename, not the actual contents.** Android blocks cross-app
-  file access on private app storage, so the receiving app was falling
-  back to the share intent's text field. Files now route through the
-  cache directory before sharing, which Android exposes to other apps.
-  (Issue #60, reported by nomad64)
-- **AI proposal cards stayed visible after the photo entry was
-  committed**, and the AI would re-render a stale card on the next
-  text question. Now clears on commit and on the next message.
-
----
-
-## [1.0.0-rc.46] - 2026-06-02
-
-### Fixed
-
-- **Wellness goal progress bars (Daily Steps, Active Minutes, Floors,
-  etc.) stayed at 0** for users whose only wellness source was Google
-  Health or Health Connect. Goals now reads from those sources too.
-  (Issue #57, reported by duplaja)
-
----
-
-## [1.0.0-rc.45] - 2026-06-01
-
-### Fixed
-
-- **Local OFF mirror: nutrition values now load alongside product
-  names** on installs where the parquet stores nutriment data in a
-  format rc.44's parser didn't fully understand. rc.44 got names and
-  barcodes working but nutrition fields came up empty. Server-side
-  fix; restart the container to pick it up. (Issue #53 round 4,
-  reported by duplaja)
-- **AI Assistant now works with Gemini again**. A schema field added
-  with the AI Meal Photos feature in rc.42 was being rejected by
-  Gemini's API. Claude and OpenAI both ignored it, so the breakage
-  only affected Gemini users. (Issue #56, reported by nomad64)
-
----
-
-## [1.0.0-rc.44] - 2026-05-31
-
-### Fixed
-
-- **Manual Google Health sync no longer throws an unhandled rejection.**
-  A leftover variable reference from an earlier internal refactor was
-  crashing the manual sync flow on Android. (Issue #55, reported by
-  nomad64)
-- **Local OFF mirror: search + barcode lookups now actually return
-  real product names and nutrition again.** rc.43 added the parser
-  but the entry-point check rejected a shape DuckDB returns on some
-  installs, so it silently fell back to passing the raw serialized
-  text through. rc.44 decodes the input before the parser runs.
-  (Issue #53 round 3, reported by duplaja)
-
----
-
-## [1.0.0-rc.43] - 2026-05-31
-
-### Fixed
-
-- **Local OFF mirror: search + barcode lookups now return real product
-  names and nutrition info again** on installs where the parquet stores
-  localized fields in a format rc.42 didn't recognize. Search results
-  were showing a long serialized blob as the product name and barcode
-  lookups came up with no nutrition. Server-side fix; restart the
-  container to pick it up. (Issue #53 round 2, reported by duplaja)
 
 ---
 

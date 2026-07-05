@@ -13,6 +13,7 @@
   import { readBodyStat } from '../lib/body-stats-unit.js';
   import { goals, energyUnit, weightUnit, lengthUnit, statsChartType, statsYZero,
            statsAvgLine, statsGoalLine, statsTrendLine, statsIncludeToday, statsShowEmptyDays,
+           statsMetricOrder, statsHiddenMetrics,
            hiddenBodyStats, dateFormat, pageBanners, bannerStyle,
            fitbitEnabled, garminEnabled, withingsEnabled, googleHealthEnabled, healthConnectEnabled, fitbitFamilyEnabled, wellnessMetrics,
            calorieGoalMode,
@@ -92,12 +93,33 @@
     { value: 'body_fat',   label: 'Body Fat',   unit: '%'  },
     { value: 'body_water', label: 'Body Water', unit: '%'  },
   ];
-  $: METRICS = [
+  // Metric identifier: nutriments use `.id`, everything else uses `.value`.
+  // Coalesce so the ordering + hide stores work with a single string key.
+  function _metricKey(m) { return m?.value ?? m?.id; }
+  $: _rawMetrics = [
     ...NUTRIMENTS.filter(n => n.default),
     ...BODY_STATS.filter(s => !($hiddenBodyStats||[]).includes(s.value)),
     ...(_waterShowInStats ? [{ value: 'water', label: 'Water', unit: _waterUnit }] : []),
     ...WELLNESS_METRICS,
   ];
+  // Apply the user's Statistics-specific hide list, then reorder by the
+  // user's saved order. Metrics not in the order array append at the end
+  // so a new metric introduced later still surfaces without config.
+  $: METRICS = (() => {
+    const hidden = new Set($statsHiddenMetrics || []);
+    const visible = _rawMetrics.filter(m => !hidden.has(_metricKey(m)));
+    const order = $statsMetricOrder || [];
+    if (!order.length) return visible;
+    const byKey = new Map(visible.map(m => [_metricKey(m), m]));
+    const sorted = order.map(k => byKey.get(k)).filter(Boolean);
+    const rest = visible.filter(m => !order.includes(_metricKey(m)));
+    return [...sorted, ...rest];
+  })();
+  // If the user hides the currently-selected metric, snap to the first
+  // still-visible one so the chart doesn't render against a missing key.
+  $: if (METRICS.length && !METRICS.find(x => x.value === metric || x.id === metric)) {
+    metric = _metricKey(METRICS[0]);
+  }
 
   // Metrics where the Y-axis should auto-fit to the data range regardless of
   // the global "Lock Y-Axis To Zero" toggle. For body measurements and resting

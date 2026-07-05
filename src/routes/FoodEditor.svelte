@@ -1051,7 +1051,7 @@
             title="Take a photo of the nutrition label to fill these fields"
             aria-label="Scan nutrition label">
             <span class="material-symbols-rounded scan-icon" class:spin={scanningLabel}>
-              {scanningLabel ? 'progress_activity' : 'photo_camera'}
+              {scanningLabel ? 'progress_activity' : 'document_scanner'}
             </span>
             <span>{scanningLabel ? 'Scanning…' : 'Scan Label'}</span>
           </button>
@@ -1083,7 +1083,7 @@
       {/each}
       <button class="btn btn-ghost w-full" style="margin-top:8px"
         on:click={() => showAllNutrients = !showAllNutrients}>
-        {showAllNutrients ? 'Show less' : 'Show all nutrients'}
+        {showAllNutrients ? 'Show Less' : 'Show All Nutrients'}
       </button>
     </div>
 

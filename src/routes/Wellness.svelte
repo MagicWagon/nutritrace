@@ -1364,7 +1364,7 @@
         on:click={syncHealthConnectManual} disabled={hcSyncing}
         title="Sync Health Connect">
         {#if hcSyncing}
-          <span class="material-symbols-rounded wl-spin-icon">sync</span>
+          <span class="material-symbols-rounded wl-spin-icon">autorenew</span>
         {:else}
           <span class="wl-brand-icon"><HealthConnectIcon /></span>
         {/if}
@@ -1375,7 +1375,7 @@
         on:click={() => sync()} disabled={syncing}
         title="Sync Fitbit{status.fitbitUserId ? ' · ' + status.fitbitUserId : ''}">
         {#if syncing}
-          <span class="material-symbols-rounded wl-spin-icon">sync</span>
+          <span class="material-symbols-rounded wl-spin-icon">autorenew</span>
         {:else}
           <span class="wl-brand-icon"><FitbitIcon /></span>
         {/if}
@@ -1386,7 +1386,7 @@
         on:click={() => syncGarmin()} disabled={garminSyncing}
         title="Sync Garmin{garminStatus.garminUserId ? ' · ' + garminStatus.garminUserId : ''}">
         {#if garminSyncing}
-          <span class="material-symbols-rounded wl-spin-icon">sync</span>
+          <span class="material-symbols-rounded wl-spin-icon">autorenew</span>
         {:else}
           <span class="wl-brand-icon"><GarminIcon /></span>
         {/if}
@@ -1397,7 +1397,7 @@
         on:click={() => syncWithings()} disabled={withingsSyncing}
         title="Sync Withings{withingsStatus.withingsUserId ? ' · User ' + withingsStatus.withingsUserId : ''}">
         {#if withingsSyncing}
-          <span class="material-symbols-rounded wl-spin-icon">sync</span>
+          <span class="material-symbols-rounded wl-spin-icon">autorenew</span>
         {:else}
           <span class="wl-brand-icon"><WithingsIcon /></span>
         {/if}
@@ -1424,7 +1424,7 @@
     <!-- ── Loading ── -->
     {#if !status || !withingsStatus}
       <div class="wellness-loading">
-        <span class="material-symbols-rounded spin">sync</span>
+        <span class="material-symbols-rounded spin">autorenew</span>
       </div>
 
     <!-- ── Nothing configured ── -->
@@ -1513,7 +1513,7 @@
               </div>
               <button class="btn btn-primary connect-btn" on:click={connect} disabled={connecting}>
                 {#if connecting}
-                  <span class="material-symbols-rounded spin">sync</span> Connecting…
+                  <span class="material-symbols-rounded spin">autorenew</span> Connecting…
                 {:else}
                   <span class="material-symbols-rounded">link</span> Connect Fitbit
                 {/if}
@@ -2050,7 +2050,7 @@
             </div>
             <button class="btn btn-primary connect-btn" on:click={connectWithings} disabled={withingsConnecting}>
               {#if withingsConnecting}
-                <span class="material-symbols-rounded spin">sync</span> Connecting…
+                <span class="material-symbols-rounded spin">autorenew</span> Connecting…
               {:else}
                 <span class="material-symbols-rounded">link</span> Connect Withings
               {/if}
@@ -2099,7 +2099,7 @@
       <!-- GPS Map -->
       {#if _loadingGps}
         <div class="workout-map-placeholder">
-          <span class="material-symbols-rounded spin">sync</span>
+          <span class="material-symbols-rounded spin">autorenew</span>
           <span>Loading route…</span>
         </div>
       {:else if _workoutGps && _workoutGps.length > 1}

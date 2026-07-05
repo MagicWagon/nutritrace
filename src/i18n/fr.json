@@ -80,7 +80,7 @@
     "nutrients":          { "section": "Nutriments" },
     "goals":              { "section": "Objectifs caloriques" },
     "body_stats":         { "section": "Mensurations" },
-    "statistics":         { "section": "Statistiques" },
+    "statistics":         { "section": "Statistiques", "categories": "Catégories", "categories_help": "Faites glisser pour réorganiser les vignettes de mesures sur la page Statistiques. Désactivez les catégories que vous ne consultez jamais." },
     "connected_services": {
       "section": "Sources d'aliments",
       "off": {

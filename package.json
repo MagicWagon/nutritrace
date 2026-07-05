@@ -1,12 +1,18 @@
 {
   "name": "nutritrace",
-  "version": "1.0.0-rc.52",
+  "version": "1.0.0-rc.53",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "android": "npm run build && npx cap sync android && npx cap open android",
+    "android:build": "npm run build && npx cap sync android",
+    "android:run": "npx cap run android",
+    "cap:sync": "npm run build && npx cap sync",
+    "cap:add:android": "npx cap add android",
+    "i18n:check": "node scripts/i18n-check.cjs",
     "postinstall": "node scripts/postinstall.cjs"
   },
   "dependencies": {
@@ -33,7 +39,7 @@
     "chart.js": "^4.4.0",
     "emoji-picker-element": "^1.29.1",
     "jszip": "^3.10.1",
-    "nodemailer": "^8.0.7",
+    "nodemailer": "^9.0.3",
     "svelte-i18n": "^4.0.1",
     "svelte-spa-router": "^4.0.1"
   },
@@ -42,8 +48,11 @@
     "@sveltejs/vite-plugin-svelte": "^5.1.1",
     "svelte": "^5.55.9",
     "typescript": "^6.0.2",
-    "vite": "^6.4.1",
+    "vite": "^6.4.3",
     "vite-plugin-pwa": "^1.0.3",
     "workbox-window": "^7.0.0"
+  },
+  "overrides": {
+    "esbuild": "^0.25.0"
   }
 }

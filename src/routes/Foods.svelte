@@ -11,6 +11,7 @@
   import Sheet       from '../components/ui/Sheet.svelte';
   import FoodDetailSheet from '../components/ui/FoodDetailSheet.svelte';
   import UnitPicker  from '../components/ui/UnitPicker.svelte';
+  import { portal } from '../lib/portal.js';
   import { scaleFactor as _unitScaleFactor, unitSystem as _unitSystem } from '../lib/units.js';
   import { diaryPromptQuantity, warnUnitMismatch, showUnitMetadata } from '../stores/settings.js';
   import { showSuccess, showError } from '../stores/toast.js';
@@ -193,8 +194,17 @@
   let multiPortionItems = [];         // [{ food, portion, unit, servings }]
   let multiAdding = false;
 
-  // Clear selection when tab changes (different list context); search does NOT clear selection
-  $: { activeTab; selectedFoods = new Set(); }
+  // Manage mode: multi-select for bulk delete of the current tab's local
+  // items. Entered from the item action sheet on a local item. Mutually
+  // exclusive with pickMode (pickMode is the add-to-diary flow).
+  let manageMode = false;
+  let manageSelected = new Set();      // Set<item id>
+  let showBulkDeleteDialog = false;
+  let bulkDeleting = false;
+
+  // Clear selection when tab changes (different list context); search does NOT clear selection.
+  // Also exit manage mode on tab change so the count reflects the new list.
+  $: { activeTab; selectedFoods = new Set(); manageMode = false; manageSelected = new Set(); }
 
   // Convert item portions to grams for total serving display
   const _toG = { g:1, ml:1, oz:28.35, lb:453.59, cup:240, tbsp:15, tsp:5 };
@@ -593,6 +603,47 @@
     showSuccess($_('foods.toast.deleted'));
   }
 
+  function enterManageMode(seedItem) {
+    if (pickMode) return;                 // pickMode owns multi-select
+    if (!seedItem?.id) return;            // external results aren't manageable
+    manageMode = true;
+    manageSelected = new Set([seedItem.id]);
+  }
+  function toggleManageSelect(item) {
+    if (!item?.id) return;
+    if (manageSelected.has(item.id)) manageSelected.delete(item.id);
+    else manageSelected.add(item.id);
+    manageSelected = manageSelected;      // trigger reactivity
+    if (manageSelected.size === 0) manageMode = false;   // match Diary
+  }
+  function exitManageMode() {
+    manageMode = false;
+    manageSelected = new Set();
+  }
+  async function confirmBulkDelete() {
+    if (bulkDeleting || manageSelected.size === 0) return;
+    bulkDeleting = true;
+    const ids = [...manageSelected];
+    const store = currentStore;
+    let ok = 0, fail = 0;
+    for (const id of ids) {
+      try {
+        if (store === 'foodList') await NtApi.deleteFood(id);
+        else await NtApi.deleteMeal(id);
+        ok++;
+      } catch (e) {
+        console.error('[foods] bulk delete failed for', id, e);
+        fail++;
+      }
+    }
+    bulkDeleting = false;
+    showBulkDeleteDialog = false;
+    exitManageMode();
+    await load();
+    if (fail === 0) showSuccess(`Deleted ${ok} ${ok === 1 ? 'item' : 'items'}`);
+    else showError(`Deleted ${ok} of ${ids.length}; ${fail} failed`);
+  }
+
   async function cloneItem(item) {
     const { id: _drop, ...rest } = item;
     const clone = { ...rest, name: 'Copy of ' + (item.name || ''), created_at: new Date().toISOString() };
@@ -625,6 +676,8 @@
       }
     } else if (detail.value === 'delete') {
       showDeleteDialog = true;
+    } else if (detail.value === 'select') {
+      enterManageMode(selectedItem);
     }
   }
 
@@ -840,8 +893,24 @@
 </script>
 
 <div class="page-shell">
+  <!-- Manage-mode action icons — fixed at top-right, matches Diary UX -->
+  {#if manageMode}
+    <div use:portal class="foods-topbar-actions">
+      <button class="btn-icon" on:click={exitManageMode} aria-label="Cancel selection" title="Cancel">
+        <span class="material-symbols-rounded">close</span>
+      </button>
+      <button class="btn-icon" style="color:var(--danger)"
+        disabled={manageSelected.size === 0 || bulkDeleting}
+        on:click={() => (showBulkDeleteDialog = true)}
+        aria-label="Delete selected" title="Delete">
+        <span class="material-symbols-rounded" class:spin={bulkDeleting}>{bulkDeleting ? 'refresh' : 'delete'}</span>
+      </button>
+    </div>
+  {/if}
   <!-- Header -->
-  <header class="page-header" class:banner-gradient={$bannerStyle === 'gradient'} class:banner-animated={$bannerStyle === 'animated'}>
+  <header class="page-header"
+    class:banner-gradient={$bannerStyle === 'gradient' && !manageMode}
+    class:banner-animated={$bannerStyle === 'animated' && !manageMode}>
     {#if pickMode && selectedFoods.size > 0}
       <h1 class="pick-count-title">{$_('foods.n_selected', { values: { n: selectedFoods.size } })}</h1>
       <button class="btn btn-primary pick-confirm-btn" on:click={confirmMultiAdd} disabled={multiAdding} aria-label={$_('foods.add_selected_to_diary')}>
@@ -853,6 +922,8 @@
           <span>{$_('foods.add_n', { values: { n: selectedFoods.size } })}</span>
         {/if}
       </button>
+    {:else if manageMode}
+      <h1 class="select-mode-title">{manageSelected.size} selected</h1>
     {:else}
       <h1>{$_('routes.foods.title')}</h1>
       <button class="btn-icon accent" on:click={() => {
@@ -1000,17 +1071,24 @@
         <ul class="food-list">
           {#each _renderList as food (food.id)}
             {@const _sel = selectedFoods.has(food)}
-            <li class="food-item card" class:food-selected={_sel} in:fade={{ duration: 160 }}>
+            {@const _mSel = manageMode && food.id != null && manageSelected.has(food.id)}
+            <li class="food-item card" class:food-selected={_sel || _mSel} in:fade={{ duration: 160 }}>
               {#if pickMode}
                 <button class="food-select-btn" on:click={() => toggleSelect(food)} aria-label="Select">
                   <span class="food-check material-symbols-rounded" class:food-check-on={_sel}>
                     {_sel ? 'check_circle' : 'radio_button_unchecked'}
                   </span>
                 </button>
+              {:else if manageMode}
+                <button class="food-select-btn" on:click={() => toggleManageSelect(food)} aria-label="Select">
+                  <span class="food-check material-symbols-rounded" class:food-check-on={_mSel}>
+                    {_mSel ? 'check_circle' : 'radio_button_unchecked'}
+                  </span>
+                </button>
               {/if}
               <button class="food-item-btn"
-                on:click={() => pickFood(food)}
-                on:contextmenu|preventDefault={() => longPress(food)}>
+                on:click={() => manageMode ? toggleManageSelect(food) : pickFood(food)}
+                on:contextmenu|preventDefault={() => !manageMode && longPress(food)}>
                 {#if $foodsShowThumbnails && food.imgUrl}
                   <img class="food-thumb" src={food.imgUrl} alt="" loading="lazy" referrerpolicy="no-referrer" on:error={e => e.target.style.display='none'} />
                 {:else}
@@ -1037,7 +1115,7 @@
                   <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
                 {/if}
               </button>
-              {#if (activeTab === 1 || activeTab === 2) && (food.items || []).length > 0}
+              {#if (activeTab === 1 || activeTab === 2) && (food.items || []).length > 0 && !manageMode}
                 <button class="btn-icon meal-info-btn" on:click|stopPropagation={() => openMealInfo(food)}
                   aria-label="Show items in {food.name}" title="Show items">
                   <span class="material-symbols-rounded">info</span>
@@ -1399,6 +1477,7 @@
   ] : [
     { label: 'Edit',   icon: 'edit',        value: 'edit' },
     ...(activeTab !== 0 ? [{ label: 'Clone', icon: 'content_copy', value: 'clone' }] : []),
+    { label: 'Select Multiple', icon: 'checklist', value: 'select' },
     { label: 'Delete', icon: 'delete',      value: 'delete', danger: true },
   ]}
   on:select={handleItemAction}
@@ -1411,6 +1490,15 @@
   confirmText="Delete"
   dangerous
   on:confirm={() => selectedItem && deleteItem(selectedItem)}
+/>
+
+<Dialog
+  bind:open={showBulkDeleteDialog}
+  title={`Delete ${manageSelected.size} ${manageSelected.size === 1 ? 'item' : 'items'}?`}
+  message="Diary entries that reference these will keep their nutrition snapshot but lose the link to the source. This can't be undone."
+  confirmText="Delete"
+  dangerous
+  on:confirm={confirmBulkDelete}
 />
 
 <style>
@@ -1785,4 +1873,19 @@
   @keyframes scan-lookup-rotate {
     to { transform: rotate(360deg); }
   }
+
+  /* Manage-mode topbar (Foods) — mirrors Diary's .diary-topbar-actions
+     styling so cancel/delete icons pin to the top-right of the viewport
+     independent of the header banner. */
+  :global(.foods-topbar-actions) {
+    position: fixed;
+    top: calc(var(--safe-top, 0px) + 10px);
+    right: 12px;
+    z-index: 41;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    pointer-events: all;
+  }
+  .select-mode-title { color: var(--accent); }
 </style>

@@ -80,7 +80,7 @@
     "nutrients":          { "section": "Nutrients" },
     "goals":              { "section": "Calorie Goals" },
     "body_stats":         { "section": "Body Stats" },
-    "statistics":         { "section": "Statistics" },
+    "statistics":         { "section": "Statistics", "categories": "Categories", "categories_help": "Drag to reorder the metric chips on the Statistics page. Toggle off any category you never look at." },
     "connected_services": {
       "section": "Food Sources",
       "off": {

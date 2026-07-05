@@ -41,6 +41,7 @@ export const USER_PREFS = new Set([
   'waterGoalMl','waterUnit','waterContainers','waterShowInStats','waterShowInDiary',
   'dateFormat','timeFormat','timezone',
   'statsChartType','statsYZero','statsAvgLine','statsGoalLine','statsTrendLine','statsIncludeToday','statsShowEmptyDays',
+  'statsMetricOrder','statsHiddenMetrics',
   // User profile (collected by Wizard, used for goal calculation; sync so multi-device
   // users see the same body profile)
   'gender','dob','height_cm','weight_kg','target_weight','activity','tdee',
@@ -607,6 +608,14 @@ export const statsIncludeToday = createSettingStore('statsIncludeToday', false);
 // Default ON: an empty day is more honest than a hidden one — gaps in logging
 // are visible and the chart can't accidentally make a sparse week look full.
 export const statsShowEmptyDays = createSettingStore('statsShowEmptyDays', true);
+// Ordered list of metric ids for the Statistics page (nutrients, body stats,
+// water, wellness). Empty = default order. Values missing from the array
+// append at the end so newly-introduced metrics still show up.
+export const statsMetricOrder = createSettingStore('statsMetricOrder', []);
+// Metric ids the user has hidden on the Statistics page. Layers on top of
+// existing per-source visibility filters (visibleNutriments, hiddenBodyStats,
+// wellnessMetrics) — a metric hidden anywhere upstream doesn't render either.
+export const statsHiddenMetrics = createSettingStore('statsHiddenMetrics', []);
 
 // Units
 export const weightUnit = createSettingStore('weightUnit', 'lb');

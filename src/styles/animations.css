@@ -37,7 +37,9 @@
   to   { transform: scale(2.5); opacity: 0; }
 }
 
-/* Spin */
+/* Spin — clockwise. Pair with the `autorenew` glyph (clockwise-pointing
+   arrows) so rotation direction visually matches the arrowheads.
+   #86 was fixed by swapping the glyph, not by reversing the rotation. */
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
