@@ -36,6 +36,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   Previously the arrowheads and the rotation ran in opposite
   directions, which looked wrong every time. (#86)
 
+### Security
+
+- **Dependency Security Updates.**
+  Bumped `multer` 1.4.5-lts.1 → 2.2.0 (patches three high-severity
+  DoS CVEs on the LTS line), `nodemailer` 8.0.7 → 9.0.3 (patches
+  five CVEs including a TLS OAuth certificate-validation bypass and
+  CRLF header injection), and `vite` 6.4.1 → 6.4.3 (dev-only,
+  patches a `server.fs.deny` bypass on Windows). Clears every
+  actionable Dependabot alert. No user-facing changes; self-hosters
+  running Docker just need to pull the new image.
+
 ---
 
 ## [1.0.0-rc.52] - 2026-07-03
