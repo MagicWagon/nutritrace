@@ -893,6 +893,32 @@ export async function dbMarkSynced(table, rows) {
   }
 }
 
+/**
+ * Mark wellness_data rows synced by id alone.
+ *
+ * wellness_data is not a user-edit table — the only writers are the
+ * Health Connect sync worker (Kotlin) + `syncHealthConnect` (JS), both
+ * out-of-band from the push loop. There's no mid-flight-edit race to
+ * guard against, so the updated_at gate that dbMarkSynced uses would
+ * be dead weight. It's also actively harmful here: wellness_data
+ * has no updated_at column at all, so calling dbMarkSynced against it
+ * throws SQLITE_ERROR: no such column, which aborts pushChanges before
+ * pullChanges runs. The bug shipped in rc.50 (commit b364c24, whose
+ * body explicitly noted 'only user-edit tables' — the intent was to
+ * exclude wellness but the code included it). Reported as #89 by
+ * duplaja on 2026-07-07: browser → phone sync broken because push
+ * was throwing on every cycle that had pending Health Connect rows.
+ */
+export async function dbMarkWellnessSynced(ids) {
+  if (!ids || !ids.length) return;
+  const db = await getDb();
+  const placeholders = ids.map(() => '?').join(',');
+  await db.run(
+    `UPDATE wellness_data SET sync_status = 'synced' WHERE id IN (${placeholders})`,
+    ids
+  );
+}
+
 // ── Sync meta ─────────────────────────────────────────────────────────────
 
 export async function dbGetSyncMeta(key) {

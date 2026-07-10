@@ -289,7 +289,8 @@ On first launch, a setup wizard walks you through enabling user management and c
 | `SMTP_FROM` | No | — | From address, e.g. `NutriTrace <noreply@example.com>` |
 | `AI_PROVIDER` | No | — | Lock Trace to a specific provider for all users: `claude` \| `openai` \| `gemini` \| `oai-compat` |
 | `AI_API_KEY` | No | — | Shared AI API key. Key is server-side only — never sent to the browser. Optional when `AI_PROVIDER=oai-compat` and pointing at a local endpoint that doesn't require auth. |
-| `AI_MODEL` | No | provider default | Override the AI model (e.g. `claude-haiku-4-5-20251001`, `llama3.1:8b`) |
+| `AI_MODEL` | No | provider default | Override the AI model (e.g. `claude-haiku-4-5-20251001`, `llama3.1:8b`). Required when `AI_PROVIDER=oai-compat` |
+| `AI_BASE_URL` | No | — | Required when `AI_PROVIDER=oai-compat`. Base URL of your OpenAI-compatible endpoint, e.g. `http://ollama:11434`. Must be reachable from the server container (a Docker Compose sidecar on an internal network is the intended use — the browser never touches it, so mixed-content and internal DNS aren't blockers). |
 | `AI_ENABLED` | No | — | Set to `true` to auto-enable Trace for all users |
 
 SMTP and AI settings can also be configured in the Settings UI. Environment variables take priority over UI values and lock those fields for all users.

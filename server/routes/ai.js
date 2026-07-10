@@ -134,18 +134,29 @@ router.post('/chat', requireAuth, aiChatLimit, wrap(async (req, res) => {
   }
 
   const cfg = getAiConfig();
-  if (!cfg.ai_api_key) return res.status(503).json({ error: 'AI not configured on server. Set AI_API_KEY in environment.' });
-
   const provider = cfg.ai_provider || 'claude';
   const model    = cfg.ai_model    || AI_DEFAULT_MODELS[provider] || '';
   const apiKey   = cfg.ai_api_key;
+  const baseUrl  = cfg.ai_base_url;
   const toolsArr = Array.isArray(tools) ? tools : [];
+
+  // API key is required for cloud providers. `oai-compat` local endpoints
+  // (Ollama, LM Studio, etc.) often don't need one — mirror the client-side
+  // callAI() behaviour at aiChat.js:247-249.
+  if (!apiKey && provider !== 'oai-compat') {
+    return res.status(503).json({ error: 'AI not configured on server. Set AI_API_KEY in environment.' });
+  }
+  if (provider === 'oai-compat') {
+    if (!baseUrl) return res.status(503).json({ error: 'AI_PROVIDER=oai-compat requires AI_BASE_URL in environment.' });
+    if (!model)   return res.status(503).json({ error: 'AI_PROVIDER=oai-compat requires AI_MODEL in environment.' });
+  }
 
   let result;
   switch (provider) {
-    case 'claude':  result = await _callClaude(apiKey, model, messages, systemPrompt, toolsArr); break;
-    case 'openai':  result = await _callOpenAI(apiKey, model, messages, systemPrompt, toolsArr); break;
-    case 'gemini':  result = await _callGemini(apiKey, model, messages, systemPrompt, toolsArr); break;
+    case 'claude':     result = await _callClaude(apiKey, model, messages, systemPrompt, toolsArr); break;
+    case 'openai':     result = await _callOpenAI(apiKey, model, messages, systemPrompt, toolsArr, 'https://api.openai.com'); break;
+    case 'gemini':     result = await _callGemini(apiKey, model, messages, systemPrompt, toolsArr); break;
+    case 'oai-compat': result = await _callOpenAI(apiKey || 'no-key', model, messages, systemPrompt, toolsArr, baseUrl.replace(/\/+$/, '')); break;
     default: return res.status(400).json({ error: `Unknown provider: ${provider}` });
   }
   res.json(result);
@@ -214,7 +225,7 @@ async function _callClaude(apiKey, model, messages, systemPrompt, tools) {
   return { assistantMessage, toolCalls };
 }
 
-async function _callOpenAI(apiKey, model, messages, systemPrompt, tools) {
+async function _callOpenAI(apiKey, model, messages, systemPrompt, tools, baseUrl = 'https://api.openai.com') {
   const openaiTools = (tools || []).map(t => ({
     type: 'function',
     function: { name: t.name, description: t.description, parameters: t.parameters },
@@ -227,7 +238,7 @@ async function _callOpenAI(apiKey, model, messages, systemPrompt, tools) {
   };
   if (openaiTools.length) body.tools = openaiTools;
 
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+  const res = await fetch(`${baseUrl}/v1/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

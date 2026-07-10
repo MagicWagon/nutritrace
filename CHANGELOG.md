@@ -9,6 +9,54 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.0-rc.54] - 2026-07-10
+
+### Fixed
+
+- **Health Connect Users' Android Sync Unstuck.**
+  Pending wellness rows on the phone were tripping a SQL bug on
+  push, which stopped every subsequent pull. Symptom: items added
+  on the browser weren't reaching the phone. Every user with
+  Health Connect enabled on Android was silently affected. Fixed.
+  (#89, reported by duplaja)
+
+- **More Accurate Time to Sound Sleep.**
+  Server-side ttss derivation now credits the initial 5-10 min
+  settling-in awake segment, matching the Fitbit app. Closes the
+  consistent -5 to -7 min under-count on nights with a short
+  initial wake segment. Applies to Health Connect and Google
+  Health syncs.
+
+### Added
+
+- **Server-Side Proxy for Local LLM Endpoints.**
+  Env-locked AI now supports `AI_PROVIDER=oai-compat` alongside
+  claude / openai / gemini. Point `AI_BASE_URL` at a private
+  network Ollama, LM Studio, LocalAI, vLLM, or similar and the
+  server calls it directly, so the browser never has to see the
+  endpoint. Solves the mixed-content + Docker-internal-DNS gap
+  for self-hosters running a local LLM sidecar. Same capability
+  added to LiftTrace and CookTrace. (#90, reported by
+  gentlecolts)
+
+### Improved
+
+- **Backup + Restore Fidelity Pass.**
+  Eight silent data-loss scenarios closed across the full backup,
+  JSON export/import, and Android local backup flows. Highlights:
+  OFF unit metadata (nutrition_basis, alt_units, density_g_ml)
+  from rc.50 now survives a restore, federation API tokens
+  survive backups, JSON settings import correctly pushes to the
+  server on PWA, and native restore no longer double-inserts on
+  a second pass.
+
+- **"Copy to Another Date" Defaults to Today.**
+  Copying a meal or item from a past date now pre-fills today in
+  the picker instead of the source date. One less tap for the
+  common "same lunch again today" case.
+
+---
+
 ## [1.0.0-rc.53] - 2026-07-05
 
 ### Added

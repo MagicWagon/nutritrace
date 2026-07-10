@@ -213,11 +213,16 @@ function restoreFromZip(zip) {
     // (or rows missing it) would otherwise restore with NULL, which the
     // Android delta sync silently skips. Forcing NOW means restored rows
     // become visible to the next pull (#39 followup).
+    // rc.50 OFF metadata columns (nutrition_basis, alt_units, density_g_ml)
+    // must be listed explicitly — better-sqlite3 silently ignores extra named
+    // parameters, so a SELECT * dump plus a partial INSERT column list would
+    // round-trip these values as NULL, silently losing every user's serving
+    // units (slice / cookie / bottle) + per-ml-vs-per-g basis + density.
     const insFood = db.prepare(`
-      INSERT OR IGNORE INTO foods (id, user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, visibility, source_id, favorite, usage_count, last_used_at, created_at, updated_at, deleted_at)
-      VALUES (@id, @user_id, @name, @brand, @nutrition, @portion, @unit, @img_url, @notes, @category, @barcode, @visibility, @source_id, @favorite, @usage_count, @last_used_at, @created_at, COALESCE(@updated_at, datetime('now')), @deleted_at)
+      INSERT OR IGNORE INTO foods (id, user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, visibility, source_id, favorite, usage_count, last_used_at, nutrition_basis, alt_units, density_g_ml, created_at, updated_at, deleted_at)
+      VALUES (@id, @user_id, @name, @brand, @nutrition, @portion, @unit, @img_url, @notes, @category, @barcode, @visibility, @source_id, @favorite, @usage_count, @last_used_at, @nutrition_basis, @alt_units, @density_g_ml, @created_at, COALESCE(@updated_at, datetime('now')), @deleted_at)
     `);
-    for (const f of data.foods || []) insFood.run({ visibility: 'private', source_id: null, favorite: 0, usage_count: 0, last_used_at: null, updated_at: null, deleted_at: null, ...f });
+    for (const f of data.foods || []) insFood.run({ visibility: 'private', source_id: null, favorite: 0, usage_count: 0, last_used_at: null, nutrition_basis: null, alt_units: null, density_g_ml: null, updated_at: null, deleted_at: null, ...f });
 
     const insMeal = db.prepare(`
       INSERT OR IGNORE INTO meals (id, user_id, name, nutrition, items, img_url, notes, is_recipe, portion, unit, servings, visibility, source_id, favorite, usage_count, last_used_at, created_at, updated_at, deleted_at)
@@ -231,11 +236,14 @@ function restoreFromZip(zip) {
     const insMealShare = db.prepare(`INSERT OR IGNORE INTO meal_shares (meal_id, user_id) VALUES (@meal_id, @user_id)`);
     for (const ms of data.meal_shares || []) insMealShare.run(ms);
 
+    // COALESCE updated_at to NOW so pre-#39 rows without the column don't
+    // restore as NULL — same rule as foods/meals. NULL updated_at is silently
+    // skipped by the Android delta sync's `WHERE updated_at >= ?` filter.
     const insDiary = db.prepare(`
       INSERT OR IGNORE INTO diary (id, user_id, date, items, body_stats, water, notes, updated_at, deleted_at)
-      VALUES (@id, @user_id, @date, @items, @body_stats, @water, @notes, @updated_at, @deleted_at)
+      VALUES (@id, @user_id, @date, @items, @body_stats, @water, @notes, COALESCE(@updated_at, datetime('now')), @deleted_at)
     `);
-    for (const d of data.diary || []) insDiary.run({ notes: null, deleted_at: null, ...d });
+    for (const d of data.diary || []) insDiary.run({ notes: null, updated_at: null, deleted_at: null, ...d });
 
     const insSettings = db.prepare(`
       INSERT OR IGNORE INTO user_settings (user_id, key, value, updated_at, deleted_at) VALUES (@user_id, @key, @value, COALESCE(@updated_at, datetime('now')), @deleted_at)
@@ -314,6 +322,24 @@ function restoreFromZip(zip) {
       VALUES (@id, @user_id, @oidc_provider_id, @oidc_sub, @email_verified, @last_login_at, @created_at)
     `);
     for (const l of data.user_oidc_links || []) insOidcLink.run({ email_verified: 0, last_login_at: null, ...l });
+
+    // Federation API tokens — token_hash is opaque SHA-256, users can't
+    // regenerate the same token. Preserving these across restore keeps
+    // configured federated peers connected.
+    db.prepare('DELETE FROM api_tokens').run();
+    const insApiToken = db.prepare(`
+      INSERT OR IGNORE INTO api_tokens (id, user_id, name, token_hash, scopes, expires_at, last_used_at, created_at)
+      VALUES (@id, @user_id, @name, @token_hash, @scopes, @expires_at, @last_used_at, @created_at)
+    `);
+    for (const t of data.api_tokens || []) insApiToken.run({ expires_at: null, last_used_at: null, ...t });
+
+    // Outstanding invite tokens so pending invites don't 404 after restore.
+    db.prepare('DELETE FROM invite_tokens').run();
+    const insInvite = db.prepare(`
+      INSERT OR IGNORE INTO invite_tokens (token, email, role, created_by, expires_at, used)
+      VALUES (@token, @email, @role, @created_by, @expires_at, @used)
+    `);
+    for (const i of data.invite_tokens || []) insInvite.run({ email: null, role: 'user', created_by: null, used: 0, ...i });
   })();
 
   // Restore images — guard against zip-slip and zip-bomb attacks
@@ -365,6 +391,14 @@ function dumpDatabase() {
     fasts:            db.prepare('SELECT * FROM fasts').all(),
     oidc_providers:   db.prepare('SELECT * FROM oidc_providers').all(),
     user_oidc_links:  db.prepare('SELECT * FROM user_oidc_links').all(),
+    // Federation API tokens — stored as SHA-256 hashes, so a user can't
+    // regenerate the same token after a restore. Capturing them lets every
+    // configured federated peer keep working after a restore. OAuth tokens
+    // (fitbit / garmin / google_health / withings) intentionally excluded
+    // because they're deploy-scoped and re-linking the wearable is fine.
+    api_tokens:       db.prepare('SELECT * FROM api_tokens').all(),
+    // Outstanding invite tokens so pending invites survive a restore.
+    invite_tokens:    db.prepare('SELECT * FROM invite_tokens').all(),
   };
 }
 

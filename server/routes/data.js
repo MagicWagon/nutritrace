@@ -39,13 +39,22 @@ router.post('/import', wrap((req, res) => {
   // updated_at must be set explicitly: the differential sync engine filters
   // foods/meals by `updated_at >= since`, and rows inserted without it would
   // never appear in the Android delta pull (#39 — reported by nomad64).
+  //
+  // Extra columns beyond the original diary/foods trio are included so a
+  // JSON round-trip (export -> import) preserves per-food favorites, "recently
+  // used" ordering, sharing visibility, and the rc.50 OFF unit metadata
+  // (nutrition_basis, alt_units, density_g_ml). Missing fields default to
+  // safe values so partial or older exports still import cleanly.
   const insFood = db.prepare(
-    `INSERT OR IGNORE INTO foods (user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+    `INSERT OR IGNORE INTO foods (user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode,
+                                  visibility, source_id, favorite, usage_count, last_used_at,
+                                  nutrition_basis, alt_units, density_g_ml, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
   );
   const insMeal = db.prepare(
-    `INSERT OR IGNORE INTO meals (user_id, name, nutrition, items, img_url, notes, is_recipe, portion, unit, servings, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+    `INSERT OR IGNORE INTO meals (user_id, name, nutrition, items, img_url, notes, is_recipe, portion, unit, servings,
+                                  visibility, source_id, favorite, usage_count, last_used_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
   );
   // updated_at must be set explicitly on every insert: differential sync
   // filters with `updated_at >= ?` and NULL never matches. Even tables that
@@ -74,7 +83,15 @@ router.post('/import', wrap((req, res) => {
         f.imgUrl || f.img_url || null,
         f.notes || null,
         (f.categories && f.categories[0]) || f.category || null,
-        f.barcode || null
+        f.barcode || null,
+        f.visibility || 'private',
+        f.source_id ?? null,
+        f.favorite ? 1 : 0,
+        Math.max(0, parseInt(f.usage_count) || 0),
+        f.last_used_at || null,
+        f.nutrition_basis || null,
+        f.alt_units ? (typeof f.alt_units === 'string' ? f.alt_units : JSON.stringify(f.alt_units)) : null,
+        f.density_g_ml != null ? Number(f.density_g_ml) : null
       );
     }
     for (const m of [...meals, ...recipes]) {
@@ -85,7 +102,12 @@ router.post('/import', wrap((req, res) => {
         m.notes || null,
         recipes.includes(m) ? 1 : 0,
         m.portion ?? 100, m.unit || 'g',
-        m.servings != null ? Math.max(1, parseInt(m.servings) || 1) : null
+        m.servings != null ? Math.max(1, parseInt(m.servings) || 1) : null,
+        m.visibility || 'private',
+        m.source_id ?? null,
+        m.favorite ? 1 : 0,
+        Math.max(0, parseInt(m.usage_count) || 0),
+        m.last_used_at || null
       );
     }
     for (const e of diary) {

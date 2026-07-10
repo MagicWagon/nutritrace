@@ -117,14 +117,27 @@ export async function exportLocalBackup(opts = {}) {
   // Wellness + workouts are native-only (PWA reads from server endpoints not unified API)
   if (isNative) {
     try {
-      const { dbGetWellnessGrouped, dbGetWorkouts } = await import('./db-native.js');
+      const { dbGetWellnessGrouped, dbGetWorkouts, dbGetWellnessByDate } = await import('./db-native.js');
       const grouped = await dbGetWellnessGrouped('1900-01-01', '2999-12-31');
-      // Flatten { date: { metric: value } } back to row form for portability
+      // Flatten { date: { metric: value } } back to row form. Include `source`
+      // + `metadata` so a restore preserves which wearable produced each row
+      // (fitbit vs garmin vs google_health) and Sleep Quality sub-metrics.
+      // Without these the restore would default every row to 'health_connect'
+      // and drop the stage-breakdown / workout-detail metadata JSON.
       wellness = [];
-      for (const [date, metrics] of Object.entries(grouped || {})) {
-        for (const [metric_type, value] of Object.entries(metrics)) {
-          wellness.push({ date, metric_type, value });
-        }
+      for (const date of Object.keys(grouped || {})) {
+        try {
+          const rows = await dbGetWellnessByDate(date) || [];
+          for (const r of rows) {
+            wellness.push({
+              date: r.date,
+              metric_type: r.metric_type,
+              value: r.value,
+              source: r.source || 'health_connect',
+              metadata: r.metadata || null,
+            });
+          }
+        } catch {}
       }
       try { workouts = await dbGetWorkouts('1900-01-01', '2999-12-31') || []; } catch {}
     } catch {}
@@ -305,16 +318,44 @@ export async function importLocalBackup(zipFile, opts = {}) {
   if (isNative) {
     try {
       const {
-        dbCreateFood, dbCreateMeal, dbSaveDiaryDate, dbUpsertWellness, dbStartFast, dbEndFast, dbUpdateFast,
+        dbCreateFood, dbCreateMeal, dbSaveDiaryDate, dbUpsertWellness,
+        dbUpsertFromServer, dbUpsertWorkoutFromServer, dbUpsertActivityFromServer,
+        dbStartFast, dbUpdateFast,
       } = await import('./db-native.js');
+      // Foods / meals / recipes — prefer the *FromServer upsert path when the
+      // export carries an `id` (or `server_id`). Falling back to dbCreateFood
+      // for id-less exports keeps backward compat with old backups. The upsert
+      // path also means a second restore on top of an existing DB doesn't
+      // double up every row (previous behaviour created a new row each pass).
       for (const food of foods) {
-        try { await dbCreateFood(food); counts.foods++; } catch {}
+        try {
+          if (food.id != null || food.server_id != null) {
+            await dbUpsertFromServer('foods', { ...food, id: food.id ?? food.server_id });
+          } else {
+            await dbCreateFood(food);
+          }
+          counts.foods++;
+        } catch {}
       }
       for (const meal of meals) {
-        try { await dbCreateMeal(meal); counts.meals++; } catch {}
+        try {
+          if (meal.id != null || meal.server_id != null) {
+            await dbUpsertFromServer('meals', { ...meal, id: meal.id ?? meal.server_id });
+          } else {
+            await dbCreateMeal(meal);
+          }
+          counts.meals++;
+        } catch {}
       }
       for (const recipe of recipes) {
-        try { await dbCreateMeal({ ...recipe, is_recipe: 1 }); counts.recipes++; } catch {}
+        try {
+          if (recipe.id != null || recipe.server_id != null) {
+            await dbUpsertFromServer('meals', { ...recipe, is_recipe: 1, id: recipe.id ?? recipe.server_id });
+          } else {
+            await dbCreateMeal({ ...recipe, is_recipe: 1 });
+          }
+          counts.recipes++;
+        } catch {}
       }
       for (const entry of diary) {
         if (!entry.date) continue;
@@ -322,10 +363,28 @@ export async function importLocalBackup(zipFile, opts = {}) {
       }
       for (const w of wellness) {
         if (!w.date || !w.metric_type) continue;
-        try { await dbUpsertWellness(w.date, w.source || 'health_connect', w.metric_type, w.value); counts.wellness++; } catch {}
+        try {
+          await dbUpsertWellness(w.date, w.source || 'health_connect', w.metric_type, w.value, w.metadata || {});
+          counts.wellness++;
+        } catch {}
       }
-      // workouts: best-effort, may not have a native upsert helper exposed
-      counts.workouts = workouts.length;
+      // Workouts — replay via server-shaped upsert so we survive a second
+      // restore without doubling rows and so gps_data carries through.
+      counts.workouts = 0;
+      for (const w of workouts) {
+        try {
+          await dbUpsertWorkoutFromServer({ ...w, id: w.server_id ?? w.id });
+          counts.workouts++;
+        } catch {}
+      }
+      // Manual activity_log entries (rc.7) — same upsert-from-server pattern.
+      counts.activity = 0;
+      for (const a of activity) {
+        try {
+          await dbUpsertActivityFromServer({ ...a, id: a.server_id ?? a.id });
+          counts.activity++;
+        } catch {}
+      }
       // Fasts — replay completed + active fasts. Use dbStartFast + dbUpdateFast
       // so the local sync_status pipeline applies correctly.
       for (const f of fasts) {

@@ -15,7 +15,7 @@ const _dlog = import.meta.env.DEV
   ? console.log
   : (...a) => { try { if (localStorage.getItem('nt:verboseLogging') === '1') console.log(...a); } catch {} };
 import {
-  dbGetPendingChanges, dbMarkSynced, dbSetServerId,
+  dbGetPendingChanges, dbMarkSynced, dbMarkWellnessSynced, dbSetServerId,
   dbGetSyncMeta, dbSetSyncMeta,
   dbUpsertFromServer, dbUpsertDiaryFromServer, dbUpsertWellnessFromServer,
   dbPurgeSoftDeleted,
@@ -271,7 +271,11 @@ async function pushChanges() {
   await dbMarkSynced('diary',        pending.diary.map(d => ({ id: d.id, updated_at: d.updated_at })));
   await dbMarkSynced('activity_log', activity.map(a => ({ id: a.id, updated_at: a.updated_at })));
   await dbMarkSynced('fasts',        fasts.map(f => ({ id: f.id, updated_at: f.updated_at })));
-  await dbMarkSynced('wellness_data', wellness.map(w => ({ id: w.id, updated_at: w.updated_at })));
+  // wellness_data has no updated_at column, so it can't go through
+  // dbMarkSynced's id+updated_at gate — that path throws SQLITE_ERROR
+  // and aborts the whole push loop before pullChanges runs. Use the
+  // dedicated id-only helper. See dbMarkWellnessSynced doc + #89.
+  await dbMarkWellnessSynced(wellness.map(w => w.id));
   if (pendingSettings.length) {
     await dbMarkSettingsSynced(pendingSettings.map(s => ({ key: s.key, updated_at: s.updated_at })));
   }
@@ -303,24 +307,39 @@ async function pullChanges() {
   }
   const data = await res.json();
 
+  // Per-item try/catch so a single malformed server row can't abort the
+  // whole pull loop. A stuck row will log a warning + a stable identifier
+  // and continue; the rest of the pull still lands. Without this guard,
+  // one bad row would silently block every downstream table (settings,
+  // workouts, activity, fasts, chat) from ever reaching the phone,
+  // reproducing the #89-style symptom on a different data trigger.
+  const _pullErr = (kind, item, e) => console.warn(
+    `[sync] pull skip ${kind}`, item?.id ?? item?.date ?? item?.key ?? '(no-id)',
+    e?.message || String(e)
+  );
+
   // Apply foods
   for (const f of (data.foods || [])) {
-    await dbUpsertFromServer('foods', f);
+    try { await dbUpsertFromServer('foods', f); }
+    catch (e) { _pullErr('foods', f, e); }
   }
 
   // Apply meals
   for (const m of (data.meals || [])) {
-    await dbUpsertFromServer('meals', m);
+    try { await dbUpsertFromServer('meals', m); }
+    catch (e) { _pullErr('meals', m, e); }
   }
 
   // Apply diary
   for (const d of (data.diary || [])) {
-    await dbUpsertDiaryFromServer(d);
+    try { await dbUpsertDiaryFromServer(d); }
+    catch (e) { _pullErr('diary', d, e); }
   }
 
   // Apply wellness data (pull-only, server-generated)
   for (const w of (data.wellness || [])) {
-    await dbUpsertWellnessFromServer(w);
+    try { await dbUpsertWellnessFromServer(w); }
+    catch (e) { _pullErr('wellness', w, e); }
   }
 
   // Apply settings from server → local SQLite + localStorage
@@ -333,28 +352,33 @@ async function pullChanges() {
       _dlog(`[sync] skip pulled setting ${s.key} — local change takes priority`);
       continue;
     }
-    await dbUpsertSettingFromServer(s);
-    if (!s.deleted_at) {
-      const { DB } = await import('./db.js');
-      const val = typeof s.value === 'string' ? _parseJson(s.value) : s.value;
-      settingsMod._applySetting(s.key, val);
-    }
+    try {
+      await dbUpsertSettingFromServer(s);
+      if (!s.deleted_at) {
+        const { DB } = await import('./db.js');
+        const val = typeof s.value === 'string' ? _parseJson(s.value) : s.value;
+        settingsMod._applySetting(s.key, val);
+      }
+    } catch (e) { _pullErr('settings', s, e); }
   }
 
   // Apply workouts from server
   for (const w of (data.workouts || [])) {
-    await dbUpsertWorkoutFromServer(w);
+    try { await dbUpsertWorkoutFromServer(w); }
+    catch (e) { _pullErr('workouts', w, e); }
   }
 
   // Apply activity entries from server
   for (const a of (data.activity || [])) {
-    await dbUpsertActivityFromServer(a);
+    try { await dbUpsertActivityFromServer(a); }
+    catch (e) { _pullErr('activity', a, e); }
   }
 
   // Apply fasts (intermittent-fasting tracker) from server
   const { dbUpsertFastFromServer } = await import('./db-native.js');
   for (const f of (data.fasts || [])) {
-    await dbUpsertFastFromServer(f);
+    try { await dbUpsertFastFromServer(f); }
+    catch (e) { _pullErr('fasts', f, e); }
   }
 
   // Chat history — pull only, notify the AI Assistant component via event
@@ -515,8 +539,15 @@ export async function fullSync(silent = false) {
     // Notify the app that sync completed — pages should refresh data
     window.dispatchEvent(new CustomEvent('nt:sync-complete'));
   } catch (e) {
-    console.error('[sync] error:', e);
-    syncState.update(s => ({ ...s, syncing: false, phase: '', progress: '', error: e.message }));
+    // Log e.message + e.code + e.stack so future issue reports don't come
+    // back with just `Error` from the Capacitor SQLite bridge — the plugin
+    // strips useful details before propagating, and 'Error' alone in a bug
+    // report is unactionable. #89 spent a full audit pass narrowing down
+    // exactly which push step was throwing because we didn't have a message.
+    const { get } = await import('svelte/store');
+    const phase = get(syncState)?.phase || '';
+    console.error('[sync] error:', e?.message || String(e), '| code:', e?.code || '(none)', '| phase:', phase, '|', e?.stack || '');
+    syncState.update(s => ({ ...s, syncing: false, phase: '', progress: '', error: e.message || 'Sync failed (see console)' }));
     // Notify on sync failure
     try {
       const { notify } = await import('./notifications.js');

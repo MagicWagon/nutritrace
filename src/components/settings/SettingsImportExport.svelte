@@ -16,7 +16,7 @@
   import { Nutrition } from '../../lib/nutrition.js';
   import { isNative, getServerUrl } from '../../lib/platform.js';
   import { get } from 'svelte/store';
-  import { foodCategories, catName as _catName } from '../../stores/settings.js';
+  import { foodCategories, catName as _catName, bulkSet } from '../../stores/settings.js';
 
   const isNativeLocal = isNative && !getServerUrl();
 
@@ -127,7 +127,11 @@
         }
 
         if (data.settings && typeof data.settings === 'object') {
-          for (const [key, value] of Object.entries(data.settings)) DB.setSetting(key, value);
+          // bulkSet writes to localStorage + native SQLite AND pushes to the
+          // server for USER_PREFS keys. A plain DB.setSetting() loop stops at
+          // localStorage, so the next 30s server pull would rehydrate the old
+          // pre-import values on PWA and silently blow away the imported ones.
+          await bulkSet(data.settings);
         }
 
         const importedCats = [...new Set((foodList || []).map(f => (f.categories && f.categories[0]) || f.category).filter(Boolean))];

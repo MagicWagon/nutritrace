@@ -643,6 +643,7 @@ export async function fetchSleepForDate(accessToken, dateStr) {
   }
 
   const BRIEF_LIGHT_MAX = 5; // LIGHT segments < 5 min count toward Sound Sleep
+  const TTSS_SETTLING_CAP = 10; // initial AWAKE up to N min counts toward TTSS
   let interruptionsMin = 0;
   let fullAwakenings   = 0;
   let restlessnessMin  = 0;
@@ -658,10 +659,23 @@ export async function fetchSleepForDate(accessToken, dateStr) {
     const durMin = (new Date(e) - new Date(s)) / 60000;
     if (!Number.isFinite(durMin)) continue;
     if (seg.type === 'AWAKE') {
-      // First AWAKE >= 5 min: settling-in period, credit to Time to Sound Sleep.
+      // First AWAKE >= 5 min: settling-in period. Fitbit's app measures TTSS
+      // from when the wearable detected the start of the sleep session
+      // (including a short initial settling-in AWAKE) to the first DEEP
+      // block — BUT only for reasonably short initial AWAKE. For long initial
+      // AWAKE (Jun 30 2026: 15m), Fitbit apparently assumes the user was
+      // awake before going to bed and starts TTSS from the first sleep stage
+      // instead. Calibration data: 3.5m/5m/5.5m/7m AWAKE all include-in-ttss,
+      // 15m does not — threshold sits somewhere between. TTSS_SETTLING_CAP
+      // set at 10 min conservatively; revisit if a 10-15m point lands.
       if (!firstAwakeSeen) {
         firstAwakeSeen = true;
-        if (durMin >= FULL_AWAKE_MIN) continue;
+        if (durMin >= FULL_AWAKE_MIN) {
+          if (durMin <= TTSS_SETTLING_CAP && firstAsleepStart == null) {
+            firstAsleepStart = new Date(s).getTime();
+          }
+          continue;
+        }
       }
       // Last AWAKE >= 5 min: morning wake-up event, exclude.
       if (i === lastAwakeBigIdx) continue;

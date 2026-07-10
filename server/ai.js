@@ -7,6 +7,13 @@ export function seedAiFromEnv() {
     AI_PROVIDER: 'ai_provider',
     AI_API_KEY:  'ai_api_key',
     AI_MODEL:    'ai_model',
+    // AI_BASE_URL enables server-side proxying for the `oai-compat`
+    // provider (Ollama, LM Studio, LocalAI, vLLM, etc.). Required when
+    // AI_PROVIDER=oai-compat; ignored otherwise. Lets self-hosters put
+    // their LLM on a private Docker network — the browser never talks
+    // to it directly, so mixed-content and internal-DNS resolution
+    // stop being blockers (#90 gentlecolts).
+    AI_BASE_URL: 'ai_base_url',
   };
   const upsert = db.prepare(
     'INSERT INTO app_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'

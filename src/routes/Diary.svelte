@@ -535,8 +535,13 @@
       // sharing one component for both flows. copyMode tells the
       // Copy handler whether to addDiaryItem (per-item) or
       // copyMealToDate (per-meal).
+      //
+      // Default target date = today (not the currently-viewed date).
+      // The common copy-from-a-past-day case is "I ate the same lunch
+      // today as I did on Monday" — so pre-filling today saves a tap.
+      // The date picker in the sheet still lets the user pick anything.
       copyMode = 'meal';
-      copyDate = $currentDate;
+      copyDate = localDateStr();
       copyMeal = Number(actionMealIdx) || 0;
       _lockAndOpen(() => showCopySheet = true);
     }
@@ -765,9 +770,11 @@
       // Open the shared Copy sheet in 'item' mode. Same single-sheet UX
       // the per-meal Copy uses; copyMode tells the Copy handler which
       // backend call to fire (addDiaryItem for items, copyMealToDate
-      // for meals).
+      // for meals). Default target = today so copying a past item to
+      // the current day takes one tap. See onMealAction for the same
+      // rationale on the per-meal path.
       copyMode = 'item';
-      copyDate = $currentDate;
+      copyDate = localDateStr();
       copyMeal = Number(actionItem.meal) || 0;
       _lockAndOpen(() => showCopySheet = true);
     }
