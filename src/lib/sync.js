@@ -21,6 +21,7 @@ import {
   dbPurgeSoftDeleted,
   dbGetPendingSettings, dbMarkSettingsSynced, dbUpsertSettingFromServer,
   dbUpsertWorkoutFromServer, dbUpsertActivityFromServer,
+  dbGetPendingWorkouts, dbSetWorkoutServerId,
 } from './db-native.js';
 import { writable } from 'svelte/store';
 
@@ -127,10 +128,14 @@ async function pushChanges() {
   const activity = pending.activity || [];
   const fasts    = pending.fasts || [];
   const wellness = pending.wellness || [];
-  const hasPending = pending.foods.length || pending.meals.length || pending.diary.length || activity.length || fasts.length || wellness.length || pendingSettings.length;
+  // Pending workouts: rows written locally (from Health Connect
+  // ExerciseSession) that don't have a server_id yet. The rule is
+  // `server_id IS NULL` — see dbGetPendingWorkouts. #91.
+  const workouts = await dbGetPendingWorkouts();
+  const hasPending = pending.foods.length || pending.meals.length || pending.diary.length || activity.length || fasts.length || wellness.length || workouts.length || pendingSettings.length;
   if (!hasPending) return false;
 
-  _dlog(`[sync] pushing: ${pending.foods.length} foods, ${pending.meals.length} meals, ${pending.diary.length} diary, ${activity.length} activity, ${fasts.length} fasts, ${wellness.length} wellness, ${pendingSettings.length} settings`);
+  _dlog(`[sync] pushing: ${pending.foods.length} foods, ${pending.meals.length} meals, ${pending.diary.length} diary, ${activity.length} activity, ${fasts.length} fasts, ${wellness.length} wellness, ${workouts.length} workouts, ${pendingSettings.length} settings`);
 
   // Build push payload with client_id and server_id
   const payload = {
@@ -215,6 +220,25 @@ async function pushChanges() {
       updated_at: s.updated_at,
       deleted_at: s.deleted_at || null,
     })),
+    // Locally-authored workouts (Health Connect ExerciseSession). Server
+    // upserts on (user_id, source, source_id); client_id is used only to
+    // stitch the server_id back to the local row via the push result. #91.
+    workouts: workouts.map(w => ({
+      client_id: w.id,
+      source: w.source,
+      source_id: String(w.source_id),
+      date: w.date,
+      activity_type: w.activity_type || null,
+      activity_name: w.activity_name || null,
+      start_time: w.start_time || null,
+      duration_ms: w.duration_ms ?? null,
+      distance_km: w.distance_km ?? null,
+      calories: w.calories ?? null,
+      avg_hr: w.avg_hr ?? null,
+      max_hr: w.max_hr ?? null,
+      steps: w.steps ?? null,
+      has_gps: w.has_gps ? 1 : 0,
+    })),
   };
 
   _dlog(`[sync] push payload: ${payload.foods.length} foods, ${payload.meals.length} meals, ${payload.diary.length} diary, ${payload.activity.length} activity, ${payload.settings.length} settings`);
@@ -258,6 +282,17 @@ async function pushChanges() {
   for (const f of (result.fasts || [])) {
     if (f.client_id && f.server_id) {
       await dbSetServerId('fasts', f.client_id, f.server_id);
+    }
+  }
+  // Workouts key on (source, source_id) not client_id: the server upserts
+  // by that composite so the same row survives a re-push. We use client_id
+  // only to lift the server_id back into the right local row.
+  for (const w of (result.workouts || [])) {
+    if (w.server_id) {
+      const localRow = workouts.find(x => x.id === w.client_id);
+      if (localRow) {
+        await dbSetWorkoutServerId(localRow.source, localRow.source_id, w.server_id);
+      }
     }
   }
 

@@ -1123,6 +1123,66 @@ export async function dbUpsertWorkoutFromServer(record) {
 }
 
 /**
+ * Upsert a locally-authored workout (Health Connect ExerciseSession).
+ * No server_id — that gets set later when the sync push confirms the row.
+ * Keyed by (source, source_id) so re-reading the same HC session twice
+ * doesn't produce duplicates.
+ *
+ * server_id stays NULL until the next sync push completes. dbGetPendingWorkouts
+ * uses `server_id IS NULL` as the pending gate.
+ */
+export async function dbUpsertWorkoutLocal(record) {
+  const db = await getDb();
+  const {
+    source, source_id, date, activity_type, activity_name, start_time,
+    duration_ms, distance_km, calories, avg_hr, max_hr, steps, has_gps,
+  } = record;
+  await db.run(
+    `INSERT INTO workouts (user_id, source, source_id, date, activity_type, activity_name, start_time, duration_ms, distance_km, calories, avg_hr, max_hr, steps, has_gps, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(user_id, source, source_id) DO UPDATE SET
+       date=excluded.date, activity_type=excluded.activity_type, activity_name=excluded.activity_name,
+       start_time=excluded.start_time, duration_ms=excluded.duration_ms, distance_km=excluded.distance_km,
+       calories=excluded.calories, avg_hr=excluded.avg_hr, max_hr=excluded.max_hr, steps=excluded.steps,
+       has_gps=excluded.has_gps, updated_at=datetime('now')`,
+    [LOCAL_USER_ID, source, String(source_id), date, activity_type || null, activity_name || null,
+     start_time || null, duration_ms ?? null, distance_km ?? null, calories ?? null,
+     avg_hr ?? null, max_hr ?? null, steps ?? null, has_gps ? 1 : 0]
+  );
+}
+
+/**
+ * Return every locally-authored workout that hasn't been confirmed to the
+ * server yet. Simple rule: server_id IS NULL means we haven't heard back
+ * about it. Consumed by the sync push builder.
+ */
+export async function dbGetPendingWorkouts() {
+  const db = await getDb();
+  const r = await db.query(
+    `SELECT id, source, source_id, date, activity_type, activity_name, start_time,
+            duration_ms, distance_km, calories, avg_hr, max_hr, steps, has_gps
+       FROM workouts
+      WHERE user_id = ? AND server_id IS NULL
+      ORDER BY id`,
+    [LOCAL_USER_ID]
+  );
+  return r?.values || [];
+}
+
+/**
+ * Set server_id on a locally-authored workout after the push confirms it.
+ * Keyed by (source, source_id) since the client uses that as its stable id
+ * before the server-side row exists.
+ */
+export async function dbSetWorkoutServerId(source, source_id, serverId) {
+  const db = await getDb();
+  await db.run(
+    `UPDATE workouts SET server_id = ? WHERE user_id = ? AND source = ? AND source_id = ?`,
+    [serverId, LOCAL_USER_ID, source, String(source_id)]
+  );
+}
+
+/**
  * Get wellness data grouped by date, matching server API shape:
  * { [date]: { [metric_type]: value } }
  * @param {string} from - start date (YYYY-MM-DD)

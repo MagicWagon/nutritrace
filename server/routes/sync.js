@@ -139,8 +139,8 @@ router.get('/pull', wrap((req, res) => {
 // Returns a mapping of client_id → server_id for newly created records.
 router.post('/push', wrap((req, res) => {
   const u = uid(req);
-  const { foods = [], meals = [], diary = [], activity = [], fasts = [], wellness = [], settings = [] } = req.body;
-  const result = { foods: [], meals: [], diary: [], activity: [], fasts: [], wellness: [], settings: [] };
+  const { foods = [], meals = [], diary = [], activity = [], fasts = [], wellness = [], settings = [], workouts = [] } = req.body;
+  const result = { foods: [], meals: [], diary: [], activity: [], fasts: [], wellness: [], settings: [], workouts: [] };
 
   // Normalize timestamp for comparison (strip T, Z, milliseconds)
   const norm = ts => ts ? ts.replace('T', ' ').replace('Z', '').replace(/\.\d+$/, '') : '';
@@ -367,6 +367,55 @@ router.post('/push', wrap((req, res) => {
       result.wellness.push({ date: w.date, source: w.source, metric_type: w.metric_type });
     }
 
+    // ── Workouts (client-authored, e.g. Health Connect ExerciseSession) ──
+    // Keyed by (user_id, source, source_id). Client-authored workouts come
+    // from the Android app's Health Connect integration (source='health_connect').
+    // Fitbit / Garmin / Google Health workouts land here too if a future client
+    // ever pushes them, but today those live entirely server-side via the
+    // OAuth-driven sync path in fitbit.js / google-health.js.
+    //
+    // Handles both new inserts (no server_id) and upserts against an existing
+    // (user_id, source, source_id) key. Fitbit's dedup pass at
+    // server/routes/fitbit.js:842-869 keys on date+start_time+activity_name so
+    // it won't touch health_connect-source rows — Fitbit users who also grant
+    // HC exercise permission will see one workout per source, which matches
+    // how Fitbit+Google-Health already behave today. Cross-source dedup is a
+    // separate follow-up (issue #91 audit calls it out).
+    const workoutUid = u ?? 0;
+    for (const w of workouts) {
+      if (!w.source || !w.source_id || !w.date) continue;
+      const r = db.prepare(
+        `INSERT INTO workouts (user_id, source, source_id, date, activity_type, activity_name, start_time, duration_ms, distance_km, calories, avg_hr, max_hr, steps, has_gps, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+         ON CONFLICT(user_id, source, source_id) DO UPDATE SET
+           date          = excluded.date,
+           activity_type = excluded.activity_type,
+           activity_name = excluded.activity_name,
+           start_time    = excluded.start_time,
+           duration_ms   = excluded.duration_ms,
+           distance_km   = excluded.distance_km,
+           calories      = excluded.calories,
+           avg_hr        = excluded.avg_hr,
+           max_hr        = excluded.max_hr,
+           steps         = excluded.steps,
+           has_gps       = MAX(has_gps, excluded.has_gps),
+           updated_at    = datetime('now')`
+      ).run(workoutUid, w.source, String(w.source_id), w.date,
+        w.activity_type || null, w.activity_name || null, w.start_time || null,
+        w.duration_ms != null ? Math.round(Number(w.duration_ms)) : null,
+        w.distance_km != null ? Number(w.distance_km) : null,
+        w.calories != null ? Math.round(Number(w.calories)) : null,
+        w.avg_hr != null ? Math.round(Number(w.avg_hr)) : null,
+        w.max_hr != null ? Math.round(Number(w.max_hr)) : null,
+        w.steps != null ? Math.round(Number(w.steps)) : null,
+        w.has_gps ? 1 : 0);
+      // Resolve the server-side row id whether we inserted or upserted.
+      const existing = db.prepare(
+        `SELECT id FROM workouts WHERE user_id = ? AND source = ? AND source_id = ?`
+      ).get(workoutUid, w.source, String(w.source_id));
+      result.workouts.push({ client_id: w.client_id, server_id: existing?.id ?? r.lastInsertRowid });
+    }
+
     // ── Settings (keyed by key, not ID) ──────────────────────────────────
     // SECURITY: server-only keys are rejected — clients can't overwrite admin config.
     if (u != null) {
@@ -388,7 +437,7 @@ router.post('/push', wrap((req, res) => {
 
   run();
 
-  logger.debug(`[sync] push: foods=${foods.length} meals=${meals.length} diary=${diary.length} activity=${activity.length} fasts=${fasts.length} wellness=${wellness.length} settings=${settings.length}`);
+  logger.debug(`[sync] push: foods=${foods.length} meals=${meals.length} diary=${diary.length} activity=${activity.length} fasts=${fasts.length} wellness=${wellness.length} settings=${settings.length} workouts=${workouts.length}`);
   res.json({ ok: true, ...result });
 }));
 

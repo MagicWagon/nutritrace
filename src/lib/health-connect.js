@@ -110,6 +110,20 @@ export async function readTodayData() {
 
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+  // For cumulative aggregates (Steps, Distance, calories, floors, hydration),
+  // use next-midnight as the end so Health Connect fully contains any
+  // day-spanning source record (Samsung Health writes one 00:00-23:59 Steps
+  // record per day and updates it in place). HC's aggregate math prorates
+  // a partial-overlap window by `overlap/duration`, so ending at `now` gives
+  // `9878 × elapsed_fraction` at 11:47 instead of the full 9878. Extending
+  // to next-midnight makes the record fully contained → 100% counted. For
+  // granular writers (Google Fit, Fitbit-to-HC, phone sensors, etc.) the
+  // sum is identical because no records exist with future timestamps.
+  // #93 reported by traebertthomas-cpu 2026-07-11.
+  const startOfNextDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
+  // Records-only endpoint (readRecords calls). Used for sleep, exercise
+  // sessions, resting HR, weight, body comp, blood pressure, etc. —
+  // readRecords doesn't proration-adjust, so `now` is fine here.
   const todayEnd = now.toISOString();
 
   const metrics = {};
@@ -117,7 +131,7 @@ export async function readTodayData() {
   // Steps (aggregate for full day)
   try {
     const { aggregates } = await hc.aggregateRecords({
-      start: todayStart, end: todayEnd,
+      start: todayStart, end: startOfNextDay,
       type: 'Steps', groupBy: 'day',
     });
     _dlog(`[health-connect] Steps aggregates:`, JSON.stringify(aggregates).slice(0, 200));
@@ -127,7 +141,7 @@ export async function readTodayData() {
   // Distance
   try {
     const { aggregates } = await hc.aggregateRecords({
-      start: todayStart, end: todayEnd,
+      start: todayStart, end: startOfNextDay,
       type: 'Distance', groupBy: 'day',
     });
     if (aggregates.length > 0) metrics.distance_km = +(aggregates[0].value / 1000).toFixed(2);
@@ -136,7 +150,7 @@ export async function readTodayData() {
   // Total calories burned
   try {
     const { aggregates } = await hc.aggregateRecords({
-      start: todayStart, end: todayEnd,
+      start: todayStart, end: startOfNextDay,
       type: 'TotalCaloriesBurned', groupBy: 'day',
     });
     if (aggregates.length > 0) metrics.calories_out = Math.round(aggregates[0].value);
@@ -145,7 +159,7 @@ export async function readTodayData() {
   // Active calories
   try {
     const { aggregates } = await hc.aggregateRecords({
-      start: todayStart, end: todayEnd,
+      start: todayStart, end: startOfNextDay,
       type: 'ActiveCaloriesBurned', groupBy: 'day',
     });
     if (aggregates.length > 0) metrics.active_calories = Math.round(aggregates[0].value);
@@ -274,11 +288,17 @@ export async function readTodayData() {
     }
   } catch {}
 
-  // Activity sessions
+  // Exercise sessions — sum duration for the active_minutes metric.
+  // The permission dialog already requests ExerciseSession (line 64 above).
+  // Previously this block read 'ActivitySession' which isn't a real HC type,
+  // so it silently no-op'd on every device — Samsung Health writes
+  // ExerciseSession records, and workouts never reached the wellness metric
+  // OR the workouts table. Reported by traebertthomas-cpu (#91) with
+  // confirmation that duplaja (#89) independently hit the same gap.
   try {
     const { records } = await hc.readRecords({
       start: todayStart, end: todayEnd,
-      type: 'ActivitySession',
+      type: 'ExerciseSession',
     });
     if (records.length > 0) {
       let totalMin = 0;
@@ -365,7 +385,7 @@ export async function readTodayData() {
   // Floors climbed
   try {
     const { aggregates } = await hc.aggregateRecords({
-      start: todayStart, end: todayEnd,
+      start: todayStart, end: startOfNextDay,
       type: 'FloorsClimbed', groupBy: 'day',
     });
     if (aggregates.length > 0) metrics.floors = Math.round(aggregates[0].value);
@@ -374,7 +394,7 @@ export async function readTodayData() {
   // Hydration
   try {
     const { aggregates } = await hc.aggregateRecords({
-      start: todayStart, end: todayEnd,
+      start: todayStart, end: startOfNextDay,
       type: 'Hydration', groupBy: 'day',
     });
     if (aggregates.length > 0) metrics.water_ml = Math.round(aggregates[0].value * 1000); // liters to ml
@@ -491,18 +511,148 @@ export async function readDateRange(startDate, endDate) {
 }
 
 /**
+ * Read Health Connect ExerciseSession records for a date range and map each
+ * one to a workout row compatible with the local `workouts` table.
+ *
+ * Per-session calories are derived by aggregating TotalCaloriesBurned over
+ * the session's time range — ExerciseSessionRecord itself doesn't carry an
+ * energy field (Health Connect models energy as separate CaloriesBurned
+ * records with their own time ranges). TotalCaloriesBurned works on Samsung
+ * devices where ActiveCaloriesBurned aggregates to 0 (#91 observation).
+ *
+ * source_id = metadata.id (stable HC UUID from the plugin). Falls back to
+ * a composite key if metadata.id is empty (defensive; the plugin sets it in
+ * practice).
+ */
+export async function readExerciseSessions(fromIso, toIso) {
+  const hc = _getPlugin();
+  if (!hc) return [];
+
+  let sessions = [];
+  try {
+    const { records } = await hc.readRecords({
+      start: fromIso, end: toIso, type: 'ExerciseSession',
+    });
+    sessions = records || [];
+  } catch (e) {
+    _dlog(`[health-connect] ExerciseSession read failed: ${e?.message}`);
+    return [];
+  }
+
+  const workouts = [];
+  for (const s of sessions) {
+    if (!s.startTime || !s.endTime) continue;
+
+    // Prefer the plugin's metadata.id (stable HC UUID); fall back to a
+    // composite key if absent so repeated reads still dedupe correctly.
+    const stableId = s.metadata?.id
+      || `${s.startTime}|${s.endTime}|${s.exerciseTypeId ?? s.exerciseType ?? 'unknown'}`;
+
+    // Per-session calories. aggregateRecords time-prorates day-spanning
+    // records (Samsung Health writes one 00:00-23:59 TotalCaloriesBurned
+    // record per day), so a 45-min session would receive its proportional
+    // slice of the daily total, which is not the actual session burn.
+    // Use readRecords + a duration filter instead: drop any record whose
+    // span is >4x the session or >6h (day-blob records) and sum the rest.
+    // If nothing granular exists, return null and let the server fall back
+    // to its METs estimate rather than log a wrong number. #93.
+    let calories = null;
+    try {
+      const sessionMs = new Date(s.endTime).getTime() - new Date(s.startTime).getTime();
+      const maxRecordMs = Math.min(sessionMs * 4, 6 * 60 * 60 * 1000);
+      const { records } = await hc.readRecords({
+        start: s.startTime, end: s.endTime, type: 'TotalCaloriesBurned',
+      });
+      const granular = (records || []).filter(r => {
+        const dur = new Date(r.endTime).getTime() - new Date(r.startTime).getTime();
+        return dur > 0 && dur <= maxRecordMs;
+      });
+      if (granular.length) {
+        const sumKcal = granular.reduce((acc, r) => {
+          const kcal = r.energy?.inKilocalories
+            ?? (r.energy?.inCalories != null ? r.energy.inCalories / 1000 : null)
+            ?? r.energyKcal
+            ?? 0;
+          return acc + kcal;
+        }, 0);
+        if (sumKcal > 0) calories = Math.round(sumKcal);
+      }
+    } catch {}
+
+    // Local calendar date for the session — start with the zone offset the
+    // record carries; fall back to a UTC-instant + local-zone conversion.
+    // Mirrors the ladder google-health.js uses server-side.
+    let localDate = null;
+    const startTimeStr = String(s.startTime || '');
+    const m = startTimeStr.match(/^(\d{4}-\d{2}-\d{2})T\d{2}:\d{2}:\d{2}(?:\.\d+)?(Z|[+-]\d{2}:?\d{2})?$/);
+    if (m && m[2] && m[2] !== 'Z') {
+      localDate = m[1]; // wall-clock local date from the offset
+    } else {
+      try {
+        localDate = new Intl.DateTimeFormat('sv-SE', { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone })
+          .format(new Date(s.startTime));
+      } catch {
+        // Last resort: substring the ISO string
+        localDate = startTimeStr.slice(0, 10) || null;
+      }
+    }
+    if (!localDate) continue;
+
+    const durationMs = Math.max(0, new Date(s.endTime) - new Date(s.startTime));
+
+    workouts.push({
+      source: 'health_connect',
+      source_id: String(stableId),
+      date: localDate,
+      activity_type: s.exerciseType || (s.exerciseTypeId != null ? String(s.exerciseTypeId) : null),
+      activity_name: s.title || s.exerciseType || 'Exercise',
+      start_time: s.startTime,
+      duration_ms: durationMs,
+      distance_km: null,      // ExerciseRoute not exposed by the plugin's converter today
+      calories,
+      avg_hr: null,           // populate from separate HR record if a future PR wants it
+      max_hr: null,
+      steps: null,
+      has_gps: 0,
+    });
+  }
+  return workouts;
+}
+
+/**
  * Sync Health Connect data to local wellness_data DB.
  * Called during sync cycle when Health Connect is enabled.
  */
 export async function syncHealthConnect(dateStr) {
   const metrics = await readTodayData();
-  if (Object.keys(metrics).length === 0) return;
+  const { dbUpsertWellness, dbUpsertWorkoutLocal } = await import('./db-native.js');
 
-  const { dbUpsertWellness } = await import('./db-native.js');
   for (const [type, value] of Object.entries(metrics)) {
     if (value != null) {
       await dbUpsertWellness(dateStr, 'health_connect', type, value);
     }
+  }
+
+  // ExerciseSession → local workouts. Reads the same date window
+  // readTodayData used so a manual sync captures today's exercise. The push
+  // path (sync.js) will send these upstream on the next cycle; a locally-
+  // authored workout has server_id=NULL until the push confirms.
+  let workoutCount = 0;
+  try {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+    const todayEnd = now.toISOString();
+    const sessions = await readExerciseSessions(todayStart, todayEnd);
+    for (const w of sessions) {
+      try {
+        await dbUpsertWorkoutLocal(w);
+        workoutCount++;
+      } catch (e) {
+        _dlog(`[health-connect] workout upsert failed for ${w.source_id}: ${e?.message}`);
+      }
+    }
+  } catch (e) {
+    _dlog(`[health-connect] ExerciseSession sync failed: ${e?.message}`);
   }
 
   // Snapshot derived scores (Readiness + Resilience pillars) into the same
@@ -516,7 +666,7 @@ export async function syncHealthConnect(dateStr) {
     _dlog(`[health-connect] snapshot failed: ${e?.message}`);
   }
 
-  _dlog(`[health-connect] Synced ${Object.keys(metrics).length} metrics for ${dateStr}`);
+  _dlog(`[health-connect] Synced ${Object.keys(metrics).length} metrics + ${workoutCount} workouts for ${dateStr}`);
   return metrics;
 }
 

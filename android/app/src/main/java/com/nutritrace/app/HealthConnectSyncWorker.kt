@@ -9,6 +9,7 @@ import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
 import androidx.health.connect.client.records.BodyFatRecord
 import androidx.health.connect.client.records.DistanceRecord
+import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.FloorsClimbedRecord
 import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.HydrationRecord
@@ -83,19 +84,82 @@ class HealthConnectSyncWorker(
             val zone = ZoneId.systemDefault()
             val today = LocalDate.now(zone)
             val todayStart = today.atStartOfDay(zone).toInstant()
+            // Cumulative aggregate window ends at next midnight so day-spanning
+            // source records (Samsung Health writes one 00:00-23:59 Steps
+            // record per day and updates in place) are fully contained.
+            // Health Connect's aggregate math prorates a partial-overlap
+            // window by overlap/duration, so ending at `now` gives
+            // 9878 * elapsed_fraction at 11:47 instead of the full 9878.
+            // Granular writers (Google Fit, Fitbit-to-HC, phone sensors) are
+            // unaffected because no records exist past `now`. #93.
+            val tomorrowStart = today.plusDays(1).atStartOfDay(zone).toInstant()
             val now = Instant.now()
             val todayStr = today.toString() // yyyy-MM-dd
 
             val metrics = mutableMapOf<String, Number>()
 
-            readMetrics(client, todayStart, now, metrics, granted)
+            readMetrics(client, todayStart, now, tomorrowStart, metrics, granted)
 
-            if (metrics.isEmpty()) {
-                Log.d(TAG, "no metrics to write")
+            // Exercise sessions → workouts. Reads if the ExerciseSession
+            // permission was granted; each session gets per-session calories
+            // by reading TotalCaloriesBurned records over the session window
+            // and filtering out any record whose span is >4x the session or
+            // >6h (day-blob records — Samsung Health). Aggregating over the
+            // window would time-prorate those day-blobs and inflate the burn.
+            // If no granular records remain, calories = null and server falls
+            // back to its METs estimate. #91 + #93 (traebertthomas-cpu).
+            val workouts = mutableListOf<WorkoutRow>()
+            if (granted.contains(HealthPermission.getReadPermission(ExerciseSessionRecord::class))) {
+                tryRead {
+                    val sessions = client.readRecords(
+                        ReadRecordsRequest(ExerciseSessionRecord::class, TimeRangeFilter.between(todayStart, now))
+                    ).records
+                    for (s in sessions) {
+                        val cal = try {
+                            val sessionMs = ChronoUnit.MILLIS.between(s.startTime, s.endTime).coerceAtLeast(1L)
+                            val maxRecordMs = minOf(sessionMs * 4L, 6L * 60L * 60L * 1000L)
+                            val calRecords = client.readRecords(
+                                ReadRecordsRequest(
+                                    TotalCaloriesBurnedRecord::class,
+                                    TimeRangeFilter.between(s.startTime, s.endTime)
+                                )
+                            ).records
+                            val sumKcal = calRecords
+                                .filter {
+                                    val dur = ChronoUnit.MILLIS.between(it.startTime, it.endTime)
+                                    dur in 1L..maxRecordMs
+                                }
+                                .sumOf { it.energy.inKilocalories }
+                            if (sumKcal > 0.0) Math.round(sumKcal).toInt() else null
+                        } catch (_: Exception) { null }
+
+                        val zoneForDate = s.startZoneOffset ?: zone
+                        val localDate = s.startTime.atZone(zoneForDate).toLocalDate().toString()
+                        val durationMs = ChronoUnit.MILLIS.between(s.startTime, s.endTime).coerceAtLeast(0L)
+                        val stableId = s.metadata.id.ifBlank { "${s.startTime}|${s.endTime}|${s.exerciseType}" }
+                        val typeStr = s.exerciseType.toString()
+
+                        workouts.add(
+                            WorkoutRow(
+                                sourceId = stableId,
+                                date = localDate,
+                                activityType = typeStr,
+                                activityName = s.title ?: typeStr,
+                                startTime = s.startTime.toString(),
+                                durationMs = durationMs,
+                                calories = cal
+                            )
+                        )
+                    }
+                }
+            }
+
+            if (metrics.isEmpty() && workouts.isEmpty()) {
+                Log.d(TAG, "no metrics or workouts to write")
                 return Result.success()
             }
 
-            writeToDb(ctx, todayStr, metrics)
+            writeToDb(ctx, todayStr, metrics, workouts)
 
             // Push to server so users on browser / other devices see today's
             // fresh metrics without needing to open the Android app first
@@ -104,7 +168,7 @@ class HealthConnectSyncWorker(
             // succeeded, and the JS-side sync will catch up on next app open.
             val (serverUrl, authToken) = readServerCredentials(ctx)
             if (!serverUrl.isNullOrBlank() && !authToken.isNullOrBlank()) {
-                pushToServer(serverUrl, authToken, todayStr, metrics)
+                pushToServer(serverUrl, authToken, todayStr, metrics, workouts)
             } else {
                 Log.d(TAG, "no server credentials in sync_meta, skipping server push (local-mode install?)")
             }
@@ -113,7 +177,7 @@ class HealthConnectSyncWorker(
             // "Last synced X minutes ago" without polling the worker.
             writeSyncMeta(ctx, "hc_last_bg_sync_at", Instant.now().toString())
 
-            Log.d(TAG, "synced ${metrics.size} metrics for $todayStr")
+            Log.d(TAG, "synced ${metrics.size} metrics + ${workouts.size} workouts for $todayStr")
             Result.success()
         } catch (e: Exception) {
             Log.w(TAG, "worker failed: ${e.message}")
@@ -125,15 +189,19 @@ class HealthConnectSyncWorker(
         client: HealthConnectClient,
         start: Instant,
         end: Instant,
+        aggregateEnd: Instant,
         out: MutableMap<String, Number>,
         granted: Set<String>
     ) {
         val tr = TimeRangeFilter.between(start, end)
+        // Cumulative aggregates need aggregateEnd (next midnight) so
+        // day-blob source records (Samsung Health) aren't time-prorated. #93.
+        val cumTr = TimeRangeFilter.between(start, aggregateEnd)
 
         // Steps (aggregate)
         if (granted.contains(HealthPermission.getReadPermission(StepsRecord::class))) {
             tryRead {
-                val r = client.aggregate(AggregateRequest(setOf(StepsRecord.COUNT_TOTAL), tr))
+                val r = client.aggregate(AggregateRequest(setOf(StepsRecord.COUNT_TOTAL), cumTr))
                 r[StepsRecord.COUNT_TOTAL]?.let { out["steps"] = it }
             }
         }
@@ -141,7 +209,7 @@ class HealthConnectSyncWorker(
         // Distance (km)
         if (granted.contains(HealthPermission.getReadPermission(DistanceRecord::class))) {
             tryRead {
-                val r = client.aggregate(AggregateRequest(setOf(DistanceRecord.DISTANCE_TOTAL), tr))
+                val r = client.aggregate(AggregateRequest(setOf(DistanceRecord.DISTANCE_TOTAL), cumTr))
                 r[DistanceRecord.DISTANCE_TOTAL]?.let {
                     out["distance_km"] = (it.inMeters / 1000.0 * 100).toLong() / 100.0
                 }
@@ -151,7 +219,7 @@ class HealthConnectSyncWorker(
         // Total calories
         if (granted.contains(HealthPermission.getReadPermission(TotalCaloriesBurnedRecord::class))) {
             tryRead {
-                val r = client.aggregate(AggregateRequest(setOf(TotalCaloriesBurnedRecord.ENERGY_TOTAL), tr))
+                val r = client.aggregate(AggregateRequest(setOf(TotalCaloriesBurnedRecord.ENERGY_TOTAL), cumTr))
                 r[TotalCaloriesBurnedRecord.ENERGY_TOTAL]?.let { out["calories_out"] = it.inKilocalories.toInt() }
             }
         }
@@ -159,7 +227,7 @@ class HealthConnectSyncWorker(
         // Active calories
         if (granted.contains(HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class))) {
             tryRead {
-                val r = client.aggregate(AggregateRequest(setOf(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL), tr))
+                val r = client.aggregate(AggregateRequest(setOf(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL), cumTr))
                 r[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.let { out["active_calories"] = it.inKilocalories.toInt() }
             }
         }
@@ -250,7 +318,7 @@ class HealthConnectSyncWorker(
         // Floors
         if (granted.contains(HealthPermission.getReadPermission(FloorsClimbedRecord::class))) {
             tryRead {
-                val r = client.aggregate(AggregateRequest(setOf(FloorsClimbedRecord.FLOORS_CLIMBED_TOTAL), tr))
+                val r = client.aggregate(AggregateRequest(setOf(FloorsClimbedRecord.FLOORS_CLIMBED_TOTAL), cumTr))
                 r[FloorsClimbedRecord.FLOORS_CLIMBED_TOTAL]?.let { out["floors"] = it.toInt() }
             }
         }
@@ -258,7 +326,7 @@ class HealthConnectSyncWorker(
         // Hydration (liters → ml)
         if (granted.contains(HealthPermission.getReadPermission(HydrationRecord::class))) {
             tryRead {
-                val r = client.aggregate(AggregateRequest(setOf(HydrationRecord.VOLUME_TOTAL), tr))
+                val r = client.aggregate(AggregateRequest(setOf(HydrationRecord.VOLUME_TOTAL), cumTr))
                 r[HydrationRecord.VOLUME_TOTAL]?.let { out["water_ml"] = (it.inLiters * 1000).toInt() }
             }
         }
@@ -324,7 +392,8 @@ class HealthConnectSyncWorker(
         serverUrl: String,
         authToken: String,
         dateStr: String,
-        metrics: Map<String, Number>
+        metrics: Map<String, Number>,
+        workouts: List<WorkoutRow>
     ) {
         var conn: HttpURLConnection? = null
         try {
@@ -338,6 +407,24 @@ class HealthConnectSyncWorker(
                     put("metadata", JSONObject())
                 })
             }
+            val workoutsArr = JSONArray()
+            for (w in workouts) {
+                workoutsArr.put(JSONObject().apply {
+                    put("source", SOURCE)
+                    put("source_id", w.sourceId)
+                    put("date", w.date)
+                    put("activity_type", w.activityType)
+                    put("activity_name", w.activityName)
+                    put("start_time", w.startTime)
+                    put("duration_ms", w.durationMs)
+                    put("distance_km", JSONObject.NULL)
+                    if (w.calories != null) put("calories", w.calories) else put("calories", JSONObject.NULL)
+                    put("avg_hr", JSONObject.NULL)
+                    put("max_hr", JSONObject.NULL)
+                    put("steps", JSONObject.NULL)
+                    put("has_gps", 0)
+                })
+            }
             val payload = JSONObject().apply {
                 put("foods", JSONArray())
                 put("meals", JSONArray())
@@ -346,6 +433,7 @@ class HealthConnectSyncWorker(
                 put("fasts", JSONArray())
                 put("wellness", wellnessArr)
                 put("settings", JSONArray())
+                put("workouts", workoutsArr)
             }.toString()
 
             val url = URL("${serverUrl.trimEnd('/')}/api/sync/push")
@@ -361,7 +449,7 @@ class HealthConnectSyncWorker(
 
             val code = conn.responseCode
             if (code in 200..299) {
-                Log.d(TAG, "server push ok: $code (${metrics.size} metrics)")
+                Log.d(TAG, "server push ok: $code (${metrics.size} metrics + ${workouts.size} workouts)")
             } else {
                 Log.w(TAG, "server push failed: HTTP $code")
             }
@@ -372,7 +460,23 @@ class HealthConnectSyncWorker(
         }
     }
 
-    private fun writeToDb(ctx: Context, dateStr: String, metrics: Map<String, Number>) {
+    /**
+     * Local-write shape for an ExerciseSession-derived workout. Kotlin-side
+     * mirror of the JS `readExerciseSessions()` return object. Written to the
+     * local `workouts` table and pushed to /api/sync/push. Follows the
+     * source='health_connect' convention shared with the JS path.
+     */
+    private data class WorkoutRow(
+        val sourceId: String,
+        val date: String,
+        val activityType: String?,
+        val activityName: String?,
+        val startTime: String?,
+        val durationMs: Long?,
+        val calories: Int?
+    )
+
+    private fun writeToDb(ctx: Context, dateStr: String, metrics: Map<String, Number>, workouts: List<WorkoutRow>) {
         val dbFile = ctx.getDatabasePath(DB_FILENAME)
         if (!dbFile.exists()) {
             Log.d(TAG, "DB not found at ${dbFile.absolutePath}")
@@ -399,6 +503,28 @@ class HealthConnectSyncWorker(
                            ON CONFLICT(user_id, date, source, metric_type) DO UPDATE SET
                              value=excluded.value, metadata=excluded.metadata, synced_at=datetime('now')""",
                         arrayOf(LOCAL_USER_ID, dateStr, SOURCE, type, value.toDouble(), "{}")
+                    )
+                }
+                // Workouts — one row per HC ExerciseSession. Keyed by
+                // (user_id, source, source_id); on conflict every field
+                // gets refreshed from the incoming row so a later HC edit
+                // (e.g. calorie refinement) propagates. server_id stays
+                // NULL locally until the sync push confirms it — the JS
+                // sync loop sets it via dbSetWorkoutServerId.
+                for (w in workouts) {
+                    db.execSQL(
+                        """INSERT INTO workouts (user_id, source, source_id, date, activity_type, activity_name, start_time, duration_ms, calories, has_gps, updated_at)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, datetime('now'))
+                           ON CONFLICT(user_id, source, source_id) DO UPDATE SET
+                             date=excluded.date, activity_type=excluded.activity_type,
+                             activity_name=excluded.activity_name, start_time=excluded.start_time,
+                             duration_ms=excluded.duration_ms, calories=excluded.calories,
+                             updated_at=datetime('now')""",
+                        arrayOf(
+                            LOCAL_USER_ID, SOURCE, w.sourceId, w.date,
+                            w.activityType, w.activityName, w.startTime,
+                            w.durationMs, w.calories
+                        )
                     )
                 }
                 db.setTransactionSuccessful()

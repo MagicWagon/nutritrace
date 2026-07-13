@@ -9,6 +9,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.0-rc.55] - 2026-07-13
+
+### Fixed
+- Health Connect: Samsung Health and other single-record-per-day step
+  sources no longer under-count during the day. Steps that read 4,938
+  at 11:47 while the Health Connect Viewer showed 9,878 now match.
+  Same fix covers Distance, Total Calories, Active Calories, Floors,
+  and Hydration. Reported by @traebertthomas-cpu in #93.
+- Health Connect: Exercise sessions (Samsung Health workouts, etc.)
+  now sync into the Diary and Statistics workout log. Permission was
+  being requested but never read. Also reported by @traebertthomas-cpu
+  in #91.
+
+---
+
 ## [1.0.0-rc.54] - 2026-07-10
 
 ### Fixed
