@@ -83,13 +83,19 @@
   const _mealieEnabled = DB.getSetting('mealieEnabled',  false);
   // OFF / USDA / Mealie are food databases — only meaningful on the Foods tab.
   // Meals + Recipes tabs only get Local + From Others (when shared content exists).
-  $: availableSources = [
+  // 'all' (issue #96) is prepended once there are >= 2 sources so the option
+  // is only offered when it actually merges something. Fires everything in
+  // parallel and shows results grouped by source with per-row source badges.
+  $: _perSourceOptions = [
     { value: 'local',  label: $_('foods.sources.local')  },
     ...(activeTab === 0 && $offEnabled    ? [{ value: 'off',    label: 'OFF' }] : []),
     ...(activeTab === 0 && $usdaEnabled   ? [{ value: 'usda',   label: 'USDA' }] : []),
     ...(activeTab === 0 && _mealieEnabled ? [{ value: 'mealie', label: 'Mealie' }] : []),
     ...(_tabHasShared  ? [{ value: 'shared', label: $_('foods.sources.from_others') }] : []),
   ];
+  $: availableSources = _perSourceOptions.length >= 2
+    ? [{ value: 'all', label: $_('foods.sources.all') }, ..._perSourceOptions]
+    : _perSourceOptions;
   $: _sourceLabel = availableSources.find(s => s.value === searchSource)?.label || '';
 
   // Sharing — "From Others" source filter (per-category)
@@ -133,12 +139,41 @@
   let localFoods = [];
   let localMeals = [];
   let localRecipes = [];
+  // apiResults still holds OFF or USDA results in single-source modes (only
+  // one of the two can be active at a time). In 'all' mode, OFF and USDA
+  // populate offResults / usdaResults separately so both can render together
+  // alongside mealieResults, local matches, and shared matches. #96.
   let apiResults = [];
+  let offResults = [];
+  let usdaResults = [];
   let mealieResults = [];
   let loading = false;
   let loadError = false;
   let mealieLoading = false;
   let searchTimeout = null;
+  // Pagination state for single-source OFF / USDA modes. Both use the
+  // shared apiResults array (only one of the two can be active at a time)
+  // so a single set of page/total/hasMore fields suffices. When the user
+  // scrolls to the bottom sentinel, loadMoreExternal() fetches the next
+  // page and appends to apiResults. #96.
+  let apiPage = 1;
+  let apiTotalHits = 0;
+  let apiHasMore = false;
+  let apiLoadingMore = false;
+  // Per-source pagination state for ALL mode (separate from single-source
+  // state so each external source can page independently within the
+  // merged view). loadMoreAll() fetches the next page from every source
+  // with hasMore=true when the ALL-mode sentinel scrolls into view.
+  let _allOffPage = 1, _allOffHasMore = false, _allOffTotal = 0;
+  let _allUsdaPage = 1, _allUsdaHasMore = false, _allUsdaTotal = 0;
+  let _allMealiePage = 1, _allMealieHasMore = false, _allMealieTotal = 0;
+  let _allLoadingMore = false;
+  // Smaller pages in ALL mode than single-source: keeps the merged
+  // first-render snappy (3 sources at 20 = up to 60 external items) vs
+  // single-source at 50 where users are deliberately going deep. Held
+  // constant per query because APIs skip items when pageSize varies
+  // between sequential pageNumber requests.
+  const ALL_MODE_PAGE_SIZE = 20;
 
   let showItemActions = false;
   let selectedItem = null;
@@ -219,6 +254,120 @@
   $: _groupList = activeTab === 0 ? groupFoods : activeTab === 1 ? groupMeals : groupRecipes;
   $: displayList = searchSource === 'shared' ? _groupList : _ownList;
   $: { if (searchSource === 'shared' && _tabHasShared && !groupFoods.length && !groupMeals.length && !groupRecipes.length) loadGroupCatalogue(); }
+  // 'all' mode (#96) needs the shared catalogue loaded too so shared items can
+  // participate in the merged results without the user having to first flip
+  // to the 'shared' chip.
+  $: { if (searchSource === 'all' && _tabHasShared && !groupFoods.length && !groupMeals.length && !groupRecipes.length) loadGroupCatalogue(); }
+
+  // Merged results for 'all' mode. Each entry is { source, item } so the row
+  // renderer can dispatch the right pick action and stamp the right badge.
+  // Ordering: Local first (user's own data), then Shared, then Mealie
+  // (self-hosted curated), then OFF (community brand-name catalogue), then
+  // USDA (verified generic reference). OFF-before-USDA matches how users
+  // actually search — familiar brand-name products usually come from OFF
+  // (Nutella, Cheerios); USDA is stronger on generic/verified nutrition
+  // reference entries and reads naturally as the "fallback / dig deeper"
+  // tier below the brand-name results.
+  $: _allModeItems = searchSource !== 'all' ? [] : [
+    ...(_ownList || []).filter(f => search.trim() ? _fuzzyMatch(f, search) : false).map(item => ({ source: 'local',  item })),
+    ...(_tabHasShared ? (_groupList || []).filter(f => search.trim() ? _fuzzyMatch(f, search) : false).map(item => ({ source: 'shared', item })) : []),
+    ...(mealieResults || []).map(item => ({ source: 'mealie', item })),
+    ...(offResults    || []).map(item => ({ source: 'off',    item })),
+    ...(usdaResults   || []).map(item => ({ source: 'usda',   item })),
+  ];
+
+  function _pickBySource(source, item) {
+    if (source === 'mealie') return pickMealieRecipe(item);
+    return pickFood(item);  // local + shared + off + usda all go through pickFood
+  }
+
+  // Fetch the next page of the currently-active external source and append
+  // to apiResults. Triggered by the IntersectionObserver on the bottom
+  // sentinel; also guarded so a fast scroller can't fire multiple in-flight
+  // requests. #96. ALL mode doesn't call this — that view stays capped per
+  // source so the merged list stays scannable.
+  async function loadMoreExternal() {
+    if (apiLoadingMore || !apiHasMore || !search.trim()) return;
+    if (searchSource !== 'off' && searchSource !== 'usda') return;
+    apiLoadingMore = true;
+    const nextPage = apiPage + 1;
+    try {
+      const r = searchSource === 'off'
+        ? await API.searchByNameWithMeta(search, nextPage)
+        : await USDA.searchByNameWithMeta(search, nextPage, usdaApiKey.get());
+      // De-dup on stable id (avoids double-inserts if the API returns
+      // overlap between pages, which USDA occasionally does for common terms).
+      const seen = new Set(apiResults.map(x => x.id ?? x.barcode ?? x.name));
+      const fresh = (r.items || []).filter(x => !seen.has(x.id ?? x.barcode ?? x.name));
+      apiResults = [...apiResults, ...fresh];
+      apiPage = r.page;
+      apiHasMore = r.hasMore;
+      apiTotalHits = r.totalHits;
+    } catch (e) {
+      console.warn('[foods] loadMore failed:', e);
+    } finally {
+      apiLoadingMore = false;
+    }
+  }
+
+  // Svelte action: fires onIntersect once each time the observed node
+  // enters the viewport (with 240px rootMargin so we start loading before
+  // the user reaches the very bottom — smoother than "load exactly at end").
+  function _infiniteScroll(node, { onIntersect }) {
+    const observer = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting) onIntersect();
+    }, { rootMargin: '240px' });
+    observer.observe(node);
+    return { destroy() { observer.disconnect(); } };
+  }
+
+  // ALL-mode counterpart of loadMoreExternal. Fires the next page of any
+  // external source that still has hasMore=true, running them in parallel.
+  // Merges appended items into their per-source arrays; the reactive
+  // _allModeItems rebuilds the merged list in source order. Local + shared
+  // are never paginated (they're already fully in memory and filtered by
+  // the search term). #96.
+  async function loadMoreAll() {
+    if (_allLoadingMore || !search.trim() || searchSource !== 'all') return;
+    if (!_allOffHasMore && !_allUsdaHasMore && !_allMealieHasMore) return;
+    _allLoadingMore = true;
+    const jobs = [];
+    const dedupAppend = (existing, incoming, keyOf) => {
+      const seen = new Set(existing.map(keyOf));
+      return [...existing, ...incoming.filter(x => !seen.has(keyOf(x)))];
+    };
+    if (_allOffHasMore) {
+      jobs.push(API.searchByNameWithMeta(search, _allOffPage + 1, ALL_MODE_PAGE_SIZE)
+        .then(r => {
+          offResults = dedupAppend(offResults, r.items || [], x => x.id ?? x.barcode ?? x.name);
+          _allOffPage = r.page; _allOffHasMore = r.hasMore; _allOffTotal = r.totalHits;
+        })
+        .catch(() => {}));
+    }
+    if (_allUsdaHasMore) {
+      const key = usdaApiKey.get();
+      jobs.push(USDA.searchByNameWithMeta(search, _allUsdaPage + 1, key, ALL_MODE_PAGE_SIZE)
+        .then(r => {
+          usdaResults = dedupAppend(usdaResults, r.items || [], x => x.id ?? x.barcode ?? x.name);
+          _allUsdaPage = r.page; _allUsdaHasMore = r.hasMore; _allUsdaTotal = r.totalHits;
+        })
+        .catch(() => {}));
+    }
+    if (_allMealieHasMore) {
+      jobs.push(Mealie.searchWithMeta(search, _allMealiePage + 1, ALL_MODE_PAGE_SIZE)
+        .then(r => {
+          mealieResults = dedupAppend(mealieResults, r.items || [], x => x.id ?? x.slug ?? x.name);
+          _allMealiePage = r.page; _allMealieHasMore = r.hasMore; _allMealieTotal = r.totalHits;
+        })
+        .catch(() => {}));
+    }
+    try { await Promise.all(jobs); }
+    finally { _allLoadingMore = false; }
+  }
+
+  // Aggregate hasMore across ALL-mode external sources — sentinel + footer
+  // only render while at least one source still has pages left.
+  $: _allHasMoreAny = _allOffHasMore || _allUsdaHasMore || _allMealieHasMore;
   function _editDist(a, b) {
     if (Math.abs(a.length - b.length) > 2) return 99;
     const m = a.length, n = b.length;
@@ -306,23 +455,40 @@
   async function onSearch() {
     clearTimeout(searchTimeout);
     apiResults = [];
+    offResults = [];
+    usdaResults = [];
     mealieResults = [];
-    if (!search.trim() || searchSource === 'local') return;
+    // Reset pagination on every fresh search — new query means starting
+    // over at page 1 with no accumulated results.
+    apiPage = 1;
+    apiTotalHits = 0;
+    apiHasMore = false;
+    // Local + shared don't need remote calls; 'all' mode always needs the
+    // debounce because it fans out to external APIs alongside local filter.
+    if (!search.trim() || searchSource === 'local' || searchSource === 'shared') return;
     const src = searchSource;
     searchTimeout = setTimeout(async () => {
       if (activeTab !== 0) return;
       if (src === 'off') {
         try {
           loading = true;
-          apiResults = await API.searchByName(search) || [];
-        } catch { apiResults = []; }
+          const r = await API.searchByNameWithMeta(search, 1);
+          apiResults = r.items;
+          apiTotalHits = r.totalHits;
+          apiHasMore = r.hasMore;
+          apiPage = r.page;
+        } catch { apiResults = []; apiTotalHits = 0; apiHasMore = false; }
         finally { loading = false; }
       } else if (src === 'usda') {
         try {
           loading = true;
           const key = usdaApiKey.get();
-          apiResults = await USDA.searchByName(search, 1, key) || [];
-        } catch { apiResults = []; }
+          const r = await USDA.searchByNameWithMeta(search, 1, key);
+          apiResults = r.items;
+          apiTotalHits = r.totalHits;
+          apiHasMore = r.hasMore;
+          apiPage = r.page;
+        } catch { apiResults = []; apiTotalHits = 0; apiHasMore = false; }
         finally { loading = false; }
       } else if (src === 'mealie') {
         try {
@@ -330,6 +496,49 @@
           mealieResults = await Mealie.search(search) || [];
         } catch { mealieResults = []; }
         finally { mealieLoading = false; }
+      } else if (src === 'all') {
+        // Parallel fan-out to every enabled external source. Each promise
+        // catches its own error so one failing API doesn't nuke the others
+        // (Promise.all fail-fast would kill the whole merge). Local + shared
+        // results come from reactive state already loaded — no fetch here.
+        // Uses *WithMeta variants so pagination state can drive the ALL-mode
+        // sentinel via loadMoreAll(). Previous version capped at 10 per
+        // source; now returns the full first page (50 per external source)
+        // and paginates on scroll for parity with single-source mode. #96.
+        _allOffPage = _allUsdaPage = _allMealiePage = 1;
+        _allOffHasMore = _allUsdaHasMore = _allMealieHasMore = false;
+        _allOffTotal = _allUsdaTotal = _allMealieTotal = 0;
+        const jobs = [];
+        const usesOffOrUsda = $offEnabled || $usdaEnabled;
+        loading = usesOffOrUsda;
+        mealieLoading = _mealieEnabled;
+        if ($offEnabled) {
+          jobs.push(API.searchByNameWithMeta(search, 1, ALL_MODE_PAGE_SIZE)
+            .then(r => {
+              offResults = r.items || [];
+              _allOffTotal = r.totalHits; _allOffHasMore = r.hasMore; _allOffPage = r.page;
+            })
+            .catch(() => { offResults = []; }));
+        }
+        if ($usdaEnabled) {
+          const key = usdaApiKey.get();
+          jobs.push(USDA.searchByNameWithMeta(search, 1, key, ALL_MODE_PAGE_SIZE)
+            .then(r => {
+              usdaResults = r.items || [];
+              _allUsdaTotal = r.totalHits; _allUsdaHasMore = r.hasMore; _allUsdaPage = r.page;
+            })
+            .catch(() => { usdaResults = []; }));
+        }
+        if (_mealieEnabled) {
+          jobs.push(Mealie.searchWithMeta(search, 1, ALL_MODE_PAGE_SIZE)
+            .then(r => {
+              mealieResults = r.items || [];
+              _allMealieTotal = r.totalHits; _allMealieHasMore = r.hasMore; _allMealiePage = r.page;
+            })
+            .catch(() => { mealieResults = []; }));
+        }
+        try { await Promise.all(jobs); }
+        finally { loading = false; mealieLoading = false; }
       }
     }, 400);
   }
@@ -1041,7 +1250,113 @@
   {/if}
 
   <div class="page-content">
-    {#if searchSource === 'local' || searchSource === 'shared' || activeTab !== 0}
+    {#if searchSource === 'all'}
+      <!-- ── All: merged results from every enabled source ─────────────────── -->
+      {#if !search.trim()}
+        <div class="empty-state">
+          <span class="material-symbols-rounded empty-icon">search</span>
+          <p>{$_('foods.all_mode.search_hint')}</p>
+        </div>
+      {:else if (loading || mealieLoading) && _allModeItems.length === 0}
+        <div class="loading-row">
+          <span class="material-symbols-rounded spin">refresh</span>
+          <span class="text-2 text-sm">{$_('foods.all_mode.searching')}</span>
+        </div>
+      {:else if _allModeItems.length === 0}
+        <div class="empty-state">
+          <span class="material-symbols-rounded empty-icon">search_off</span>
+          <p>{$_('foods.all_mode.no_matches', { values: { q: search } })}</p>
+        </div>
+      {:else}
+        <ul class="food-list">
+          {#each _allModeItems as { source, item } (source + ':' + (item.id || item.slug || item.barcode || item.name))}
+            {@const isMealie = source === 'mealie'}
+            {@const isExternal = source === 'off' || source === 'usda'}
+            {@const _foodEnergy = isMealie
+              ? null
+              : Nutrition.displayEnergy(item.nutrition?.calories || item.calories || 0, $energyUnit)}
+            <li class="food-item card" in:fade={{ duration: 140 }}>
+              <button class="food-item-btn"
+                on:click={() => _pickBySource(source, item)}
+                on:contextmenu|preventDefault={() => !isMealie && !isExternal && longPress(item)}>
+                {#if isMealie && item.id}
+                  <img class="food-thumb" src={Mealie.imageUrl(item.id)} alt=""
+                    loading="lazy" on:error={e => e.target.style.display='none'} />
+                {:else if item.imgUrl}
+                  <img class="food-thumb" src={item.imgUrl} alt="" loading="lazy" referrerpolicy="no-referrer" on:error={e => e.target.style.display='none'} />
+                {:else}
+                  <div class="food-thumb-placeholder">
+                    <span class="material-symbols-rounded">
+                      {#if isMealie}menu_book{:else if source === 'usda'}science{:else if source === 'off'}public{:else}{_tabIcon}{/if}
+                    </span>
+                  </div>
+                {/if}
+                <div class="food-info">
+                  <span class="food-name">
+                    {#if source === 'local' && item.favorite}<span class="material-symbols-rounded fav-mark" title="Favorite">favorite</span>{/if}
+                    {item.name}
+                  </span>
+                  {#if isMealie}
+                    {#if item.recipeCategory?.length}
+                      <span class="food-brand text-3 text-sm">{item.recipeCategory.map(c => c.name).join(', ')}</span>
+                    {/if}
+                  {:else}
+                    {#if item.brand}<span class="food-brand text-3 text-sm">{item.brand}</span>{/if}
+                    {#if _foodEnergy}<span class="food-kcal text-sm">{_foodEnergy.value.toLocaleString()} {_foodEnergy.unit}</span>{/if}
+                    {#if source === 'shared' && item._shared_by}<span class="food-kcal text-sm" style="color:var(--accent)">by {item._shared_by}</span>{/if}
+                  {/if}
+                </div>
+                <span class="source-badge source-badge-{source}">
+                  {#if source === 'local'}{$_('foods.sources.local')}
+                  {:else if source === 'shared'}{$_('foods.sources.shared')}
+                  {:else if source === 'mealie'}{$_('foods.sources.mealie')}
+                  {:else if source === 'usda'}USDA
+                  {:else}OFF{/if}
+                </span>
+              </button>
+            </li>
+          {/each}
+        </ul>
+        <!-- ALL-mode per-source counts + infinite-scroll sentinel. Counts
+             turn silent 0s into visible signals (e.g. "OFF · 0" tells the
+             user OFF didn't return anything, not that ALL is broken).
+             Sentinel fires loadMoreAll() when it scrolls into view. #96. -->
+        {#if _allModeItems.length > 0 || _allOffTotal > 0 || _allUsdaTotal > 0 || _allMealieTotal > 0}
+          {@const _localCount = (_ownList || []).filter(f => search.trim() ? _fuzzyMatch(f, search) : false).length}
+          {@const _sharedCount = _tabHasShared ? (_groupList || []).filter(f => search.trim() ? _fuzzyMatch(f, search) : false).length : 0}
+          <div class="all-source-counts">
+            <span class="asc-chip"><span class="asc-dot asc-local"></span>Local · {_localCount}</span>
+            {#if _tabHasShared}
+              <span class="asc-chip"><span class="asc-dot asc-shared"></span>Shared · {_sharedCount}</span>
+            {/if}
+            {#if _mealieEnabled}
+              <span class="asc-chip"><span class="asc-dot asc-mealie"></span>Mealie · {mealieResults.length}{#if _allMealieTotal > mealieResults.length} of {_allMealieTotal.toLocaleString()}{/if}</span>
+            {/if}
+            {#if $offEnabled}
+              <span class="asc-chip"><span class="asc-dot asc-off"></span>OFF · {offResults.length}{#if _allOffTotal > offResults.length} of {_allOffTotal.toLocaleString()}{/if}</span>
+            {/if}
+            {#if $usdaEnabled}
+              <span class="asc-chip"><span class="asc-dot asc-usda"></span>USDA · {usdaResults.length}{#if _allUsdaTotal > usdaResults.length} of {_allUsdaTotal.toLocaleString()}{/if}</span>
+            {/if}
+          </div>
+        {/if}
+        {#if _allLoadingMore}
+          <div class="loading-row" style="margin-top:8px">
+            <span class="material-symbols-rounded spin">refresh</span>
+            <span class="text-2 text-sm">{$_('foods.all_mode.loading_more')}</span>
+          </div>
+        {:else if loading || mealieLoading}
+          <div class="loading-row" style="margin-top:8px">
+            <span class="material-symbols-rounded spin">refresh</span>
+            <span class="text-2 text-sm">{$_('foods.all_mode.still_searching_others')}</span>
+          </div>
+        {/if}
+        {#if _allHasMoreAny && !_allLoadingMore}
+          <div class="scroll-sentinel" use:_infiniteScroll={{ onIntersect: loadMoreAll }}></div>
+        {/if}
+      {/if}
+
+    {:else if searchSource === 'local' || searchSource === 'shared' || activeTab !== 0}
       <!-- ── Local list ─────────────────────────────────────────────────────── -->
       {#if filteredList.length === 0 && !search && !loadError}
         <div class="empty-state">
@@ -1180,6 +1495,26 @@
               </li>
             {/each}
           </ul>
+          <!-- Pagination footer: "Showing X of Y", plus a sentinel that
+               triggers loadMoreExternal when it scrolls into view (240px
+               rootMargin so we prefetch a screen before the user reaches
+               the actual bottom). Hidden entirely on the last page. #96. -->
+          {#if apiTotalHits > 0}
+            <div class="pagination-footer">
+              <span class="text-3 text-sm">
+                {$_('foods.pagination.showing_x_of_y', { values: { shown: apiResults.length.toLocaleString(), total: apiTotalHits.toLocaleString() } })}
+              </span>
+              {#if apiLoadingMore}
+                <span class="loading-more">
+                  <span class="material-symbols-rounded spin">refresh</span>
+                  {$_('foods.pagination.loading_more')}
+                </span>
+              {/if}
+            </div>
+            {#if apiHasMore && !apiLoadingMore}
+              <div class="scroll-sentinel" use:_infiniteScroll={{ onIntersect: loadMoreExternal }}></div>
+            {/if}
+          {/if}
         {/if}
 
         <!-- Mealie results -->
@@ -1707,6 +2042,90 @@
   .fav-mark   { font-size: 14px; vertical-align: -2px; color: var(--macro-protein, #ec4899); margin-right: 4px; }
   .food-brand { }
   .food-kcal  { color: var(--text-2); }
+
+  /* Source badge — pill on each row in 'all' search mode indicating which
+     source the item came from (Local / Shared / Mealie / USDA / OFF).
+     Colors chosen for scannability: user's own = green, community = neutral
+     gray, curated/structured = accent, self-hosted Mealie = orange. #96. */
+  .source-badge {
+    flex-shrink: 0;
+    align-self: center;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    margin-left: 8px;
+  }
+  .source-badge-local  { background: rgba(74, 222, 128, 0.14); color: rgb(52, 179, 105); }
+  .source-badge-shared { background: rgba(168, 85, 247, 0.14); color: rgb(168, 85, 247); }
+  .source-badge-mealie { background: rgba(251, 146, 60, 0.14); color: rgb(234, 128, 42); }
+  .source-badge-usda   { background: rgba(59, 130, 246, 0.14); color: rgb(59, 130, 246); }
+  .source-badge-off    { background: rgba(148, 163, 184, 0.18); color: rgb(148, 163, 184); }
+
+  /* Pagination footer under external results (single-source OFF/USDA
+     modes). "Showing X of Y" gives users the truth about how much data
+     is behind the query, and the scroll-sentinel silently drives
+     infinite scroll — no explicit "load more" button. #96. */
+  .pagination-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 4px 0;
+    gap: 8px;
+  }
+  .loading-more {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-2);
+    font-size: 13px;
+  }
+  .loading-more .material-symbols-rounded {
+    font-size: 16px;
+  }
+  .scroll-sentinel {
+    /* Zero-height / non-interactive sentinel. IntersectionObserver
+       watches it; when it enters the viewport (with rootMargin), we
+       fetch the next page. Height 1px avoids some browsers collapsing
+       0-height elements out of the layout tree. */
+    height: 1px;
+    width: 100%;
+    pointer-events: none;
+  }
+
+  /* ALL-mode per-source counts strip. One chip per enabled source so
+     the user sees exactly what each source contributed and whether more
+     hits exist (e.g. "USDA · 50 of 20,968"). Dots reuse the badge color
+     scheme so the strip and the row badges speak the same visual
+     language. #96. */
+  .all-source-counts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    padding: 10px 4px 0;
+  }
+  .asc-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: var(--surface-2);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-2);
+  }
+  .asc-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .asc-local  { background: rgb(52, 179, 105); }
+  .asc-shared { background: rgb(168, 85, 247); }
+  .asc-mealie { background: rgb(234, 128, 42); }
+  .asc-usda   { background: rgb(59, 130, 246); }
+  .asc-off    { background: rgb(148, 163, 184); }
 
   .server-error-banner {
     display: flex; align-items: center; gap: 8px;
