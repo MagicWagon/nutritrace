@@ -9,6 +9,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.2] - 2026-07-22
+
+Patch release. Fixes long-press to open the food/meal/recipe action
+sheet on iOS Safari, plus a high-severity brace-expansion CVE bump.
+
+### Fixed
+
+- **Long-press works on Foods/Meals/Recipes lists in iOS Safari.**
+  The Diary tab already used a manual touch timer to detect long-press;
+  the Foods tab only listened for `contextmenu`, which iOS Safari
+  doesn't dispatch for long-press on non-text elements. Ported the
+  same touch-timer pattern to Foods/Meals/Recipes so long-press
+  opens the edit/clone/delete action sheet across every browser.
+  (#102, reported by @javydekoning)
+
+### Security
+
+- **brace-expansion bumped to 5.0.7 (CVE-2026-13149, high).**
+  Regex denial-of-service in the expansion parser. Transitive dep;
+  no direct code change required.
+
+---
+
 ## [1.0.1] - 2026-07-19
 
 Patch release. Activity MET auto-estimate now uses your latest
