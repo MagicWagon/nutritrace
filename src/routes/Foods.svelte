@@ -867,6 +867,21 @@
     showItemActions = true;
   }
 
+  // Manual long-press timer for iOS Safari, which doesn't dispatch
+  // `contextmenu` events on long-press for non-text elements (especially
+  // when the element sets `-webkit-touch-callout: none`, which .food-item-btn
+  // does). touchstart/touchmove/touchend always fire on iOS, so we detect
+  // the hold ourselves and trigger the same action sheet. Mirrors the
+  // Diary's implementation. iOS also suppresses synthetic click after a
+  // >300ms hold, so no double-fire risk at 500ms. #102.
+  let _lpTimer = null;
+  function _startLongPress(action) {
+    _lpTimer = setTimeout(() => { _lpTimer = null; action(); }, 500);
+  }
+  function _cancelLongPress() {
+    if (_lpTimer) { clearTimeout(_lpTimer); _lpTimer = null; }
+  }
+
   function handleItemAction({ detail }) {
     if (!selectedItem) return;
     if (detail.value === 'edit') {
@@ -1278,7 +1293,10 @@
             <li class="food-item card" in:fade={{ duration: 140 }}>
               <button class="food-item-btn"
                 on:click={() => _pickBySource(source, item)}
-                on:contextmenu|preventDefault={() => !isMealie && !isExternal && longPress(item)}>
+                on:contextmenu|preventDefault={() => !isMealie && !isExternal && longPress(item)}
+                on:touchstart|passive={() => _startLongPress(() => !isMealie && !isExternal && longPress(item))}
+                on:touchmove|passive={_cancelLongPress}
+                on:touchend={_cancelLongPress}>
                 {#if isMealie && item.id}
                   <img class="food-thumb" src={Mealie.imageUrl(item.id)} alt=""
                     loading="lazy" on:error={e => e.target.style.display='none'} />
@@ -1403,7 +1421,10 @@
               {/if}
               <button class="food-item-btn"
                 on:click={() => manageMode ? toggleManageSelect(food) : pickFood(food)}
-                on:contextmenu|preventDefault={() => !manageMode && longPress(food)}>
+                on:contextmenu|preventDefault={() => !manageMode && longPress(food)}
+                on:touchstart|passive={() => _startLongPress(() => !manageMode && longPress(food))}
+                on:touchmove|passive={_cancelLongPress}
+                on:touchend={_cancelLongPress}>
                 {#if $foodsShowThumbnails && food.imgUrl}
                   <img class="food-thumb" src={food.imgUrl} alt="" loading="lazy" referrerpolicy="no-referrer" on:error={e => e.target.style.display='none'} />
                 {:else}
@@ -1478,7 +1499,10 @@
                 {/if}
                 <button class="food-item-btn"
                   on:click={() => pickFood(food)}
-                  on:contextmenu|preventDefault={() => longPress(food)}>
+                  on:contextmenu|preventDefault={() => longPress(food)}
+                  on:touchstart|passive={() => _startLongPress(() => longPress(food))}
+                  on:touchmove|passive={_cancelLongPress}
+                  on:touchend={_cancelLongPress}>
                   {#if food.imgUrl}
                     <img class="food-thumb" src={food.imgUrl} alt="" loading="lazy" referrerpolicy="no-referrer" on:error={e => e.target.style.display='none'} />
                   {:else}
