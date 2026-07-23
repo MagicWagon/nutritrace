@@ -344,16 +344,20 @@ export const AI_PROVIDERS = [
 export const AI_MODELS = {
   claude: [
     { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku (fast, cheap)' },
-    { value: 'claude-sonnet-4-6',         label: 'Claude Sonnet (smarter)'    },
+    { value: 'claude-sonnet-5',           label: 'Claude Sonnet (smarter)'    },
+    { value: 'claude-opus-4-8',           label: 'Claude Opus (smartest)'     },
+    { value: '__custom__',                label: 'Custom…'                    },
   ],
   openai: [
-    { value: 'gpt-4o-mini', label: 'GPT-4o mini (fast, cheap)' },
-    { value: 'gpt-4o',      label: 'GPT-4o (smarter)'          },
+    { value: 'gpt-4o-mini',  label: 'GPT-4o mini (fast, cheap)' },
+    { value: 'gpt-4o',       label: 'GPT-4o (smarter)'          },
+    { value: '__custom__',   label: 'Custom…'                   },
   ],
   gemini: [
     { value: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite (cheapest)' },
     { value: 'gemini-2.5-flash',      label: 'Gemini 2.5 Flash (fast, cheap)'   },
     { value: 'gemini-2.5-pro',        label: 'Gemini 2.5 Pro (smarter)'         },
+    { value: '__custom__',            label: 'Custom…'                          },
   ],
 };
 
