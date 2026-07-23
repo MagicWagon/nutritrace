@@ -2030,7 +2030,13 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    width: 100%;
+    /* flex + min-width: 0 so we take remaining space after the sibling
+       meal-info-btn claims its own, and allow the food-name inside to
+       shrink and ellipsis-truncate. Previously used `width: 100%` which
+       forced full parent width and pushed the info button past the
+       card boundary on narrow viewports (Firefox + iOS Safari). #106 */
+    flex: 1;
+    min-width: 0;
     padding: 12px 14px;
     background: none;
     border: none;
