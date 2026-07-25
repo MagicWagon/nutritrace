@@ -1,6 +1,23 @@
-# NutriTrace
+<h1 align="center">NutriTrace</h1>
 
-**Trace Every Bite** — A self-hosted personal nutrition tracker built for privacy and full data ownership.
+<p align="center"><b>Trace Every Bite</b></p>
+
+<p align="center">A self-hosted personal nutrition tracker.<br/>
+No accounts, no telemetry, no cloud sync unless you opt in.</p>
+
+<p align="center">
+  <img src="public/icons/logo-transparent.png" alt="NutriTrace" width="180" />
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-AGPL--3.0-blue"></a>
+  <a href="https://github.com/traceapps/nutritrace/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/traceapps/nutritrace?label=release&color=blue"></a>
+  <a href="https://github.com/traceapps/nutritrace/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/traceapps/nutritrace/total?label=downloads&color=blue"></a>
+  <a href="https://github.com/traceapps/nutritrace/pkgs/container/nutritrace"><img alt="Docker image" src="https://img.shields.io/badge/docker-ghcr.io%2Ftraceapps%2Fnutritrace-2496ED?logo=docker&logoColor=white"></a>
+  <a href="https://github.com/traceapps/nutritrace/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/traceapps/nutritrace?style=flat"></a>
+</p>
+
+---
 
 NutriTrace runs as a single Docker container on your own hardware, with a PWA for the browser and a native Android app for your phone. No accounts on external services, no data leaving your network, no subscriptions.
 
