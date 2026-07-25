@@ -22,6 +22,7 @@
   import { Nutrition } from '../lib/nutrition.js';
   import { Mealie } from '../lib/mealieApi.js';
   import { resolveAssetUrl } from '../lib/platform.js';
+  import { offCountryTagToFlag, offCountryTagToName } from '../lib/off-country-flag.js';
   import { foodsShowThumbnails, foodsShowCategories, foodsShowLabels, foodsShowNotes, foodsSort, mealsSort, recipesSort, foodCategories, foodsShowYesterdayMeals, foodsYesterdayCollapsed, foodsSavedCollapsed, mealNames, usdaEnabled, usdaApiKey, offEnabled, offSearchCountry, catName as _catName, catDisplay as _catDisplay, pageBanners, bannerStyle, energyUnit } from '../stores/settings.js';
   import { mealIcon } from '../lib/mealIcon.js';
 
@@ -1196,24 +1197,6 @@
           {src.label}
         </button>
       {/each}
-      <!-- OFF country filter — surfaces the offSearchCountry setting inline
-           when the user is searching OFF (or 'all' which fans out to OFF).
-           Narrows OFF results to a specific country's products, which cuts
-           through the "10,000 similar-name variants from around the world"
-           noise in default worldwide search. Default 'World' = no filter.
-           Only rendered when OFF is one of the active sources. -->
-      {#if activeTab === 0 && $offEnabled && (searchSource === 'off' || searchSource === 'all')}
-        <div class="off-country-picker">
-          <span class="material-symbols-rounded off-country-icon">public</span>
-          <select class="off-country-select"
-                  bind:value={$offSearchCountry}
-                  title="OFF search country filter">
-            {#each ['World','United States','United Kingdom','Australia','Canada','France','Germany','Spain','Italy','Mexico','Brazil','Japan','China','India'] as c}
-              <option value={c}>{c === 'World' ? 'Worldwide' : c}</option>
-            {/each}
-          </select>
-        </div>
-      {/if}
     </div>
   {/if}
   </div>
@@ -1533,7 +1516,21 @@
                     </div>
                   {/if}
                   <div class="food-info">
-                    <span class="food-name">{food.name}</span>
+                    <span class="food-name">
+                      {food.name}
+                      {#if searchSource === 'off' && food.originTag}
+                        {@const _flag = offCountryTagToFlag(food.originTag)}
+                        {#if _flag}
+                          <!-- OFF origin-country flag lifted from `origins_tags` (or
+                               manufacturing_places_tags fallback). Only rendered when
+                               we can map the tag to an ISO code — unmapped countries
+                               show nothing rather than a placeholder. Sold-in countries
+                               (`countries_tags`) are deliberately NOT used here since
+                               they don't mean origin. -->
+                          <span class="off-origin-flag" title={`Made in ${offCountryTagToName(food.originTag)}`} aria-label={`Origin: ${offCountryTagToName(food.originTag)}`}>{_flag}</span>
+                        {/if}
+                      {/if}
+                    </span>
                     {#if food.brand}<span class="food-brand text-3 text-sm">{food.brand}</span>{/if}
                     <span class="food-kcal text-sm">
                       {_foodEnergy.value.toLocaleString()} {_foodEnergy.unit}
@@ -2330,35 +2327,16 @@
     font-weight: 600;
   }
 
-  /* OFF country filter chip — sits inline with source chips. Globe icon
-     + a compact <select> that switches the offSearchCountry setting. Same
-     visual weight as source-chip so the row stays cohesive. */
-  .off-country-picker {
-    flex-shrink: 0;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 3px 10px 3px 8px;
-    border-radius: var(--radius-full);
-    border: 1.5px solid var(--border);
-    background: var(--surface-1);
-    color: var(--text-2);
-    font-size: 13px;
-  }
-  .off-country-icon {
-    font-size: 16px;
-    color: var(--text-3);
-  }
-  .off-country-select {
-    border: none;
-    background: transparent;
-    color: inherit;
-    font-size: 13px;
-    font-weight: 500;
-    outline: none;
-    padding: 2px 0;
-    cursor: pointer;
-    max-width: 130px;
+  /* OFF origin-country flag emoji shown next to each OFF result's name.
+     Small, inline, decorative — the tooltip carries the country name for
+     platforms where flag emojis render as country-code text (older
+     Android, some Linux). Kept subtle so the food name stays the focus. */
+  .off-origin-flag {
+    display: inline-block;
+    margin-left: 6px;
+    font-size: 14px;
+    vertical-align: -1px;
+    line-height: 1;
   }
 
   /* Barcode-lookup loading overlay. Centered card, soft backdrop, polished

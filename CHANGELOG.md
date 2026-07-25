@@ -9,13 +9,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
-- **Country filter chip in Foods search.** When searching Open Food Facts
-  (or in "All" mode), a globe-icon dropdown next to the source chips lets
-  you narrow results to a specific country's products (Worldwide, United
-  States, United Kingdom, France, and more). Cuts through the noise when
-  a common term returns many similar variants from around the world.
-  Stays in sync with Settings → Connected Services → Open Food Facts →
-  Search Country.
+- **Origin-country flag on OFF search results.** Each Open Food Facts
+  result now shows a small flag emoji next to the food name when OFF has
+  origin data for it (from `origins_tags`, falling back to
+  `manufacturing_places_tags`). Lets you see at a glance whether that
+  "yogurt" is French, American, or Australian without opening the entry.
+  Countries OFF doesn't have origin data for show no flag rather than a
+  misleading placeholder.
 - **Data-completeness indicator on OFF search results.** Small colored
   dot next to the kcal on each OFF row: green when the entry has most
   nutriment fields filled in, yellow for partial, grey for sparse.

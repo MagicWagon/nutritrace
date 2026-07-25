@@ -337,6 +337,16 @@ const API = {
     const completeness = typeof p.completeness === 'number' ? p.completeness : null;
     const nutriscore   = (p.nutriscore_grade || p.nutrition_grades || '').toLowerCase() || null;
     const nova         = typeof p.nova_group === 'number' ? p.nova_group : null;
+    // Origin country tag for the small flag emoji shown on OFF result rows.
+    // Prefer `origins_tags` (actual manufacturing origin per OFF's taxonomy)
+    // and fall back to `manufacturing_places_tags`. `countries_tags` is NOT
+    // used because that field means "where sold", not "where from" — showing
+    // a US flag on a French product just because it's sold at Trader Joe's
+    // would be misleading. When neither field is populated the flag doesn't
+    // render (many OFF entries lack this metadata; that's honest).
+    const originTag = (Array.isArray(p.origins_tags) && p.origins_tags[0])
+                   || (Array.isArray(p.manufacturing_places_tags) && p.manufacturing_places_tags[0])
+                   || null;
     return {
       name:      (p.product_name || '').trim(),
       brand:     (Array.isArray(p.brands) ? (p.brands[0] || '') : (p.brands || '').split(',')[0] || '').trim(),
@@ -352,6 +362,7 @@ const API = {
       completeness,
       nutriscore,
       nova,
+      originTag,
       nutrition: Nutrition.deriveSodiumSalt({
         calories:        Math.round(kcal * 10) / 10,
         kilojoules:      g('energy'),
