@@ -321,7 +321,7 @@
     bodyStats:         ['body stats','body','weight','measurements','stats','body fat','body water','hydration','muscle','bone'],
     statistics:        ['statistics','chart','y-axis','average','goal line','trend','stats'],
     connectedServices: ['food sources','connected services','usda','open food facts','mealie','recipe','search language','country','api key','credentials','username','password'],
-    ai:                ['ai','trace','assistant','provider','model','api key','artificial intelligence','chat','smart log','voice','quick log','goal insights','claude','openai','gemini','ollama','lm studio','deepseek','groq','openai compatible','oai-compat','base url'],
+    ai:                ['ai','trace','assistant','provider','model','custom model','model id','api key','artificial intelligence','chat','smart log','voice','quick log','goal insights','claude','openai','gemini','sonnet','opus','haiku','gpt','gemini 3','ollama','lm studio','deepseek','groq','openai compatible','oai-compat','base url'],
     notifications:     ['notifications','reminders','water reminder','meal reminder','weigh-in','weigh in','gotify','apprise','ntfy','push','alerts','wellness alerts','goal celebration','weekly summary','email summary'],
     wellness:          ['wellness','activity tracking','fitbit','withings','garmin','health connect','steps','sleep','heart rate','hrv','spo2','sync mode','sync range','connect','disconnect','connected devices','fitness tracker','body battery','stress','lifttrace','workout','calories burned','wearable'],
     sharing:           ['sharing','share','group','catalogue','catalog','visibility','private','members','food sharing'],
@@ -2738,6 +2738,27 @@
               retestDisabled={_offDownloading}
               retestLabel={_offRefreshBtnLabel}
             />
+            <!-- ODbL disclosure for operators running the local OFF mirror.
+                 Only rendered when OFF_LOCAL_DB is env-locked on the server
+                 (envLocks.off_local === true), and only to admin users so
+                 non-admin household members don't see it. Share-alike
+                 obligations flow to the operator serving other users, not
+                 to NutriTrace itself. See LICENSES.md in the repo root. -->
+            {#if $currentUser?.role === 'admin'}
+              <div style="padding:12px 16px;display:flex;gap:10px;align-items:flex-start;background:color-mix(in srgb,#3b82f6 6%,transparent);border-left:3px solid #3b82f6">
+                <span class="material-symbols-rounded" style="font-size:18px;color:#3b82f6;flex-shrink:0;margin-top:2px">info</span>
+                <div class="setting-desc" style="margin:0;line-height:1.5">
+                  Local Open Food Facts mirror is active. OFF data is
+                  licensed under the
+                  <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener" class="about-link">Open Database License (ODbL)</a>.
+                  If you serve other users from this instance, share-alike
+                  obligations apply to your operation. See
+                  <a href="https://github.com/TraceApps/nutritrace/blob/main/LICENSES.md" target="_blank" rel="noopener" class="about-link">LICENSES.md</a>
+                  for details.
+                </div>
+              </div>
+              <div class="setting-divider"></div>
+            {/if}
             {#if $currentUser?.role === 'admin'}
               <div class="setting-row">
                 <div>

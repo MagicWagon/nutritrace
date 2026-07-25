@@ -2,7 +2,7 @@
   import { onMount, onDestroy, tick } from 'svelte';
   import { push, location } from 'svelte-spa-router';
   import { _ } from 'svelte-i18n';
-  import { fade, fly } from 'svelte/transition';
+  import { fade, fly, slide } from 'svelte/transition';
 
   import Tabs        from '../components/ui/Tabs.svelte';
   import ActionSheet     from '../components/ui/ActionSheet.svelte';
@@ -22,7 +22,8 @@
   import { Nutrition } from '../lib/nutrition.js';
   import { Mealie } from '../lib/mealieApi.js';
   import { resolveAssetUrl } from '../lib/platform.js';
-  import { foodsShowThumbnails, foodsShowCategories, foodsShowLabels, foodsShowNotes, foodsSort, mealsSort, recipesSort, foodCategories, foodsShowYesterdayMeals, foodsYesterdayCollapsed, foodsSavedCollapsed, mealNames, usdaEnabled, usdaApiKey, offEnabled, catName as _catName, catDisplay as _catDisplay, pageBanners, bannerStyle, energyUnit } from '../stores/settings.js';
+  import { offCountryTagToFlag, offCountryTagToName } from '../lib/off-country-flag.js';
+  import { foodsShowThumbnails, foodsShowCategories, foodsShowLabels, foodsShowNotes, foodsSort, mealsSort, recipesSort, foodCategories, foodsShowYesterdayMeals, foodsYesterdayCollapsed, foodsSavedCollapsed, mealNames, usdaEnabled, usdaApiKey, offEnabled, offSearchCountry, offSearchLanguage, catName as _catName, catDisplay as _catDisplay, pageBanners, bannerStyle, energyUnit } from '../stores/settings.js';
   import { mealIcon } from '../lib/mealIcon.js';
 
   // Query string params
@@ -97,6 +98,221 @@
     ? [{ value: 'all', label: $_('foods.sources.all') }, ..._perSourceOptions]
     : _perSourceOptions;
   $: _sourceLabel = availableSources.find(s => s.value === searchSource)?.label || '';
+
+  // ── Per-source quality-tier filters ──────────────────────────────────────
+  // Backdrop-pattern dropdown attached to the OFF + USDA source chips (via
+  // caret). Multi-select checkboxes, default all-active (no filter).
+  // Filters apply client-side after fetch, only when the specific source
+  // is active — not in 'all' mode.
+  //
+  // Implementation follows ActionSheet.svelte's proven pattern:
+  //   1. Backdrop covers full viewport, portalled to body
+  //   2. Panel is INSIDE the backdrop, uses on:click|stopPropagation
+  //   3. Backdrop's on:click closes (target === currentTarget check)
+  //   4. Regular on:click (NOT pointerdown) — reliable across Android WebView
+  //
+  // OFF tiers = the same buckets our completeness dot uses (green ≥70%,
+  // yellow 40-70%, grey <40%; "unknown" for entries OFF didn't populate).
+  // USDA tiers = the actual dataType values USDA returns; matches the
+  // tier badge letters (F, L, S, B, X).
+  const _OFF_TIERS = ['hi', 'mid', 'lo', 'unknown'];
+  const _USDA_TIERS = ['Foundation', 'SR Legacy', 'Survey (FNDDS)', 'Branded', 'Experimental', 'unknown'];
+  let offTiersActive  = new Set(_OFF_TIERS);
+  let usdaTiersActive = new Set(_USDA_TIERS);
+  let offDropdownOpen  = false;
+  let usdaDropdownOpen = false;
+  let offCaretEl = null;
+  let usdaCaretEl = null;
+  let offDropdownPos  = { top: 0, right: 0 };
+  let usdaDropdownPos = { top: 0, right: 0 };
+
+  // ── Multi-select source chips (long-press to add) ─────────────────────
+  // pinnedSources holds sources the user has explicitly pinned via long-
+  // press. When any are pinned we enter "multi mode": searchSource flips
+  // to 'all' (triggering the existing merged fan-out), and _allModeItems
+  // is filtered to only show items from pinned sources. Tap on any chip
+  // exits multi mode. Reduces to single-source cleanly when the pinned
+  // set drops to 1.
+  let pinnedSources = new Set();
+  let _lpChipTimer = null;
+  let _lpChipStartX = 0;
+  let _lpChipStartY = 0;
+  // Set true when a long-press just fired, cleared shortly after. Guards
+  // _onChipTap from running the click that Android WebView sometimes
+  // emits after a long-press (would immediately undo the multi-select
+  // and drop back to single-source mode).
+  let _lpChipJustFired = false;
+  function _startChipLongPress(sourceValue, e) {
+    const t = e?.touches?.[0];
+    _lpChipStartX = t?.clientX ?? 0;
+    _lpChipStartY = t?.clientY ?? 0;
+    clearTimeout(_lpChipTimer);
+    _lpChipTimer = setTimeout(() => {
+      _lpChipTimer = null;
+      _toggleChipInMulti(sourceValue);
+    }, 500);
+  }
+  // Movement-thresholded cancel — only kill the timer when the finger has
+  // actually moved more than ~10px. Without the threshold the chip row's
+  // horizontal-scroll overflow causes the browser to fire touchmove events
+  // proactively (to test for pan intent), which cancels the long-press
+  // timer before it ever fires. Foods list rows don't have this issue
+  // because they don't sit inside an overflow-scroll container.
+  function _maybeCancelChipLongPress(e) {
+    if (!_lpChipTimer) return;
+    const t = e?.touches?.[0];
+    if (!t) return;
+    const dx = Math.abs(t.clientX - _lpChipStartX);
+    const dy = Math.abs(t.clientY - _lpChipStartY);
+    if (dx > 10 || dy > 10) _cancelChipLongPress();
+  }
+  function _cancelChipLongPress() {
+    if (_lpChipTimer) { clearTimeout(_lpChipTimer); _lpChipTimer = null; }
+  }
+  function _toggleChipInMulti(sourceValue) {
+    // 'all' is meaningless in multi mode (it already IS all sources).
+    if (sourceValue === 'all') return;
+    // Guard against double-fire from contextmenu + touchstart-timer both
+    // firing on the same long-press. First one wins; second and any
+    // trailing synthetic click event are suppressed for 400ms.
+    if (_lpChipJustFired) return;
+    _lpChipJustFired = true;
+    setTimeout(() => { _lpChipJustFired = false; }, 400);
+
+    const s = new Set(pinnedSources);
+    if (s.has(sourceValue)) {
+      s.delete(sourceValue);
+    } else {
+      // First pin: seed with the currently-active single source so we
+      // don't accidentally deselect it when adding the second source.
+      if (s.size === 0 && searchSource !== 'all' && searchSource !== sourceValue) {
+        s.add(searchSource);
+      }
+      s.add(sourceValue);
+    }
+    if (s.size <= 1) {
+      // Fall back to single-source mode — multi with only one source is
+      // functionally identical to just selecting that source normally.
+      pinnedSources = new Set();
+      if (s.size === 1) searchSource = [...s][0];
+    } else {
+      pinnedSources = s;
+      searchSource = 'all';   // triggers existing all-mode fan-out
+    }
+  }
+  // Pre-compute active flags for each chip in a plain object so the
+  // template's `class:active={activeChips[v]}` has a static dependency
+  // Svelte can track. Previously used a derived function which Svelte's
+  // static analysis couldn't tie to pinnedSources/searchSource, so the
+  // chip highlight never updated after a long-press even though the
+  // pinned set was correctly updated (verified via adb logcat).
+  $: activeChips = {
+    local:  pinnedSources.size > 0 ? pinnedSources.has('local')  : searchSource === 'local',
+    off:    pinnedSources.size > 0 ? pinnedSources.has('off')    : searchSource === 'off',
+    usda:   pinnedSources.size > 0 ? pinnedSources.has('usda')   : searchSource === 'usda',
+    mealie: pinnedSources.size > 0 ? pinnedSources.has('mealie') : searchSource === 'mealie',
+    shared: pinnedSources.size > 0 ? pinnedSources.has('shared') : searchSource === 'shared',
+    all:    pinnedSources.size === 0 && searchSource === 'all',
+  };
+  // Tap handler: exits multi mode and single-selects the tapped source.
+  // Guarded against the synthetic click Android WebView emits after a
+  // long-press — otherwise the long-press-to-add flow would immediately
+  // reset to single-select mode.
+  function _onChipTap(sourceValue) {
+    _cancelChipLongPress();
+    // Guard against the synthetic click Android WebView emits after a
+    // long-press — otherwise the long-press-to-add flow would immediately
+    // reset to single-select mode.
+    if (_lpChipJustFired) return;
+    pinnedSources = new Set();
+    searchSource = sourceValue;
+  }
+  // Small helper for _allModeItems below.
+  function _isSourceActive(name) {
+    return pinnedSources.size === 0 || pinnedSources.has(name);
+  }
+
+  function _bucketOff(c) {
+    if (typeof c !== 'number') return 'unknown';
+    if (c >= 0.7) return 'hi';
+    if (c >= 0.4) return 'mid';
+    return 'lo';
+  }
+
+  function toggleOffTier(t) {
+    const s = new Set(offTiersActive);
+    if (s.has(t)) s.delete(t); else s.add(t);
+    // Refuse to hide everything — user would see zero results with no
+    // clear recourse. Keep at least one tier active at all times.
+    if (s.size === 0) s.add(t);
+    offTiersActive = s;
+  }
+  function toggleUsdaTier(t) {
+    const s = new Set(usdaTiersActive);
+    if (s.has(t)) s.delete(t); else s.add(t);
+    if (s.size === 0) s.add(t);
+    usdaTiersActive = s;
+  }
+  function resetOffTiers()  { offTiersActive  = new Set(_OFF_TIERS); }
+  function resetUsdaTiers() { usdaTiersActive = new Set(_USDA_TIERS); }
+
+  $: offTiersFiltered  = offTiersActive.size  !== _OFF_TIERS.length;
+  $: usdaTiersFiltered = usdaTiersActive.size !== _USDA_TIERS.length;
+
+  // Derived visible results — filters apiResults per the active tier
+  // set. Only applies for the dedicated OFF or USDA source; 'all' mode
+  // keeps the raw mixed list.
+  $: visibleApiResults = (() => {
+    if (searchSource === 'off' && offTiersFiltered) {
+      return apiResults.filter(f => offTiersActive.has(_bucketOff(f.completeness)));
+    }
+    if (searchSource === 'usda' && usdaTiersFiltered) {
+      return apiResults.filter(f => usdaTiersActive.has(f.dataType || 'unknown'));
+    }
+    return apiResults;
+  })();
+
+  function openOffDropdown() {
+    usdaDropdownOpen = false;
+    const r = offCaretEl?.getBoundingClientRect();
+    if (r) offDropdownPos = { top: r.bottom + 6, right: Math.max(8, window.innerWidth - r.right) };
+    offDropdownOpen = true;
+  }
+  function openUsdaDropdown() {
+    offDropdownOpen = false;
+    const r = usdaCaretEl?.getBoundingClientRect();
+    if (r) usdaDropdownPos = { top: r.bottom + 6, right: Math.max(8, window.innerWidth - r.right) };
+    usdaDropdownOpen = true;
+  }
+
+  // Dismiss the tier dropdowns via window-level events. Backdrop is
+  // pointer-events:none so touches pass through — dismiss instead relies
+  // on click / touchmove / scroll bubbling up to window. Panel clicks
+  // are stopped inline with on:click|stopPropagation so they don't reach
+  // here. Caret clicks are checked by .contains() so tapping the same
+  // caret again correctly toggles (open handler runs after our close).
+  let offDropdownPanelEl = null;
+  let usdaDropdownPanelEl = null;
+  function _closeTierDropdowns() {
+    offDropdownOpen = false;
+    usdaDropdownOpen = false;
+  }
+  function _onWindowClick(e) {
+    if (!offDropdownOpen && !usdaDropdownOpen) return;
+    const t = e.target;
+    if (offCaretEl && offCaretEl.contains(t)) return;
+    if (usdaCaretEl && usdaCaretEl.contains(t)) return;
+    if (offDropdownPanelEl  && offDropdownPanelEl.contains(t))  return;
+    if (usdaDropdownPanelEl && usdaDropdownPanelEl.contains(t)) return;
+    _closeTierDropdowns();
+  }
+  function _onWindowTouchMove() {
+    // Any touch drag anywhere = user is scrolling; close dropdown.
+    // Since backdrop is pointer-events:none the touch actually landed
+    // on the underlying element, so the scroll happens natively while
+    // we dismiss.
+    if (offDropdownOpen || usdaDropdownOpen) _closeTierDropdowns();
+  }
 
   // Sharing — "From Others" source filter (per-category)
   let sharingEnabled = false;
@@ -268,12 +484,22 @@
   // (Nutella, Cheerios); USDA is stronger on generic/verified nutrition
   // reference entries and reads naturally as the "fallback / dig deeper"
   // tier below the brand-name results.
+  // _allModeItems runs in 'all' mode (either the user tapped 'All' OR they
+  // entered multi mode via long-press, which flips searchSource to 'all').
+  // The _isSourceActive() gate short-circuits any sources the user has
+  // filtered out via multi-select — pinned set empty = show everything
+  // (regular all mode), pinned set populated = show only those sources.
+  //
+  // The OFF completeness + USDA data-type tier filters ALSO apply here
+  // (not just in dedicated OFF/USDA single-source mode) — filtering
+  // happens at the item level so multi-source results still honour the
+  // user's tier picks within each source.
   $: _allModeItems = searchSource !== 'all' ? [] : [
-    ...(_ownList || []).filter(f => search.trim() ? _fuzzyMatch(f, search) : false).map(item => ({ source: 'local',  item })),
-    ...(_tabHasShared ? (_groupList || []).filter(f => search.trim() ? _fuzzyMatch(f, search) : false).map(item => ({ source: 'shared', item })) : []),
-    ...(mealieResults || []).map(item => ({ source: 'mealie', item })),
-    ...(offResults    || []).map(item => ({ source: 'off',    item })),
-    ...(usdaResults   || []).map(item => ({ source: 'usda',   item })),
+    ...(_isSourceActive('local')  ? (_ownList || []).filter(f => search.trim() ? _fuzzyMatch(f, search) : false).map(item => ({ source: 'local',  item })) : []),
+    ...(_isSourceActive('shared') && _tabHasShared ? (_groupList || []).filter(f => search.trim() ? _fuzzyMatch(f, search) : false).map(item => ({ source: 'shared', item })) : []),
+    ...(_isSourceActive('mealie') ? (mealieResults || []).map(item => ({ source: 'mealie', item })) : []),
+    ...(_isSourceActive('off')    ? (offResults    || []).filter(f => !offTiersFiltered  || offTiersActive.has(_bucketOff(f.completeness))).map(item => ({ source: 'off',    item })) : []),
+    ...(_isSourceActive('usda')   ? (usdaResults   || []).filter(f => !usdaTiersFiltered || usdaTiersActive.has(f.dataType || 'unknown')).map(item => ({ source: 'usda',   item })) : []),
   ];
 
   function _pickBySource(source, item) {
@@ -554,7 +780,11 @@
     }
   }
 
-  $: { search; searchSource; onSearch(); }
+  // Re-run search when query, source, or OFF filters change (country + language).
+  // Country change is rare in practice (setting lives in Settings) but keeping
+  // the reactive means switching either one takes effect immediately without
+  // needing to retype the query.
+  $: { search; searchSource; $offSearchCountry; $offSearchLanguage; onSearch(); }
 
   function _saveScrollState() {
     editorState.foodsScrollY   = window.scrollY;
@@ -1116,6 +1346,17 @@
   });
 </script>
 
+<!-- Dismiss triggers for the OFF/USDA tier dropdowns. Since the backdrop
+     is pointer-events:none (so scrolls pass through to underlying page),
+     we detect dismiss via window-level events that bubble from wherever
+     the touch actually landed. -->
+<svelte:window
+  on:click={_onWindowClick}
+  on:touchmove={_onWindowTouchMove}
+  on:scroll={_closeTierDropdowns}
+  on:resize={_closeTierDropdowns}
+/>
+
 <div class="page-shell">
   <!-- Manage-mode action icons — fixed at top-right, matches Diary UX -->
   {#if manageMode}
@@ -1187,10 +1428,64 @@
   {#if availableSources.length > 1}
     <div class="source-chip-row">
       {#each availableSources as src}
-        <button class="source-chip" class:active={searchSource === src.value}
-          on:click={() => { searchSource = src.value; }}>
-          {src.label}
-        </button>
+        {#if src.value === 'off'}
+          <div class="source-chip-wrap">
+            <button class="source-chip source-chip-split"
+                    class:active={activeChips.off}
+                    on:click={() => _onChipTap('off')}
+                    on:contextmenu|preventDefault={() => _toggleChipInMulti('off')}
+                    on:touchstart|passive={(e) => _startChipLongPress('off', e)}
+                    on:touchmove|passive={_maybeCancelChipLongPress}
+                    on:touchend={_cancelChipLongPress}
+                    on:touchcancel={_cancelChipLongPress}>
+              {src.label}
+              {#if offTiersFiltered}<span class="tier-active-dot" title="OFF tier filter active"></span>{/if}
+            </button>
+            <button class="source-chip-caret"
+                    class:active={activeChips.off}
+                    class:open={offDropdownOpen}
+                    bind:this={offCaretEl}
+                    on:click={openOffDropdown}
+                    aria-label="Filter OFF results by quality tier"
+                    aria-expanded={offDropdownOpen}>
+              <span class="material-symbols-rounded">expand_more</span>
+            </button>
+          </div>
+        {:else if src.value === 'usda'}
+          <div class="source-chip-wrap">
+            <button class="source-chip source-chip-split"
+                    class:active={activeChips.usda}
+                    on:click={() => _onChipTap('usda')}
+                    on:contextmenu|preventDefault={() => _toggleChipInMulti('usda')}
+                    on:touchstart|passive={(e) => _startChipLongPress('usda', e)}
+                    on:touchmove|passive={_maybeCancelChipLongPress}
+                    on:touchend={_cancelChipLongPress}
+                    on:touchcancel={_cancelChipLongPress}>
+              {src.label}
+              {#if usdaTiersFiltered}<span class="tier-active-dot" title="USDA tier filter active"></span>{/if}
+            </button>
+            <button class="source-chip-caret"
+                    class:active={activeChips.usda}
+                    class:open={usdaDropdownOpen}
+                    bind:this={usdaCaretEl}
+                    on:click={openUsdaDropdown}
+                    aria-label="Filter USDA results by data type"
+                    aria-expanded={usdaDropdownOpen}>
+              <span class="material-symbols-rounded">expand_more</span>
+            </button>
+          </div>
+        {:else}
+          <button class="source-chip"
+                  class:active={activeChips[src.value]}
+                  on:click={() => _onChipTap(src.value)}
+                  on:contextmenu|preventDefault={() => _toggleChipInMulti(src.value)}
+                  on:touchstart|passive={(e) => _startChipLongPress(src.value, e)}
+                  on:touchmove|passive={_maybeCancelChipLongPress}
+                  on:touchend={_cancelChipLongPress}
+                  on:touchcancel={_cancelChipLongPress}>
+            {src.label}
+          </button>
+        {/if}
       {/each}
     </div>
   {/if}
@@ -1313,6 +1608,15 @@
                   <span class="food-name">
                     {#if source === 'local' && item.favorite}<span class="material-symbols-rounded fav-mark" title="Favorite">favorite</span>{/if}
                     {item.name}
+                    <!-- OFF origin-country flag — shown on any OFF item
+                         with origin data, regardless of whether the user
+                         is on single-OFF mode or multi-source mode. -->
+                    {#if source === 'off' && item.originTag}
+                      {@const _flag = offCountryTagToFlag(item.originTag)}
+                      {#if _flag}
+                        <span class="off-origin-flag" title={`Made in ${offCountryTagToName(item.originTag)}`} aria-label={`Origin: ${offCountryTagToName(item.originTag)}`}>{_flag}</span>
+                      {/if}
+                    {/if}
                   </span>
                   {#if isMealie}
                     {#if item.recipeCategory?.length}
@@ -1320,7 +1624,31 @@
                     {/if}
                   {:else}
                     {#if item.brand}<span class="food-brand text-3 text-sm">{item.brand}</span>{/if}
-                    {#if _foodEnergy}<span class="food-kcal text-sm">{_foodEnergy.value.toLocaleString()} {_foodEnergy.unit}</span>{/if}
+                    {#if _foodEnergy}
+                      <span class="food-kcal text-sm">
+                        {_foodEnergy.value.toLocaleString()} {_foodEnergy.unit}
+                        <!-- OFF completeness dot -->
+                        {#if source === 'off' && typeof item.completeness === 'number'}
+                          <span class="off-quality-dot"
+                                class:off-q-hi={item.completeness >= 0.7}
+                                class:off-q-mid={item.completeness >= 0.4 && item.completeness < 0.7}
+                                class:off-q-lo={item.completeness < 0.4}
+                                title={`OFF data completeness: ${Math.round(item.completeness * 100)}%`}
+                                aria-label={`Data completeness ${Math.round(item.completeness * 100)}%`}></span>
+                        {/if}
+                        <!-- USDA data-type badge -->
+                        {#if source === 'usda' && item.dataType}
+                          {@const _t = item.dataType}
+                          {@const _abbr = _t === 'Foundation' ? 'F' : _t === 'SR Legacy' ? 'L' : _t === 'Survey (FNDDS)' ? 'S' : _t === 'Branded' ? 'B' : _t === 'Experimental' ? 'X' : '?'}
+                          <span class="usda-type-badge"
+                                class:usda-t-hi={_t === 'Foundation' || _t === 'SR Legacy'}
+                                class:usda-t-mid={_t === 'Survey (FNDDS)'}
+                                class:usda-t-lo={_t === 'Branded' || _t === 'Experimental'}
+                                title={`USDA ${_t}`}
+                                aria-label={`USDA data type ${_t}`}>{_abbr}</span>
+                        {/if}
+                      </span>
+                    {/if}
                     {#if source === 'shared' && item._shared_by}<span class="food-kcal text-sm" style="color:var(--accent)">by {item._shared_by}</span>{/if}
                   {/if}
                 </div>
@@ -1483,10 +1811,23 @@
         </div>
 
       {:else}
-        <!-- OFF / USDA results -->
-        {#if apiResults.length > 0}
+        <!-- Per-source tier filter hid every fetched result -->
+        {#if apiResults.length > 0 && visibleApiResults.length === 0}
+          <div class="empty-state">
+            <span class="material-symbols-rounded empty-icon">filter_alt_off</span>
+            <p>
+              {apiResults.length.toLocaleString()} result{apiResults.length === 1 ? '' : 's'} hidden by the
+              {searchSource === 'off' ? 'OFF' : 'USDA'} tier filter.
+              Widen your selection in the dropdown next to the source chip.
+            </p>
+          </div>
+        {/if}
+        <!-- OFF / USDA results — rendered from visibleApiResults so the
+             per-source tier filters can hide low-quality entries without
+             changing the underlying fetch. -->
+        {#if visibleApiResults.length > 0}
           <ul class="food-list">
-            {#each apiResults as food (food.id || food.barcode)}
+            {#each visibleApiResults as food (food.id || food.barcode)}
               {@const _sel = selectedFoods.has(food)}
               {@const _foodEnergy = Nutrition.displayEnergy(food.nutrition?.calories || food.calories || 0, $energyUnit)}
               <li class="food-item card" class:food-selected={_sel}>
@@ -1511,9 +1852,53 @@
                     </div>
                   {/if}
                   <div class="food-info">
-                    <span class="food-name">{food.name}</span>
+                    <span class="food-name">
+                      {food.name}
+                      {#if searchSource === 'off' && food.originTag}
+                        {@const _flag = offCountryTagToFlag(food.originTag)}
+                        {#if _flag}
+                          <!-- OFF origin-country flag lifted from `origins_tags` (or
+                               manufacturing_places_tags fallback). Only rendered when
+                               we can map the tag to an ISO code — unmapped countries
+                               show nothing rather than a placeholder. Sold-in countries
+                               (`countries_tags`) are deliberately NOT used here since
+                               they don't mean origin. -->
+                          <span class="off-origin-flag" title={`Made in ${offCountryTagToName(food.originTag)}`} aria-label={`Origin: ${offCountryTagToName(food.originTag)}`}>{_flag}</span>
+                        {/if}
+                      {/if}
+                    </span>
                     {#if food.brand}<span class="food-brand text-3 text-sm">{food.brand}</span>{/if}
-                    <span class="food-kcal text-sm">{_foodEnergy.value.toLocaleString()} {_foodEnergy.unit}</span>
+                    <span class="food-kcal text-sm">
+                      {_foodEnergy.value.toLocaleString()} {_foodEnergy.unit}
+                      {#if searchSource === 'off' && typeof food.completeness === 'number'}
+                        <!-- OFF data-completeness dot. Green when the entry has most
+                             nutriment fields filled in, yellow when partial, grey when
+                             sparse. Helps users pick the more reliable of two similar
+                             OFF entries without opening each one. -->
+                        <span class="off-quality-dot"
+                              class:off-q-hi={food.completeness >= 0.7}
+                              class:off-q-mid={food.completeness >= 0.4 && food.completeness < 0.7}
+                              class:off-q-lo={food.completeness < 0.4}
+                              title={`OFF data completeness: ${Math.round(food.completeness * 100)}%`}
+                              aria-label={`Data completeness ${Math.round(food.completeness * 100)}%`}></span>
+                      {/if}
+                      {#if searchSource === 'usda' && food.dataType}
+                        <!-- USDA data-type badge. Foundation + SR Legacy are USDA's
+                             curated tiers (laboratory-analyzed staples, well-established
+                             reference data). Survey (FNDDS) is composite dietary data.
+                             Branded is manufacturer-submitted with widely varying quality.
+                             Letter + color = fast visual signal so users pick the curated
+                             entry over the brand-submitted one when searching common foods. -->
+                        {@const _t = food.dataType}
+                        {@const _abbr = _t === 'Foundation' ? 'F' : _t === 'SR Legacy' ? 'L' : _t === 'Survey (FNDDS)' ? 'S' : _t === 'Branded' ? 'B' : _t === 'Experimental' ? 'X' : '?'}
+                        <span class="usda-type-badge"
+                              class:usda-t-hi={_t === 'Foundation' || _t === 'SR Legacy'}
+                              class:usda-t-mid={_t === 'Survey (FNDDS)'}
+                              class:usda-t-lo={_t === 'Branded' || _t === 'Experimental'}
+                              title={`USDA ${_t}`}
+                              aria-label={`USDA data type ${_t}`}>{_abbr}</span>
+                      {/if}
+                    </span>
                   </div>
                 </button>
               </li>
@@ -1860,6 +2245,96 @@
   on:confirm={confirmBulkDelete}
 />
 
+<!-- OFF tier filter dropdown — backdrop-wrapped, portalled to body,
+     positioned via getBoundingClientRect measured on open. Follows the
+     exact pattern of ActionSheet.svelte: backdrop's on:click closes,
+     inner panel uses on:click|stopPropagation so clicks on checkboxes
+     don't propagate to the backdrop. -->
+{#if offDropdownOpen}
+  <!-- svelte-ignore a11y-click-events-have-key-events -->
+  <!-- svelte-ignore a11y-no-static-element-interactions -->
+  <div use:portal class="tier-dropdown-backdrop"
+    in:fade={{ duration: 120 }} out:fade={{ duration: 100 }}>
+    <div class="tier-dropdown-panel"
+      bind:this={offDropdownPanelEl}
+      style="top:{offDropdownPos.top}px; right:{offDropdownPos.right}px;"
+      on:click|stopPropagation
+      in:slide={{ duration: 140 }}>
+      <div class="tier-dropdown-header">
+        <span>OFF data quality</span>
+        {#if offTiersFiltered}
+          <button class="tier-reset" on:click={resetOffTiers}>Reset</button>
+        {/if}
+      </div>
+      <label class="tier-option">
+        <input type="checkbox" checked={offTiersActive.has('hi')} on:change={() => toggleOffTier('hi')} />
+        <span class="tier-swatch tier-swatch-hi"></span>
+        <span class="tier-label">High <span class="tier-hint">(≥70%)</span></span>
+      </label>
+      <label class="tier-option">
+        <input type="checkbox" checked={offTiersActive.has('mid')} on:change={() => toggleOffTier('mid')} />
+        <span class="tier-swatch tier-swatch-mid"></span>
+        <span class="tier-label">Medium <span class="tier-hint">(40-69%)</span></span>
+      </label>
+      <label class="tier-option">
+        <input type="checkbox" checked={offTiersActive.has('lo')} on:change={() => toggleOffTier('lo')} />
+        <span class="tier-swatch tier-swatch-lo"></span>
+        <span class="tier-label">Low <span class="tier-hint">(&lt;40%)</span></span>
+      </label>
+      <label class="tier-option">
+        <input type="checkbox" checked={offTiersActive.has('unknown')} on:change={() => toggleOffTier('unknown')} />
+        <span class="tier-swatch"></span>
+        <span class="tier-label">Unknown <span class="tier-hint">(no data)</span></span>
+      </label>
+    </div>
+  </div>
+{/if}
+
+{#if usdaDropdownOpen}
+  <!-- svelte-ignore a11y-click-events-have-key-events -->
+  <!-- svelte-ignore a11y-no-static-element-interactions -->
+  <div use:portal class="tier-dropdown-backdrop"
+    in:fade={{ duration: 120 }} out:fade={{ duration: 100 }}>
+    <div class="tier-dropdown-panel"
+      bind:this={usdaDropdownPanelEl}
+      style="top:{usdaDropdownPos.top}px; right:{usdaDropdownPos.right}px;"
+      on:click|stopPropagation
+      in:slide={{ duration: 140 }}>
+      <div class="tier-dropdown-header">
+        <span>USDA data type</span>
+        {#if usdaTiersFiltered}
+          <button class="tier-reset" on:click={resetUsdaTiers}>Reset</button>
+        {/if}
+      </div>
+      <label class="tier-option">
+        <input type="checkbox" checked={usdaTiersActive.has('Foundation')} on:change={() => toggleUsdaTier('Foundation')} />
+        <span class="tier-swatch tier-swatch-hi"></span>
+        <span class="tier-label">Foundation <span class="tier-hint">(curated)</span></span>
+      </label>
+      <label class="tier-option">
+        <input type="checkbox" checked={usdaTiersActive.has('SR Legacy')} on:change={() => toggleUsdaTier('SR Legacy')} />
+        <span class="tier-swatch tier-swatch-hi"></span>
+        <span class="tier-label">SR Legacy <span class="tier-hint">(reference)</span></span>
+      </label>
+      <label class="tier-option">
+        <input type="checkbox" checked={usdaTiersActive.has('Survey (FNDDS)')} on:change={() => toggleUsdaTier('Survey (FNDDS)')} />
+        <span class="tier-swatch tier-swatch-mid"></span>
+        <span class="tier-label">Survey (FNDDS) <span class="tier-hint">(composite)</span></span>
+      </label>
+      <label class="tier-option">
+        <input type="checkbox" checked={usdaTiersActive.has('Branded')} on:change={() => toggleUsdaTier('Branded')} />
+        <span class="tier-swatch tier-swatch-lo"></span>
+        <span class="tier-label">Branded <span class="tier-hint">(brand-submitted)</span></span>
+      </label>
+      <label class="tier-option">
+        <input type="checkbox" checked={usdaTiersActive.has('Experimental')} on:change={() => toggleUsdaTier('Experimental')} />
+        <span class="tier-swatch tier-swatch-lo"></span>
+        <span class="tier-label">Experimental <span class="tier-hint">(research)</span></span>
+      </label>
+    </div>
+  </div>
+{/if}
+
 <style>
   /* Live-preview macro pills inside the qty-prompt sheet (#30).
      Mirrors the diary edit sheet's .edit-macro-pill styling. */
@@ -2030,7 +2505,13 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    width: 100%;
+    /* flex + min-width: 0 so we take remaining space after the sibling
+       meal-info-btn claims its own, and allow the food-name inside to
+       shrink and ellipsis-truncate. Previously used `width: 100%` which
+       forced full parent width and pushed the info button past the
+       card boundary on narrow viewports (Firefox + iOS Safari). #106 */
+    flex: 1;
+    min-width: 0;
     padding: 12px 14px;
     background: none;
     border: none;
@@ -2066,6 +2547,49 @@
   .fav-mark   { font-size: 14px; vertical-align: -2px; color: var(--macro-protein, #ec4899); margin-right: 4px; }
   .food-brand { }
   .food-kcal  { color: var(--text-2); }
+
+  /* Small dot next to kcal on OFF results indicating how complete the OFF
+     entry's data is (green ≥70%, yellow 40-69%, grey <40%). Lets users
+     eyeball which of two similar entries is more trustworthy without
+     opening each one. Cursor stays default because the parent is already
+     a button (whole row is the tap target); the dot is decorative + a
+     hover/long-press tooltip. */
+  .off-quality-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-left: 6px;
+    vertical-align: 1px;
+    background: var(--border);
+  }
+  .off-q-hi  { background: #22c55e; }
+  .off-q-mid { background: #eab308; }
+  .off-q-lo  { background: var(--text-3); }
+
+  /* USDA data-type badge — single letter with color-coded background.
+     Curated tiers (Foundation, SR Legacy) get green, Survey/FNDDS gets
+     yellow, Branded/Experimental grey. Similar visual weight to the
+     OFF completeness dot but text-carrying since USDA's four types
+     don't map cleanly to a continuous scale. */
+  .usda-type-badge {
+    display: inline-block;
+    min-width: 14px;
+    height: 14px;
+    padding: 0 3px;
+    margin-left: 6px;
+    border-radius: 3px;
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 14px;
+    text-align: center;
+    color: white;
+    vertical-align: 1px;
+    background: var(--text-3);
+  }
+  .usda-t-hi  { background: #22c55e; }
+  .usda-t-mid { background: #eab308; }
+  .usda-t-lo  { background: var(--text-3); }
 
   /* Source badge — pill on each row in 'all' search mode indicating which
      source the item came from (Local / Shared / Mealie / USDA / OFF).
@@ -2260,6 +2784,12 @@
     color: var(--text-2);
     transition: all var(--dur-fast);
     white-space: nowrap;
+    /* Suppress the Android WebView text-selection popup that fires on
+       long-press. Same treatment as action-sheet items — see memory
+       note feedback_android_long_press.md. */
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
   }
   .source-chip:hover { background: var(--surface-2); }
   .source-chip.active {
@@ -2267,6 +2797,163 @@
     border-color: var(--accent);
     color: var(--surface-1);
     font-weight: 600;
+  }
+
+  /* Split source chip — left half selects source, right half opens a
+     tier filter dropdown. Wrapper is a plain flex container (no
+     positioning needed — the dropdown is portalled + fixed-positioned). */
+  .source-chip-wrap {
+    display: inline-flex;
+    align-items: stretch;
+    flex-shrink: 0;
+  }
+  .source-chip-split {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    border-right: none;
+    padding-right: 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .source-chip-caret {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 6px;
+    border: 1.5px solid var(--border);
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    border-top-right-radius: var(--radius-full);
+    border-bottom-right-radius: var(--radius-full);
+    background: var(--surface-1);
+    color: var(--text-3);
+    cursor: pointer;
+    transition: all var(--dur-fast);
+  }
+  .source-chip-caret:hover { background: var(--surface-2); color: var(--text-2); }
+  .source-chip-caret.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--surface-1);
+  }
+  .source-chip-caret .material-symbols-rounded {
+    font-size: 16px;
+    transition: transform var(--dur-fast);
+  }
+  .source-chip-caret.open .material-symbols-rounded {
+    transform: rotate(180deg);
+  }
+  /* Small dot on the source label when the tier filter is narrowing */
+  .tier-active-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.7;
+    margin-left: 2px;
+  }
+
+  /* Tier filter dropdown — matches ActionSheet.svelte's proven pattern:
+     backdrop covers full viewport (transparent — no dim, dropdown
+     shouldn't feel like a modal), inner panel is fixed-positioned near
+     the caret. Backdrop click closes; panel click|stopPropagation
+     prevents accidental close when interacting with checkboxes.
+     Globalized because :global(.tier-dropdown-backdrop) etc. lands
+     inside document.body via use:portal. */
+  :global(.tier-dropdown-backdrop) {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: transparent;
+    /* CRITICAL: backdrop is non-blocking so touches pass through to the
+       underlying page. First swipe both dismisses the dropdown (via the
+       svelte:window handlers below) AND scrolls the page natively in
+       the same gesture. Panel below re-enables pointer-events so its
+       checkboxes remain interactive. */
+    pointer-events: none;
+  }
+  :global(.tier-dropdown-panel) {
+    position: fixed;
+    min-width: 220px;
+    max-width: min(calc(100vw - 24px), 260px);
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg, 12px);
+    box-shadow: var(--shadow-md, 0 8px 24px rgba(0,0,0,0.15));
+    padding: 6px;
+    /* Re-enable — backdrop is pointer-events:none for scroll-passthrough. */
+    pointer-events: auto;
+  }
+  :global(.tier-dropdown-header) {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  :global(.tier-reset) {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--accent);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px 6px;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  :global(.tier-reset:hover) { text-decoration: underline; }
+  :global(.tier-option) {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-1);
+    transition: background var(--dur-fast);
+  }
+  :global(.tier-option:hover) { background: var(--surface-2); }
+  :global(.tier-option input[type="checkbox"]) {
+    margin: 0;
+    flex-shrink: 0;
+    accent-color: var(--accent);
+  }
+  :global(.tier-swatch) {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--text-3);
+    flex-shrink: 0;
+  }
+  :global(.tier-swatch-hi)  { background: #22c55e; }
+  :global(.tier-swatch-mid) { background: #eab308; }
+  :global(.tier-swatch-lo)  { background: var(--text-3); }
+  :global(.tier-label) { flex: 1; }
+  :global(.tier-hint) {
+    color: var(--text-3);
+    font-size: 11px;
+    margin-left: 2px;
+  }
+
+  /* OFF origin-country flag emoji shown next to each OFF result's name.
+     Small, inline, decorative — the tooltip carries the country name for
+     platforms where flag emojis render as country-code text (older
+     Android, some Linux). Kept subtle so the food name stays the focus. */
+  .off-origin-flag {
+    display: inline-block;
+    margin-left: 6px;
+    font-size: 14px;
+    vertical-align: -1px;
+    line-height: 1;
   }
 
   /* Barcode-lookup loading overlay. Centered card, soft backdrop, polished

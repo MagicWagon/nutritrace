@@ -91,10 +91,45 @@
       ? 'fail'
       : ($aiKeyVerified || _hasAll ? 'ok' : '');
 
-  // Reset model to provider default when switching to a built-in provider.
-  // 'oai-compat' has no model dropdown (free-text input), so skip the reset.
-  $: if (aiProviderVal !== 'oai-compat' && aiModelVal && !AI_MODELS[aiProviderVal]?.find(m => m.value === aiModelVal)) {
-    aiModelVal = AI_DEFAULT_MODELS[aiProviderVal] || '';
+  // Branded providers (claude/openai/gemini) render a <select>. To let users
+  // pick a model outside the hardcoded list (e.g. after a vendor renames), the
+  // select includes a 'Custom…' option that reveals a free-text input.
+  //   aiModelSelectVal    — the <select>'s current option ('__custom__' or preset id)
+  //   aiCustomModelVal    — the free-text input's value (only meaningful in custom mode)
+  //   aiModelVal          — source-of-truth persisted to settings; derived from the two above
+  let aiModelSelectVal;
+  let aiCustomModelVal = '';
+  {
+    const saved = aiModelVal;
+    const isPreset = AI_MODELS[aiProviderVal]?.some(m => m.value === saved && m.value !== '__custom__');
+    if (saved && !isPreset && aiProviderVal !== 'oai-compat') {
+      aiModelSelectVal = '__custom__';
+      aiCustomModelVal = saved;
+    } else {
+      aiModelSelectVal = saved || AI_DEFAULT_MODELS[aiProviderVal] || '';
+    }
+  }
+
+  // Explicit handlers (not reactives) to avoid a Svelte cyclical-dependency
+  // error between aiModelVal, aiModelSelectVal, and _hasAll.
+  function _syncModelFromSelect() {
+    if (aiProviderVal === 'oai-compat') return;
+    aiModelVal = (aiModelSelectVal === '__custom__')
+      ? aiCustomModelVal.trim()
+      : (aiModelSelectVal || '');
+  }
+  function _onProviderChange() {
+    if (aiProviderVal === 'oai-compat') return;
+    const isPreset = AI_MODELS[aiProviderVal]?.some(m => m.value === aiModelVal && m.value !== '__custom__');
+    if (!aiModelVal || !isPreset) {
+      // A custom name like "gpt-4o-turbo" won't work on Gemini, so don't
+      // preserve custom across a switch — reset to the new provider's default.
+      aiModelSelectVal = AI_DEFAULT_MODELS[aiProviderVal] || '';
+      aiCustomModelVal = '';
+      aiModelVal = aiModelSelectVal;
+    } else {
+      aiModelSelectVal = aiModelVal;
+    }
   }
 
   // Reactive saves
@@ -212,7 +247,7 @@
       <div class="setting-divider"></div>
       <div class="setting-row">
         <span class="setting-label">Provider</span>
-        <select class="select sel-sm" style="width:auto" bind:value={aiProviderVal} disabled={envLocks.ai}>
+        <select class="select sel-sm" style="width:auto" bind:value={aiProviderVal} on:change={_onProviderChange} disabled={envLocks.ai}>
           {#each AI_PROVIDERS as p}
             <option value={p.value}>{p.label}</option>
           {/each}
@@ -250,12 +285,30 @@
       {:else}
         <div class="setting-row">
           <span class="setting-label">Model</span>
-          <select class="select sel-sm" style="width:auto" bind:value={aiModelVal} disabled={envLocks.ai}>
+          <select class="select sel-sm" style="width:auto" bind:value={aiModelSelectVal} on:change={_syncModelFromSelect} disabled={envLocks.ai}>
             {#each (AI_MODELS[aiProviderVal] || []) as m}
               <option value={m.value}>{m.label}</option>
             {/each}
           </select>
         </div>
+        {#if aiModelSelectVal === '__custom__'}
+          <div class="setting-divider"></div>
+          <div class="setting-row">
+            <span class="setting-label">Custom Model ID</span>
+            <input class="input" style="width:220px;text-align:right"
+              placeholder={aiProviderVal === 'gemini' ? 'gemini-3.5-flash' : aiProviderVal === 'claude' ? 'claude-sonnet-5' : 'gpt-4o'}
+              bind:value={aiCustomModelVal} disabled={envLocks.ai} />
+          </div>
+          <div style="padding:8px 16px 12px;display:flex;gap:8px;align-items:flex-start">
+            <span class="material-symbols-rounded" style="font-size:16px;color:var(--muted);flex-shrink:0;margin-top:2px">info</span>
+            <div class="setting-desc" style="margin:0;line-height:1.5">
+              Enter the exact model ID from the vendor (e.g.
+              {#if aiProviderVal === 'gemini'}<a href="https://ai.google.dev/gemini-api/docs/models" target="_blank" rel="noopener" class="about-link">Google's model list</a>
+              {:else if aiProviderVal === 'claude'}<a href="https://docs.anthropic.com/en/docs/about-claude/models/overview" target="_blank" rel="noopener" class="about-link">Anthropic's model list</a>
+              {:else}<a href="https://platform.openai.com/docs/models" target="_blank" rel="noopener" class="about-link">OpenAI's model list</a>{/if}). Use this if the preset dropdown doesn't have the model you want.
+            </div>
+          </div>
+        {/if}
       {/if}
 
       {#if !envLocks.ai}

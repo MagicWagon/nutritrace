@@ -52,12 +52,76 @@ async function _extFetch(url) {
   return fetch(apiUrl('/api/proxy?url=' + encodeURIComponent(url)));
 }
 
+// Read the user's saved OFF country-filter preference from localStorage.
+// Returns the OFF tag form (lowercase, dashes for spaces) or null when
+// the user picked 'World' or hasn't set anything. Reading direct from
+// localStorage instead of the store to keep this module store-free.
+function _getOffSearchCountry() {
+  try {
+    const userId = localStorage.getItem('wl:userId');
+    const setKey = userId ? `wl_u${userId}_offSearchCountry` : 'wl_offSearchCountry';
+    const raw = localStorage.getItem(setKey);
+    if (!raw) return null;
+    const country = JSON.parse(raw);
+    if (!country || country === 'World') return null;
+    return country.toLowerCase().replace(/\s+/g, '-');
+  } catch { return null; }
+}
+
+// Read the user's saved OFF language preference (short ISO 639-1 code
+// like 'en', 'fr', 'de'). Passed to OFF as `lc=<code>` so product
+// names, ingredients, categories, and labels come back translated to
+// the user's language when OFF has that translation. Defaults to 'en'
+// (matches the setting store default) so we don't have to special-case
+// null downstream. Same store-free localStorage pattern as
+// _getOffSearchCountry.
+function _getOffSearchLanguage() {
+  try {
+    const userId = localStorage.getItem('wl:userId');
+    const setKey = userId ? `wl_u${userId}_offSearchLanguage` : 'wl_offSearchLanguage';
+    const raw = localStorage.getItem(setKey);
+    if (!raw) return 'en';
+    const lang = JSON.parse(raw);
+    if (!lang || typeof lang !== 'string') return 'en';
+    return lang.slice(0, 2).toLowerCase();
+  } catch { return 'en'; }
+}
+
+// Re-rank OFF search results within the fetched page so higher-quality
+// entries surface first. OFF's server-side relevance is name-match based
+// and doesn't consider how complete the entry is, so a search for
+// "yogurt" returns entries with 3 nutriment fields set alongside entries
+// with 40 filled in, in essentially random order. This helper keeps OFF's
+// relevance for the initial page selection but re-orders within the
+// batch. Signals used (in priority order):
+//   1. has an image (users pick with their eyes)
+//   2. completeness score (0-1, OFF's own "how filled in" metric)
+//   3. Nutri-Score present (means enough data to compute one)
+// Missing fields degrade to 0 so entries without signals sink but aren't
+// hidden.
+function _rankOFFResults(items) {
+  if (!Array.isArray(items) || items.length < 2) return items;
+  return items.slice().sort((a, b) => {
+    const aImg = a.imgUrl ? 1 : 0;
+    const bImg = b.imgUrl ? 1 : 0;
+    if (aImg !== bImg) return bImg - aImg;
+    const aComp = a.completeness ?? 0;
+    const bComp = b.completeness ?? 0;
+    if (aComp !== bComp) return bComp - aComp;
+    const aNs = a.nutriscore ? 1 : 0;
+    const bNs = b.nutriscore ? 1 : 0;
+    return bNs - aNs;
+  });
+}
+
 const API = {
   OFF_BASE: 'https://world.openfoodfacts.org',
 
   async lookupBarcode(barcode) {
     try {
-      const res = await _extFetch(`${this.OFF_BASE}/api/v0/product/${barcode}.json`);
+      const lc = _getOffSearchLanguage();
+      const url = `${this.OFF_BASE}/api/v0/product/${barcode}.json?lc=${encodeURIComponent(lc)}`;
+      const res = await _extFetch(url);
       if (!res.ok) return null;
       const data = await res.json();
       if (data.status !== 1) return null;
@@ -71,11 +135,15 @@ const API = {
   async searchByName(query, page) {
     page = page || 1;
     try {
-      const offUrl = `https://search.openfoodfacts.org/search?q=${encodeURIComponent(query)}&json=1&page_size=50&page=${page}`;
+      const country = _getOffSearchCountry();
+      const cq = country ? `&countries_tags_en=${encodeURIComponent(country)}` : '';
+      const lc = `&lc=${encodeURIComponent(_getOffSearchLanguage())}`;
+      const offUrl = `https://search.openfoodfacts.org/search?q=${encodeURIComponent(query)}&json=1&page_size=50&page=${page}${cq}${lc}`;
       const res = await _extFetch(offUrl);
       if (!res.ok) return [];
       const data = await res.json();
-      return (data.hits || []).map(p => this._mapOFFProduct(p)).filter(Boolean);
+      const items = (data.hits || []).map(p => this._mapOFFProduct(p)).filter(Boolean);
+      return _rankOFFResults(items);
     } catch(e) {
       console.error('Search failed:', e);
       return [];
@@ -90,14 +158,17 @@ const API = {
   async searchByNameWithMeta(query, page, pageSize = 50) {
     page = page || 1;
     try {
-      const offUrl = `https://search.openfoodfacts.org/search?q=${encodeURIComponent(query)}&json=1&page_size=${pageSize}&page=${page}`;
+      const country = _getOffSearchCountry();
+      const cq = country ? `&countries_tags_en=${encodeURIComponent(country)}` : '';
+      const lc = `&lc=${encodeURIComponent(_getOffSearchLanguage())}`;
+      const offUrl = `https://search.openfoodfacts.org/search?q=${encodeURIComponent(query)}&json=1&page_size=${pageSize}&page=${page}${cq}${lc}`;
       const res = await _extFetch(offUrl);
       if (!res.ok) return { items: [], totalHits: 0, page, hasMore: false };
       const data = await res.json();
       const items = (data.hits || []).map(p => this._mapOFFProduct(p)).filter(Boolean);
       const totalHits = typeof data.count === 'number' ? data.count : items.length;
       const hasMore = page * pageSize < totalHits;
-      return { items, totalHits, page, hasMore };
+      return { items: _rankOFFResults(items), totalHits, page, hasMore };
     } catch(e) {
       console.error('Search failed:', e);
       return { items: [], totalHits: 0, page, hasMore: false };
@@ -281,6 +352,24 @@ const API = {
       if (!label || BASE_UNITS.has(label)) return null;
       return [{ abbr: label, grams: Math.round(sq * 10) / 10 }];
     })();
+    // Quality signals lifted from the OFF product/hit shape. Used by the
+    // Foods search UI to rank results (more complete + graded entries
+    // surface higher than sparse ones) and to render a small quality dot
+    // next to each result so the user can pick informed. All fields are
+    // optional; anything missing degrades gracefully to null / undefined.
+    const completeness = typeof p.completeness === 'number' ? p.completeness : null;
+    const nutriscore   = (p.nutriscore_grade || p.nutrition_grades || '').toLowerCase() || null;
+    const nova         = typeof p.nova_group === 'number' ? p.nova_group : null;
+    // Origin country tag for the small flag emoji shown on OFF result rows.
+    // Prefer `origins_tags` (actual manufacturing origin per OFF's taxonomy)
+    // and fall back to `manufacturing_places_tags`. `countries_tags` is NOT
+    // used because that field means "where sold", not "where from" — showing
+    // a US flag on a French product just because it's sold at Trader Joe's
+    // would be misleading. When neither field is populated the flag doesn't
+    // render (many OFF entries lack this metadata; that's honest).
+    const originTag = (Array.isArray(p.origins_tags) && p.origins_tags[0])
+                   || (Array.isArray(p.manufacturing_places_tags) && p.manufacturing_places_tags[0])
+                   || null;
     return {
       name:      (p.product_name || '').trim(),
       brand:     (Array.isArray(p.brands) ? (p.brands[0] || '') : (p.brands || '').split(',')[0] || '').trim(),
@@ -293,6 +382,10 @@ const API = {
       categories: [],
       nutrition_basis: basis,
       alt_units:       altUnits,
+      completeness,
+      nutriscore,
+      nova,
+      originTag,
       nutrition: Nutrition.deriveSodiumSalt({
         calories:        Math.round(kcal * 10) / 10,
         kilojoules:      g('energy'),
@@ -333,6 +426,37 @@ const API = {
   }
 };
 const _USDA_BASE = 'https://api.nal.usda.gov/fdc/v1';
+
+// USDA data-type priority (lower = higher quality, surface first).
+// Foundation Foods are laboratory-analyzed staples like "Chicken, broiler,
+// breast, meat only, roasted" — the gold standard. SR Legacy is the classic
+// USDA Standard Reference, well-established. Survey (FNDDS) is dietary
+// composite data. Branded is manufacturer-submitted and dominates search
+// volume but varies wildly in quality. Experimental is tiny research data.
+// Unknown/null types sink to the bottom so newer/older records that lack
+// the field don't push curated entries down.
+const _USDA_TYPE_PRIORITY = {
+  'Foundation':      1,
+  'SR Legacy':       2,
+  'Survey (FNDDS)':  3,
+  'Branded':         4,
+  'Experimental':    5,
+};
+
+// Re-rank USDA search results within each fetched page so the higher-quality
+// tiers (Foundation, SR Legacy) surface above manufacturer-submitted Branded
+// entries. USDA's server-side relevance is text-match based and doesn't
+// consider tier quality, so a search for "chicken" returns 50 branded chicken
+// products before the one curated Foundation entry. Keeps USDA's relevance
+// for the initial page selection; re-orders within the batch.
+function _rankUSDAResults(items) {
+  if (!Array.isArray(items) || items.length < 2) return items;
+  return items.slice().sort((a, b) => {
+    const aP = _USDA_TYPE_PRIORITY[a.dataType] || 99;
+    const bP = _USDA_TYPE_PRIORITY[b.dataType] || 99;
+    return aP - bP;
+  });
+}
 
 // USDA FoodData Central nutrient ID → our nutrition object key
 const _USDA_NUTRIENT_MAP = {
@@ -419,6 +543,14 @@ const USDA = {
       dateTime:  new Date().toISOString(),
       categories: [],
       nutrition,
+      // USDA's `dataType` distinguishes the source database. Feeds both the
+      // in-page result sort (curated tiers first) and the small badge that
+      // renders next to each USDA result row so users can pick informed.
+      // Values seen from USDA: 'Foundation' (highest curated quality),
+      // 'SR Legacy' (established), 'Survey (FNDDS)' (derived dietary
+      // composite), 'Branded' (brand-submitted, quality varies wildly),
+      // 'Experimental' (research; tiny). Null for old imports that lack it.
+      dataType:  item.dataType || null,
       _source:   'usda',
     };
   },
@@ -437,11 +569,12 @@ const USDA = {
       const res = await _extFetch(url);
       if (!res.ok) return [];
       const data = await res.json();
-      return (data.foods || []).map(f => {
+      const items = (data.foods || []).map(f => {
         // Use servingSize when available, otherwise fall back to 100g base
         const ss = (f.servingSize && !isNaN(f.servingSize)) ? f.servingSize : 100;
         return this._mapProduct(f, ss);
       }).filter(f => f.name);
+      return _rankUSDAResults(items);
     } catch(e) {
       console.error('[USDA] Search failed:', e);
       return [];
@@ -468,7 +601,7 @@ const USDA = {
       const totalHits = typeof data.totalHits === 'number' ? data.totalHits : items.length;
       const totalPages = typeof data.totalPages === 'number' ? data.totalPages : Math.ceil(totalHits / pageSize);
       const hasMore = page < totalPages;
-      return { items, totalHits, page, hasMore };
+      return { items: _rankUSDAResults(items), totalHits, page, hasMore };
     } catch(e) {
       console.error('[USDA] Search failed:', e);
       return { items: [], totalHits: 0, page, hasMore: false };

@@ -9,6 +9,133 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.3] - 2026-07-25
+
+### Added
+
+- **Origin-country flag on OFF search results.** Each Open Food Facts
+  result now shows a small flag emoji next to the food name when OFF has
+  origin data for it (from `origins_tags`, falling back to
+  `manufacturing_places_tags`). Lets you see at a glance whether that
+  "yogurt" is French, American, or Australian without opening the entry.
+  Countries OFF doesn't have origin data for show no flag rather than a
+  misleading placeholder.
+- **Data-completeness indicator on OFF search results.** Small colored
+  dot next to the kcal on each OFF row: green when the entry has most
+  nutriment fields filled in, yellow for partial, grey for sparse.
+  Long-press or hover shows the exact percentage. Helps pick the more
+  trustworthy of two similar entries.
+- **USDA data-type badge on USDA search results.** Small color-coded
+  letter next to the kcal on each USDA row: F (Foundation, curated
+  laboratory-analyzed staples), L (SR Legacy, established reference
+  data), S (Survey/FNDDS, dietary composite), B (Branded,
+  manufacturer-submitted). Letter + color tells you which tier the
+  entry came from so you can favor curated Foundation entries over
+  manufacturer-submitted branded ones for common searches.
+- **"Custom…" option on the Model dropdown for Claude, OpenAI, and
+  Gemini.** Lets you enter any model ID the vendor supports without
+  waiting for the preset list to catch up. Same behavior the OpenAI
+  Compatible provider has always had.
+- **Retirement remap for retired Gemini models.** Saved selections of
+  `gemini-1.5-*` or `gemini-2.0-*` (both retired by Google) are quietly
+  upgraded to the current default at request time, avoiding 404 errors
+  after the vendor pulled the model.
+- **`LICENSES.md`** at the repo root formally lists the four food data
+  sources (Open Food Facts, USDA, Mealie, Local Foods) and their licenses,
+  plus the operator obligations that apply if the `OFF_LOCAL_DB` local
+  mirror is enabled on a multi-user instance.
+- **In-app ODbL disclosure banner** for admin users when the local Open
+  Food Facts mirror is active, so operators serving other users don't
+  miss the share-alike consideration.
+- **SSO-only mode via environment variable.** Set
+  `OIDC_ENABLE_EMAIL_PASSWORD_LOGIN=0` (or `false` / `no`) at boot to
+  disable password login server-wide, so users must sign in via an OIDC
+  provider. Locks the corresponding admin UI toggle with an env-lock
+  note. Mirrors the pattern of other env-locked settings. Applies to
+  NutriTrace, LiftTrace, and CookTrace since all three share the same
+  shape (asked for on LT #16).
+- **Per-source tier filter dropdowns on the Foods search bar.** A caret
+  next to the OFF and USDA source chips opens a checkbox panel to
+  narrow results by tier — OFF completeness bucket (High / Medium /
+  Low / Unknown) or USDA data type (Foundation / SR Legacy /
+  Survey / Branded / Experimental). Defaults to all tiers active; a
+  small dot on the source chip signals when a subset is applied.
+  Filter is client-side (no extra API calls) and also applies in
+  All-mode and multi-source mode.
+- **Long-press to combine sources on the Foods search bar.** Long-press
+  any source chip to pin it alongside the currently-active source —
+  results become a merged, multi-source view with per-row source
+  badges (same fan-out as All-mode, but limited to your pinned set).
+  Long-press an already-pinned chip to remove it. Regular tap on any
+  chip exits multi mode back to single-source. OFF completeness dot,
+  origin-country flag, and USDA data-type badge all render in the
+  merged results too, so quality signals stay visible.
+
+### Changed
+
+- **OFF search results now sorted by data quality within each fetched
+  page.** Entries with images and more complete nutrition data surface
+  higher than sparse ones. OFF's server-side relevance still picks the
+  initial batch; the re-rank runs within the batch to reduce the
+  "many near-identical variants" search noise.
+- **USDA search results now sorted by data-type tier within each
+  fetched page.** Foundation entries and SR Legacy come first, then
+  Survey/FNDDS, then Branded. Same pattern as OFF: USDA's server-side
+  relevance still picks the initial batch; the re-rank surfaces the
+  curated tiers above the ~1M brand-submitted entries that would
+  otherwise dominate common searches like "chicken" or "milk".
+- **Claude model presets refreshed.** Sonnet bumped to Sonnet 5, Opus
+  4.8 added as a "smartest" tier option, older Sonnet 4.6 removed.
+
+### Fixed
+
+- **OIDC sign-in now works on Android first-install for OIDC-only
+  servers** (#110, reported by @ImmanuelMc). NativeSetup previously
+  required a username + password to submit, so users on Authentik /
+  Keycloak / Authelia-backed servers with password login disabled had
+  no way to complete initial setup — the OIDC button never appeared
+  because it lived on the post-setup Login screen, but Login never
+  loaded because the server URL was never persisted. The setup form is
+  now a two-step flow: enter server URL → app fetches
+  `/api/auth/status` → renders whichever auth methods the server
+  actually supports (password fields only when enabled, OIDC provider
+  buttons with logos when configured, both when both). After OIDC
+  callback completes the setup gate re-evaluates so the app lands on
+  the main screen instead of staying visually stuck.
+- **OIDC callbacks no longer fail on the first attempt** with a
+  spurious `callback_failed` error. openid-client v5's default outgoing
+  HTTP timeout was 3500ms, tight enough that cold token-exchange or
+  userinfo requests to Authentik / Keycloak / etc. would sometimes
+  time out. Bumped to 10 seconds, matching most other OAuth client
+  library defaults.
+- **Info icon on meal rows no longer escapes the card on narrow
+  viewports** (#106, reported by @javydekoning). Flex sizing on the
+  food-item button had `width: 100%` while being a flex child, pushing
+  the info icon past the parent boundary on Firefox and iOS Safari when
+  the food name was long. Now uses `flex: 1; min-width: 0`.
+- **`offSearchCountry` setting now actually filters OFF searches.** The
+  Settings → Connected Services → Open Food Facts → Search Country
+  dropdown was previously stored but never applied to the search URL.
+  Now correctly narrows OFF search results to the selected country.
+- **`offSearchLanguage` setting now actually localizes OFF results.** Same
+  bug pattern as country: the Settings → Connected Services → Open Food
+  Facts → Search Language dropdown was previously stored but never sent
+  to OFF. Now passed as `lc=<code>` to both the search and barcode-lookup
+  endpoints, so product names, ingredients, categories, and labels come
+  back in the user's chosen language when OFF has translations.
+
+### Security
+
+- **fast-uri bumped to 3.1.4** (GHSA-4c8g-83qw-93j6, high). ReDoS in
+  URI parsing.
+- **brace-expansion bumped to 5.0.8** (GHSA-mh99-v99m-4gvg, high). DoS
+  via unbounded expansion length causing out-of-memory. Follow-up to
+  the 5.0.7 bump in v1.0.2, which fixed a different CVE.
+- **body-parser bumped to 2.3.0** (GHSA-v422-hmwv-36x6, low). DoS when
+  an invalid `limit` value silently disables size enforcement.
+
+---
+
 ## [1.0.2] - 2026-07-22
 
 Patch release. Fixes long-press to open the food/meal/recipe action
