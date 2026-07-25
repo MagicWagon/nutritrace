@@ -62,6 +62,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **OIDC sign-in now works on Android first-install for OIDC-only
+  servers** (#110, reported by @ImmanuelMc). NativeSetup previously
+  required a username + password to submit, so users on Authentik /
+  Keycloak / Authelia-backed servers with password login disabled had
+  no way to complete initial setup — the OIDC button never appeared
+  because it lived on the post-setup Login screen, but Login never
+  loaded because the server URL was never persisted. The setup form is
+  now a two-step flow: enter server URL → app fetches
+  `/api/auth/status` → renders whichever auth methods the server
+  actually supports (password fields only when enabled, OIDC provider
+  buttons with logos when configured, both when both). After OIDC
+  callback completes the setup gate re-evaluates so the app lands on
+  the main screen instead of staying visually stuck.
+- **OIDC callbacks no longer fail on the first attempt** with a
+  spurious `callback_failed` error. openid-client v5's default outgoing
+  HTTP timeout was 3500ms, tight enough that cold token-exchange or
+  userinfo requests to Authentik / Keycloak / etc. would sometimes
+  time out. Bumped to 10 seconds, matching most other OAuth client
+  library defaults.
 - **Info icon on meal rows no longer escapes the card on narrow
   viewports** (#106, reported by @javydekoning). Flex sizing on the
   food-item button had `width: 100%` while being a flex child, pushing

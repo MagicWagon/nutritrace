@@ -9,10 +9,23 @@
  * Schema is in server/db.js (oidc_providers, user_oidc_links). Client
  * secrets are stored encrypted via server/lib/token-crypto.js.
  */
-import { Issuer, generators } from 'openid-client';
+import { Issuer, generators, custom } from 'openid-client';
 import db from '../db.js';
 import { encrypt, decrypt } from './token-crypto.js';
 import { logger } from '../logger.js';
+
+// openid-client v5.7.x defaults outgoing HTTP requests to a 3500ms timeout,
+// which is too tight in practice — first-time Authentik / Keycloak / Authelia
+// callbacks that involve token exchange + userinfo + JWKS fetches can spike
+// past 3s on a slightly cold network without anything actually being wrong.
+// Symptom was #110-adjacent: users hit "callback failed" on the first OIDC
+// sign-in attempt, retry succeeded because the discovery cache was warm.
+// Bumping to 10s matches most OAuth client library defaults (google-auth,
+// go-oidc, python-authlib) and gives real network flakiness a chance to
+// recover without silently failing the auth flow. The per-provider
+// request_timeout_ms column in the DB (default 30000) is still respected
+// as an upper bound via oidc-admin's validation range (1000-120000).
+custom.setHttpOptionsDefaults({ timeout: 10000 });
 
 const DISCOVERY_TTL_MS = 60 * 60 * 1000;             // 1h
 const STATE_TTL_MS     = 10 * 60 * 1000;             // 10 min — IdP round-trip window
