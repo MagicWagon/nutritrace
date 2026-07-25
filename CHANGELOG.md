@@ -50,6 +50,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   note. Mirrors the pattern of other env-locked settings. Applies to
   NutriTrace, LiftTrace, and CookTrace since all three share the same
   shape (asked for on LT #16).
+- **Per-source tier filter dropdowns on the Foods search bar.** A caret
+  next to the OFF and USDA source chips opens a checkbox panel to
+  narrow results by tier — OFF completeness bucket (High / Medium /
+  Low / Unknown) or USDA data type (Foundation / SR Legacy /
+  Survey / Branded / Experimental). Defaults to all tiers active; a
+  small dot on the source chip signals when a subset is applied.
+  Filter is client-side (no extra API calls) and also applies in
+  All-mode and multi-source mode.
+- **Long-press to combine sources on the Foods search bar.** Long-press
+  any source chip to pin it alongside the currently-active source —
+  results become a merged, multi-source view with per-row source
+  badges (same fan-out as All-mode, but limited to your pinned set).
+  Long-press an already-pinned chip to remove it. Regular tap on any
+  chip exits multi mode back to single-source. OFF completeness dot,
+  origin-country flag, and USDA data-type badge all render in the
+  merged results too, so quality signals stay visible.
 
 ### Changed
 
