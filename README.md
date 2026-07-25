@@ -423,10 +423,15 @@ Optional. Connect any OpenID Connect 1.0 compliant identity provider — **Authe
 
    # Optional fields (per-provider)
    OIDC_SCOPE=openid profile email
+   OIDC_TOKEN_AUTH_METHOD=client_secret_post   # or client_secret_basic / none (for PKCE public clients)
    OIDC_ADMIN_GROUP_CLAIM=groups
    OIDC_ADMIN_GROUP_VALUE=NutriTraceAdmins
    OIDC_AUTO_LINK=1
    OIDC_AUTO_REGISTER=0
+
+   # SSO-only mode (optional) — disable password login server-wide so users
+   # must sign in via OIDC. Truthy = enabled (default), falsy = SSO only.
+   OIDC_ENABLE_EMAIL_PASSWORD_LOGIN=0
 
    # Multi-provider — use numbered prefix instead
    OIDC_PROVIDER_2_ISSUER=https://other-idp.example.com
@@ -435,7 +440,7 @@ Optional. Connect any OpenID Connect 1.0 compliant identity provider — **Authe
    OIDC_PROVIDER_2_DISPLAY_NAME=Keycloak
    ```
 
-   `OIDC_*` (unnumbered) is an alias for `OIDC_PROVIDER_1_*`. Numbered providers can be added independently of the first. Env-defined providers show with a lock badge in the Settings UI and are read-only — managed entirely from your config files.
+   `OIDC_*` (unnumbered) is an alias for `OIDC_PROVIDER_1_*`. Numbered providers can be added independently of the first. Env-defined providers show with a lock badge in the Settings UI and are read-only — managed entirely from your config files. When `OIDC_ENABLE_EMAIL_PASSWORD_LOGIN` is set the "Allow Password Login" toggle in Settings also becomes read-only, showing the same env-lock note.
 
 **Per-provider toggles**:
 - **Auto-link existing users (verified email)** — when the IdP says `email_verified=true` and the email matches an existing NutriTrace user, link them silently on first SSO sign-in. Defaults ON; safe for any IdP you trust to verify emails.

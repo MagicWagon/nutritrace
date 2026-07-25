@@ -43,6 +43,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **In-app ODbL disclosure banner** for admin users when the local Open
   Food Facts mirror is active, so operators serving other users don't
   miss the share-alike consideration.
+- **SSO-only mode via environment variable.** Set
+  `OIDC_ENABLE_EMAIL_PASSWORD_LOGIN=0` (or `false` / `no`) at boot to
+  disable password login server-wide, so users must sign in via an OIDC
+  provider. Locks the corresponding admin UI toggle with an env-lock
+  note. Mirrors the pattern of other env-locked settings. Applies to
+  NutriTrace, LiftTrace, and CookTrace since all three share the same
+  shape (asked for on LT #16).
 
 ### Changed
 

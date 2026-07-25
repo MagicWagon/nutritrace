@@ -27,7 +27,7 @@ const ALLOWED_KEYS = new Set([
 // Any authenticated user can read this (needed to disable UI fields)
 router.get('/env-locks', requireAuth, wrap(async (req, res) => {
   // Lazy import — oidc-env is only meaningful when OIDC is configured.
-  const { getEnvLockedProviderIds } = await import('../lib/oidc-env.js');
+  const { getEnvLockedProviderIds, isPasswordLoginEnvLocked } = await import('../lib/oidc-env.js');
   // Surface ai_enabled too when the AI section is env-locked. Without it
   // the client can disable the toggle but has no way to know whether the
   // env operator wanted AI ON or OFF — the toggle just sticks at the
@@ -78,6 +78,11 @@ router.get('/env-locks', requireAuth, wrap(async (req, res) => {
     off_local,
     off_local_only,
     oidc_provider_ids: getEnvLockedProviderIds(),
+    // True when OIDC_ENABLE_EMAIL_PASSWORD_LOGIN is set at boot. Admin UI
+    // uses this to disable the "Enable password login" toggle with a note
+    // that the value is controlled by the environment, matching how other
+    // env-locked settings (SMTP, AI, backup) render.
+    oidc_password_login_locked: isPasswordLoginEnvLocked(),
     lifttrace_connected,
     backup_locked,
   });
