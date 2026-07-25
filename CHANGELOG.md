@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [1.0.3] - 2026-07-25
+
 ### Added
 
 - **Origin-country flag on OFF search results.** Each Open Food Facts
@@ -119,6 +123,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   to OFF. Now passed as `lc=<code>` to both the search and barcode-lookup
   endpoints, so product names, ingredients, categories, and labels come
   back in the user's chosen language when OFF has translations.
+
+### Security
+
+- **fast-uri bumped to 3.1.4** (GHSA-4c8g-83qw-93j6, high). ReDoS in
+  URI parsing.
+- **brace-expansion bumped to 5.0.8** (GHSA-mh99-v99m-4gvg, high). DoS
+  via unbounded expansion length causing out-of-memory. Follow-up to
+  the 5.0.7 bump in v1.0.2, which fixed a different CVE.
+- **body-parser bumped to 2.3.0** (GHSA-v422-hmwv-36x6, low). DoS when
+  an invalid `limit` value silently disables size enforcement.
 
 ---
 
