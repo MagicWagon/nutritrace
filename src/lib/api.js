@@ -52,6 +52,49 @@ async function _extFetch(url) {
   return fetch(apiUrl('/api/proxy?url=' + encodeURIComponent(url)));
 }
 
+// Read the user's saved OFF country-filter preference from localStorage.
+// Returns the OFF tag form (lowercase, dashes for spaces) or null when
+// the user picked 'World' or hasn't set anything. Reading direct from
+// localStorage instead of the store to keep this module store-free.
+function _getOffSearchCountry() {
+  try {
+    const userId = localStorage.getItem('wl:userId');
+    const setKey = userId ? `wl_u${userId}_offSearchCountry` : 'wl_offSearchCountry';
+    const raw = localStorage.getItem(setKey);
+    if (!raw) return null;
+    const country = JSON.parse(raw);
+    if (!country || country === 'World') return null;
+    return country.toLowerCase().replace(/\s+/g, '-');
+  } catch { return null; }
+}
+
+// Re-rank OFF search results within the fetched page so higher-quality
+// entries surface first. OFF's server-side relevance is name-match based
+// and doesn't consider how complete the entry is, so a search for
+// "yogurt" returns entries with 3 nutriment fields set alongside entries
+// with 40 filled in, in essentially random order. This helper keeps OFF's
+// relevance for the initial page selection but re-orders within the
+// batch. Signals used (in priority order):
+//   1. has an image (users pick with their eyes)
+//   2. completeness score (0-1, OFF's own "how filled in" metric)
+//   3. Nutri-Score present (means enough data to compute one)
+// Missing fields degrade to 0 so entries without signals sink but aren't
+// hidden.
+function _rankOFFResults(items) {
+  if (!Array.isArray(items) || items.length < 2) return items;
+  return items.slice().sort((a, b) => {
+    const aImg = a.imgUrl ? 1 : 0;
+    const bImg = b.imgUrl ? 1 : 0;
+    if (aImg !== bImg) return bImg - aImg;
+    const aComp = a.completeness ?? 0;
+    const bComp = b.completeness ?? 0;
+    if (aComp !== bComp) return bComp - aComp;
+    const aNs = a.nutriscore ? 1 : 0;
+    const bNs = b.nutriscore ? 1 : 0;
+    return bNs - aNs;
+  });
+}
+
 const API = {
   OFF_BASE: 'https://world.openfoodfacts.org',
 
@@ -71,11 +114,14 @@ const API = {
   async searchByName(query, page) {
     page = page || 1;
     try {
-      const offUrl = `https://search.openfoodfacts.org/search?q=${encodeURIComponent(query)}&json=1&page_size=50&page=${page}`;
+      const country = _getOffSearchCountry();
+      const cq = country ? `&countries_tags_en=${encodeURIComponent(country)}` : '';
+      const offUrl = `https://search.openfoodfacts.org/search?q=${encodeURIComponent(query)}&json=1&page_size=50&page=${page}${cq}`;
       const res = await _extFetch(offUrl);
       if (!res.ok) return [];
       const data = await res.json();
-      return (data.hits || []).map(p => this._mapOFFProduct(p)).filter(Boolean);
+      const items = (data.hits || []).map(p => this._mapOFFProduct(p)).filter(Boolean);
+      return _rankOFFResults(items);
     } catch(e) {
       console.error('Search failed:', e);
       return [];
@@ -90,14 +136,16 @@ const API = {
   async searchByNameWithMeta(query, page, pageSize = 50) {
     page = page || 1;
     try {
-      const offUrl = `https://search.openfoodfacts.org/search?q=${encodeURIComponent(query)}&json=1&page_size=${pageSize}&page=${page}`;
+      const country = _getOffSearchCountry();
+      const cq = country ? `&countries_tags_en=${encodeURIComponent(country)}` : '';
+      const offUrl = `https://search.openfoodfacts.org/search?q=${encodeURIComponent(query)}&json=1&page_size=${pageSize}&page=${page}${cq}`;
       const res = await _extFetch(offUrl);
       if (!res.ok) return { items: [], totalHits: 0, page, hasMore: false };
       const data = await res.json();
       const items = (data.hits || []).map(p => this._mapOFFProduct(p)).filter(Boolean);
       const totalHits = typeof data.count === 'number' ? data.count : items.length;
       const hasMore = page * pageSize < totalHits;
-      return { items, totalHits, page, hasMore };
+      return { items: _rankOFFResults(items), totalHits, page, hasMore };
     } catch(e) {
       console.error('Search failed:', e);
       return { items: [], totalHits: 0, page, hasMore: false };
@@ -281,6 +329,14 @@ const API = {
       if (!label || BASE_UNITS.has(label)) return null;
       return [{ abbr: label, grams: Math.round(sq * 10) / 10 }];
     })();
+    // Quality signals lifted from the OFF product/hit shape. Used by the
+    // Foods search UI to rank results (more complete + graded entries
+    // surface higher than sparse ones) and to render a small quality dot
+    // next to each result so the user can pick informed. All fields are
+    // optional; anything missing degrades gracefully to null / undefined.
+    const completeness = typeof p.completeness === 'number' ? p.completeness : null;
+    const nutriscore   = (p.nutriscore_grade || p.nutrition_grades || '').toLowerCase() || null;
+    const nova         = typeof p.nova_group === 'number' ? p.nova_group : null;
     return {
       name:      (p.product_name || '').trim(),
       brand:     (Array.isArray(p.brands) ? (p.brands[0] || '') : (p.brands || '').split(',')[0] || '').trim(),
@@ -293,6 +349,9 @@ const API = {
       categories: [],
       nutrition_basis: basis,
       alt_units:       altUnits,
+      completeness,
+      nutriscore,
+      nova,
       nutrition: Nutrition.deriveSodiumSalt({
         calories:        Math.round(kcal * 10) / 10,
         kilojoules:      g('energy'),

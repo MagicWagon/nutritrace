@@ -22,7 +22,7 @@
   import { Nutrition } from '../lib/nutrition.js';
   import { Mealie } from '../lib/mealieApi.js';
   import { resolveAssetUrl } from '../lib/platform.js';
-  import { foodsShowThumbnails, foodsShowCategories, foodsShowLabels, foodsShowNotes, foodsSort, mealsSort, recipesSort, foodCategories, foodsShowYesterdayMeals, foodsYesterdayCollapsed, foodsSavedCollapsed, mealNames, usdaEnabled, usdaApiKey, offEnabled, catName as _catName, catDisplay as _catDisplay, pageBanners, bannerStyle, energyUnit } from '../stores/settings.js';
+  import { foodsShowThumbnails, foodsShowCategories, foodsShowLabels, foodsShowNotes, foodsSort, mealsSort, recipesSort, foodCategories, foodsShowYesterdayMeals, foodsYesterdayCollapsed, foodsSavedCollapsed, mealNames, usdaEnabled, usdaApiKey, offEnabled, offSearchCountry, catName as _catName, catDisplay as _catDisplay, pageBanners, bannerStyle, energyUnit } from '../stores/settings.js';
   import { mealIcon } from '../lib/mealIcon.js';
 
   // Query string params
@@ -554,7 +554,11 @@
     }
   }
 
-  $: { search; searchSource; onSearch(); }
+  // Re-run search when query, source, or OFF country filter changes. Including
+  // $offSearchCountry here means the country dropdown feels immediate — user
+  // switches from "Worldwide" to "United States" and results reflect the
+  // narrower filter without needing to retype.
+  $: { search; searchSource; $offSearchCountry; onSearch(); }
 
   function _saveScrollState() {
     editorState.foodsScrollY   = window.scrollY;
@@ -1192,6 +1196,24 @@
           {src.label}
         </button>
       {/each}
+      <!-- OFF country filter — surfaces the offSearchCountry setting inline
+           when the user is searching OFF (or 'all' which fans out to OFF).
+           Narrows OFF results to a specific country's products, which cuts
+           through the "10,000 similar-name variants from around the world"
+           noise in default worldwide search. Default 'World' = no filter.
+           Only rendered when OFF is one of the active sources. -->
+      {#if activeTab === 0 && $offEnabled && (searchSource === 'off' || searchSource === 'all')}
+        <div class="off-country-picker">
+          <span class="material-symbols-rounded off-country-icon">public</span>
+          <select class="off-country-select"
+                  bind:value={$offSearchCountry}
+                  title="OFF search country filter">
+            {#each ['World','United States','United Kingdom','Australia','Canada','France','Germany','Spain','Italy','Mexico','Brazil','Japan','China','India'] as c}
+              <option value={c}>{c === 'World' ? 'Worldwide' : c}</option>
+            {/each}
+          </select>
+        </div>
+      {/if}
     </div>
   {/if}
   </div>
@@ -1513,7 +1535,21 @@
                   <div class="food-info">
                     <span class="food-name">{food.name}</span>
                     {#if food.brand}<span class="food-brand text-3 text-sm">{food.brand}</span>{/if}
-                    <span class="food-kcal text-sm">{_foodEnergy.value.toLocaleString()} {_foodEnergy.unit}</span>
+                    <span class="food-kcal text-sm">
+                      {_foodEnergy.value.toLocaleString()} {_foodEnergy.unit}
+                      {#if searchSource === 'off' && typeof food.completeness === 'number'}
+                        <!-- OFF data-completeness dot. Green when the entry has most
+                             nutriment fields filled in, yellow when partial, grey when
+                             sparse. Helps users pick the more reliable of two similar
+                             OFF entries without opening each one. -->
+                        <span class="off-quality-dot"
+                              class:off-q-hi={food.completeness >= 0.7}
+                              class:off-q-mid={food.completeness >= 0.4 && food.completeness < 0.7}
+                              class:off-q-lo={food.completeness < 0.4}
+                              title={`OFF data completeness: ${Math.round(food.completeness * 100)}%`}
+                              aria-label={`Data completeness ${Math.round(food.completeness * 100)}%`}></span>
+                      {/if}
+                    </span>
                   </div>
                 </button>
               </li>
@@ -2073,6 +2109,25 @@
   .food-brand { }
   .food-kcal  { color: var(--text-2); }
 
+  /* Small dot next to kcal on OFF results indicating how complete the OFF
+     entry's data is (green ≥70%, yellow 40-69%, grey <40%). Lets users
+     eyeball which of two similar entries is more trustworthy without
+     opening each one. Cursor stays default because the parent is already
+     a button (whole row is the tap target); the dot is decorative + a
+     hover/long-press tooltip. */
+  .off-quality-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-left: 6px;
+    vertical-align: 1px;
+    background: var(--border);
+  }
+  .off-q-hi  { background: #22c55e; }
+  .off-q-mid { background: #eab308; }
+  .off-q-lo  { background: var(--text-3); }
+
   /* Source badge — pill on each row in 'all' search mode indicating which
      source the item came from (Local / Shared / Mealie / USDA / OFF).
      Colors chosen for scannability: user's own = green, community = neutral
@@ -2273,6 +2328,37 @@
     border-color: var(--accent);
     color: var(--surface-1);
     font-weight: 600;
+  }
+
+  /* OFF country filter chip — sits inline with source chips. Globe icon
+     + a compact <select> that switches the offSearchCountry setting. Same
+     visual weight as source-chip so the row stays cohesive. */
+  .off-country-picker {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px 3px 8px;
+    border-radius: var(--radius-full);
+    border: 1.5px solid var(--border);
+    background: var(--surface-1);
+    color: var(--text-2);
+    font-size: 13px;
+  }
+  .off-country-icon {
+    font-size: 16px;
+    color: var(--text-3);
+  }
+  .off-country-select {
+    border: none;
+    background: transparent;
+    color: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    outline: none;
+    padding: 2px 0;
+    cursor: pointer;
+    max-width: 130px;
   }
 
   /* Barcode-lookup loading overlay. Centered card, soft backdrop, polished

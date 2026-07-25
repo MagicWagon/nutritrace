@@ -7,6 +7,58 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **Country filter chip in Foods search.** When searching Open Food Facts
+  (or in "All" mode), a globe-icon dropdown next to the source chips lets
+  you narrow results to a specific country's products (Worldwide, United
+  States, United Kingdom, France, and more). Cuts through the noise when
+  a common term returns many similar variants from around the world.
+  Stays in sync with Settings → Connected Services → Open Food Facts →
+  Search Country.
+- **Data-completeness indicator on OFF search results.** Small colored
+  dot next to the kcal on each OFF row: green when the entry has most
+  nutriment fields filled in, yellow for partial, grey for sparse.
+  Long-press or hover shows the exact percentage. Helps pick the more
+  trustworthy of two similar entries.
+- **"Custom…" option on the Model dropdown for Claude, OpenAI, and
+  Gemini.** Lets you enter any model ID the vendor supports without
+  waiting for the preset list to catch up. Same behavior the OpenAI
+  Compatible provider has always had.
+- **Retirement remap for retired Gemini models.** Saved selections of
+  `gemini-1.5-*` or `gemini-2.0-*` (both retired by Google) are quietly
+  upgraded to the current default at request time, avoiding 404 errors
+  after the vendor pulled the model.
+- **`LICENSES.md`** at the repo root formally lists the four food data
+  sources (Open Food Facts, USDA, Mealie, Local Foods) and their licenses,
+  plus the operator obligations that apply if the `OFF_LOCAL_DB` local
+  mirror is enabled on a multi-user instance.
+- **In-app ODbL disclosure banner** for admin users when the local Open
+  Food Facts mirror is active, so operators serving other users don't
+  miss the share-alike consideration.
+
+### Changed
+
+- **OFF search results now sorted by data quality within each fetched
+  page.** Entries with images and more complete nutrition data surface
+  higher than sparse ones. OFF's server-side relevance still picks the
+  initial batch; the re-rank runs within the batch to reduce the
+  "many near-identical variants" search noise.
+- **Claude model presets refreshed.** Sonnet bumped to Sonnet 5, Opus
+  4.8 added as a "smartest" tier option, older Sonnet 4.6 removed.
+
+### Fixed
+
+- **Info icon on meal rows no longer escapes the card on narrow
+  viewports** (#106, reported by @javydekoning). Flex sizing on the
+  food-item button had `width: 100%` while being a flex child, pushing
+  the info icon past the parent boundary on Firefox and iOS Safari when
+  the food name was long. Now uses `flex: 1; min-width: 0`.
+- **`offSearchCountry` setting now actually filters OFF searches.** The
+  Settings → Connected Services → Open Food Facts → Search Country
+  dropdown was previously stored but never applied to the search URL.
+  Now correctly narrows OFF search results to the selected country.
+
 ---
 
 ## [1.0.2] - 2026-07-22
