@@ -1546,6 +1546,22 @@
                               title={`OFF data completeness: ${Math.round(food.completeness * 100)}%`}
                               aria-label={`Data completeness ${Math.round(food.completeness * 100)}%`}></span>
                       {/if}
+                      {#if searchSource === 'usda' && food.dataType}
+                        <!-- USDA data-type badge. Foundation + SR Legacy are USDA's
+                             curated tiers (laboratory-analyzed staples, well-established
+                             reference data). Survey (FNDDS) is composite dietary data.
+                             Branded is manufacturer-submitted with widely varying quality.
+                             Letter + color = fast visual signal so users pick the curated
+                             entry over the brand-submitted one when searching common foods. -->
+                        {@const _t = food.dataType}
+                        {@const _abbr = _t === 'Foundation' ? 'F' : _t === 'SR Legacy' ? 'L' : _t === 'Survey (FNDDS)' ? 'S' : _t === 'Branded' ? 'B' : _t === 'Experimental' ? 'X' : '?'}
+                        <span class="usda-type-badge"
+                              class:usda-t-hi={_t === 'Foundation' || _t === 'SR Legacy'}
+                              class:usda-t-mid={_t === 'Survey (FNDDS)'}
+                              class:usda-t-lo={_t === 'Branded' || _t === 'Experimental'}
+                              title={`USDA ${_t}`}
+                              aria-label={`USDA data type ${_t}`}>{_abbr}</span>
+                      {/if}
                     </span>
                   </div>
                 </button>
@@ -2124,6 +2140,30 @@
   .off-q-hi  { background: #22c55e; }
   .off-q-mid { background: #eab308; }
   .off-q-lo  { background: var(--text-3); }
+
+  /* USDA data-type badge — single letter with color-coded background.
+     Curated tiers (Foundation, SR Legacy) get green, Survey/FNDDS gets
+     yellow, Branded/Experimental grey. Similar visual weight to the
+     OFF completeness dot but text-carrying since USDA's four types
+     don't map cleanly to a continuous scale. */
+  .usda-type-badge {
+    display: inline-block;
+    min-width: 14px;
+    height: 14px;
+    padding: 0 3px;
+    margin-left: 6px;
+    border-radius: 3px;
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 14px;
+    text-align: center;
+    color: white;
+    vertical-align: 1px;
+    background: var(--text-3);
+  }
+  .usda-t-hi  { background: #22c55e; }
+  .usda-t-mid { background: #eab308; }
+  .usda-t-lo  { background: var(--text-3); }
 
   /* Source badge — pill on each row in 'all' search mode indicating which
      source the item came from (Local / Shared / Mealie / USDA / OFF).

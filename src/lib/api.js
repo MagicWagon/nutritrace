@@ -427,6 +427,37 @@ const API = {
 };
 const _USDA_BASE = 'https://api.nal.usda.gov/fdc/v1';
 
+// USDA data-type priority (lower = higher quality, surface first).
+// Foundation Foods are laboratory-analyzed staples like "Chicken, broiler,
+// breast, meat only, roasted" — the gold standard. SR Legacy is the classic
+// USDA Standard Reference, well-established. Survey (FNDDS) is dietary
+// composite data. Branded is manufacturer-submitted and dominates search
+// volume but varies wildly in quality. Experimental is tiny research data.
+// Unknown/null types sink to the bottom so newer/older records that lack
+// the field don't push curated entries down.
+const _USDA_TYPE_PRIORITY = {
+  'Foundation':      1,
+  'SR Legacy':       2,
+  'Survey (FNDDS)':  3,
+  'Branded':         4,
+  'Experimental':    5,
+};
+
+// Re-rank USDA search results within each fetched page so the higher-quality
+// tiers (Foundation, SR Legacy) surface above manufacturer-submitted Branded
+// entries. USDA's server-side relevance is text-match based and doesn't
+// consider tier quality, so a search for "chicken" returns 50 branded chicken
+// products before the one curated Foundation entry. Keeps USDA's relevance
+// for the initial page selection; re-orders within the batch.
+function _rankUSDAResults(items) {
+  if (!Array.isArray(items) || items.length < 2) return items;
+  return items.slice().sort((a, b) => {
+    const aP = _USDA_TYPE_PRIORITY[a.dataType] || 99;
+    const bP = _USDA_TYPE_PRIORITY[b.dataType] || 99;
+    return aP - bP;
+  });
+}
+
 // USDA FoodData Central nutrient ID → our nutrition object key
 const _USDA_NUTRIENT_MAP = {
   1008: 'calories',        // Energy kcal
@@ -512,6 +543,14 @@ const USDA = {
       dateTime:  new Date().toISOString(),
       categories: [],
       nutrition,
+      // USDA's `dataType` distinguishes the source database. Feeds both the
+      // in-page result sort (curated tiers first) and the small badge that
+      // renders next to each USDA result row so users can pick informed.
+      // Values seen from USDA: 'Foundation' (highest curated quality),
+      // 'SR Legacy' (established), 'Survey (FNDDS)' (derived dietary
+      // composite), 'Branded' (brand-submitted, quality varies wildly),
+      // 'Experimental' (research; tiny). Null for old imports that lack it.
+      dataType:  item.dataType || null,
       _source:   'usda',
     };
   },
@@ -530,11 +569,12 @@ const USDA = {
       const res = await _extFetch(url);
       if (!res.ok) return [];
       const data = await res.json();
-      return (data.foods || []).map(f => {
+      const items = (data.foods || []).map(f => {
         // Use servingSize when available, otherwise fall back to 100g base
         const ss = (f.servingSize && !isNaN(f.servingSize)) ? f.servingSize : 100;
         return this._mapProduct(f, ss);
       }).filter(f => f.name);
+      return _rankUSDAResults(items);
     } catch(e) {
       console.error('[USDA] Search failed:', e);
       return [];
@@ -561,7 +601,7 @@ const USDA = {
       const totalHits = typeof data.totalHits === 'number' ? data.totalHits : items.length;
       const totalPages = typeof data.totalPages === 'number' ? data.totalPages : Math.ceil(totalHits / pageSize);
       const hasMore = page < totalPages;
-      return { items, totalHits, page, hasMore };
+      return { items: _rankUSDAResults(items), totalHits, page, hasMore };
     } catch(e) {
       console.error('[USDA] Search failed:', e);
       return { items: [], totalHits: 0, page, hasMore: false };

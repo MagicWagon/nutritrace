@@ -21,6 +21,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   nutriment fields filled in, yellow for partial, grey for sparse.
   Long-press or hover shows the exact percentage. Helps pick the more
   trustworthy of two similar entries.
+- **USDA data-type badge on USDA search results.** Small color-coded
+  letter next to the kcal on each USDA row: F (Foundation, curated
+  laboratory-analyzed staples), L (SR Legacy, established reference
+  data), S (Survey/FNDDS, dietary composite), B (Branded,
+  manufacturer-submitted). Letter + color tells you which tier the
+  entry came from so you can favor curated Foundation entries over
+  manufacturer-submitted branded ones for common searches.
 - **"Custom…" option on the Model dropdown for Claude, OpenAI, and
   Gemini.** Lets you enter any model ID the vendor supports without
   waiting for the preset list to catch up. Same behavior the OpenAI
@@ -44,6 +51,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   higher than sparse ones. OFF's server-side relevance still picks the
   initial batch; the re-rank runs within the batch to reduce the
   "many near-identical variants" search noise.
+- **USDA search results now sorted by data-type tier within each
+  fetched page.** Foundation entries and SR Legacy come first, then
+  Survey/FNDDS, then Branded. Same pattern as OFF: USDA's server-side
+  relevance still picks the initial batch; the re-rank surfaces the
+  curated tiers above the ~1M brand-submitted entries that would
+  otherwise dominate common searches like "chicken" or "milk".
 - **Claude model presets refreshed.** Sonnet bumped to Sonnet 5, Opus
   4.8 added as a "smartest" tier option, older Sonnet 4.6 removed.
 
