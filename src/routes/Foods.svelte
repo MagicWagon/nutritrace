@@ -23,7 +23,7 @@
   import { Mealie } from '../lib/mealieApi.js';
   import { resolveAssetUrl } from '../lib/platform.js';
   import { offCountryTagToFlag, offCountryTagToName } from '../lib/off-country-flag.js';
-  import { foodsShowThumbnails, foodsShowCategories, foodsShowLabels, foodsShowNotes, foodsSort, mealsSort, recipesSort, foodCategories, foodsShowYesterdayMeals, foodsYesterdayCollapsed, foodsSavedCollapsed, mealNames, usdaEnabled, usdaApiKey, offEnabled, offSearchCountry, catName as _catName, catDisplay as _catDisplay, pageBanners, bannerStyle, energyUnit } from '../stores/settings.js';
+  import { foodsShowThumbnails, foodsShowCategories, foodsShowLabels, foodsShowNotes, foodsSort, mealsSort, recipesSort, foodCategories, foodsShowYesterdayMeals, foodsYesterdayCollapsed, foodsSavedCollapsed, mealNames, usdaEnabled, usdaApiKey, offEnabled, offSearchCountry, offSearchLanguage, catName as _catName, catDisplay as _catDisplay, pageBanners, bannerStyle, energyUnit } from '../stores/settings.js';
   import { mealIcon } from '../lib/mealIcon.js';
 
   // Query string params
@@ -555,11 +555,11 @@
     }
   }
 
-  // Re-run search when query, source, or OFF country filter changes. Including
-  // $offSearchCountry here means the country dropdown feels immediate — user
-  // switches from "Worldwide" to "United States" and results reflect the
-  // narrower filter without needing to retype.
-  $: { search; searchSource; $offSearchCountry; onSearch(); }
+  // Re-run search when query, source, or OFF filters change (country + language).
+  // Country change is rare in practice (setting lives in Settings) but keeping
+  // the reactive means switching either one takes effect immediately without
+  // needing to retype the query.
+  $: { search; searchSource; $offSearchCountry; $offSearchLanguage; onSearch(); }
 
   function _saveScrollState() {
     editorState.foodsScrollY   = window.scrollY;

@@ -58,6 +58,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   Settings → Connected Services → Open Food Facts → Search Country
   dropdown was previously stored but never applied to the search URL.
   Now correctly narrows OFF search results to the selected country.
+- **`offSearchLanguage` setting now actually localizes OFF results.** Same
+  bug pattern as country: the Settings → Connected Services → Open Food
+  Facts → Search Language dropdown was previously stored but never sent
+  to OFF. Now passed as `lc=<code>` to both the search and barcode-lookup
+  endpoints, so product names, ingredients, categories, and labels come
+  back in the user's chosen language when OFF has translations.
 
 ---
 
