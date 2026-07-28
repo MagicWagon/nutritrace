@@ -17,6 +17,7 @@
   import SettingsBackup from '../components/settings/SettingsBackup.svelte';
   import SettingsImportExport from '../components/settings/SettingsImportExport.svelte';
   import SettingsNutritionImport from '../components/settings/SettingsNutritionImport.svelte';
+  import SettingsUpdates from '../components/settings/SettingsUpdates.svelte';
   import { APP_VERSION } from '../lib/version.js';
   import Sheet  from '../components/ui/Sheet.svelte';
 
@@ -77,7 +78,7 @@
   let openSections = { serverConnection: false, appearance: false, regional: false, diary: false, foods: false, water: false,
                        categories: false, customUnits: false, nutrients: false, goals: false, bodyStats: false, statistics: false,
                        connectedServices: false, ai: false, notifications: false, wellness: false, sharing: false,
-                       authentication: false, apiTokens: false, backup: false, importExport: false, email: false, users: false, helpImprove: false, about: false };
+                       authentication: false, apiTokens: false, backup: false, importExport: false, email: false, users: false, helpImprove: false, updates: false, about: false };
 
   // ── Sync state + manual trigger ────────────────────────────────────────
   // Native server mode only. lastSyncAt comes from sync_meta on mount and is
@@ -333,6 +334,7 @@
     users:             ['users','user management','accounts','login','admin','register','invite','revoke','pending invite','session','session duration','password policy','strong password','strong passwords','require strong','zxcvbn'],
     apiTokens:         ['api','api tokens','token','federation','cooktrace','lifttrace','bearer','integration','integrations','external','third-party','third party'],
     helpImprove:       ['diagnostics','logs','verbose','calibration','export','bug','report','troubleshoot'],
+    updates:           ['updates','update','upgrade','version','new version','changelog','release','releases','apk','install','download','check for updates','auto-check','channel','stable','dev','dev-latest','beta','github','server update','docker','compose','docker-compose'],
     about:             ['about','version','nutritrace'],
   };
 
@@ -3133,6 +3135,18 @@
       <SettingsApiTokens expanded={openSections.apiTokens} />
     {/if}
     {/if}
+    {/if}
+
+    <!-- Updates — in-app version check + APK install (Android) + admin server-update banner (PWA). -->
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'updates')} on:click={() => toggleSection('updates')}>
+      <span class="material-symbols-rounded si">system_update</span>
+      <span>{$_('settings.updates.section')}</span>
+      <span class="material-symbols-rounded chevron" class:rotated={openSections.updates}>expand_more</span>
+    </button>
+    {#if sectionOpen(openSections, settingsQuery, 'updates') && sectionVisible(settingsQuery, 'updates')}
+      <div class="section-body" transition:slide={{ duration: 180 }}>
+        <SettingsUpdates />
+      </div>
     {/if}
 
     <!-- About — standalone footer item, no group label. Always last. -->

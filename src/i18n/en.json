@@ -201,7 +201,48 @@
     "importExport":       { "section": "Import & Export" },
     "server":             { "section": "Server Connection" },
     "diagnostics":        { "section": "Diagnostics" },
+    "updates":            { "section": "Updates" },
     "about":              { "section": "About" }
+  },
+  "updates": {
+    "current_version":       "Current version",
+    "channel": {
+      "label":  "Update channel",
+      "stable": "Stable",
+      "dev":    "Dev-latest",
+      "help":   "Stable tracks tagged releases. Dev-latest is the rolling development build; expect bugs."
+    },
+    "auto_check":            "Automatically check for updates",
+    "auto_check_desc":       "Once per day when you open the app.",
+    "last_checked":          "Last checked",
+    "last_checked_never":    "Never",
+    "check_now":             "Check now",
+    "checking":              "Checking…",
+    "check_failed":          "Update check failed. Try again in a moment.",
+    "up_to_date":            "You're on the latest version.",
+    "available_headline":    "{version} is available",
+    "released":              "Released {when}",
+    "release_notes_heading": "What's new",
+    "view_on_github":        "View release on GitHub",
+    "download_install":      "Download & Install",
+    "downloading":           "Downloading… {percent}%",
+    "install_starting":      "Opening installer…",
+    "install_failed":        "Install failed. Try again or download manually from GitHub.",
+    "skip_this_version":     "Skip this version",
+    "no_apk_asset":          "This release has no APK asset attached.",
+    "banner_cta":            "Tap to view what's new and install.",
+    "banner_view":           "View",
+    "server": {
+      "heading":          "Server update",
+      "versions":         "Server is on {current}. Latest release: {latest}.",
+      "available_chip":   "Update available",
+      "instructions":     "To update the server, run on the host machine:",
+      "copy_command":     "Copy command",
+      "copied":           "Copied to clipboard.",
+      "copy_failed":      "Copy failed. Copy the command manually.",
+      "view_notes":       "View release notes",
+      "channel_note":     "To switch channels, change your docker-compose.yml image tag (:latest, :1.0, :1, :dev) and re-run docker-compose pull && docker-compose up -d."
+    }
   },
   "login": {
     "subtitle":             "Sign in to your account",

@@ -43,6 +43,7 @@
   import ResetPassword  from './routes/ResetPassword.svelte';
   import AcceptInvite   from './routes/AcceptInvite.svelte';
   import Trace      from './components/ai/Trace.svelte';
+  import UpdateBanner from './components/UpdateBanner.svelte';
   import Wellness   from './routes/Wellness.svelte';
 
   const routes = {
@@ -535,6 +536,10 @@
     <span>Sync error</span>
   </div>
 {/if}
+
+<!-- In-app update banner (Android only — PWA gets SW reload prompt separately;
+     server-update banner lives inside Settings → Updates admin panel). -->
+{#if !needsLogin}<UpdateBanner />{/if}
 
 <!-- Page content -->
 {#key $location}
