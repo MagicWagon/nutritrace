@@ -612,6 +612,90 @@
   "smart_log": {
     "placeholder": "for breakfast I had 2 eggs and toast"
   },
+  "goals_page": {
+    "adaptive": {
+      "title":           "Adaptive TDEE",
+      "learned":         "Learned <strong>{value} {unit}/day</strong> · weight trend {trend} kg/week",
+      "building":        "Building up data: <strong>{available} / {required}</strong> days with both weight + diary",
+      "help_button":     "How it works",
+      "today_goal":      "Today's goal",
+      "confidence":      "Confidence",
+      "weight_source":   "Weight source",
+      "until_ready":     "Until ready, your fixed goal of {value} {unit} applies.",
+      "help_headline":   "How it works.",
+      "help_intro":      "Adaptive TDEE learns your true daily energy expenditure from your weight trend over the last 35 days, paired with how much you actually ate. The math:",
+      "help_step_1":     "Smooth your weight series (linear regression over 35 days).",
+      "help_step_2":     "Convert the trend into daily energy balance (1 kg of body mass ≈ 7,700 kcal).",
+      "help_step_3":     "TDEE = average daily intake − that daily balance.",
+      "help_best_intro": "For best results:",
+      "help_best_weigh": "<strong>Weigh yourself frequently</strong> — daily is best, every other day is fine. Sparse weights are interpolated, but more measurements = tighter signal. A connected scale (Withings, Fitbit, Garmin, Health Connect) is automatic; manual body-stats entries also work.",
+      "help_best_log":   "<strong>Log your food consistently.</strong> Missing days are dropped from the calculation. The estimate gets noisy if you log half your days.",
+      "help_best_switch":"<strong>Don't switch goals mid-window.</strong> The 35-day rolling average converges over time. If you bounce between cuts and bulks weekly, the learned TDEE will lag.",
+      "help_best_reweigh":"<strong>Re-weigh in similar conditions</strong> — first thing in the morning, after using the bathroom, before food/drink. Day-to-day fluctuations are mostly water; the trend is what matters.",
+      "help_caveats":    "<strong>Caveats.</strong> Big changes in activity (started running, broke a leg) take ~2 weeks to fully reflect. Travel weeks with under-logged food can pull the estimate up. The learned TDEE is multiplied by your goal factor (Lose -20% / Maintain / Gain +20%) to get your actual daily target."
+    },
+    "empty": {
+      "no_goals":        "No goals set yet.",
+      "add_hint":        "Go to <strong>All Fields</strong> tab to add goals.",
+      "no_templates":    "No templates yet.",
+      "no_templates_hint":"Save your current goals to create your first template."
+    },
+    "sections": {
+      "body_stats":  "Body Stats",
+      "nutrients":   "Nutrients",
+      "water":       "Water",
+      "wellness":    "Wellness"
+    },
+    "row": {
+      "not_set":     "Not set",
+      "no_goal":     "No goal",
+      "min":         "(min)",
+      "stale_tip":   "Most recent reading within the last 30 days, used until you log a new value",
+      "daily_water_goal": "Daily Water Goal"
+    },
+    "all_fields": {
+      "intro":       "Tap any field to set or edit its goal."
+    },
+    "templates": {
+      "intro":              "Save your current goals as a named template to reuse later.",
+      "save_button":        "Save Current Goals",
+      "goals_count":        "{count} goals",
+      "apply":              "Apply",
+      "delete_template":    "Delete template",
+      "save_title":         "Save as Template",
+      "template_name":      "Template Name",
+      "template_placeholder":"e.g. Cut — Summer 2025",
+      "snapshot_hint":      "Saves a snapshot of all {count} current goals.",
+      "save_template":      "Save Template",
+      "apply_title":        "Apply Template",
+      "apply_confirm":      "Apply <strong>{name}</strong>?",
+      "apply_desc":         "This will replace your current goals with the {count} goals saved in this template.",
+      "cancel":             "Cancel"
+    },
+    "editor": {
+      "display":                "Display",
+      "show_in_diary":          "Show in Diary",
+      "show_in_statistics":     "Show in Statistics",
+      "goal_behavior":          "Goal Behavior",
+      "same_every_day":         "Same goal every day",
+      "one_target":             "One target for every day",
+      "per_weekday":            "Different target per weekday",
+      "minimum_goal":           "Minimum Goal",
+      "min_hint_true":          "Must reach at least this value",
+      "min_hint_false":         "Must not exceed this value",
+      "as_percent_calories":    "Goal as % of calories",
+      "as_percent_hint":        "Target scales with your calorie goal",
+      "auto_adjust":            "Auto-adjust to activity",
+      "auto_adjust_hint":       "Adjusts based on calories burned from wearables",
+      "target":                 "Target",
+      "targets_per_day":        "Targets per day",
+      "value_percent_of_cal":   "% of calories",
+      "value_label":            "Value ({unit})",
+      "value_label_day":        "{day} ({unit})",
+      "remove_goal":            "Remove Goal",
+      "water_sheet_label":      "Goal ({unit})"
+    }
+  },
   "goals": {
     "save_goal": "Save Goal",
     "toast": {
