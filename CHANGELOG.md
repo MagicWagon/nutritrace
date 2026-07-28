@@ -7,13 +7,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **In-app updates.** New Settings → Updates panel checks GitHub Releases
+  for a newer version and, on Android, downloads the signed APK with a
+  progress bar and hands off to the system installer via FileProvider.
+  Admins on the PWA see a server-update banner comparing the running
+  server version against the latest release, with a copy-paste
+  `docker-compose` upgrade command. Opt-in stable or dev-build channels.
+  Same shared signing key means Android upgrades in place with no
+  reinstall.
+
 ### Changed
 
 - **Fitbit connect card hidden for new users.** Fitbit's Web API is being
-  wound down (see [[project_nutritrace_google_health]]); Google Health
-  is the recommended path forward. Users who already have Fitbit
-  connected continue to see the card and their data keeps syncing until
-  the September 2026 cutoff. Nothing changes for existing connections.
+  wound down; Google Health is the recommended path forward. Users who
+  already have Fitbit connected continue to see the card and their data
+  keeps syncing until the September 2026 cutoff. Nothing changes for
+  existing connections.
 
 ### Fixed
 
