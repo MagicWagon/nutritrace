@@ -611,7 +611,7 @@
         <div class="setting-row">
           <div>
             <span class="setting-label" style="opacity:0.5">{$_('settings_wellness.fitbit.enable')}</span>
-            <div class="setting-desc">Requires a server connection for OAuth authentication. In local mode, use <strong>Health Connect</strong> below to read Fitbit data directly from your Android device.</div>
+            <div class="setting-desc">{$_('settings_wellness.fitbit_deep.server_only')}</div>
           </div>
         </div>
       {:else if fitbitEnabledVal || legacyFitbitConnected}
@@ -620,7 +620,7 @@
       <div class="setting-row">
         <div>
           <span class="setting-label">{$_('settings_wellness.fitbit.enable')}</span>
-          <div class="setting-desc">Steps, activity, sleep stages, heart rate, HRV, SpO2. Legacy Fitbit Web API is being retired; new connections should use Google Health below.</div>
+          <div class="setting-desc">{$_('settings_wellness.fitbit_deep.legacy_desc')}</div>
         </div>
         <Toggle checked={fitbitEnabledVal} on:change={e => { fitbitEnabledVal = e.detail; fitbitEnabled.set(e.detail); }} />
       </div>
@@ -630,7 +630,7 @@
       <div class="setting-row">
         <div>
           <span class="setting-label" style="opacity:0.6">{$_('settings_wellness.fitbit.retired_label')}</span>
-          <div class="setting-desc">The legacy Fitbit Web API is being retired. To sync Fitbit data, connect via <strong>Google Health</strong> below, which uses the same underlying data via Google's Fitness API.</div>
+          <div class="setting-desc">{$_('settings_wellness.fitbit_deep.retired_desc')}</div>
         </div>
       </div>
       {/if}
@@ -640,7 +640,7 @@
         <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px">
           <div>
             <span class="setting-label">{$_('settings_wellness.common.sync_range')}</span>
-            <div class="setting-desc">How far back the manual Sync button fetches. Auto-sync always covers today only.</div>
+            <div class="setting-desc">{$_('settings_wellness.common.sync_range_desc_fitbit')}</div>
           </div>
           <div style="display:flex;flex-direction:column;gap:6px">
             <div class="chip-group">
@@ -699,7 +699,7 @@
             <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px">
               <div>
                 <span class="setting-label">{$_('settings_wellness.common.active_window')}</span>
-                <div class="setting-desc">Only sync during these hours. Leave blank for all day.</div>
+                <div class="setting-desc">{$_('settings_wellness.common.active_window_desc')}</div>
               </div>
               <div style="display:flex;gap:8px;align-items:center">
                 <TimePicker value={fitbitSyncWindowStartVal} placeholder={$_('settings_wellness.common.time_start')} on:change={e => { fitbitSyncWindowStartVal = e.detail; fitbitSyncWindowStart.set(e.detail || null); }} />
@@ -717,7 +717,7 @@
                Google Health pipe. -->
           <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px;background:var(--surface-2);padding:12px;border-radius:var(--radius-sm)">
             <div>
-              <span class="setting-label">Re-link required by May 31, 2026</span>
+              <span class="setting-label">{$_('settings_wellness.fitbit_deep.relink_label')}</span>
               <div class="setting-desc" style="line-height:1.5">
                 Fitbit data now flows through Google's new Health API.
                 NutriTrace is removing the legacy Fitbit Web API code path
@@ -752,7 +752,7 @@
           <div class="setting-row">
             <div>
               <span class="setting-label">{$_('settings_wellness.common.not_connected')}</span>
-              <div class="setting-desc">Authorize NutriTrace to read your Fitbit data via Google Health.</div>
+              <div class="setting-desc">{$_('settings_wellness.fitbit_deep.authorize_desc')}</div>
             </div>
             <div style="display:flex;gap:8px;align-items:center">
               <button class="btn btn-ghost" style="height:32px;padding:0 10px;font-size:13px" on:click={() => fitbitEditingCreds = true} title={$_('settings_wellness.common.change_creds_title')}>
@@ -771,16 +771,14 @@
             <div>
               <span class="setting-label">{$_('settings_wellness.common.api_credentials')}</span>
               <div class="setting-desc" style="line-height:1.5">
-                Fitbit setup now uses Google Cloud Console (legacy dev.fitbit.com no
-                longer accepts new app registrations). Create an OAuth 2.0 client
-                of type <strong>Web server</strong> and paste the Client ID + Secret here.
-                <a href="https://developers.google.com/health/setup" target="_blank" rel="noopener" class="about-link">Setup guide →</a>
+                {$_('settings_wellness.fitbit_deep.setup_desc')}
+                <a href="https://developers.google.com/health/setup" target="_blank" rel="noopener" class="about-link">{$_('settings_wellness.fitbit_deep.setup_link')}</a>
               </div>
             </div>
             <div style="width:100%;display:flex;flex-direction:column;gap:8px">
               <div class="form-group" style="margin:0">
                 <label class="form-label">{$_('settings_wellness.common.client_id')}</label>
-                <input class="input" type="text" autocomplete="off" placeholder="From Google Cloud Console → APIs & Services → Credentials"
+                <input class="input" type="text" autocomplete="off" placeholder={$_('settings_wellness.fitbit_deep.client_id_ph')}
                   bind:value={fitbitClientId} />
               </div>
               <div class="form-group" style="margin:0">
@@ -798,13 +796,13 @@
               </div>
               <div class="form-group" style="margin:0">
                 <label class="form-label">{$_('settings_wellness.common.redirect_uri')}</label>
-                <div class="setting-desc" style="margin-bottom:4px">Add this exact URI to your Google Cloud OAuth client's Authorized redirect URIs list</div>
+                <div class="setting-desc" style="margin-bottom:4px">{$_('settings_wellness.fitbit_deep.redirect_note')}</div>
                 <div style="display:flex;gap:6px">
                   <input class="input" type="url" placeholder={fitbitRedirectSuggested} bind:value={fitbitRedirectUri} style="flex:1;font-size:12px" />
                   <button class="btn-icon" title={$_('settings_wellness.common.use_suggested')} on:click={() => fitbitRedirectUri = fitbitRedirectSuggested}><span class="material-symbols-rounded">auto_awesome</span></button>
                   <button class="btn-icon" on:click={copyRedirectUri} title={$_('settings_wellness.common.copy_uri')}><span class="material-symbols-rounded">content_copy</span></button>
                 </div>
-                <div class="setting-desc" style="font-size:11px;margin-top:2px">Format: <code style="font-size:11px">https://your-domain.com/api/wellness/google-health/callback</code></div>
+                <div class="setting-desc" style="font-size:11px;margin-top:2px">{$_('settings_wellness.fitbit_deep.redirect_format')} <code style="font-size:11px">https://your-domain.com/api/wellness/google-health/callback</code></div>
               </div>
               <button class="btn btn-primary" style="align-self:flex-end" on:click={saveFitbitConfig}>{fitbitEditingCreds ? $_('settings_wellness.common.save') : $_('settings_wellness.common.save_and_connect')}</button>
             </div>
@@ -824,7 +822,7 @@
         <div class="setting-row">
           <div>
             <span class="setting-label">{$_('settings_wellness.common.workout_history')}</span>
-            <div class="setting-desc">Show recorded workouts with GPS route maps in the Movement tab. Requires a GPS-enabled device.</div>
+            <div class="setting-desc">{$_('settings_wellness.common.workout_history_desc')}</div>
           </div>
           <Toggle checked={workoutsEnabledVal} on:change={e => { workoutsEnabledVal = e.detail; workoutsEnabled.set(e.detail); }} />
         </div>
@@ -860,7 +858,7 @@
         <div class="setting-row">
           <div>
             <span class="setting-label" style="opacity:0.5">{$_('settings_wellness.garmin.enable')}</span>
-            <div class="setting-desc">Requires a server connection for OAuth authentication. In local mode, use <strong>Health Connect</strong> below to read Garmin data directly from your Android device.</div>
+            <div class="setting-desc">{$_('settings_wellness.garmin_deep.server_only')}</div>
           </div>
         </div>
       {:else}
@@ -868,7 +866,7 @@
         <div>
           <span class="setting-label">{$_('settings_wellness.garmin.enable')}</span>
           <div class="setting-desc">
-            Steps, sleep, heart rate, HRV, SpO2, Body Battery, stress. Requires the <strong>Garmin Health API</strong> partnership.
+            {$_('settings_wellness.garmin_deep.metrics_desc')}
             <a href="https://developer.garmin.com/gc-developer-program/health-api/" target="_blank" rel="noopener" class="about-link">Apply for access →</a>
           </div>
         </div>
@@ -881,7 +879,7 @@
         <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px">
           <div>
             <span class="setting-label">{$_('settings_wellness.common.sync_range')}</span>
-            <div class="setting-desc">How far back the manual Sync button fetches.</div>
+            <div class="setting-desc">{$_('settings_wellness.common.sync_range_desc')}</div>
           </div>
           <div style="display:flex;flex-direction:column;gap:6px">
             <div class="chip-group">
@@ -940,7 +938,7 @@
             <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px">
               <div>
                 <span class="setting-label">{$_('settings_wellness.common.active_window')}</span>
-                <div class="setting-desc">Only sync during these hours. Leave blank for all day.</div>
+                <div class="setting-desc">{$_('settings_wellness.common.active_window_desc')}</div>
               </div>
               <div style="display:flex;gap:8px;align-items:center">
                 <TimePicker value={garminSyncWindowStartVal} placeholder={$_('settings_wellness.common.time_start')} on:change={e => { garminSyncWindowStartVal = e.detail; garminSyncWindowStart.set(e.detail || null); }} />
@@ -961,7 +959,7 @@
           <div class="setting-row">
             <div>
               <span class="setting-label">{$_('settings_wellness.common.not_connected')}</span>
-              <div class="setting-desc">Authorize NutriTrace to read your Garmin data.</div>
+              <div class="setting-desc">{$_('settings_wellness.garmin_deep.authorize_desc')}</div>
             </div>
             <div style="display:flex;gap:8px;align-items:center">
               <button class="btn btn-ghost" style="height:32px;padding:0 10px;font-size:13px" on:click={() => garminEditingCreds = true} title={$_('settings_wellness.common.change_creds_title')}>
@@ -983,12 +981,12 @@
             </div>
             <div style="width:100%;display:flex;flex-direction:column;gap:8px">
               <div class="form-group" style="margin:0">
-                <label class="form-label">Consumer Key</label>
-                <input class="input" type="text" autocomplete="off" placeholder="Your Garmin Consumer Key"
+                <label class="form-label">{$_('settings_wellness.common.consumer_key')}</label>
+                <input class="input" type="text" autocomplete="off" placeholder={$_('settings_wellness.common.consumer_key_ph')}
                   bind:value={garminConsumerKey} />
               </div>
               <div class="form-group" style="margin:0">
-                <label class="form-label">Consumer Secret</label>
+                <label class="form-label">{$_('settings_wellness.common.consumer_secret')}</label>
                 <div style="display:flex;gap:6px">
                   {#if garminShowSecret}
                     <input class="input" type="text" autocomplete="new-password" placeholder="••••••••" bind:value={garminConsumerSecret} style="flex:1" />
@@ -1002,7 +1000,7 @@
               </div>
               <div class="form-group" style="margin:0">
                 <label class="form-label">{$_('settings_wellness.common.redirect_uri')}</label>
-                <div class="setting-desc" style="margin-bottom:4px">Register this exact URI in your Garmin app settings</div>
+                <div class="setting-desc" style="margin-bottom:4px">{$_('settings_wellness.common.register_uri_note')}</div>
                 <div style="display:flex;gap:6px">
                   <input class="input" type="url" placeholder={garminRedirectSuggested} bind:value={garminRedirectUri} style="flex:1;font-size:12px" />
                   <button class="btn-icon" title={$_('settings_wellness.common.use_suggested')} on:click={() => garminRedirectUri = garminRedirectSuggested}><span class="material-symbols-rounded">auto_awesome</span></button>
@@ -1053,7 +1051,7 @@
         <div class="setting-row">
           <div>
             <span class="setting-label" style="opacity:0.5">{$_('settings_wellness.withings.enable')}</span>
-            <div class="setting-desc">Requires a server connection for OAuth authentication. In local mode, use <strong>Health Connect</strong> below to read Withings data directly from your Android device.</div>
+            <div class="setting-desc">{$_('settings_wellness.withings_deep.server_only')}</div>
           </div>
         </div>
       {:else}
@@ -1074,7 +1072,7 @@
         <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px">
           <div>
             <span class="setting-label">{$_('settings_wellness.common.sync_range')}</span>
-            <div class="setting-desc">How far back the manual Sync button fetches.</div>
+            <div class="setting-desc">{$_('settings_wellness.common.sync_range_desc')}</div>
           </div>
           <div style="display:flex;flex-direction:column;gap:6px">
             <div class="chip-group">
@@ -1133,7 +1131,7 @@
             <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px">
               <div>
                 <span class="setting-label">{$_('settings_wellness.common.active_window')}</span>
-                <div class="setting-desc">Only sync during these hours. Leave blank for all day.</div>
+                <div class="setting-desc">{$_('settings_wellness.common.active_window_desc')}</div>
               </div>
               <div style="display:flex;gap:8px;align-items:center">
                 <TimePicker value={withingsSyncWindowStartVal} placeholder={$_('settings_wellness.common.time_start')} on:change={e => { withingsSyncWindowStartVal = e.detail; withingsSyncWindowStart.set(e.detail || null); }} />
@@ -1154,7 +1152,7 @@
           <div class="setting-row">
             <div>
               <span class="setting-label">{$_('settings_wellness.common.not_connected')}</span>
-              <div class="setting-desc">Authorize NutriTrace to read your Withings data.</div>
+              <div class="setting-desc">{$_('settings_wellness.withings_deep.authorize_desc')}</div>
             </div>
             <div style="display:flex;gap:8px;align-items:center">
               <button class="btn btn-ghost" style="height:32px;padding:0 10px;font-size:13px" on:click={() => withingsEditingCreds = true} title={$_('settings_wellness.common.change_creds_title')}>
@@ -1242,29 +1240,28 @@
         {:else if healthConnectEnabledVal && healthConnectAvailability === 'NotInstalled'}
           <ConnectionStatus
             status="fail"
-            error="Health Connect is not installed. Install it from the Play Store."
+            error={$_('settings_wellness.hc.not_installed')}
           />
         {/if}
         <div class="setting-row">
           <div>
-            <span class="setting-label">Enable Health Connect</span>
-            <div class="setting-desc">Read steps, heart rate, sleep, weight, and activity from Android Health Connect. Data from any connected wearable.</div>
+            <span class="setting-label">{$_('settings_wellness.hc.enable_label')}</span>
+            <div class="setting-desc">{$_('settings_wellness.hc.enable_desc')}</div>
           </div>
           <Toggle checked={healthConnectEnabledVal} on:change={async e => {
             const enabled = e.detail;
             if (enabled) {
               if (healthConnectAvailability !== 'Available') {
-                showError(healthConnectAvailability === 'NotInstalled' ? 'Health Connect is not installed. Install it from the Play Store.' : 'Health Connect is not supported on this device.');
+                showError(healthConnectAvailability === 'NotInstalled' ? $_('settings_wellness.hc.not_installed') : $_('settings_wellness.hc.not_supported'));
                 return;
               }
               const { requestPermissions } = await import('../../lib/health-connect.js');
               const perms = await requestPermissions();
               if (perms.read.length === 0) {
-                showError('Permissions not granted. Try opening Health Connect app → App permissions → NutriTrace and enable manually.');
-                // Still enable the setting — user can grant manually later
+                showError($_('settings_wellness.hc.perms_not_granted'));
               }
               healthConnectPermissions = perms;
-              showSuccess(`Health Connect enabled (${perms.read.length} data types)`);
+              showSuccess($_('settings_wellness.hc.enabled_success', { values: { count: perms.read.length } }));
             }
             healthConnectEnabledVal = enabled;
             healthConnectEnabled.set(enabled);
@@ -1275,8 +1272,8 @@
             <div class="setting-divider"></div>
             <div class="setting-row">
               <div>
-                <span class="setting-label">Status</span>
-                <div class="setting-desc" style="color:var(--text-3)">Not supported on this device</div>
+                <span class="setting-label">{$_('settings_wellness.hc.status_label')}</span>
+                <div class="setting-desc" style="color:var(--text-3)">{$_('settings_wellness.hc.status_unsupported')}</div>
               </div>
             </div>
           {/if}
@@ -1287,7 +1284,7 @@
               <select class="select sel-sm" bind:value={hcSyncModeVal} on:change={e => healthConnectSyncMode.set(e.target.value)}>
                 <option value="auto">{$_('settings_wellness.common.mode_auto')}</option>
                 <option value="manual">{$_('settings_wellness.common.mode_manual')}</option>
-                <option value="scheduled">Scheduled</option>
+                <option value="scheduled">{$_('settings_wellness.hc.mode_scheduled')}</option>
               </select>
             </div>
           </div>
@@ -1311,7 +1308,7 @@
               <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px">
                 <div>
                   <span class="setting-label">{$_('settings_wellness.common.active_window')}</span>
-                  <div class="setting-desc">Only sync during these hours. Leave blank for all day.</div>
+                  <div class="setting-desc">{$_('settings_wellness.common.active_window_desc')}</div>
                 </div>
                 <div style="display:flex;gap:8px;align-items:center">
                   <TimePicker value={hcSyncWindowStartVal} placeholder={$_('settings_wellness.common.time_start')} on:change={e => { hcSyncWindowStartVal = e.detail; healthConnectSyncWindowStart.set(e.detail || null); }} />
@@ -1324,12 +1321,11 @@
           <div class="setting-divider"></div>
           <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:6px">
             <div style="display:flex;justify-content:space-between;width:100%;align-items:baseline;gap:8px">
-              <span class="setting-label">Background Sync</span>
+              <span class="setting-label">{$_('settings_wellness.hc.bg_sync_label')}</span>
               <span style="color:var(--text-3);font-size:0.85em">{_formatRelative(hcLastBgSyncAt)}</span>
             </div>
             <div class="setting-desc">
-              Runs hourly in the background even when NutriTrace is closed, so today's wearable data is already on the server when you open NutriTrace elsewhere. If syncs stop running, check
-              <strong>Android Settings → Apps → NutriTrace → Battery</strong> and set it to <strong>Unrestricted</strong>. Some launchers (Samsung, Xiaomi, OnePlus) also need NutriTrace added to the "never sleeping apps" or auto-start whitelist.
+              {$_('settings_wellness.hc.bg_sync_desc')}
             </div>
           </div>
           <div class="setting-divider"></div>
@@ -1360,8 +1356,8 @@
       <div class="card settings-card">
         <div class="setting-row">
           <div>
-            <span class="setting-label">Prefer Wearable Data Over LiftTrace</span>
-            <div class="setting-desc">When LiftTrace sends a completed workout's estimated calories burned and a wearable (Fitbit, Garmin, Google Health, Health Connect) has already logged a daily total for the same date, the wearable's number wins to avoid double-counting (its daily total already includes the workout). LiftTrace workouts still show in Wellness; they just don't add on top. Turn off if your wearable misses lifting sessions and you'd rather count LiftTrace's per-workout estimate instead.</div>
+            <span class="setting-label">{$_('settings_wellness.lifttrace_ovr.prefer_label')}</span>
+            <div class="setting-desc">{$_('settings_wellness.lifttrace_ovr.prefer_desc')}</div>
           </div>
           <Toggle checked={lifttraceOverlapFillVal} on:change={e => { lifttraceOverlapFillVal = e.detail; lifttraceOverlapFill.set(e.detail); }} />
         </div>
@@ -1373,7 +1369,7 @@
          one shown. -->
     <div style="display:flex;justify-content:flex-end;margin-top:8px">
       <button class="btn btn-secondary btn-sm" on:click={() => wellnessMetrics.set(null)}>
-        Reset all visible metrics
+        {$_('settings_wellness.common.reset_visible_metrics')}
       </button>
     </div>
   {/if}

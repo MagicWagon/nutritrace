@@ -913,7 +913,51 @@
       "custom_days_title":    "Custom number of days (max {max})",
       "authorize_desc":       "Authorize NutriTrace to read your {provider} data.",
       "authorize_desc_fitbit": "Authorize NutriTrace to read your Fitbit data via Google Health.",
-      "server_only_desc":     "Requires a server connection for OAuth authentication. In local mode, use Health Connect below to read {provider} data directly from your Android device."
+      "server_only_desc":     "Requires a server connection for OAuth authentication. In local mode, use Health Connect below to read {provider} data directly from your Android device.",
+      "sync_range_desc":      "How far back the manual Sync button fetches.",
+      "sync_range_desc_fitbit": "How far back the manual Sync button fetches. Auto-sync always covers today only.",
+      "register_uri_note":    "Register this exact URI in your app settings",
+      "consumer_key":         "Consumer Key",
+      "consumer_key_ph":      "Your Garmin Consumer Key",
+      "consumer_secret":      "Consumer Secret"
+    },
+    "hc": {
+      "not_installed":         "Health Connect is not installed. Install it from the Play Store.",
+      "not_supported":         "Health Connect is not supported on this device.",
+      "perms_not_granted":     "Permissions not granted. Try opening Health Connect app → App permissions → NutriTrace and enable manually.",
+      "enabled_success":       "Health Connect enabled ({count} data types)",
+      "enable_label":          "Enable Health Connect",
+      "enable_desc":           "Read steps, heart rate, sleep, weight, and activity from Android Health Connect. Data from any connected wearable.",
+      "status_label":          "Status",
+      "status_unsupported":    "Not supported on this device",
+      "mode_scheduled":        "Scheduled",
+      "bg_sync_label":         "Background Sync",
+      "bg_sync_desc":          "Runs hourly in the background even when NutriTrace is closed, so today's wearable data is already on the server when you open NutriTrace elsewhere. If syncs stop running, check Android Settings → Apps → NutriTrace → Battery and set it to Unrestricted. Some launchers (Samsung, Xiaomi, OnePlus) also need NutriTrace added to the \"never sleeping apps\" or auto-start whitelist."
+    },
+    "lifttrace_ovr": {
+      "prefer_label":          "Prefer Wearable Data Over LiftTrace",
+      "prefer_desc":           "When LiftTrace sends a completed workout's estimated calories burned and a wearable (Fitbit, Garmin, Google Health, Health Connect) has already logged a daily total for the same date, the wearable's number wins to avoid double-counting (its daily total already includes the workout). LiftTrace workouts still show in Wellness, they just don't add on top. Turn off if your wearable misses lifting sessions and you'd rather count LiftTrace's per-workout estimate instead."
+    },
+    "fitbit_deep": {
+      "server_only":           "Requires a server connection for OAuth authentication. In local mode, use Health Connect below to read Fitbit data directly from your Android device.",
+      "legacy_desc":           "Steps, activity, sleep stages, heart rate, HRV, SpO2. Legacy Fitbit Web API is being retired, new connections should use Google Health below.",
+      "retired_desc":          "The legacy Fitbit Web API is being retired. To sync Fitbit data, connect via Google Health below, which uses the same underlying data via Google's Fitness API.",
+      "relink_label":          "Re-link required by May 31, 2026",
+      "authorize_desc":        "Authorize NutriTrace to read your Fitbit data via Google Health.",
+      "setup_desc":            "Fitbit setup now uses Google Cloud Console (legacy dev.fitbit.com no longer accepts new app registrations). Create an OAuth 2.0 client of type Web server and paste the Client ID + Secret here.",
+      "setup_link":            "Setup guide →",
+      "client_id_ph":          "From Google Cloud Console → APIs & Services → Credentials",
+      "redirect_note":         "Add this exact URI to your Google Cloud OAuth client's Authorized redirect URIs list",
+      "redirect_format":       "Format:"
+    },
+    "garmin_deep": {
+      "server_only":           "Requires a server connection for OAuth authentication. In local mode, use Health Connect below to read Garmin data directly from your Android device.",
+      "metrics_desc":          "Steps, sleep, heart rate, HRV, SpO2, Body Battery, stress. Requires the Garmin Health API partnership.",
+      "authorize_desc":        "Authorize NutriTrace to read your Garmin data."
+    },
+    "withings_deep": {
+      "server_only":           "Requires a server connection for OAuth authentication. In local mode, use Health Connect below to read Withings data directly from your Android device.",
+      "authorize_desc":        "Authorize NutriTrace to read your Withings data."
     },
     "fitbit": {
       "title":                 "Fitbit",
