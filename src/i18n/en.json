@@ -807,6 +807,21 @@
       "template_applied": "\"{name}\" applied"
     }
   },
+  "barcode_scanner": {
+    "toast": {
+      "cam_denied":       "Camera permission denied",
+      "scan_failed":      "Barcode scan failed: {error}",
+      "unknown_error":    "Unknown error"
+    },
+    "close":              "Close scanner",
+    "close_short":        "Close",
+    "torch":              "Toggle flashlight",
+    "title":              "Scan Barcode",
+    "library":            "Library",
+    "camera":             "Camera",
+    "manual_ph":          "Or type barcode manually…",
+    "lookup":             "Look Up"
+  },
   "food_editor": {
     "name_placeholder":  "Food name",
     "brand_placeholder": "Brand (optional)",
@@ -827,8 +842,28 @@
     "field_serving_units":   "Serving Units",
     "field_barcode":     "Barcode",
     "placeholder_optional": "Optional",
-    "errors": {
-      "name_required": "Please enter a name"
+    "notes_placeholder":   "Optional notes",
+    "readonly_sub":        "Tap Save to My Catalog to bring this into your catalog and edit it.",
+    "photo_remove":        "Remove photo",
+    "close_camera":        "Close camera",
+    "cancel":              "Cancel",
+    "scan_barcode":        "Scan barcode",
+    "scan_label_title":    "Take a photo of the nutrition label to fill these fields",
+    "remove_serving_unit": "Remove serving unit",
+    "toast": {
+      "camera_denied":         "Camera access denied or unavailable.",
+      "barcode_set":           "Barcode set",
+      "off_upload_failed":     "Could not upload to Open Food Facts: {error}",
+      "off_not_found":         "Not found in Open Food Facts",
+      "off_refreshed":         "Data refreshed from Open Food Facts",
+      "refresh_failed":        "Refresh failed: {error}",
+      "label_read_failed":     "Could not read the label. Try a clearer photo.",
+      "nutrition_extracted":   "Nutrition extracted from label",
+      "scan_failed":           "Scan failed: {error}",
+      "saved_copy":            "Saved a copy to your catalog",
+      "save_copy_failed":      "Could not save copy: {error}",
+      "save_failed":           "Save failed: {error}",
+      "unknown_error":         "unknown error"
     }
   },
   "meal_editor": {
