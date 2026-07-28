@@ -473,8 +473,8 @@
 
           <div class="toggle-row">
             <div>
-              <div class="toggle-label">Enable user accounts</div>
-              <div class="toggle-hint">Each user gets their own food diary, settings, and profile</div>
+              <div class="toggle-label">{$_('wizard.usermgmt.enable_toggle')}</div>
+              <div class="toggle-hint">{$_('wizard.usermgmt.enable_toggle_hint')}</div>
             </div>
             <Toggle checked={enableUserMgmt} on:change={e => enableUserMgmt = e.detail} />
           </div>
@@ -482,28 +482,28 @@
 
         {#if enableUserMgmt}
           <div class="um-form" transition:fly={{ y: 10, duration: 200 }}>
-            <p class="um-section-label">Admin Account</p>
+            <p class="um-section-label">{$_('wizard.usermgmt.admin_section')}</p>
 
             <div class="form-row-2">
               <div class="form-group">
-                <label class="form-label">Username *</label>
-                <input class="input" type="text" bind:value={adminUsername} placeholder="admin" autocomplete="username" />
+                <label class="form-label">{$_('wizard.usermgmt.username_label')}</label>
+                <input class="input" type="text" bind:value={adminUsername} placeholder={$_('wizard.usermgmt.username_placeholder')} autocomplete="username" />
               </div>
               <div class="form-group">
-                <label class="form-label">Nickname</label>
-                <input class="input" type="text" bind:value={adminNickname} placeholder="Optional" />
+                <label class="form-label">{$_('wizard.usermgmt.nickname_label')}</label>
+                <input class="input" type="text" bind:value={adminNickname} placeholder={$_('wizard.usermgmt.nickname_placeholder')} />
               </div>
             </div>
 
             <div class="form-group">
-              <label class="form-label">Full Name</label>
-              <input class="input" type="text" bind:value={adminFullName} placeholder="Optional" />
+              <label class="form-label">{$_('wizard.usermgmt.full_name_label')}</label>
+              <input class="input" type="text" bind:value={adminFullName} placeholder={$_('wizard.usermgmt.full_name_placeholder')} />
             </div>
 
             <div class="form-group">
-              <label class="form-label">Email Address</label>
+              <label class="form-label">{$_('wizard.usermgmt.email_label')}</label>
               <input class="input" type="email" bind:value={adminEmail}
-                placeholder="Used for password resets (optional)" autocomplete="email" />
+                placeholder={$_('wizard.usermgmt.email_placeholder')} autocomplete="email" />
             </div>
 
             <div class="form-row-2">
@@ -568,7 +568,7 @@
           <button class="option-card" class:selected={unitSystem === 'metric'}
             on:click={() => applyUnitSystem('metric')}>
             <span class="material-symbols-rounded" style="font-size:48px">straighten</span>
-            <span class="option-label">Metric</span>
+            <span class="option-label">{$_('wizard.units.metric')}</span>
             <span class="option-sublabel">kg, cm, °C</span>
             {#if unitSystem === 'metric'}
               <span class="material-symbols-rounded check">check_circle</span>
@@ -577,7 +577,7 @@
           <button class="option-card" class:selected={unitSystem === 'imperial'}
             on:click={() => applyUnitSystem('imperial')}>
             <span class="material-symbols-rounded" style="font-size:48px">scale</span>
-            <span class="option-label">Imperial</span>
+            <span class="option-label">{$_('wizard.units.imperial')}</span>
             <span class="option-sublabel">lb, ft/in, °F</span>
             {#if unitSystem === 'imperial'}
               <span class="material-symbols-rounded check">check_circle</span>
@@ -616,17 +616,17 @@
         <p class="step-desc">{$_('wizard.height.desc')}</p>
         <div style="margin-top:24px;display:flex;flex-direction:column;gap:12px">
           {#if hUnit === 'cm'}
-            <label class="form-label">Height (cm)</label>
+            <label class="form-label">{$_('wizard.height.label_cm')}</label>
             <input class="input" type="number" min="100" max="250" bind:value={heightCm} style="font-size:16px" />
           {:else}
-            <label class="form-label">Height</label>
+            <label class="form-label">{$_('wizard.height.label')}</label>
             <div style="display:flex;gap:10px">
               <div style="flex:1">
-                <label class="form-label" style="font-size:11px">Feet</label>
+                <label class="form-label" style="font-size:11px">{$_('wizard.height.feet')}</label>
                 <input class="input" type="number" min="3" max="8" bind:value={heightFt} style="font-size:16px" />
               </div>
               <div style="flex:1">
-                <label class="form-label" style="font-size:11px">Inches</label>
+                <label class="form-label" style="font-size:11px">{$_('wizard.height.inches')}</label>
                 <input class="input" type="number" min="0" max="11" bind:value={heightIn} style="font-size:16px" />
               </div>
             </div>
@@ -680,13 +680,13 @@
             <div class="int-card-head">
               <div class="int-card-icon">🥫</div>
               <div class="int-card-info">
-                <div class="int-card-title">Open Food Facts</div>
+                <div class="int-card-title">{$_('wizard.integrations_cards.off')}</div>
                 <div class="int-card-sub">Search the global crowd-sourced food database. An account is only needed to upload edits.</div>
               </div>
               {#if intSkipped.off}
-                <button class="int-restore-btn" on:click={() => intSkipped = {...intSkipped, off: false}}>Configure</button>
+                <button class="int-restore-btn" on:click={() => intSkipped = {...intSkipped, off: false}}>{$_('wizard.integrations_cards.configure')}</button>
               {:else}
-                <button class="int-skip-btn" on:click={() => intSkipped = {...intSkipped, off: true}}>Skip This</button>
+                <button class="int-skip-btn" on:click={() => intSkipped = {...intSkipped, off: true}}>{$_('wizard.integrations_cards.skip_this')}</button>
               {/if}
             </div>
             {#if !intSkipped.off}
@@ -703,13 +703,13 @@
             <div class="int-card-head">
               <div class="int-card-icon">🔬</div>
               <div class="int-card-info">
-                <div class="int-card-title">USDA FoodData Central</div>
+                <div class="int-card-title">{$_('wizard.integrations_cards.usda')}</div>
                 <div class="int-card-sub">Search the USDA food and nutrient database</div>
               </div>
               {#if intSkipped.usda}
-                <button class="int-restore-btn" on:click={() => intSkipped = {...intSkipped, usda: false}}>Configure</button>
+                <button class="int-restore-btn" on:click={() => intSkipped = {...intSkipped, usda: false}}>{$_('wizard.integrations_cards.configure')}</button>
               {:else}
-                <button class="int-skip-btn" on:click={() => intSkipped = {...intSkipped, usda: true}}>Skip This</button>
+                <button class="int-skip-btn" on:click={() => intSkipped = {...intSkipped, usda: true}}>{$_('wizard.integrations_cards.skip_this')}</button>
               {/if}
             </div>
             {#if !intSkipped.usda}
@@ -725,13 +725,13 @@
             <div class="int-card-head">
               <div class="int-card-icon">🍽️</div>
               <div class="int-card-info">
-                <div class="int-card-title">Mealie</div>
+                <div class="int-card-title">{$_('wizard.integrations_cards.mealie')}</div>
                 <div class="int-card-sub">Import recipes from your self-hosted Mealie instance</div>
               </div>
               {#if intSkipped.mealie}
-                <button class="int-restore-btn" on:click={() => intSkipped = {...intSkipped, mealie: false}}>Configure</button>
+                <button class="int-restore-btn" on:click={() => intSkipped = {...intSkipped, mealie: false}}>{$_('wizard.integrations_cards.configure')}</button>
               {:else}
-                <button class="int-skip-btn" on:click={() => intSkipped = {...intSkipped, mealie: true}}>Skip This</button>
+                <button class="int-skip-btn" on:click={() => intSkipped = {...intSkipped, mealie: true}}>{$_('wizard.integrations_cards.skip_this')}</button>
               {/if}
             </div>
             {#if !intSkipped.mealie}
@@ -748,7 +748,7 @@
               <div class="int-card-head">
                 <div class="int-card-icon">🤖</div>
                 <div class="int-card-info">
-                  <div class="int-card-title">AI Assistant</div>
+                  <div class="int-card-title">{$_('wizard.integrations_cards.ai')}</div>
                   <div class="int-card-sub int-locked-label">Configured via environment variables</div>
                 </div>
                 <span class="material-symbols-rounded int-lock-icon">lock</span>
@@ -759,13 +759,13 @@
               <div class="int-card-head">
                 <div class="int-card-icon">🤖</div>
                 <div class="int-card-info">
-                  <div class="int-card-title">AI Assistant</div>
+                  <div class="int-card-title">{$_('wizard.integrations_cards.ai')}</div>
                   <div class="int-card-sub">Trace, your AI nutrition assistant — bring your own API key</div>
                 </div>
                 {#if intSkipped.ai}
-                  <button class="int-restore-btn" on:click={() => intSkipped = {...intSkipped, ai: false}}>Configure</button>
+                  <button class="int-restore-btn" on:click={() => intSkipped = {...intSkipped, ai: false}}>{$_('wizard.integrations_cards.configure')}</button>
                 {:else}
-                  <button class="int-skip-btn" on:click={() => intSkipped = {...intSkipped, ai: true}}>Skip This</button>
+                  <button class="int-skip-btn" on:click={() => intSkipped = {...intSkipped, ai: true}}>{$_('wizard.integrations_cards.skip_this')}</button>
                 {/if}
               </div>
               {#if !intSkipped.ai}

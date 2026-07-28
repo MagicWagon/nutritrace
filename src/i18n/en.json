@@ -400,11 +400,24 @@
       "create_account_title": "Create Your Account",
       "create_account_desc":  "Set up your admin account to secure your NutriTrace instance. You can invite other users later from Settings.",
       "multi_user_title":     "Multi-User Support",
-      "multi_user_desc":      "NutriTrace can run in single-user mode (default) or multi-user mode with separate logins and password resets. You can always enable this later in Settings."
+      "multi_user_desc":      "NutriTrace can run in single-user mode (default) or multi-user mode with separate logins and password resets. You can always enable this later in Settings.",
+      "enable_toggle":        "Enable user accounts",
+      "enable_toggle_hint":   "Each user gets their own food diary, settings, and profile",
+      "admin_section":        "Admin Account",
+      "username_label":       "Username *",
+      "username_placeholder": "admin",
+      "nickname_label":       "Nickname",
+      "nickname_placeholder": "Optional",
+      "full_name_label":      "Full Name",
+      "full_name_placeholder": "Optional",
+      "email_label":          "Email Address",
+      "email_placeholder":    "Used for password resets (optional)"
     },
     "units": {
       "title": "Measurement System",
-      "desc":  "How do you measure things?"
+      "desc":  "How do you measure things?",
+      "metric":   "Metric",
+      "imperial": "Imperial"
     },
     "gender": {
       "title": "What is your gender?",
@@ -416,7 +429,19 @@
     },
     "height": {
       "title": "What is your height?",
-      "desc":  "Used to estimate your calorie needs."
+      "desc":  "Used to estimate your calorie needs.",
+      "label_cm": "Height (cm)",
+      "label":    "Height",
+      "feet":     "Feet",
+      "inches":   "Inches"
+    },
+    "integrations_cards": {
+      "configure": "Configure",
+      "skip_this": "Skip This",
+      "off":     "Open Food Facts",
+      "usda":    "USDA FoodData Central",
+      "mealie":  "Mealie",
+      "ai":      "AI Assistant"
     },
     "weight": {
       "title": "What is your weight?"
