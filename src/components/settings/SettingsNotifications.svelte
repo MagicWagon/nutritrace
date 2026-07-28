@@ -1,5 +1,6 @@
 <script>
   import { slide } from 'svelte/transition';
+  import { _ } from 'svelte-i18n';
   import Toggle from './Toggle.svelte';
   import TimePicker from '../ui/TimePicker.svelte';
   import ConnectionStatus from './ConnectionStatus.svelte';
@@ -130,10 +131,10 @@
       const { sendPush } = await import('../../lib/notifications.js');
       await sendPush(_notifPushService, 'NutriTrace', 'Test notification, push service connected', 5);
       _pushTestResult = 'ok';
-      showSuccess('Test sent, check your device');
+      showSuccess($_('settings_notifications.toast.test_sent'));
     } catch (e) {
       _pushTestResult = 'fail';
-      showError(`Test failed: ${e.message || 'unknown error'}`);
+      showError($_('settings_notifications.toast.test_failed', { values: { error: e.message || 'unknown error' } }));
     }
     _gotifyTesting = false;
   }
@@ -142,43 +143,38 @@
 <div class="section-body" transition:slide={{ duration: 180 }}>
 
   <!-- Delivery setup -->
-  <p class="sub-label">Delivery</p>
+  <p class="sub-label">{$_('settings_notifications.sections.delivery')}</p>
   <div class="card settings-card">
-    <!-- Push service status banner — sits at the top of the Delivery card,
-         above the first setting-row. Matches the established NutriTrace
-         pattern used by USDA, Mealie, SMTP, AI Assistant, Wellness:
-         ConnectionStatus is part of the same card as its config, not its
-         own separate card. Renders only when a push provider is selected. -->
     {#if _notifPushService !== 'none'}
       <ConnectionStatus
         status={_pushBannerStatus}
-        okLabel="Configured"
+        okLabel={$_('settings_notifications.push.configured')}
         connectedAs={_pushProviderLabel}
-        error={_pushTestResult === 'fail' ? `${_pushProviderLabel} test failed, check the URL and credentials below` : ''}
+        error={_pushTestResult === 'fail' ? $_('settings_notifications.push.test_failed_hint', { values: { provider: _pushProviderLabel } }) : ''}
         onRetest={_testPush}
         retestDisabled={_pushBannerDisabled}
-        retestLabel="Send Test"
+        retestLabel={$_('settings_notifications.push.send_test')}
       />
     {/if}
     <div class="setting-row">
       <div>
-        <span class="setting-label">Device Notifications</span>
-        <div class="setting-desc">Alerts delivered directly to this device — native on Android, browser pop-ups on desktop/PWA</div>
+        <span class="setting-label">{$_('settings_notifications.push.device')}</span>
+        <div class="setting-desc">{$_('settings_notifications.push.device_desc')}</div>
       </div>
       <Toggle checked={_notifLocal} on:change={e => { _notifLocal = e.detail; set('notifLocalEnabled', e.detail); if (e.detail) _requestNotifPermission(); }} />
     </div>
     <div class="setting-divider"></div>
     <div class="setting-row">
       <div>
-        <span class="setting-label">Push Service</span>
-        <div class="setting-desc">Server-relayed alerts via Apprise, Gotify, or ntfy — useful for PWA users or Home Assistant</div>
+        <span class="setting-label">{$_('settings_notifications.push.push_service')}</span>
+        <div class="setting-desc">{$_('settings_notifications.push.push_service_desc')}</div>
       </div>
       <div class="select-wrap" style="width:130px">
         <select class="select sel-sm" value={_notifPushService} on:change={e => { _notifPushService = e.target.value; set('notifPushService', e.target.value); }}>
-          <option value="none">None</option>
-          <option value="apprise">Apprise</option>
-          <option value="gotify">Gotify</option>
-          <option value="ntfy">ntfy</option>
+          <option value="none">{$_('settings_notifications.push.option_none')}</option>
+          <option value="apprise">{$_('settings_notifications.push.option_apprise')}</option>
+          <option value="gotify">{$_('settings_notifications.push.option_gotify')}</option>
+          <option value="ntfy">{$_('settings_notifications.push.option_ntfy')}</option>
         </select>
       </div>
     </div>
@@ -186,30 +182,30 @@
     <!-- Apprise config -->
     {#if _notifPushService === 'apprise'}
       <div class="form-group" style="padding:10px 16px 4px">
-        <label class="form-label">Apprise Server URL</label>
-        <input class="input" placeholder="https://apprise.example.com" bind:value={_appriseUrl} on:blur={() => set('appriseUrl', _appriseUrl)} />
+        <label class="form-label">{$_('settings_notifications.push.apprise_url')}</label>
+        <input class="input" placeholder={$_('settings_notifications.push.apprise_url_ph')} bind:value={_appriseUrl} on:blur={() => set('appriseUrl', _appriseUrl)} />
       </div>
       <div class="form-group" style="padding:8px 16px 14px">
-        <label class="form-label">Tag (optional)</label>
-        <input class="input" placeholder="e.g. nutritrace" bind:value={_appriseTag} on:blur={() => set('appriseTag', _appriseTag)} />
+        <label class="form-label">{$_('settings_notifications.push.apprise_tag')}</label>
+        <input class="input" placeholder={$_('settings_notifications.push.apprise_tag_ph')} bind:value={_appriseTag} on:blur={() => set('appriseTag', _appriseTag)} />
       </div>
     {/if}
 
     <!-- Gotify config -->
     {#if _notifPushService === 'gotify'}
       <div class="form-group" style="padding:10px 16px 4px">
-        <label class="form-label">Gotify Server URL</label>
-        <input class="input" placeholder="https://gotify.example.com" bind:value={_gotifyUrl} on:blur={() => set('gotifyUrl', _gotifyUrl)} />
+        <label class="form-label">{$_('settings_notifications.push.gotify_url')}</label>
+        <input class="input" placeholder={$_('settings_notifications.push.gotify_url_ph')} bind:value={_gotifyUrl} on:blur={() => set('gotifyUrl', _gotifyUrl)} />
       </div>
       <div class="form-group" style="padding:8px 16px 14px">
-        <label class="form-label">App Token</label>
+        <label class="form-label">{$_('settings_notifications.push.gotify_token')}</label>
         <div style="display:flex;gap:8px;align-items:center">
           {#if _gotifyShowToken}
-            <input class="input" style="flex:1" type="text" placeholder="Your Gotify app token" bind:value={_gotifyToken} on:blur={() => set('gotifyToken', _gotifyToken)} />
+            <input class="input" style="flex:1" type="text" placeholder={$_('settings_notifications.push.gotify_token_ph')} bind:value={_gotifyToken} on:blur={() => set('gotifyToken', _gotifyToken)} />
           {:else}
-            <input class="input" style="flex:1" type="password" placeholder="Your Gotify app token" bind:value={_gotifyToken} on:blur={() => set('gotifyToken', _gotifyToken)} />
+            <input class="input" style="flex:1" type="password" placeholder={$_('settings_notifications.push.gotify_token_ph')} bind:value={_gotifyToken} on:blur={() => set('gotifyToken', _gotifyToken)} />
           {/if}
-          <button class="btn-icon" on:click={() => _gotifyShowToken = !_gotifyShowToken} title={_gotifyShowToken ? 'Hide' : 'Show'}>
+          <button class="btn-icon" on:click={() => _gotifyShowToken = !_gotifyShowToken} title={_gotifyShowToken ? $_('settings_notifications.push.hide') : $_('settings_notifications.push.show')}>
             <span class="material-symbols-rounded">{_gotifyShowToken ? 'visibility_off' : 'visibility'}</span>
           </button>
         </div>
@@ -219,22 +215,22 @@
     <!-- ntfy config -->
     {#if _notifPushService === 'ntfy'}
       <div class="form-group" style="padding:10px 16px 4px">
-        <label class="form-label">ntfy Server URL</label>
-        <input class="input" placeholder="https://ntfy.sh" bind:value={_ntfyUrl} on:blur={() => set('ntfyUrl', _ntfyUrl)} />
+        <label class="form-label">{$_('settings_notifications.push.ntfy_url')}</label>
+        <input class="input" placeholder={$_('settings_notifications.push.ntfy_url_ph')} bind:value={_ntfyUrl} on:blur={() => set('ntfyUrl', _ntfyUrl)} />
       </div>
       <div class="form-group" style="padding:8px 16px 4px">
-        <label class="form-label">Topic</label>
-        <input class="input" placeholder="e.g. my-nutritrace" bind:value={_ntfyTopic} on:blur={() => set('ntfyTopic', _ntfyTopic)} />
+        <label class="form-label">{$_('settings_notifications.push.ntfy_topic')}</label>
+        <input class="input" placeholder={$_('settings_notifications.push.ntfy_topic_ph')} bind:value={_ntfyTopic} on:blur={() => set('ntfyTopic', _ntfyTopic)} />
       </div>
       <div class="form-group" style="padding:8px 16px 14px">
-        <label class="form-label">Access Token (optional, for private topics)</label>
+        <label class="form-label">{$_('settings_notifications.push.ntfy_token')}</label>
         <div style="display:flex;gap:8px;align-items:center">
           {#if _ntfyShowToken}
-            <input class="input" style="flex:1" type="text" placeholder="Bearer token" bind:value={_ntfyToken} on:blur={() => set('ntfyToken', _ntfyToken)} />
+            <input class="input" style="flex:1" type="text" placeholder={$_('settings_notifications.push.ntfy_token_ph')} bind:value={_ntfyToken} on:blur={() => set('ntfyToken', _ntfyToken)} />
           {:else}
-            <input class="input" style="flex:1" type="password" placeholder="Bearer token" bind:value={_ntfyToken} on:blur={() => set('ntfyToken', _ntfyToken)} />
+            <input class="input" style="flex:1" type="password" placeholder={$_('settings_notifications.push.ntfy_token_ph')} bind:value={_ntfyToken} on:blur={() => set('ntfyToken', _ntfyToken)} />
           {/if}
-          <button class="btn-icon" on:click={() => _ntfyShowToken = !_ntfyShowToken} title={_ntfyShowToken ? 'Hide' : 'Show'}>
+          <button class="btn-icon" on:click={() => _ntfyShowToken = !_ntfyShowToken} title={_ntfyShowToken ? $_('settings_notifications.push.hide') : $_('settings_notifications.push.show')}>
             <span class="material-symbols-rounded">{_ntfyShowToken ? 'visibility_off' : 'visibility'}</span>
           </button>
         </div>
@@ -243,26 +239,25 @@
   </div>
 
   {#if _anyNotifEnabled}
-    <!-- Notification types — all go through whichever delivery methods are enabled -->
-    <p class="sub-label">Scheduled Reminders</p>
+    <p class="sub-label">{$_('settings_notifications.sections.scheduled_reminders')}</p>
     <div class="card settings-card">
       <div class="setting-row">
         <div>
-          <span class="setting-label">Water Reminders</span>
-          <div class="setting-desc">Periodic reminders to stay hydrated (8am–10pm)</div>
+          <span class="setting-label">{$_('settings_notifications.reminders.water')}</span>
+          <div class="setting-desc">{$_('settings_notifications.reminders.water_desc')}</div>
         </div>
         <Toggle checked={_notifWater} on:change={e => { _notifWater = e.detail; set('notifWaterReminders', e.detail); _scheduleWater(); }} />
       </div>
       {#if _notifWater}
         <div class="setting-divider"></div>
         <div class="setting-row">
-          <span class="setting-label">Interval</span>
+          <span class="setting-label">{$_('settings_notifications.reminders.interval')}</span>
           <div class="select-wrap" style="width:130px">
             <select class="select sel-sm" value={_notifWaterInt} on:change={e => { _notifWaterInt = Number(e.target.value); set('notifWaterInterval', _notifWaterInt); _scheduleWater(); }}>
-              <option value={60}>Every 1 hour</option>
-              <option value={90}>Every 1.5 hours</option>
-              <option value={120}>Every 2 hours</option>
-              <option value={180}>Every 3 hours</option>
+              <option value={60}>{$_('settings_notifications.reminders.interval_1h')}</option>
+              <option value={90}>{$_('settings_notifications.reminders.interval_1_5h')}</option>
+              <option value={120}>{$_('settings_notifications.reminders.interval_2h')}</option>
+              <option value={180}>{$_('settings_notifications.reminders.interval_3h')}</option>
             </select>
           </div>
         </div>
@@ -270,8 +265,8 @@
       <div class="setting-divider"></div>
       <div class="setting-row">
         <div>
-          <span class="setting-label">Meal Log Reminders</span>
-          <div class="setting-desc">Daily reminders to log your meals</div>
+          <span class="setting-label">{$_('settings_notifications.reminders.meal')}</span>
+          <div class="setting-desc">{$_('settings_notifications.reminders.meal_desc')}</div>
         </div>
         <Toggle checked={_notifMeals} on:change={e => { _notifMeals = e.detail; set('notifMealReminders', e.detail); _scheduleMeals(); }} />
       </div>
@@ -294,23 +289,23 @@
       <div class="setting-divider"></div>
       <div class="setting-row">
         <div>
-          <span class="setting-label">Weigh-in Reminder</span>
-          <div class="setting-desc">Morning reminder to step on the scale</div>
+          <span class="setting-label">{$_('settings_notifications.reminders.weighin')}</span>
+          <div class="setting-desc">{$_('settings_notifications.reminders.weighin_desc')}</div>
         </div>
         <Toggle checked={_notifWeighIn} on:change={e => { _notifWeighIn = e.detail; set('notifWeighIn', e.detail); _scheduleWeighIn(); }} />
       </div>
       {#if _notifWeighIn}
         <div class="setting-divider"></div>
         <div class="setting-row">
-          <span class="setting-label">Time</span>
+          <span class="setting-label">{$_('settings_notifications.reminders.weighin_time')}</span>
           <TimePicker value={_notifWeighInTime} on:change={e => { _notifWeighInTime = e.detail; set('notifWeighInTime', e.detail); _scheduleWeighIn(); }} />
         </div>
       {/if}
       <div class="setting-divider"></div>
       <div class="setting-row">
         <div>
-          <span class="setting-label">Bedtime Reminder</span>
-          <div class="setting-desc">Evening nudge to wind down for sleep</div>
+          <span class="setting-label">{$_('settings_notifications.reminders.bedtime')}</span>
+          <div class="setting-desc">{$_('settings_notifications.reminders.bedtime_desc')}</div>
         </div>
         <Toggle checked={_notifBedtime} on:change={e => { _notifBedtime = e.detail; set('notifBedtime', e.detail); }} />
       </div>
@@ -318,14 +313,14 @@
        <div transition:slide={{ duration: 160 }}>
         <div class="setting-divider"></div>
         <div class="setting-row">
-          <span class="setting-label">Bedtime</span>
+          <span class="setting-label">{$_('settings_notifications.reminders.bedtime_time')}</span>
           <TimePicker value={_notifBedtimeTime} on:change={e => { _notifBedtimeTime = e.detail; set('notifBedtimeTime', e.detail); }} />
         </div>
         <div class="setting-divider"></div>
         <div class="setting-row">
           <div>
-            <span class="setting-label">Wind-down Reminder</span>
-            <div class="setting-desc">Extra nudge before bedtime to start winding down</div>
+            <span class="setting-label">{$_('settings_notifications.reminders.wind_down')}</span>
+            <div class="setting-desc">{$_('settings_notifications.reminders.wind_down_desc')}</div>
           </div>
           <Toggle checked={_notifBedtimeWindDown} on:change={e => { _notifBedtimeWindDown = e.detail; set('notifBedtimeWindDown', e.detail); }} />
         </div>
@@ -333,14 +328,14 @@
           <div transition:slide={{ duration: 160 }}>
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <span class="setting-label">Minutes Before</span>
+            <span class="setting-label">{$_('settings_notifications.reminders.minutes_before')}</span>
             <div class="select-wrap" style="width:120px">
               <select class="select sel-sm" bind:value={_notifBedtimeWindDownMin} on:change={e => set('notifBedtimeWindDownMin', parseInt(e.target.value))}>
-                <option value={15}>15 min</option>
-                <option value={30}>30 min</option>
-                <option value={45}>45 min</option>
-                <option value={60}>60 min</option>
-                <option value={90}>90 min</option>
+                <option value={15}>{$_('settings_notifications.reminders.min_15')}</option>
+                <option value={30}>{$_('settings_notifications.reminders.min_30')}</option>
+                <option value={45}>{$_('settings_notifications.reminders.min_45')}</option>
+                <option value={60}>{$_('settings_notifications.reminders.min_60')}</option>
+                <option value={90}>{$_('settings_notifications.reminders.min_90')}</option>
               </select>
             </div>
           </div>
@@ -349,8 +344,8 @@
         <div class="setting-divider"></div>
         <div class="setting-row">
           <div>
-            <span class="setting-label">Smart Message</span>
-            <div class="setting-desc">Adjust the reminder based on last night's sleep (if tracked)</div>
+            <span class="setting-label">{$_('settings_notifications.reminders.smart_message')}</span>
+            <div class="setting-desc">{$_('settings_notifications.reminders.smart_message_desc')}</div>
           </div>
           <Toggle checked={_notifBedtimeSmart} on:change={e => { _notifBedtimeSmart = e.detail; set('notifBedtimeSmart', e.detail); }} />
         </div>
@@ -358,53 +353,53 @@
       {/if}
     </div>
 
-    <p class="sub-label">Alerts &amp; Summaries</p>
+    <p class="sub-label">{$_('settings_notifications.sections.alerts_summaries')}</p>
     <div class="card settings-card">
       <div class="setting-row">
         <div>
-          <span class="setting-label">Goal Celebrations</span>
-          <div class="setting-desc">Celebrates when you hit any daily goal — calories, protein, carbs, fat, water, steps, sleep, and more</div>
+          <span class="setting-label">{$_('settings_notifications.alerts.goals')}</span>
+          <div class="setting-desc">{$_('settings_notifications.alerts.goals_desc')}</div>
         </div>
         <Toggle checked={_notifGoals} on:change={e => { _notifGoals = e.detail; set('notifGoalCelebrations', e.detail); }} />
       </div>
       <div class="setting-divider"></div>
       <div class="setting-row">
         <div>
-          <span class="setting-label">Step Goal Progress</span>
-          <div class="setting-desc">Midday nudge if you're behind on your step goal</div>
+          <span class="setting-label">{$_('settings_notifications.alerts.steps')}</span>
+          <div class="setting-desc">{$_('settings_notifications.alerts.steps_desc')}</div>
         </div>
         <Toggle checked={_notifSteps} on:change={e => { _notifSteps = e.detail; set('notifStepGoal', e.detail); }} />
       </div>
       <div class="setting-divider"></div>
       <div class="setting-row">
         <div>
-          <span class="setting-label">Wellness Alerts</span>
-          <div class="setting-desc">Warns when HRV drops significantly, sleep quality declines, or resting heart rate spikes</div>
+          <span class="setting-label">{$_('settings_notifications.alerts.wellness')}</span>
+          <div class="setting-desc">{$_('settings_notifications.alerts.wellness_desc')}</div>
         </div>
         <Toggle checked={_notifWellness} on:change={e => { _notifWellness = e.detail; set('notifWellnessAlerts', e.detail); }} />
       </div>
       <div class="setting-divider"></div>
       <div class="setting-row">
         <div>
-          <span class="setting-label">Workout Summaries</span>
-          <div class="setting-desc">Recap after a workout syncs — duration, distance, calories burned</div>
+          <span class="setting-label">{$_('settings_notifications.alerts.workouts')}</span>
+          <div class="setting-desc">{$_('settings_notifications.alerts.workouts_desc')}</div>
         </div>
         <Toggle checked={_notifWorkouts} on:change={e => { _notifWorkouts = e.detail; set('notifWorkoutSummary', e.detail); }} />
       </div>
       <div class="setting-divider"></div>
       <div class="setting-row">
         <div>
-          <span class="setting-label">Weekly Summary</span>
-          <div class="setting-desc">Weekly digest with average calories, protein, steps, sleep, goal hit rate, and weight change — delivered by push notification and email (if configured)</div>
+          <span class="setting-label">{$_('settings_notifications.alerts.weekly')}</span>
+          <div class="setting-desc">{$_('settings_notifications.alerts.weekly_desc')}</div>
         </div>
         <Toggle checked={_notifWeekly} on:change={e => { _notifWeekly = e.detail; set('notifWeeklySummary', e.detail); }} />
       </div>
       {#if _notifWeekly}
         <div class="setting-divider"></div>
         <div class="setting-row">
-          <span class="setting-label">Delivery Day</span>
+          <span class="setting-label">{$_('settings_notifications.alerts.delivery_day')}</span>
           <div class="seg-control" style="--seg-count:7;--seg-active:{_weeklySummaryDay}">
-            {#each ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'] as day, i}
+            {#each [$_('settings_notifications.alerts.day_sun'), $_('settings_notifications.alerts.day_mon'), $_('settings_notifications.alerts.day_tue'), $_('settings_notifications.alerts.day_wed'), $_('settings_notifications.alerts.day_thu'), $_('settings_notifications.alerts.day_fri'), $_('settings_notifications.alerts.day_sat')] as day, i}
               <button class="seg-opt" class:seg-active={_weeklySummaryDay === i}
                 on:click={() => { _weeklySummaryDay = i; set('weeklySummaryDay', i); }}>
                 {day}
@@ -414,15 +409,15 @@
         </div>
         <div class="setting-divider"></div>
         <div class="setting-row">
-          <span class="setting-label">Delivery Time</span>
+          <span class="setting-label">{$_('settings_notifications.alerts.delivery_time')}</span>
           <TimePicker value={_weeklySummaryTime} on:change={e => { _weeklySummaryTime = e.detail; set('weeklySummaryTime', e.detail); }} />
         </div>
       {/if}
       <div class="setting-divider"></div>
       <div class="setting-row">
         <div>
-          <span class="setting-label">Sync Failures</span>
-          <div class="setting-desc">Alert when Fitbit, Garmin, or Withings sync fails</div>
+          <span class="setting-label">{$_('settings_notifications.alerts.sync_failures')}</span>
+          <div class="setting-desc">{$_('settings_notifications.alerts.sync_failures_desc')}</div>
         </div>
         <Toggle checked={_notifSync} on:change={e => { _notifSync = e.detail; set('notifSyncFailures', e.detail); }} />
       </div>
