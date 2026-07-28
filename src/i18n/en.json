@@ -227,7 +227,7 @@
     "download_install":      "Download & Install",
     "downloading":           "Downloading… {percent}%",
     "install_starting":      "Opening installer…",
-    "install_failed":        "Install failed. Try again or download manually from GitHub.",
+    "install_failed":        "Install failed. Try again.",
     "skip_this_version":     "Skip This Version",
     "no_apk_asset":          "This release has no APK asset attached.",
     "banner_cta":            "Tap to view what's new and install.",

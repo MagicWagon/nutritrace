@@ -236,46 +236,59 @@ export function isUpdateAvailable(latest) {
 }
 
 /**
- * Download the APK to app storage and hand off to the Android system installer.
- * Android/Capacitor-only. Progress callback receives 0-100.
+ * Download the APK to app storage and hand off to the Android system
+ * installer. Android/Capacitor-only. Progress callback receives 0-100.
  * Throws on non-native platforms or download failure.
+ *
+ * Uses Capacitor's native Filesystem.downloadFile (Java/Kotlin download
+ * on the Android side) instead of `fetch` + `blob`. Two reasons the
+ * WebView-fetch path was wrong for this workload:
+ *   1. GitHub Releases asset URLs (github.com/.../releases/download/...)
+ *      return a 302 to `objects.githubusercontent.com`. The WebView's
+ *      cross-origin fetch rules reject that redirect chain in some
+ *      Chromium versions, showing "failed to fetch" instantly.
+ *   2. Buffering a 57 MB APK as a Blob and then base64-encoding for
+ *      Filesystem.writeFile roughly triples memory during the write.
+ *      Native download streams straight to disk.
  */
 export async function downloadAndInstallApk(latest, onProgress) {
   if (!isNative) throw new Error('APK install only available in the Android app');
   if (!latest?.apkAsset) throw new Error('No APK asset in this release');
   const { Filesystem, Directory } = await import('@capacitor/filesystem');
 
-  // Manual fetch + write so we can surface progress. Capacitor's
-  // Filesystem.downloadFile is simpler but its progress reporting is
-  // spotty on older Capacitor versions and silently drops on chunked
-  // transfer without a Content-Length header.
-  const res = await fetch(latest.apkAsset.url, {
-    headers: { 'User-Agent': UA },
-  });
-  if (!res.ok) throw new Error(`Download failed: HTTP ${res.status}`);
-  const total = latest.apkAsset.size || parseInt(res.headers.get('content-length') || '0', 10);
-  const reader = res.body.getReader();
-  const chunks = [];
-  let received = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    received += value.length;
-    if (onProgress && total > 0) onProgress(Math.min(99, Math.floor(received / total * 100)));
-  }
-  const blob = new Blob(chunks, { type: 'application/vnd.android.package-archive' });
-  const base64 = await _blobToBase64(blob);
-
   const path = `updates/${latest.apkAsset.name}`;
-  await Filesystem.writeFile({
-    path,
-    data: base64,
-    directory: Directory.Data,
-    recursive: true,
-  });
-  const { uri } = await Filesystem.getUri({ path, directory: Directory.Data });
+
+  // Wire native progress events (Capacitor Filesystem 5.0+). Silently
+  // no-ops on older builds — fall back to a fake 0 → 100 flip on
+  // completion so the UI doesn't just hang without feedback.
+  let progressHandle = null;
+  try {
+    progressHandle = await Filesystem.addListener('progress', ev => {
+      if (!ev || !ev.bytes || !ev.contentLength || !onProgress) return;
+      onProgress(Math.min(99, Math.floor(ev.bytes / ev.contentLength * 100)));
+    });
+  } catch { /* older Filesystem — no progress events */ }
+
+  try {
+    await Filesystem.downloadFile({
+      url: latest.apkAsset.url,
+      path,
+      directory: Directory.Data,
+      recursive: true,
+      progress: true,
+      // Explicit UA so GitHub is happy with anonymous asset pulls.
+      headers: { 'User-Agent': UA },
+    });
+  } catch (e) {
+    throw new Error(e?.message || 'Download failed');
+  } finally {
+    if (progressHandle && typeof progressHandle.remove === 'function') {
+      try { await progressHandle.remove(); } catch {}
+    }
+  }
+
   if (onProgress) onProgress(100);
+  const { uri } = await Filesystem.getUri({ path, directory: Directory.Data });
 
   // Hand off to system installer. @capacitor-community/file-opener wraps
   // Android's Intent.ACTION_VIEW + FileProvider dance, resolving the
@@ -293,19 +306,6 @@ export async function downloadAndInstallApk(latest, onProgress) {
   } catch (e) {
     throw new Error(`Could not open installer: ${e?.message || e}`);
   }
-}
-
-function _blobToBase64(blob) {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onloadend = () => {
-      const s = String(r.result || '');
-      const idx = s.indexOf(',');
-      resolve(idx >= 0 ? s.slice(idx + 1) : s);
-    };
-    r.onerror = () => reject(r.error);
-    r.readAsDataURL(blob);
-  });
 }
 
 /** Format an ISO date for the "Last checked: X ago" label. */
