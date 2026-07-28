@@ -1616,7 +1616,7 @@
     </button>
     {/if}
 
-    <p class="settings-group-label">Display</p>
+    <p class="settings-group-label">{$_('settings_main.group_display')}</p>
     <!-- ── Appearance ──────────────────────────────────────────────────────── -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'appearance')} on:click={() => toggleSection('appearance')}>
       <span class="material-symbols-rounded si">contrast</span>
@@ -1654,7 +1654,7 @@
               {/each}
               <!-- Custom color swatch (color wheel) -->
               <button class="accent-swatch accent-swatch-custom" class:active={/^#[0-9a-fA-F]{6}$/.test($accentColor)}
-                title="Custom color" style={/^#[0-9a-fA-F]{6}$/.test($accentColor) ? "background:"+$accentColor : ""}
+                title={$_('settings_main.custom_color')} style={/^#[0-9a-fA-F]{6}$/.test($accentColor) ? "background:"+$accentColor : ""}
                 on:click={openColorSheet}>
                 <span class="material-symbols-rounded" style="font-size:16px;color:rgba(255,255,255,0.9);text-shadow:0 0 3px rgba(0,0,0,0.5)">colorize</span>
               </button>
@@ -1673,15 +1673,15 @@
             <div class="setting-divider"></div>
             <div class="setting-row">
               <div>
-                <span class="setting-label">Persistent Sidebar</span>
-                <div class="setting-desc">Sidebar stays open and shifts page content instead of overlaying it. Available on tablets, foldables, and desktop.</div>
+                <span class="setting-label">{$_('settings_main.persistent_sidebar')}</span>
+                <div class="setting-desc">{$_('settings_main.persistent_sidebar_desc')}</div>
               </div>
               <Toggle checked={sidebarPersistentVal} on:change={e => sidebarPersistentVal = e.detail} />
             </div>
           {/if}
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <span class="setting-label">Start Page</span>
+            <span class="setting-label">{$_('settings_main.start_page')}</span>
             <div class="select-wrap" style="width:150px">
               <select class="select sel-sm" bind:value={startPage}>
                 {#each START_PAGE_OPTS as o}<option value={o.value}>{o.label}</option>{/each}
@@ -1690,43 +1690,43 @@
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <span class="setting-label">Reduce Motion</span>
+            <span class="setting-label">{$_('settings_main.reduce_motion')}</span>
             <Toggle checked={disableAnimations} on:change={e => { disableAnimations = e.detail; set('disableAnimations', e.detail); }} />
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
             <div>
-              <span class="setting-label">Goal Pulse Animation</span>
-              <div class="setting-desc">Pulse the diary's nutrition bar when you hit a daily goal. For push notifications on goal hits, see Notifications.</div>
+              <span class="setting-label">{$_('settings_main.goal_pulse')}</span>
+              <div class="setting-desc">{$_('settings_main.goal_pulse_desc')}</div>
             </div>
             <Toggle checked={$goalCelebrations} on:change={e => goalCelebrations.set(e.detail)} />
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
             <div>
-              <span class="setting-label">Page Banners</span>
-              <div class="setting-desc">Header style at the top of every page. Animated is a compact accent-gradient bar with a chosen motion style; Gradient is the same bar, static; Off is a plain glass header.</div>
+              <span class="setting-label">{$_('settings_main.page_banners')}</span>
+              <div class="setting-desc">{$_('settings_main.page_banners_desc')}</div>
             </div>
             <div class="select-wrap" style="width:130px">
               <select class="select sel-sm" value={$bannerStyle} on:change={e => bannerStyle.set(e.currentTarget.value)}>
-                <option value="animated">Animated</option>
-                <option value="gradient">Gradient</option>
-                <option value="off">Off</option>
+                <option value="animated">{$_('settings_main.banner_animated')}</option>
+                <option value="gradient">{$_('settings_main.banner_gradient')}</option>
+                <option value="off">{$_('settings_main.banner_off')}</option>
               </select>
             </div>
           </div>
           {#if $bannerStyle === 'animated'}
             <div class="setting-row">
               <div>
-                <span class="setting-label">Animation Style</span>
-                <div class="setting-desc">Shimmer is a soft white sweep, Drift is a slow hue rotation, Pulse is a gentle breathing, Aurora is a soft accent-tinted cloud-of-light. All honour Reduce Motion.</div>
+                <span class="setting-label">{$_('settings_main.anim_style')}</span>
+                <div class="setting-desc">{$_('settings_main.anim_style_desc')}</div>
               </div>
               <div class="select-wrap" style="width:130px">
                 <select class="select sel-sm" value={$bannerAnimation} on:change={e => bannerAnimation.set(e.currentTarget.value)}>
-                  <option value="shimmer">Shimmer</option>
-                  <option value="drift">Drift</option>
-                  <option value="pulse">Pulse</option>
-                  <option value="aurora">Aurora</option>
+                  <option value="shimmer">{$_('settings_main.anim_shimmer')}</option>
+                  <option value="drift">{$_('settings_main.anim_drift')}</option>
+                  <option value="pulse">{$_('settings_main.anim_pulse')}</option>
+                  <option value="aurora">{$_('settings_main.anim_aurora')}</option>
                 </select>
               </div>
             </div>
@@ -1848,37 +1848,37 @@
       <div class="section-body" transition:slide={{ duration: 180 }}>
         <div class="card settings-card">
           <div class="setting-row">
-            <div><span class="setting-label">Show Brand Names</span><div class="setting-desc">Display the brand under each food name</div></div>
+            <div><span class="setting-label">{$_('settings_diary.show_brand')}</span><div class="setting-desc">{$_('settings_diary.show_brand_desc')}</div></div>
             <Toggle checked={$diaryShowBrands} on:change={e => diaryShowBrands.set(e.detail)} />
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <div><span class="setting-label">Show Timestamps</span><div class="setting-desc">Show the time each item was logged</div></div>
+            <div><span class="setting-label">{$_('settings_diary.show_timestamps')}</span><div class="setting-desc">{$_('settings_diary.show_timestamps_desc')}</div></div>
             <Toggle checked={$diaryShowTimestamps} on:change={e => diaryShowTimestamps.set(e.detail)} />
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <div><span class="setting-label">Show Thumbnails</span><div class="setting-desc">Food/meal photos next to each item</div></div>
+            <div><span class="setting-label">{$_('settings_diary.show_thumbnails')}</span><div class="setting-desc">{$_('settings_diary.show_thumbnails_desc')}</div></div>
             <Toggle checked={$diaryShowThumbnails} on:change={e => diaryShowThumbnails.set(e.detail)} />
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <div><span class="setting-label">Show All Nutrients</span><div class="setting-desc">When viewing a meal's totals, show every available nutrient (vitamins, minerals, etc.) instead of just the macros</div></div>
+            <div><span class="setting-label">{$_('settings_diary.show_all_nutrients')}</span><div class="setting-desc">{$_('settings_diary.show_all_nutrients_desc')}</div></div>
             <Toggle checked={$diaryShowAllNutrients} on:change={e => diaryShowAllNutrients.set(e.detail)} />
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <div><span class="setting-label">Show Nutrition Units</span><div class="setting-desc">Append "g" / "mg" / etc. after numeric values</div></div>
+            <div><span class="setting-label">{$_('settings_diary.show_units')}</span><div class="setting-desc">{$_('settings_diary.show_units_desc')}</div></div>
             <Toggle checked={$diaryShowNutritionUnits} on:change={e => diaryShowNutritionUnits.set(e.detail)} />
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <div><span class="setting-label">Show Macro Summary Per Meal</span><div class="setting-desc">P/C/F bar at the bottom of each meal — tap it for full nutrient breakdown</div></div>
+            <div><span class="setting-label">{$_('settings_diary.show_macro_summary')}</span><div class="setting-desc">{$_('settings_diary.show_macro_summary_desc')}</div></div>
             <Toggle checked={$diaryShowMacroSummary} on:change={e => diaryShowMacroSummary.set(e.detail)} />
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <div><span class="setting-label">Ask For Quantity When Adding</span><div class="setting-desc">Prompt for portion size before adding a food (otherwise use the food's default)</div></div>
+            <div><span class="setting-label">{$_('settings_diary.ask_quantity')}</span><div class="setting-desc">{$_('settings_diary.ask_quantity_desc')}</div></div>
             <Toggle checked={$diaryPromptQuantity} on:change={e => diaryPromptQuantity.set(e.detail)} />
           </div>
           <div class="setting-divider"></div>
@@ -1888,7 +1888,7 @@
                Auto-on for anyone who turned on Warn About Unit
                Conversions below (the natural signal of intent). -->
           <div class="setting-row">
-            <div><span class="setting-label">Show Unit Metadata</span><div class="setting-desc">Adds three fields in the Food Editor: Nutrition Basis (per 100 g vs per 100 ml), Serving Units (1 slice = 35 g, 1 bottle = 500 ml, etc.), and Density (g/ml) for accurate volume-to-mass math on liquids. Also surfaces quick-pick serving chips on the Add to Diary sheet and a "per 100 g/ml" suffix on food list rows. Off by default; turn on if you log Open Food Facts liquids in grams or want custom serving units like slice / cookie / bottle.</div></div>
+            <div><span class="setting-label">{$_('settings_diary.unit_metadata')}</span><div class="setting-desc">{$_('settings_diary.unit_metadata_desc')}</div></div>
             <Toggle checked={$showUnitMetadata} on:change={e => showUnitMetadata.set(e.detail)} />
           </div>
           <div class="setting-divider"></div>
@@ -1898,45 +1898,45 @@
                enables Show Unit Metadata at the call sites via the
                reactive gate `$showUnitMetadata || $warnUnitMismatch`. -->
           <div class="setting-row">
-            <div><span class="setting-label">Warn About Unit Conversions</span><div class="setting-desc">Show a warning when you pick a mass unit (g/oz) on a food whose nutrition is per 100 ml, or vice versa, without a density value set on the food. The fallback math assumes 1 ml ≈ 1 g, which is rough for oils, honey, etc.</div></div>
+            <div><span class="setting-label">{$_('settings_diary.warn_conversions')}</span><div class="setting-desc">{$_('settings_diary.warn_conversions_desc')}</div></div>
             <Toggle checked={$warnUnitMismatch} on:change={e => warnUnitMismatch.set(e.detail)} />
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <div><span class="setting-label">Show Portion Size</span><div class="setting-desc">Display "150g" / "1 cup" etc. on each diary item</div></div>
+            <div><span class="setting-label">{$_('settings_diary.show_portion')}</span><div class="setting-desc">{$_('settings_diary.show_portion_desc')}</div></div>
             <Toggle checked={$diaryShowPortionSize} on:change={e => diaryShowPortionSize.set(e.detail)} />
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <div><span class="setting-label">Show Daily Notes</span><div class="setting-desc">Free-text notes section at the bottom of each day's diary</div></div>
+            <div><span class="setting-label">{$_('settings_diary.show_daily_notes')}</span><div class="setting-desc">{$_('settings_diary.show_daily_notes_desc')}</div></div>
             <Toggle checked={$diaryShowNotes} on:change={e => diaryShowNotes.set(e.detail)} />
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <div><span class="setting-label">Show Quick Calories Button</span><div class="setting-desc">Adds a bolt icon on each meal section for fast calorie-only entry (no food, no portion). Useful when you know the calories but don't want to model the food, or when you're coming from Fitbit-style "quick calories".</div></div>
+            <div><span class="setting-label">{$_('settings_diary.show_quick_cals')}</span><div class="setting-desc">{$_('settings_diary.show_quick_cals_desc')}</div></div>
             <Toggle checked={$showQuickCalories} on:change={e => showQuickCalories.set(e.detail)} />
           </div>
           {#if $showQuickCalories}
             <div class="setting-divider"></div>
             <div class="setting-row">
-              <div><span class="setting-label">Quick Calories Display</span><div class="setting-desc">How multiple Quick Calorie entries in the same meal appear in the diary. Summed collapses them into one row; Separate shows each entry on its own line.</div></div>
+              <div><span class="setting-label">{$_('settings_diary.quick_cals_display')}</span><div class="setting-desc">{$_('settings_diary.quick_cals_display_desc')}</div></div>
               <div class="select-wrap" style="width:130px">
                 <select class="select sel-sm" value={$quickCaloriesDisplay} on:change={e => quickCaloriesDisplay.set(e.currentTarget.value)}>
-                  <option value="summed">Summed</option>
-                  <option value="separate">Separate</option>
+                  <option value="summed">{$_('settings_diary.opt_summed')}</option>
+                  <option value="separate">{$_('settings_diary.opt_separate')}</option>
                 </select>
               </div>
             </div>
           {/if}
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <div><span class="setting-label">Show Activity Section</span><div class="setting-desc">A list-of-entries Activity section on the Diary for logging exercise. Each entry has a name + calories burned. Useful if you don't have a wearable integration.</div></div>
+            <div><span class="setting-label">{$_('settings_diary.show_activity')}</span><div class="setting-desc">{$_('settings_diary.show_activity_desc')}</div></div>
             <Toggle checked={$diaryShowActivity} on:change={e => diaryShowActivity.set(e.detail)} />
           </div>
           {#if $diaryShowActivity}
             <div class="setting-divider"></div>
             <div class="setting-row">
-              <div><span class="setting-label">Adjust Calorie Goal From Activity</span><div class="setting-desc">When on, today's burn (manual + wearable per the policy below) raises your calorie remaining for the day — earn-back model. When off, activity entries still log and display but your goal stays at its base value.</div></div>
+              <div><span class="setting-label">{$_('settings_diary.adjust_calorie_goal')}</span><div class="setting-desc">{$_('settings_diary.adjust_calorie_goal_desc')}</div></div>
               <Toggle checked={$calorieAdjustFromActivity} on:change={e => calorieAdjustFromActivity.set(e.detail)} />
             </div>
           {/if}
@@ -1949,15 +1949,15 @@
                 <div style="margin-top:8px; display:flex; flex-direction:column; gap:6px;">
                   <label style="display:flex; gap:8px; align-items:flex-start;">
                     <input type="radio" name="activityPolicy" value="wearable_wins" checked={$manualActivityPolicy === 'wearable_wins'} on:change={() => manualActivityPolicy.set('wearable_wins')} />
-                    <span><strong>Wearable wins</strong> <span class="setting-desc">— manual entries show on the diary but don't move the goal math. Default, no double-count risk.</span></span>
+                    <span><strong>{$_('settings_diary.policy_wearable_wins')}</strong> <span class="setting-desc">{$_('settings_diary.policy_wearable_desc')}</span></span>
                   </label>
                   <label style="display:flex; gap:8px; align-items:flex-start;">
                     <input type="radio" name="activityPolicy" value="manual_wins" checked={$manualActivityPolicy === 'manual_wins'} on:change={() => manualActivityPolicy.set('manual_wins')} />
-                    <span><strong>Manual wins</strong> <span class="setting-desc">— your manually-logged total replaces the wearable's burn for the day.</span></span>
+                    <span><strong>{$_('settings_diary.policy_manual_wins')}</strong> <span class="setting-desc">{$_('settings_diary.policy_manual_desc')}</span></span>
                   </label>
                   <label style="display:flex; gap:8px; align-items:flex-start;">
                     <input type="radio" name="activityPolicy" value="additive" checked={$manualActivityPolicy === 'additive'} on:change={() => manualActivityPolicy.set('additive')} />
-                    <span><strong>Add together</strong> <span class="setting-desc">— sums both. ⚠ Risk of double-counting if your wearable already saw the activity.</span></span>
+                    <span><strong>{$_('settings_diary.policy_add')}</strong> <span class="setting-desc">{$_('settings_diary.policy_add_desc')}</span></span>
                   </label>
                 </div>
                 <div class="setting-desc" style="margin-top:8px">When no wearable data exists for a day, manual entries always count regardless of this setting.</div>
@@ -1966,13 +1966,13 @@
           {/if}
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <div><span class="setting-label">Show Fasting Tracker</span><div class="setting-desc">Adds an intermittent-fasting timer at the top of the Diary. Start a fast, see elapsed time and progress toward your goal, end when you're done.</div></div>
+            <div><span class="setting-label">{$_('settings_diary.show_fasting')}</span><div class="setting-desc">{$_('settings_diary.show_fasting_desc')}</div></div>
             <Toggle checked={$fastingEnabled} on:change={e => fastingEnabled.set(e.detail)} />
           </div>
           {#if $fastingEnabled}
             <div class="setting-divider"></div>
             <div class="setting-row" style="flex-direction:column;align-items:stretch;gap:8px">
-              <span class="setting-label">Default Fast Goal</span>
+              <span class="setting-label">{$_('settings_diary.default_fast_goal')}</span>
               <div class="seg-control" style="width:100%;--seg-count:5;--seg-active:{[14,16,18,20,23].indexOf($fastingDefaultHours)}">
                 {#each [14,16,18,20,23] as h}
                   <button class="seg-opt" class:seg-active={$fastingDefaultHours === h}
@@ -1984,14 +1984,14 @@
             </div>
             <div class="setting-divider"></div>
             <div class="setting-row">
-              <div><span class="setting-label">Notify When Goal Reached</span><div class="setting-desc">Fire a notification when your active fast hits its goal so you don't have to keep checking the Diary.</div></div>
+              <div><span class="setting-label">{$_('settings_diary.notify_goal')}</span><div class="setting-desc">{$_('settings_diary.notify_goal_desc')}</div></div>
               <Toggle checked={$fastingNotifyOnGoal} on:change={e => fastingNotifyOnGoal.set(e.detail)} />
             </div>
 
             <div class="setting-divider"></div>
             <div class="setting-row">
               <div>
-                <span class="setting-label">Recurring Schedule</span>
+                <span class="setting-label">{$_('settings_diary.recurring_schedule')}</span>
                 <div class="setting-desc">Auto-start a fast at a fixed time each day. The schedule fires once per scheduled day; manually started fasts still work normally.</div>
               </div>
               <Toggle checked={$fastingScheduleEnabled} on:change={e => fastingScheduleEnabled.set(e.detail)} />
@@ -1999,14 +1999,14 @@
             {#if $fastingScheduleEnabled}
               <div class="setting-divider"></div>
               <div class="setting-row">
-                <span class="setting-label">Start Time</span>
+                <span class="setting-label">{$_('settings_diary.start_time')}</span>
                 <input class="input" type="time" style="width:120px;text-align:center"
                   value={$fastingScheduleTime}
                   on:change={e => fastingScheduleTime.set(e.target.value)} />
               </div>
               <div class="setting-divider"></div>
               <div class="setting-row" style="flex-direction:column;align-items:stretch;gap:8px">
-                <span class="setting-label">Repeat On</span>
+                <span class="setting-label">{$_('settings_diary.repeat_on')}</span>
                 <div class="seg-control multi" style="width:100%;--seg-count:7">
                   {#each ['S','M','T','W','T','F','S'] as label, idx}
                     <button class="seg-opt" type="button"
@@ -2024,7 +2024,7 @@
               </div>
               <div class="setting-divider"></div>
               <div class="setting-row">
-                <span class="setting-label">Schedule Goal</span>
+                <span class="setting-label">{$_('settings_diary.schedule_goal')}</span>
                 <input class="input" type="number" min="1" max="168" step="0.5"
                   style="width:90px;text-align:center"
                   value={$fastingScheduleGoal}
@@ -2034,12 +2034,12 @@
           {/if}
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <div><span class="setting-label">Show Daily Goals Progress Bar</span><div class="setting-desc">Progress strip at the bottom of the diary showing how much of your daily goals you've hit</div></div>
+            <div><span class="setting-label">{$_('settings_diary.show_progress_bar')}</span><div class="setting-desc">{$_('settings_diary.show_progress_bar_desc')}</div></div>
             <Toggle checked={$diaryShowNutritionBar} on:change={e => diaryShowNutritionBar.set(e.detail)} />
           </div>
         </div>
 
-        <p class="sub-label">Meal names</p>
+        <p class="sub-label">{$_('settings_diary.meal_names')}</p>
         <!-- svelte-ignore a11y-no-static-element-interactions -->
         <div class="card settings-card drag-list"
           on:pointermove={onMealDragMove}
@@ -2088,7 +2088,7 @@
         <!-- Goal + unit -->
         <div class="card settings-card">
           <div class="setting-row">
-            <span class="setting-label">Display Unit</span>
+            <span class="setting-label">{$_('settings_water.display_unit')}</span>
             <select class="select sel-sm" value={$waterUnit} on:change={e => waterUnit.set(e.target.value)}>
               <option value="ml">Milliliters (ml)</option>
               <option value="oz">Fluid ounces (fl oz)</option>
@@ -2098,18 +2098,18 @@
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <span class="setting-label">Show In Diary</span>
+            <span class="setting-label">{$_('settings_water.show_in_diary')}</span>
             <Toggle checked={$waterShowInDiary} on:change={e => waterShowInDiary.set(e.detail)} />
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <span class="setting-label">Show In Statistics</span>
+            <span class="setting-label">{$_('settings_water.show_in_statistics')}</span>
             <Toggle checked={$waterShowInStats} on:change={e => waterShowInStats.set(e.detail)} />
           </div>
         </div>
 
         <!-- Containers list -->
-        <p class="section-title" style="margin-top:14px">Water Containers</p>
+        <p class="section-title" style="margin-top:14px">{$_('settings_water.containers_title')}</p>
         <p class="setting-desc" style="padding:0 var(--page-px) 10px">Quick-add buttons shown in the Diary for logging water intake</p>
         <div class="card settings-card">
           {#each $waterContainers as container, i}
@@ -2128,14 +2128,14 @@
             </div>
           {/each}
           {#if $waterContainers.length === 0}
-            <p class="text-3 text-sm" style="padding:16px;text-align:center">No containers yet</p>
+            <p class="text-3 text-sm" style="padding:16px;text-align:center">{$_('settings_water.no_containers')}</p>
           {/if}
         </div>
 
         <!-- Add container form -->
         <div class="card settings-card" style="margin-top:8px">
           <div style="padding:12px 16px 14px">
-            <p class="setting-label" style="margin-bottom:10px">Add Container</p>
+            <p class="setting-label" style="margin-bottom:10px">{$_('settings_water.add_container')}</p>
             <input class="input" type="text" placeholder="Name (e.g. My Water Bottle)"
               bind:value={_newContName} style="margin-bottom:8px" />
             <div style="display:flex;gap:8px;align-items:center">
@@ -2164,22 +2164,22 @@
       <div class="section-body" transition:slide={{ duration: 180 }}>
         <div class="card settings-card">
           <div class="setting-row">
-            <div><span class="setting-label">Show Thumbnails</span><div class="setting-desc">Food/meal photos in the picker list</div></div>
+            <div><span class="setting-label">{$_('settings_foods_picker.show_thumbnails')}</span><div class="setting-desc">{$_('settings_foods_picker.show_thumbnails_desc')}</div></div>
             <Toggle checked={$foodsShowThumbnails} on:change={e => foodsShowThumbnails.set(e.detail)} />
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <div><span class="setting-label">Show Categories</span><div class="setting-desc">Filter chips at the top of the Foods picker</div></div>
+            <div><span class="setting-label">{$_('settings_foods_picker.show_categories')}</span><div class="setting-desc">{$_('settings_foods_picker.show_categories_desc')}</div></div>
             <Toggle checked={$foodsShowCategories} on:change={e => foodsShowCategories.set(e.detail)} />
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <div><span class="setting-label">Show Category Labels</span><div class="setting-desc">Display the category name + emoji on each food row</div></div>
+            <div><span class="setting-label">{$_('settings_foods_picker.show_category_labels')}</span><div class="setting-desc">{$_('settings_foods_picker.show_category_labels_desc')}</div></div>
             <Toggle checked={$foodsShowLabels} on:change={e => foodsShowLabels.set(e.detail)} />
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <div><span class="setting-label">Show Notes</span><div class="setting-desc">Show saved food notes (e.g. "1 serving = 150g cooked") in the quick-add card</div></div>
+            <div><span class="setting-label">{$_('settings_foods_picker.show_notes')}</span><div class="setting-desc">{$_('settings_foods_picker.show_notes_desc')}</div></div>
             <Toggle checked={$foodsShowNotes} on:change={e => foodsShowNotes.set(e.detail)} />
           </div>
           <div class="setting-divider"></div>
@@ -2190,55 +2190,55 @@
           <div class="setting-divider"></div>
           <div class="setting-row">
             <div>
-              <span class="setting-label">Foods Sort</span>
+              <span class="setting-label">{$_('settings_foods_picker.foods_sort')}</span>
               <div class="setting-desc">How items are ordered in the Foods tab. Favorites are always pinned at the top regardless of sort.</div>
             </div>
             <div class="select-wrap" style="width:160px">
               <select class="select sel-sm" value={$foodsSort} on:change={e => foodsSort.set(e.target.value)}>
-                <option value="recent">Recently Used</option>
-                <option value="most">Most Used</option>
-                <option value="alpha">Alphabetical</option>
+                <option value="recent">{$_('settings_foods_picker.opt_recent')}</option>
+                <option value="most">{$_('settings_foods_picker.opt_most')}</option>
+                <option value="alpha">{$_('settings_foods_picker.opt_alpha')}</option>
               </select>
             </div>
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
             <div>
-              <span class="setting-label">Meals Sort</span>
+              <span class="setting-label">{$_('settings_foods_picker.meals_sort')}</span>
               <div class="setting-desc">How items are ordered in the Meals tab.</div>
             </div>
             <div class="select-wrap" style="width:160px">
               <select class="select sel-sm" value={$mealsSort} on:change={e => mealsSort.set(e.target.value)}>
-                <option value="recent">Recently Used</option>
-                <option value="most">Most Used</option>
-                <option value="alpha">Alphabetical</option>
+                <option value="recent">{$_('settings_foods_picker.opt_recent')}</option>
+                <option value="most">{$_('settings_foods_picker.opt_most')}</option>
+                <option value="alpha">{$_('settings_foods_picker.opt_alpha')}</option>
               </select>
             </div>
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
             <div>
-              <span class="setting-label">Recipes Sort</span>
+              <span class="setting-label">{$_('settings_scanner.recipes_sort')}</span>
               <div class="setting-desc">How items are ordered in the Recipes tab.</div>
             </div>
             <div class="select-wrap" style="width:160px">
               <select class="select sel-sm" value={$recipesSort} on:change={e => recipesSort.set(e.target.value)}>
-                <option value="recent">Recently Used</option>
-                <option value="most">Most Used</option>
-                <option value="alpha">Alphabetical</option>
+                <option value="recent">{$_('settings_foods_picker.opt_recent')}</option>
+                <option value="most">{$_('settings_foods_picker.opt_most')}</option>
+                <option value="alpha">{$_('settings_foods_picker.opt_alpha')}</option>
               </select>
             </div>
           </div>
         </div>
         <p class="sub-label">Camera &amp; Scanning</p>
         <div class="card settings-card">
-          <div class="setting-row"><span class="setting-label">Beep On Successful Scan</span><Toggle checked={$barcodeBeep} on:change={e => barcodeBeep.set(e.detail)} /></div>
+          <div class="setting-row"><span class="setting-label">{$_('settings_scanner.beep_on_scan')}</span><Toggle checked={$barcodeBeep} on:change={e => barcodeBeep.set(e.detail)} /></div>
           {#if isNative}
             <div class="setting-divider"></div>
-            <div class="setting-row"><span class="setting-label">Use Flashlight While Scanning</span><Toggle checked={$barcodeFlashlight} on:change={e => barcodeFlashlight.set(e.detail)} /></div>
+            <div class="setting-row"><span class="setting-label">{$_('settings_scanner.use_flashlight')}</span><Toggle checked={$barcodeFlashlight} on:change={e => barcodeFlashlight.set(e.detail)} /></div>
           {/if}
           <div class="setting-divider"></div>
-          <div class="setting-row"><span class="setting-label">Crop Photos On Upload</span><Toggle checked={$cropPhotos} on:change={e => cropPhotos.set(e.detail)} /></div>
+          <div class="setting-row"><span class="setting-label">{$_('settings_scanner.crop_photos')}</span><Toggle checked={$cropPhotos} on:change={e => cropPhotos.set(e.detail)} /></div>
         </div>
       </div>
     {/if}
@@ -2255,18 +2255,18 @@
         <div class="card settings-card">
           <div class="setting-row" style="flex-direction:column;align-items:stretch;gap:8px">
             <div>
-              <span class="setting-label">Calorie Goal Mode</span>
-              <div class="setting-desc">How your daily calorie target is calculated</div>
+              <span class="setting-label">{$_('settings_goals.calorie_goal_mode')}</span>
+              <div class="setting-desc">{$_('settings_goals.calorie_goal_mode_desc')}</div>
             </div>
             <div class="seg-control" style="width:100%;--seg-count:3;--seg-active:{$calorieGoalMode === 'fixed' ? 0 : $calorieGoalMode === 'dynamic' ? 1 : 2}">
               <button class="seg-opt" class:seg-active={$calorieGoalMode === 'fixed'}
-                on:click={() => calorieGoalMode.set('fixed')}>Fixed</button>
+                on:click={() => calorieGoalMode.set('fixed')}>{$_('settings_goals.mode_fixed')}</button>
               <button class="seg-opt" class:seg-active={$calorieGoalMode === 'dynamic'}
                 disabled={!_hasWearable}
                 title={!_hasWearable ? 'Connect a wearable in Wellness first' : ''}
-                on:click={() => _hasWearable && calorieGoalMode.set('dynamic')}>Dynamic</button>
+                on:click={() => _hasWearable && calorieGoalMode.set('dynamic')}>{$_('settings_goals.mode_dynamic')}</button>
               <button class="seg-opt" class:seg-active={$calorieGoalMode === 'adaptive'}
-                on:click={() => calorieGoalMode.set('adaptive')}>Adaptive</button>
+                on:click={() => calorieGoalMode.set('adaptive')}>{$_('settings_goals.mode_adaptive')}</button>
             </div>
           </div>
           {#if $calorieGoalMode === 'fixed'}
@@ -2277,10 +2277,10 @@
           {:else if $calorieGoalMode === 'dynamic'}
             <div class="setting-divider"></div>
             <div class="setting-row" style="flex-direction:column;align-items:stretch;gap:8px">
-              <span class="setting-label">Goal Factor</span>
+              <span class="setting-label">{$_('settings_goals.goal_factor')}</span>
               <div class="seg-control" style="width:100%;--seg-count:3;--seg-active:{$calorieGoalFactor === 0.8 ? 0 : $calorieGoalFactor === 1.2 ? 2 : 1}">
                 <button class="seg-opt" class:seg-active={$calorieGoalFactor === 0.8}  on:click={() => calorieGoalFactor.set(0.8)}>Lose −20%</button>
-                <button class="seg-opt" class:seg-active={$calorieGoalFactor === 1.0}  on:click={() => calorieGoalFactor.set(1.0)}>Maintain</button>
+                <button class="seg-opt" class:seg-active={$calorieGoalFactor === 1.0}  on:click={() => calorieGoalFactor.set(1.0)}>{$_('settings_goals.factor_maintain')}</button>
                 <button class="seg-opt" class:seg-active={$calorieGoalFactor === 1.2}  on:click={() => calorieGoalFactor.set(1.2)}>Gain +20%</button>
               </div>
             </div>
@@ -2291,16 +2291,16 @@
           {:else if $calorieGoalMode === 'adaptive'}
             <div class="setting-divider"></div>
             <div class="setting-row" style="flex-direction:column;align-items:stretch;gap:8px">
-              <span class="setting-label">Goal Factor</span>
+              <span class="setting-label">{$_('settings_goals.goal_factor')}</span>
               <div class="seg-control" style="width:100%;--seg-count:3;--seg-active:{$calorieGoalFactor === 0.8 ? 0 : $calorieGoalFactor === 1.2 ? 2 : 1}">
                 <button class="seg-opt" class:seg-active={$calorieGoalFactor === 0.8}  on:click={() => calorieGoalFactor.set(0.8)}>Lose −20%</button>
-                <button class="seg-opt" class:seg-active={$calorieGoalFactor === 1.0}  on:click={() => calorieGoalFactor.set(1.0)}>Maintain</button>
+                <button class="seg-opt" class:seg-active={$calorieGoalFactor === 1.0}  on:click={() => calorieGoalFactor.set(1.0)}>{$_('settings_goals.factor_maintain')}</button>
                 <button class="seg-opt" class:seg-active={$calorieGoalFactor === 1.2}  on:click={() => calorieGoalFactor.set(1.2)}>Gain +20%</button>
               </div>
             </div>
             <div class="setting-divider"></div>
             <p class="setting-desc" style="padding:8px var(--page-px);line-height:1.5">
-              Learns your true TDEE from <strong>35 days of weight + diary</strong> and adjusts daily. Falls back to your fixed goal until enough data is logged. See the readiness card on the <strong>Goals</strong> page for current status. <a href="https://github.com/TraceApps/nutritrace#adaptive-tdee" target="_blank" rel="noopener" class="about-link">How it works →</a>
+              {$_('settings_goals.adaptive_note')} <a href="https://github.com/TraceApps/nutritrace#adaptive-tdee" target="_blank" rel="noopener" class="about-link">{$_('settings_goals.how_it_works')}</a>
             </p>
           {/if}
         </div>
@@ -2350,7 +2350,7 @@
       <div class="section-body" transition:slide={{ duration: 180 }}>
         <div class="card settings-card">
           <div class="setting-row">
-            <span class="setting-label">Default Chart Type</span>
+            <span class="setting-label">{$_('settings_stats.default_chart')}</span>
             <div class="select-wrap" style="width:110px">
               <select class="select sel-sm" bind:value={statsChartType}>
                 <option value="bar">Bar</option>
@@ -2364,15 +2364,15 @@
             <Toggle checked={statsYZero} on:change={e => { statsYZero = e.detail; set('statsYZero', e.detail); }} />
           </div>
           <div class="setting-divider"></div>
-          <div class="setting-row"><span class="setting-label">Show Average Line</span><Toggle checked={statsAvgLine} on:change={e => { statsAvgLine = e.detail; set('statsAvgLine', e.detail); }} /></div>
+          <div class="setting-row"><span class="setting-label">{$_('settings_stats.show_average_line')}</span><Toggle checked={statsAvgLine} on:change={e => { statsAvgLine = e.detail; set('statsAvgLine', e.detail); }} /></div>
           <div class="setting-divider"></div>
-          <div class="setting-row"><span class="setting-label">Show Goal Line</span><Toggle checked={statsGoalLine} on:change={e => { statsGoalLine = e.detail; set('statsGoalLine', e.detail); }} /></div>
+          <div class="setting-row"><span class="setting-label">{$_('settings_stats.show_goal_line')}</span><Toggle checked={statsGoalLine} on:change={e => { statsGoalLine = e.detail; set('statsGoalLine', e.detail); }} /></div>
           <div class="setting-divider"></div>
-          <div class="setting-row"><span class="setting-label">Show Trend Line</span><Toggle checked={statsTrendLine} on:change={e => { statsTrendLine = e.detail; set('statsTrendLine', e.detail); }} /></div>
+          <div class="setting-row"><span class="setting-label">{$_('settings_stats.show_trend_line')}</span><Toggle checked={statsTrendLine} on:change={e => { statsTrendLine = e.detail; set('statsTrendLine', e.detail); }} /></div>
           <div class="setting-divider"></div>
           <div class="setting-row">
             <div>
-              <span class="setting-label">Include Today In Trends</span>
+              <span class="setting-label">{$_('settings_stats.include_today')}</span>
               <div class="setting-desc">For cumulative metrics (calories, water, steps, etc.) today is partial until the day ends. Off by default — the chart looks cleaner. Statistics page also has an inline toggle for one-off overrides.</div>
             </div>
             <Toggle checked={statsIncludeTodayLocal} on:change={e => { statsIncludeTodayLocal = e.detail; set('statsIncludeToday', e.detail); }} />
@@ -2380,7 +2380,7 @@
           <div class="setting-divider"></div>
           <div class="setting-row">
             <div>
-              <span class="setting-label">Show Empty Days</span>
+              <span class="setting-label">{$_('settings_stats.show_empty_days')}</span>
               <div class="setting-desc">Keep every date in the chart's range visible even when nothing was logged that day. Lets gaps in logging show up rather than collapsing into a denser chart that hides them. Applies to both bar and line charts.</div>
             </div>
             <Toggle checked={statsShowEmptyDaysLocal} on:change={e => { statsShowEmptyDaysLocal = e.detail; set('statsShowEmptyDays', e.detail); }} />
@@ -2449,7 +2449,7 @@
           {/each}
         </div>
 
-        <p class="sub-label">Custom nutrients</p>
+        <p class="sub-label">{$_('settings_stats.custom_nutrients')}</p>
         <div class="card settings-card">
           {#each ($customNutriments || []) as cn, i}
             {#if i > 0}<div class="setting-divider"></div>{/if}
@@ -2462,7 +2462,7 @@
             </div>
           {/each}
           {#if ($customNutriments || []).length === 0}
-            <div class="setting-row"><span class="text-3 text-sm">No custom nutrients</span></div>
+            <div class="setting-row"><span class="text-3 text-sm">{$_('settings_stats.no_custom_nutrients')}</span></div>
             <div class="setting-divider"></div>
           {/if}
           <div style="padding:8px 16px 14px">
@@ -2495,13 +2495,13 @@
               </div>
             {/each}
             {#if ($foodCategories || []).length === 0}
-              <span class="text-3 text-sm">No categories yet</span>
+              <span class="text-3 text-sm">{$_('settings_stats.no_categories')}</span>
             {/if}
           </div>
           <div class="setting-divider"></div>
           <div class="cat-add-row">
             <div style="display:flex;flex-direction:column;gap:3px;flex-shrink:0;position:relative">
-              <span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);text-align:center">Label</span>
+              <span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);text-align:center">{$_('settings_stats.label')}</span>
               <button class="input emoji-btn" title="Pick an emoji label"
                 on:click={openEmojiPicker}>
                 {newCategoryLabel || '🏷️'}
@@ -2522,7 +2522,7 @@
     <!-- ── Custom Units ───────────────────────────────────────────────────── -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'customUnits')} on:click={() => toggleSection('customUnits')}>
       <span class="material-symbols-rounded si">straighten</span>
-      <span>Custom Units</span>
+      <span>{$_('settings_stats.custom_units')}</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.customUnits}>expand_more</span>
     </button>
     {#if sectionOpen(openSections, settingsQuery, 'customUnits') && sectionVisible(settingsQuery, 'customUnits')}
@@ -2547,7 +2547,7 @@
               </div>
             {/each}
             {#if (!$customUnits || $customUnits.length === 0)}
-              <span class="text-3 text-sm">No custom units yet</span>
+              <span class="text-3 text-sm">{$_('settings_stats.no_custom_units')}</span>
             {/if}
           </div>
           <div class="setting-divider"></div>
@@ -2558,7 +2558,7 @@
                 bind:value={newUnitAbbr} on:keydown={e => e.key==='Enter' && addCustomUnit()} />
             </div>
             <div style="display:flex;flex-direction:column;gap:3px;flex:1">
-              <span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3)">Full name</span>
+              <span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3)">{$_('settings_stats.full_name')}</span>
               <input class="input" style="height:40px" placeholder="shot glass"
                 bind:value={newUnitFull} on:keydown={e => e.key==='Enter' && addCustomUnit()} />
             </div>
@@ -2569,7 +2569,7 @@
     {/if}
 
 
-    <p class="settings-group-label">Integrations</p>
+    <p class="settings-group-label">{$_('settings_integrations.group')}</p>
     <!-- ── Food Sources ───────────────────────────────────────────────────── -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'connectedServices')} on:click={() => toggleSection('connectedServices')}>
       <span class="material-symbols-rounded si">hub</span>
@@ -2728,7 +2728,7 @@
           {/if}
           <div class="setting-row">
             <div>
-              <span class="setting-label">Enable USDA FoodData</span>
+              <span class="setting-label">{$_('settings_integrations.enable_usda')}</span>
               <div class="setting-desc">
                 Search the USDA nutrition database when adding foods.
                 <a href="https://fdc.nal.usda.gov/api-key-signup" target="_blank" rel="noopener" class="about-link">Get a free API key →</a>
@@ -2749,7 +2749,7 @@
           {/if}
         </div>
 
-        <p class="sub-label">Mealie</p>
+        <p class="sub-label">{$_('settings_integrations.mealie_section')}</p>
         <div class="card settings-card">
           {#if mealieEnabled}
             <ConnectionStatus
@@ -2761,7 +2761,7 @@
           {/if}
           <div class="setting-row">
             <div>
-              <span class="setting-label">Enable Mealie</span>
+              <span class="setting-label">{$_('settings_integrations.enable_mealie')}</span>
               <div class="setting-desc">Import recipes from your self-hosted Mealie instance</div>
             </div>
             <Toggle checked={mealieEnabled} on:change={e => { mealieEnabled = e.detail; set('mealieEnabled', e.detail); }} />
@@ -2769,7 +2769,7 @@
           {#if mealieEnabled}
             <div class="setting-divider"></div>
             <div class="form-group" style="padding:10px 16px">
-              <label class="form-label" for="mealie-base-url">Base URL</label>
+              <label class="form-label" for="mealie-base-url">{$_('settings_integrations.base_url')}</label>
               <input id="mealie-base-url" class="input" type="url"
                 placeholder="https://mealie.example.com"
                 bind:value={mealieBaseUrl}
@@ -2843,7 +2843,7 @@
           {#if serverMode === 'server' && getServerUrl()}
             <div class="setting-row">
               <div>
-                <span class="setting-label">Connected</span>
+                <span class="setting-label">{$_('settings_integrations.connected')}</span>
                 <div class="setting-desc">{getServerUrl()}</div>
               </div>
               <span class="material-symbols-rounded" style="color:var(--success, #22c55e);font-size:22px">cloud_done</span>
@@ -2851,7 +2851,7 @@
             <div class="setting-divider"></div>
             <div class="setting-row">
               <div>
-                <span class="setting-label">Last Synced</span>
+                <span class="setting-label">{$_('settings_integrations.last_synced')}</span>
                 <div class="setting-desc">
                   {#key _nowTick}{_fmtTimeAgo(lastSyncAt)}{/key}
                 </div>
@@ -2875,23 +2875,23 @@
           {:else}
             <div class="setting-row">
               <div>
-                <span class="setting-label">Local Mode</span>
-                <div class="setting-desc">All data stored on this device only</div>
+                <span class="setting-label">{$_('settings_integrations.local_mode')}</span>
+                <div class="setting-desc">{$_('settings_integrations.local_mode_desc')}</div>
               </div>
               <span class="material-symbols-rounded" style="color:var(--text-3);font-size:22px">smartphone</span>
             </div>
             <div class="setting-divider"></div>
             <div style="padding:12px 16px;display:flex;flex-direction:column;gap:10px">
               <div class="form-group" style="margin:0">
-                <label class="form-label">Server URL</label>
+                <label class="form-label">{$_('settings_integrations.server_url')}</label>
                 <input class="input" type="url" placeholder="https://nutritrace.example.com" bind:value={serverUrlInput} />
               </div>
               <div class="form-group" style="margin:0">
-                <label class="form-label">Username</label>
+                <label class="form-label">{$_('settings_integrations.username')}</label>
                 <input class="input" type="text" placeholder="Your username" bind:value={serverUsername} autocapitalize="off" />
               </div>
               <div class="form-group" style="margin:0">
-                <label class="form-label">Password</label>
+                <label class="form-label">{$_('settings_integrations.password')}</label>
                 <div style="position:relative">
                   {#if serverShowPw}
                     <input class="input" type="text" placeholder="Your password" bind:value={serverPassword} style="padding-right:40px" />
@@ -2961,11 +2961,11 @@
       {#if sectionOpen(openSections, settingsQuery, 'sharing') && sectionVisible(settingsQuery, 'sharing')}
         <div class="section-body" transition:slide={{ duration: 180 }}>
           {#if $currentUser?.role === 'admin'}
-            <p class="sub-label">Admin</p>
+            <p class="sub-label">{$_('settings_integrations.admin_section')}</p>
             <div class="card settings-card">
               <div class="setting-row">
                 <div>
-                  <span class="setting-label">Enable Food Sharing</span>
+                  <span class="setting-label">{$_('settings_integrations.enable_sharing')}</span>
                   <span class="setting-desc">Allow group members to share foods, meals, and recipes with each other</span>
                 </div>
                 <Toggle checked={adminSharingEnabled} on:change={e => saveAdminSharingEnabled(e.detail)} />
@@ -2973,7 +2973,7 @@
             </div>
           {/if}
           {#if adminSharingEnabled}
-          <p class="sub-label">Bulk Share</p>
+          <p class="sub-label">{$_('settings_integrations.bulk_share')}</p>
           <p class="setting-desc" style="padding:0 var(--page-px) 6px;line-height:1.5">
             Set who can see your existing items. Each category has its own visibility, so changing one doesn't affect the others.
           </p>
@@ -2997,9 +2997,9 @@
                       if (cat.key === 'recipes') bulkVisRecipes = v;
                     }}
                     value={_vis}>
-                    <option value="private">Private</option>
-                    <option value="group">Everyone</option>
-                    <option value="specific">Specific People</option>
+                    <option value="private">{$_('settings_integrations.vis_private')}</option>
+                    <option value="group">{$_('settings_integrations.vis_group')}</option>
+                    <option value="specific">{$_('settings_integrations.vis_specific')}</option>
                   </select>
                 </div>
               </div>
@@ -3041,16 +3041,16 @@
         <div class="card settings-card">
           <div class="setting-row">
             <div>
-              <span class="setting-label">Diagnostic Mode</span>
+              <span class="setting-label">{$_('settings_diagnostics.diag_mode')}</span>
               <div class="setting-desc">Enables detailed app-internal logs (sync, settings, notifications, Health Connect) and{isNative ? ' writes them to a daily log file on disk so they survive crashes and reloads.' : ' enables verbose console output.'} Off by default — turn on while reproducing a bug, then export below.</div>
             </div>
             <Toggle checked={_verboseLogging} on:change={e => _toggleVerbose(e.detail)} />
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px">
-            <span class="setting-label">View Diagnostic Logs</span>
+            <span class="setting-label">{$_('settings_diagnostics.view_logs')}</span>
             <p class="setting-desc" style="line-height:1.5">
-              Recent log lines from the app's console. Useful for bug reports — copy / share into a <a href="https://github.com/traceapps/nutritrace/issues" target="_blank" rel="noopener" class="about-link">GitHub issue</a>.{isNative ? ' On Android with Diagnostic Mode on, you can also share the persisted log file or any captured crash report.' : ''} Nothing is sent anywhere automatically.
+              {$_('settings_diagnostics.logs_desc_web')} <a href="https://github.com/traceapps/nutritrace/issues" target="_blank" rel="noopener" class="about-link">GitHub issue</a>.{isNative ? $_('settings_diagnostics.logs_desc_android') : ''} {$_('settings_diagnostics.logs_note')}
             </p>
             <button class="btn btn-secondary" style="height:40px;font-size:13px" on:click={_openLogsSheet}>
               <span class="material-symbols-rounded" style="font-size:16px">terminal</span>
@@ -3059,7 +3059,7 @@
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px">
-            <span class="setting-label">Calibration Export</span>
+            <span class="setting-label">{$_('settings_diagnostics.calibration_export')}</span>
             <p class="setting-desc" style="line-height:1.5">
               Anonymized 30-day JSON of your wellness data (HRV, RHR, sleep, calculated Trace scores). Useful for tracking how Trace scores compare to your device's own scores over time, or for attaching to a wellness-related bug report. Held in-memory until you copy it — nothing is sent anywhere automatically. Review the JSON before sharing.
             </p>
@@ -3083,7 +3083,7 @@
          on-ramp visible to the synthetic admin, or multi-user admin
          viewer). Hidden entirely for non-admin members on multi-user. -->
     {#if !isNativeLocal && (!$userMgmtActive || $currentUser?.role === 'admin')}
-    <p class="settings-group-label">Admin</p>
+    <p class="settings-group-label">{$_('settings_admin_group')}</p>
 
     <!-- ── Users (was "User Management" — admin features for the user directory) -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'users')} on:click={() => toggleSection('users')}>
@@ -3193,18 +3193,18 @@
           <div class="setting-divider"></div>
           <div class="about-row">
             <span class="material-symbols-rounded about-feat-icon">restaurant_menu</span>
-            <span>Food data from <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener" class="about-link">Open Food Facts</a> (ODbL)</span>
+            <span>{$_('settings_about.food_data_from')} <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener" class="about-link">Open Food Facts</a> {$_('settings_about.food_data_license')}</span>
           </div>
           <div class="setting-divider"></div>
           <div class="about-row">
             <span class="material-symbols-rounded about-feat-icon">code</span>
-            <span>Server: <a href="https://github.com/traceapps/nutritrace" target="_blank" rel="noopener" class="about-link">Open source</a> (AGPL-3.0)</span>
+            <span>{$_('settings_about.server_from')} <a href="https://github.com/traceapps/nutritrace" target="_blank" rel="noopener" class="about-link">{$_('settings_about.server_open_source')}</a> {$_('settings_about.server_license')}</span>
           </div>
           <div class="setting-divider"></div>
           <div class="about-row" style="flex-direction:column;align-items:flex-start;gap:8px">
             <div style="display:flex;align-items:center;gap:8px">
               <span class="material-symbols-rounded about-feat-icon">volunteer_activism</span>
-              <span>Support development</span>
+              <span>{$_('settings_about.support_dev')}</span>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;padding-left:30px">
               <!-- GitHub Sponsors button removed pending traceapps org Sponsors approval — re-add when live -->
@@ -3243,7 +3243,7 @@
 {#if mergeStep === 'ask-settings'}
   <div class="merge-overlay" use:portal transition:fade={{ duration: 150 }}>
     <div class="merge-dialog">
-      <h3 style="margin:0 0 6px;font-size:18px;color:var(--text-1)">Sync Options</h3>
+      <h3 style="margin:0 0 6px;font-size:18px;color:var(--text-1)">{$_('settings_merge.title')}</h3>
       <p style="font-size:13px;color:var(--text-3);margin:0 0 12px;line-height:1.5">
         You have data on this phone. How should it be handled when connecting?
       </p>
@@ -3263,25 +3263,25 @@
         <button class="merge-option" on:click={() => _mergeAndConnect('upload')}>
           <span class="material-symbols-rounded" style="font-size:22px;color:var(--accent)">cloud_upload</span>
           <div>
-            <div class="merge-option-title">Upload phone to server</div>
+            <div class="merge-option-title">{$_('settings_merge.upload')}</div>
             <div class="merge-option-desc">Send this phone's foods, diary, and settings to the server. Existing server data stays.</div>
           </div>
         </button>
         <button class="merge-option" on:click={() => _mergeAndConnect('download')}>
           <span class="material-symbols-rounded" style="font-size:22px;color:var(--accent)">cloud_download</span>
           <div>
-            <div class="merge-option-title">Download server to phone</div>
+            <div class="merge-option-title">{$_('settings_merge.download')}</div>
             <div class="merge-option-desc">Replace this phone's data with everything from the server. Local data is discarded.</div>
           </div>
         </button>
         <button class="merge-option" on:click={() => _mergeAndConnect('merge')}>
           <span class="material-symbols-rounded" style="font-size:22px;color:var(--accent)">sync</span>
           <div>
-            <div class="merge-option-title">Merge both</div>
+            <div class="merge-option-title">{$_('settings_merge.merge')}</div>
             <div class="merge-option-desc">Upload phone data to the server AND download server data. Nothing is lost, but duplicates are possible.</div>
           </div>
         </button>
-        <button class="btn btn-ghost w-full" style="color:var(--text-3);margin-top:4px" on:click={cancelMerge}>Cancel</button>
+        <button class="btn btn-ghost w-full" style="color:var(--text-3);margin-top:4px" on:click={cancelMerge}>{$_('settings_merge.cancel')}</button>
       </div>
     </div>
   </div>
@@ -3330,7 +3330,7 @@
           </ul>
         </div>
       {/if}
-      <button class="btn btn-primary w-full" on:click={_finalizeConnect}>Continue</button>
+      <button class="btn btn-primary w-full" on:click={_finalizeConnect}>{$_('settings_merge.continue')}</button>
     </div>
   </div>
 {/if}
@@ -3353,7 +3353,7 @@
     </div>
     <!-- Saturation slider -->
     <div class="cp-slider-group">
-      <label class="form-label">Saturation</label>
+      <label class="form-label">{$_('settings_color.saturation')}</label>
       <div class="cp-slider-wrap">
         <input type="range" class="cp-slider cp-sat" min="0" max="100"
           bind:value={cpSat} on:input={cpUpdateFromSliders}
@@ -3362,7 +3362,7 @@
     </div>
     <!-- Lightness slider -->
     <div class="cp-slider-group">
-      <label class="form-label">Lightness</label>
+      <label class="form-label">{$_('settings_color.lightness')}</label>
       <div class="cp-slider-wrap">
         <input type="range" class="cp-slider cp-lgt" min="0" max="100"
           bind:value={cpLgt} on:input={cpUpdateFromSliders}
@@ -3389,7 +3389,7 @@
     </div>
     <!-- Hex input -->
     <div class="cp-slider-group">
-      <label class="form-label">Hex Code</label>
+      <label class="form-label">{$_('settings_color.hex_code')}</label>
       <div class="cp-hex-row">
         <span class="cp-hex-dot" style="background:{/^#[0-9a-fA-F]{6}$/.test(customHexInput) ? customHexInput : '#ccc'}"></span>
         <input class="input" type="text" placeholder="#rrggbb" maxlength="7"
@@ -3399,7 +3399,7 @@
           on:keydown={e => e.key === 'Enter' && applyCustomColor()} />
       </div>
     </div>
-    <button class="btn btn-primary w-full" style="height:44px;margin-top:4px" on:click={applyCustomColor}>Apply Color</button>
+    <button class="btn btn-primary w-full" style="height:44px;margin-top:4px" on:click={applyCustomColor}>{$_('settings_color.apply_color')}</button>
   </div>
 </Sheet>
 
@@ -3407,7 +3407,7 @@
 <Sheet bind:open={showNutrientSheet} title="Add Custom Nutrient">
   <div style="display:flex;flex-direction:column;gap:16px;padding-top:8px">
     <div class="form-group">
-      <label class="form-label" for="cn-label">Nutrient name</label>
+      <label class="form-label" for="cn-label">{$_('settings_custom_nutrient.name')}</label>
       <input id="cn-label" class="input" placeholder="e.g. Omega-3" bind:value={newNutrient.label} />
     </div>
     <div class="form-group">
@@ -3424,7 +3424,7 @@
         </select>
       </div>
     </div>
-    <button class="btn btn-primary w-full" on:click={addCustomNutrient}>Add Nutrient</button>
+    <button class="btn btn-primary w-full" on:click={addCustomNutrient}>{$_('settings_custom_nutrient.add')}</button>
   </div>
 </Sheet>
 
@@ -3432,7 +3432,7 @@
 <Sheet bind:open={_logsSheet} title="Diagnostic Logs">
   <div style="padding:0 4px 8px">
     <p class="setting-desc" style="line-height:1.5;margin-bottom:10px">
-      Recent log lines (capped at 500 normally, 1000 in verbose mode). Header shows app version + platform so the recipient knows what they're looking at. <strong>Redact</strong> any HRV / RHR / weight / calorie values before posting publicly — they're personal health data.
+      {$_('settings_diagnostics.log_help')}
     </p>
     <textarea readonly style="width:100%;height:280px;font-family:monospace;font-size:11px;padding:8px;border:1px solid var(--border);border-radius:var(--radius-sm,6px);background:var(--surface-2);color:var(--text-1);resize:vertical;white-space:pre">{_logsText}</textarea>
     <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
@@ -3464,7 +3464,7 @@
       <div style="margin-top:14px;padding:10px;background:color-mix(in srgb,var(--danger) 8%, transparent);border-left:3px solid var(--danger);border-radius:var(--radius-sm,6px)">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
           <span class="material-symbols-rounded" style="font-size:18px;color:var(--danger)">warning</span>
-          <strong style="color:var(--danger);font-size:14px">Crash report available</strong>
+          <strong style="color:var(--danger);font-size:14px">{$_('settings_diagnostics.crash_available')}</strong>
         </div>
         <p class="setting-desc" style="margin:0 0 8px;font-size:12px">
           The app captured an uncaught error. Share the report to help track it down, then dismiss it.
