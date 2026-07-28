@@ -1,5 +1,6 @@
 <script>
   import { slide } from 'svelte/transition';
+  import { _ } from 'svelte-i18n';
   import Toggle from './Toggle.svelte';
   import ConnectionStatus from './ConnectionStatus.svelte';
   import { showSuccess, showError } from '../../stores/toast.js';
@@ -10,37 +11,34 @@
   } from '../../stores/settings.js';
 
   // Smart Log voice-input language options. 'auto' uses navigator.language
-  // (device locale). Explicit choices override for users whose device
-  // locale doesn't match what they actually speak — see settings.js
-  // comment on smartLogVoiceLang for the why. Covers OFF's 20 top food
-  // languages plus a few extra; users typing into the box (no picker UI)
-  // can still pass any BCP-47 tag the underlying engine accepts.
-  const VOICE_LANGS = [
-    { value: 'auto',  label: 'Auto (use device language)' },
-    { value: 'en-US', label: 'English (US)' },
-    { value: 'en-GB', label: 'English (UK)' },
-    { value: 'it-IT', label: 'Italian' },
-    { value: 'es-ES', label: 'Spanish (Spain)' },
-    { value: 'es-MX', label: 'Spanish (Mexico)' },
-    { value: 'fr-FR', label: 'French' },
-    { value: 'de-DE', label: 'German' },
-    { value: 'pt-BR', label: 'Portuguese (Brazil)' },
-    { value: 'pt-PT', label: 'Portuguese (Portugal)' },
-    { value: 'nl-NL', label: 'Dutch' },
-    { value: 'pl-PL', label: 'Polish' },
-    { value: 'ru-RU', label: 'Russian' },
-    { value: 'sv-SE', label: 'Swedish' },
-    { value: 'da-DK', label: 'Danish' },
-    { value: 'nb-NO', label: 'Norwegian' },
-    { value: 'fi-FI', label: 'Finnish' },
-    { value: 'cs-CZ', label: 'Czech' },
-    { value: 'tr-TR', label: 'Turkish' },
-    { value: 'ja-JP', label: 'Japanese' },
-    { value: 'ko-KR', label: 'Korean' },
-    { value: 'zh-CN', label: 'Chinese (Simplified)' },
-    { value: 'zh-TW', label: 'Chinese (Traditional)' },
-    { value: 'hi-IN', label: 'Hindi' },
-    { value: 'ar-SA', label: 'Arabic' },
+  // (device locale). Labels resolve reactively via $_ so translations
+  // update when the app language changes.
+  $: VOICE_LANGS = [
+    { value: 'auto',  label: $_('settings_trace.voice_langs.auto')  },
+    { value: 'en-US', label: $_('settings_trace.voice_langs.en_US') },
+    { value: 'en-GB', label: $_('settings_trace.voice_langs.en_GB') },
+    { value: 'it-IT', label: $_('settings_trace.voice_langs.it_IT') },
+    { value: 'es-ES', label: $_('settings_trace.voice_langs.es_ES') },
+    { value: 'es-MX', label: $_('settings_trace.voice_langs.es_MX') },
+    { value: 'fr-FR', label: $_('settings_trace.voice_langs.fr_FR') },
+    { value: 'de-DE', label: $_('settings_trace.voice_langs.de_DE') },
+    { value: 'pt-BR', label: $_('settings_trace.voice_langs.pt_BR') },
+    { value: 'pt-PT', label: $_('settings_trace.voice_langs.pt_PT') },
+    { value: 'nl-NL', label: $_('settings_trace.voice_langs.nl_NL') },
+    { value: 'pl-PL', label: $_('settings_trace.voice_langs.pl_PL') },
+    { value: 'ru-RU', label: $_('settings_trace.voice_langs.ru_RU') },
+    { value: 'sv-SE', label: $_('settings_trace.voice_langs.sv_SE') },
+    { value: 'da-DK', label: $_('settings_trace.voice_langs.da_DK') },
+    { value: 'nb-NO', label: $_('settings_trace.voice_langs.nb_NO') },
+    { value: 'fi-FI', label: $_('settings_trace.voice_langs.fi_FI') },
+    { value: 'cs-CZ', label: $_('settings_trace.voice_langs.cs_CZ') },
+    { value: 'tr-TR', label: $_('settings_trace.voice_langs.tr_TR') },
+    { value: 'ja-JP', label: $_('settings_trace.voice_langs.ja_JP') },
+    { value: 'ko-KR', label: $_('settings_trace.voice_langs.ko_KR') },
+    { value: 'zh-CN', label: $_('settings_trace.voice_langs.zh_CN') },
+    { value: 'zh-TW', label: $_('settings_trace.voice_langs.zh_TW') },
+    { value: 'hi-IN', label: $_('settings_trace.voice_langs.hi_IN') },
+    { value: 'ar-SA', label: $_('settings_trace.voice_langs.ar_SA') },
   ];
   import { AI_PROVIDERS, AI_MODELS, AI_DEFAULT_MODELS, callAI, callAIProxy } from '../../lib/aiChat.js';
   import { DB } from '../../lib/db.js';
@@ -196,11 +194,11 @@
           systemPrompt,
         });
       }
-      if (!text || typeof text !== 'string') throw new Error('Empty response from AI');
+      if (!text || typeof text !== 'string') throw new Error($_('settings_trace.toast.empty_response'));
       aiKeyVerified.set(true);
-      showSuccess('Trace AI connected, assistant is ready');
+      showSuccess($_('settings_trace.toast.connected'));
     } catch (e) {
-      testError = e.message || 'Test failed';
+      testError = e.message || $_('settings_trace.toast.test_failed');
       aiKeyVerified.set(false);
       showError(testError);
     } finally {
@@ -210,7 +208,7 @@
 
   // Provider label for the connection badge.
   $: _providerLabel = envLocks.ai
-    ? 'Environment-locked'
+    ? $_('settings_trace.provider_env_locked')
     : (AI_PROVIDERS.find(p => p.value === aiProviderVal)?.label || aiProviderVal || '');
 
   // (No shim needed — the reactive `_hasAll` derivation above gives
@@ -222,7 +220,7 @@
   {#if envLocks.ai}
     <div class="env-lock-banner">
       <span class="material-symbols-rounded">lock</span>
-      Configured via environment variables — changes are disabled.
+      {$_('settings_trace.env_lock_banner')}
     </div>
   {/if}
   <div class="card settings-card">
@@ -237,8 +235,8 @@
     {/if}
     <div class="setting-row">
       <div>
-        <span class="setting-label">Enable AI Assistant</span>
-        <div class="setting-desc">Adds a floating chat button to all pages</div>
+        <span class="setting-label">{$_('settings_trace.labels.enable')}</span>
+        <div class="setting-desc">{$_('settings_trace.labels.enable_desc')}</div>
       </div>
       <Toggle checked={_displayedAiEnabled} on:change={e => aiEnabledVal = e.detail} disabled={envLocks.ai} />
     </div>
@@ -246,7 +244,7 @@
     {#if _displayedAiEnabled}
       <div class="setting-divider"></div>
       <div class="setting-row">
-        <span class="setting-label">Provider</span>
+        <span class="setting-label">{$_('settings_trace.labels.provider')}</span>
         <select class="select sel-sm" style="width:auto" bind:value={aiProviderVal} on:change={_onProviderChange} disabled={envLocks.ai}>
           {#each AI_PROVIDERS as p}
             <option value={p.value}>{p.label}</option>
@@ -258,19 +256,19 @@
       {#if aiProviderVal === 'oai-compat'}
         <!-- Custom OpenAI-compatible: free-text Base URL + Model name -->
         <div class="form-group" style="padding:10px 16px">
-          <label class="form-label" for="ai-base-url">Base URL</label>
+          <label class="form-label" for="ai-base-url">{$_('settings_trace.labels.base_url')}</label>
           <input id="ai-base-url" class="input" type="url"
-            placeholder="http://localhost:11434  or  https://api.deepseek.com"
+            placeholder={$_('settings_trace.labels.base_url_ph')}
             bind:value={aiBaseUrlVal}
             on:blur={saveAiBaseUrl}
             autocomplete="off" style="width:100%" />
           <div class="setting-desc" style="margin-top:6px">
-            Any OpenAI Compatible <code>/v1/chat/completions</code> endpoint — Ollama, LM Studio, LocalAI, vLLM, llama.cpp's server, DeepSeek, Groq, Together AI, Mistral La Plateforme, etc. Don't include the path; just the origin.
+            {$_('settings_trace.labels.base_url_desc')}
           </div>
         </div>
         <div class="setting-divider"></div>
         <div class="setting-row">
-          <span class="setting-label">Model</span>
+          <span class="setting-label">{$_('settings_trace.labels.model')}</span>
           <input class="input" style="width:220px;text-align:right"
             placeholder="llama3.1:8b"
             bind:value={aiModelVal} disabled={envLocks.ai} />
@@ -279,12 +277,12 @@
         <div style="padding:10px 16px;display:flex;gap:8px;align-items:flex-start;background:color-mix(in srgb,#f59e0b 8%, transparent);border-left:3px solid #f59e0b">
           <span class="material-symbols-rounded" style="font-size:18px;color:#f59e0b;flex-shrink:0">info</span>
           <div class="setting-desc" style="margin:0;line-height:1.5">
-            <strong>Tool calls reliability varies by model.</strong> Llama 3.1+, Mistral, Qwen 2.5+ handle them well; smaller or older models may break Smart Log + Goal Insights silently. Vision (image attachments) needs a multimodal model. If you're unsure, start with a known-good model and check the chat works before relying on it.
+            <strong>{$_('settings_trace.labels.reliability_title')}</strong> {$_('settings_trace.labels.reliability_body')}
           </div>
         </div>
       {:else}
         <div class="setting-row">
-          <span class="setting-label">Model</span>
+          <span class="setting-label">{$_('settings_trace.labels.model')}</span>
           <select class="select sel-sm" style="width:auto" bind:value={aiModelSelectVal} on:change={_syncModelFromSelect} disabled={envLocks.ai}>
             {#each (AI_MODELS[aiProviderVal] || []) as m}
               <option value={m.value}>{m.label}</option>
@@ -294,7 +292,7 @@
         {#if aiModelSelectVal === '__custom__'}
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <span class="setting-label">Custom Model ID</span>
+            <span class="setting-label">{$_('settings_trace.labels.custom_model_id')}</span>
             <input class="input" style="width:220px;text-align:right"
               placeholder={aiProviderVal === 'gemini' ? 'gemini-3.5-flash' : aiProviderVal === 'claude' ? 'claude-sonnet-5' : 'gpt-4o'}
               bind:value={aiCustomModelVal} disabled={envLocks.ai} />
@@ -302,10 +300,7 @@
           <div style="padding:8px 16px 12px;display:flex;gap:8px;align-items:flex-start">
             <span class="material-symbols-rounded" style="font-size:16px;color:var(--muted);flex-shrink:0;margin-top:2px">info</span>
             <div class="setting-desc" style="margin:0;line-height:1.5">
-              Enter the exact model ID from the vendor (e.g.
-              {#if aiProviderVal === 'gemini'}<a href="https://ai.google.dev/gemini-api/docs/models" target="_blank" rel="noopener" class="about-link">Google's model list</a>
-              {:else if aiProviderVal === 'claude'}<a href="https://docs.anthropic.com/en/docs/about-claude/models/overview" target="_blank" rel="noopener" class="about-link">Anthropic's model list</a>
-              {:else}<a href="https://platform.openai.com/docs/models" target="_blank" rel="noopener" class="about-link">OpenAI's model list</a>{/if}). Use this if the preset dropdown doesn't have the model you want.
+              {$_('settings_trace.labels.custom_model_hint')}
             </div>
           </div>
         {/if}
@@ -315,40 +310,40 @@
         <div class="setting-divider"></div>
         <div class="form-group" style="padding:10px 16px">
           <label class="form-label" for="ai-api-key">
-            API Key{aiProviderVal === 'oai-compat' ? ' (optional)' : ''}
+            {$_('settings_trace.labels.api_key')}{aiProviderVal === 'oai-compat' ? $_('settings_trace.labels.api_key_optional_suffix') : ''}
           </label>
           <div style="display:flex;gap:8px;align-items:center">
             {#if aiShowKey}
               <input id="ai-api-key" class="input" type="text"
-                placeholder={aiProviderVal === 'oai-compat' ? 'Leave blank for local endpoints (Ollama, etc.)' : 'Paste your API key here'}
+                placeholder={aiProviderVal === 'oai-compat' ? $_('settings_trace.labels.api_key_ph_local') : $_('settings_trace.labels.api_key_ph_cloud')}
                 bind:value={aiApiKeyVal}
                 on:blur={saveAiKey}
                 autocomplete="off" style="flex:1" />
             {:else}
               <input id="ai-api-key" class="input" type="password"
-                placeholder={aiProviderVal === 'oai-compat' ? 'Leave blank for local endpoints (Ollama, etc.)' : 'Paste your API key here'}
+                placeholder={aiProviderVal === 'oai-compat' ? $_('settings_trace.labels.api_key_ph_local') : $_('settings_trace.labels.api_key_ph_cloud')}
                 bind:value={aiApiKeyVal}
                 on:blur={saveAiKey}
                 autocomplete="off" style="flex:1" />
             {/if}
-            <button class="btn-icon" on:click={() => aiShowKey = !aiShowKey} title={aiShowKey ? 'Hide' : 'Show'}>
+            <button class="btn-icon" on:click={() => aiShowKey = !aiShowKey} title={aiShowKey ? $_('settings_trace.labels.hide') : $_('settings_trace.labels.show')}>
               <span class="material-symbols-rounded">{aiShowKey ? 'visibility_off' : 'visibility'}</span>
             </button>
           </div>
           <div class="setting-desc" style="margin-top:6px">
             {#if aiProviderVal === 'claude'}
-              Get your key at <a href="https://console.anthropic.com" target="_blank" rel="noopener" class="about-link">console.anthropic.com</a>
+              {$_('settings_trace.labels.key_hint_claude')} <a href="https://console.anthropic.com" target="_blank" rel="noopener" class="about-link">console.anthropic.com</a>
             {:else if aiProviderVal === 'openai'}
-              Get your key at <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener" class="about-link">platform.openai.com</a>
+              {$_('settings_trace.labels.key_hint_openai')} <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener" class="about-link">platform.openai.com</a>
             {:else if aiProviderVal === 'gemini'}
-              Get your key at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" class="about-link">aistudio.google.com</a>
+              {$_('settings_trace.labels.key_hint_gemini')} <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" class="about-link">aistudio.google.com</a>
             {:else if aiProviderVal === 'oai-compat'}
-              Local endpoints (Ollama, LM Studio, etc.) typically don't need a key. Cloud providers like DeepSeek or Groq do — get one from their dashboard.
+              {$_('settings_trace.labels.key_hint_oai_compat')}
             {/if}
             {#if isNative && !getServerUrl()}
-              Your key is stored on this device.
+              {$_('settings_trace.labels.key_stored_device')}
             {:else}
-              Your key is stored securely on the server.
+              {$_('settings_trace.labels.key_stored_server')}
             {/if}
           </div>
         </div>
@@ -356,17 +351,17 @@
 
       <div class="setting-divider"></div>
       <div class="setting-row">
-        <span class="setting-label">Assistant Name</span>
+        <span class="setting-label">{$_('settings_trace.labels.assistant_name')}</span>
         <input class="input" style="width:130px;text-align:right"
-          placeholder="Trace"
+          placeholder={$_('settings_trace.labels.assistant_name_ph')}
           bind:value={aiAssistantNameVal} />
       </div>
 
       <div class="setting-divider"></div>
       <div class="setting-row">
         <div>
-          <span class="setting-label">Smart Log</span>
-          <div class="setting-desc">Hold the assistant button, speak what you ate — AI parses the items and meal slot, matches your food database, then confirms before saving</div>
+          <span class="setting-label">{$_('settings_trace.labels.smart_log')}</span>
+          <div class="setting-desc">{$_('settings_trace.labels.smart_log_desc')}</div>
         </div>
         <Toggle checked={quickLogEnabledVal} on:change={e => quickLogEnabledVal = e.detail} />
       </div>
@@ -374,8 +369,8 @@
         <div class="setting-divider"></div>
         <div class="setting-row">
           <div>
-            <span class="setting-label">Voice Input Language</span>
-            <div class="setting-desc">Language the microphone listens for. Defaults to your device language; override if you speak a different language than your device is set to.</div>
+            <span class="setting-label">{$_('settings_trace.labels.voice_lang')}</span>
+            <div class="setting-desc">{$_('settings_trace.labels.voice_lang_desc')}</div>
           </div>
           <select class="select sel-sm" style="width:auto" value={$smartLogVoiceLang}
                   on:change={e => smartLogVoiceLang.set(e.target.value)}>
@@ -387,14 +382,14 @@
         <div class="setting-divider"></div>
         <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:6px">
           <div class="setting-desc" style="line-height:1.55">
-            <strong style="color:var(--text-2)">Trigger Words</strong>
+            <strong style="color:var(--text-2)">{$_('settings_trace.labels.trigger_words')}</strong>
             <div style="margin-top:4px">
-              • <em>"my X <strong>meal</strong>"</em> → saved meals<br/>
-              • <em>"my X <strong>recipe</strong>"</em> → saved recipes<br/>
-              • <em>"<strong>same as yesterday</strong> for lunch"</em> → copy yesterday's items
+              • <em>{$_('settings_trace.labels.trigger_meal')}</em><br/>
+              • <em>{$_('settings_trace.labels.trigger_recipe')}</em><br/>
+              • <em>{$_('settings_trace.labels.trigger_yesterday')}</em>
             </div>
             <div style="margin-top:8px">
-              See the <a href="https://github.com/traceapps/nutritrace#smart-log--voice--ai-food-logging" target="_blank" rel="noopener" class="about-link">Smart Log section in the README</a> for full examples and privacy details.
+              <a href="https://github.com/traceapps/nutritrace#smart-log--voice--ai-food-logging" target="_blank" rel="noopener" class="about-link">{$_('settings_trace.labels.smart_log_readme')}</a>
             </div>
           </div>
         </div>
@@ -404,8 +399,8 @@
         <div class="setting-divider"></div>
         <div class="setting-row">
           <div>
-            <span class="setting-label">Estimate Activity Calories</span>
-            <div class="setting-desc">When you log a workout via Trace without a calorie number ("I hiked 10 miles"), let Trace estimate the burn from your body profile. Estimations need your <strong>weight, height, age, and sex</strong> on file — missing any pauses the estimator and Trace will ask for a number instead.</div>
+            <span class="setting-label">{$_('settings_trace.labels.activity_estimate')}</span>
+            <div class="setting-desc">{$_('settings_trace.labels.activity_estimate_desc')}</div>
           </div>
           <Toggle checked={$activityAutoEstimate} on:change={e => activityAutoEstimate.set(e.detail)} />
         </div>
@@ -414,8 +409,8 @@
       <div class="setting-divider"></div>
       <div class="setting-row">
         <div>
-          <span class="setting-label">Goal Insights</span>
-          <div class="setting-desc">The assistant analyzes your intake trends and proactively suggests goal adjustments when patterns are consistent</div>
+          <span class="setting-label">{$_('settings_trace.labels.goal_insights')}</span>
+          <div class="setting-desc">{$_('settings_trace.labels.goal_insights_desc')}</div>
         </div>
         <Toggle checked={$aiGoalInsights} on:change={e => aiGoalInsights.set(e.detail)} />
       </div>
