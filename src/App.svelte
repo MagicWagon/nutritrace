@@ -171,6 +171,17 @@
       }).catch(e => console.warn('[local-backup] scheduler start failed:', e?.message));
     }
 
+    // In-app-update cache housekeeping — deletes APKs in
+    // Directory.Data/updates/ whose version is ≤ the running APP_VERSION
+    // (leftovers from the update that just installed) plus anything
+    // older than 7 days (orphans from cancelled downloads). Native-only
+    // + best-effort — silent on failure.
+    if (isNative) {
+      import('./lib/updates.js').then(({ cleanUpdateCache }) => {
+        cleanUpdateCache();
+      }).catch(() => { /* ignore */ });
+    }
+
     // Android back button: navigate back or confirm exit
     if (isNative) {
       import('@capacitor/app').then(({ App }) => {

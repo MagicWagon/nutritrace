@@ -236,6 +236,57 @@ export function isUpdateAvailable(latest) {
 }
 
 /**
+ * Extract the semver from an APK filename our downloader writes.
+ * Names follow `nutritrace-<version>.apk` — same shape as GH release
+ * assets. Anything else returns null (safer than guessing).
+ */
+function _apkVersionFromName(name) {
+  if (!name || !name.toLowerCase().endsWith('.apk')) return null;
+  const m = /-v?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)\.apk$/i.exec(name);
+  return m ? `v${m[1]}` : null;
+}
+
+/**
+ * Wipe stale APKs from Directory.Data/updates/. Called at app boot AND
+ * before each fresh download. Two invariants:
+ *   - After a successful in-app update, the APK that triggered the
+ *     install is no longer needed. The system installer already replaced
+ *     the app; on next boot the running APP_VERSION is that APK's
+ *     version, so any file whose parsed version is ≤ APP_VERSION is
+ *     stale and gets deleted.
+ *   - `alsoOlderThanDays` sweeps orphans from downloads that never got
+ *     installed (user cancelled the system dialog, etc.).
+ *
+ * Runs silently — filesystem errors are swallowed since this is
+ * best-effort housekeeping, not a critical path.
+ */
+export async function cleanUpdateCache({ alsoOlderThanDays = 7 } = {}) {
+  if (!isNative) return;
+  try {
+    const { Filesystem, Directory } = await import('@capacitor/filesystem');
+    let listing;
+    try {
+      listing = await Filesystem.readdir({ path: 'updates', directory: Directory.Data });
+    } catch { return; /* updates/ doesn't exist yet — nothing to clean */ }
+    const files = listing?.files || [];
+    const cutoffMs = Date.now() - (alsoOlderThanDays * 24 * 60 * 60 * 1000);
+    for (const f of files) {
+      const name = typeof f === 'string' ? f : f?.name;
+      if (!name || !name.toLowerCase().endsWith('.apk')) continue;
+      const fileVer = _apkVersionFromName(name);
+      const mtimeMs = typeof f === 'object' ? (f.mtime || f.ctime || 0) : 0;
+      const isStaleByVersion = fileVer && compareSemver(fileVer, APP_VERSION) <= 0;
+      const isStaleByAge     = mtimeMs > 0 && mtimeMs < cutoffMs;
+      if (isStaleByVersion || isStaleByAge) {
+        try {
+          await Filesystem.deleteFile({ path: `updates/${name}`, directory: Directory.Data });
+        } catch { /* keep going */ }
+      }
+    }
+  } catch { /* best-effort — never let cleanup crash the app */ }
+}
+
+/**
  * Download the APK to app storage and hand off to the Android system
  * installer. Android/Capacitor-only. Progress callback receives 0-100.
  * Throws on non-native platforms or download failure.
@@ -268,6 +319,23 @@ export async function downloadAndInstallApk(latest, onProgress) {
     // ok if it already exists — plugin throws "Directory exists" in that case.
     if (!/exist/i.test(e?.message || '')) throw e;
   }
+
+  // Delete any existing APK files in updates/ before writing the new
+  // one. Prior downloads (successful or cancelled) leave ~57 MB files
+  // sitting around; without this, /data/user/0/.../files/updates/
+  // grows unbounded over time. Version-based cleanup at app boot
+  // (cleanUpdateCache) catches whatever we don't delete here.
+  try {
+    const existing = await Filesystem.readdir({ path: 'updates', directory: Directory.Data });
+    for (const f of (existing?.files || [])) {
+      const name = typeof f === 'string' ? f : f?.name;
+      if (name && name.toLowerCase().endsWith('.apk')) {
+        try {
+          await Filesystem.deleteFile({ path: `updates/${name}`, directory: Directory.Data });
+        } catch { /* ignore */ }
+      }
+    }
+  } catch { /* updates/ might not exist yet */ }
 
   // Wire native progress events (Capacitor Filesystem 5.0+). Silently
   // no-ops on older builds — fall back to a fake 0 → 100 flip on
