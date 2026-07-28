@@ -484,6 +484,30 @@
       "item_removed":     "Item removed",
       "activity_removed": "Activity removed"
     },
+    "empty": {
+      "tap_to_add_food":    "Tap to add food"
+    },
+    "server_error": {
+      "unreachable":        "Could not reach server —",
+      "retry":              "Retry"
+    },
+    "water": {
+      "custom":             "Custom",
+      "add":                "Add",
+      "remove":             "Remove"
+    },
+    "edit_item": {
+      "save":               "Save",
+      "remove_ingredient":  "Remove ingredient",
+      "remove_qc_entry":    "Remove entry",
+      "remove_qc_aria":     "Remove Quick Calories entry"
+    },
+    "confirm": {
+      "remove_item":        "Remove {name} item?",
+      "remove_fallback":    "item",
+      "clear_all_meal":     "Clear all items from {meal}?",
+      "clear_all_fallback": "meal"
+    },
     "errors": {
       "note_save_failed":     "Note save failed",
       "name_required":        "Please enter a name",

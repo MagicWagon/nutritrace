@@ -1203,7 +1203,7 @@
 {#if $diaryLoadError}
       <div class="server-error-banner">
         <span class="material-symbols-rounded">cloud_off</span>
-        <span>Could not reach server — <button class="server-error-retry" on:click={() => loadEntry($currentDate)}>Retry</button></span>
+        <span>{$_('diary.server_error.unreachable')} <button class="server-error-retry" on:click={() => loadEntry($currentDate)}>{$_('diary.server_error.retry')}</button></span>
       </div>
     {/if}
     <!-- Intermittent fasting widget — opt-in via Settings → Diary -->
@@ -1240,7 +1240,7 @@
         {#if items.length === 0}
           <button type="button" class="meal-empty" on:click={() => openAddFood(mealIdx)} aria-label="Add food to {meal}">
             <span class="material-symbols-rounded meal-empty-icon" style="color:{mealColor(mealIdx)}">add_circle</span>
-            <span class="meal-empty-text">Tap to add food</span>
+            <span class="meal-empty-text">{$_('diary.empty.tap_to_add_food')}</span>
           </button>
         {:else}
           {@const _foodItems  = items.filter(it => it.type !== 'quick_calories')}
@@ -1304,7 +1304,7 @@
                         </span>
                       </button>
                       <button type="button" class="btn-icon split-child-del" on:click|stopPropagation={() => onRemoveSplitChild(item._i, ci)}
-                        aria-label="Remove ingredient" title="Remove ingredient">
+                        aria-label={$_('diary.edit_item.remove_ingredient')} title={$_('diary.edit_item.remove_ingredient')}>
                         <span class="material-symbols-rounded" style="font-size:16px">close</span>
                       </button>
                     </div>
@@ -1398,7 +1398,7 @@
                           </span>
                         </button>
                         <button type="button" class="btn-icon split-child-del" on:click|stopPropagation={() => removeDiaryItem(qItem._i)}
-                          aria-label="Remove Quick Calories entry" title="Remove entry">
+                          aria-label={$_('diary.edit_item.remove_qc_aria')} title={$_('diary.edit_item.remove_qc_entry')}>
                           <span class="material-symbols-rounded" style="font-size:16px">close</span>
                         </button>
                       </div>
@@ -1738,7 +1738,7 @@
       {/if}
       <button class="wc-btn wc-btn-custom" on:click={_toggleWaterCustom}>
         <span class="material-symbols-rounded">edit</span>
-        <span class="wc-btn-name">Custom</span>
+        <span class="wc-btn-name">{$_('diary.water.custom')}</span>
       </button>
     </div>
 
@@ -1748,7 +1748,7 @@
           placeholder={`Amount (${_waterUnit === 'oz' ? 'fl oz' : _waterUnit})`}
           bind:value={_waterCustomAmt} bind:this={_waterCustomInput}
           on:keydown={e => e.key === 'Enter' && _addWaterCustom()} />
-        <button class="btn btn-primary" on:click={_addWaterCustom}>Add</button>
+        <button class="btn btn-primary" on:click={_addWaterCustom}>{$_('diary.water.add')}</button>
       </div>
     {/if}
 
@@ -1786,7 +1786,7 @@
                 <span class="font-medium">{_waterDisplay(log.amount)}</span>
                 {#if log.time}<span class="text-3 text-sm">{log.time}</span>{/if}
               </div>
-              <button class="btn-icon" on:click|stopPropagation={() => _removeWaterLog(i)} title="Remove">
+              <button class="btn-icon" on:click|stopPropagation={() => _removeWaterLog(i)} title={$_('diary.water.remove')}>
                 <span class="material-symbols-rounded" style="font-size:18px;color:var(--text-3)">delete</span>
               </button>
             </div>
@@ -1858,7 +1858,7 @@
             <span class="qce-macro-label">Fat</span>
           </div>
         </div>
-        <button class="btn btn-primary w-full" style="margin-top:16px" on:click={saveEditItem}>Save</button>
+        <button class="btn btn-primary w-full" style="margin-top:16px" on:click={saveEditItem}>{$_('diary.edit_item.save')}</button>
       {:else}
       <div style="display:flex;gap:12px;margin-bottom:16px">
         <div style="flex:1">
@@ -1896,7 +1896,7 @@
           <span class="edit-macro-label">fat</span>
         </div>
       </div>
-      <button class="btn btn-primary w-full" style="margin-top:16px" on:click={saveEditItem}>Save</button>
+      <button class="btn btn-primary w-full" style="margin-top:16px" on:click={saveEditItem}>{$_('diary.edit_item.save')}</button>
       {/if}
     </div>
   {/if}
@@ -1908,7 +1908,7 @@
 <!-- Delete confirm dialog -->
 <Dialog
   bind:open={showDeleteDialog}
-  title="Remove {actionItem?.name || 'item'}?"
+  title={$_('diary.confirm.remove_item', { values: { name: actionItem?.name || $_('diary.confirm.remove_fallback') } })}
   message="This will remove it from your diary."
   confirmText="Remove"
   dangerous
@@ -2021,7 +2021,7 @@
 <!-- Clear meal confirm -->
 <Dialog
   bind:open={showClearMealDialog}
-  title="Clear all items from {actionMealIdx != null ? meals[actionMealIdx] : 'meal'}?"
+  title={$_('diary.confirm.clear_all_meal', { values: { meal: actionMealIdx != null ? meals[actionMealIdx] : $_('diary.confirm.clear_all_fallback') } })}
   message="This will remove every item in this meal from your diary for {$currentDate}. This can't be undone."
   confirmText="Clear"
   dangerous
@@ -2122,7 +2122,7 @@
         </div>
       </div>
       <div class="bs-sheet-footer">
-        <button class="btn btn-primary w-full" type="submit">Save</button>
+        <button class="btn btn-primary w-full" type="submit">{$_('common.save')}</button>
       </div>
       </form>
     </div>
