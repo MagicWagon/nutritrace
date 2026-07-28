@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte';
+  import { _ } from 'svelte-i18n';
   import { slide } from 'svelte/transition';
   import Toggle from './Toggle.svelte';
   import TimePicker from '../ui/TimePicker.svelte';
@@ -354,7 +355,7 @@
       ]);
       fitbitConnectionStatus = { ...fitbitConnectionStatus, connected: false };
       legacyFitbitConnected = false;
-      showSuccess('Disconnected from Fitbit');
+      showSuccess($_('settings_wellness.fitbit.disconnected'));
     } catch(e) { showError(e.message); }
     disconnectingFitbit = false;
   }
@@ -364,7 +365,7 @@
     try {
       await NtApi.del('/api/wellness/withings/disconnect');
       withingsConnectionStatus = { ...withingsConnectionStatus, connected: false };
-      showSuccess('Disconnected from Withings');
+      showSuccess($_('settings_wellness.withings.disconnected'));
     } catch(e) { showError(e.message); }
     disconnectingWithings = false;
   }
@@ -383,7 +384,7 @@
         window.location.href = url;
       }
     } catch(e) {
-      showError(e.message || 'Could not start Fitbit authorization');
+      showError(e.message || $_('settings_wellness.fitbit.auth_start_failed'));
       connectingFitbit = false;
     }
   }
@@ -399,7 +400,7 @@
         window.location.href = url;
       }
     } catch(e) {
-      showError(e.message || 'Could not start Withings authorization');
+      showError(e.message || $_('settings_wellness.withings.auth_start_failed'));
       connectingWithings = false;
     }
   }
@@ -417,8 +418,8 @@
       fitbitConnectionStatus = null;
       fitbitConnectionStatus = await NtApi.get('/api/wellness/google-health/status');
       fitbitEditingCreds = false;
-      showSuccess('Fitbit credentials saved');
-    } catch (e) { showError('Failed to save: ' + e.message); }
+      showSuccess($_('settings_wellness.fitbit.creds_saved'));
+    } catch (e) { showError($_('settings_wellness.common.save_failed_prefix') + e.message); }
   }
 
   // ── Sync helpers — pull today's metrics from each provider ──────────────
@@ -494,7 +495,7 @@
   }
 
   function copyRedirectUri() {
-    navigator.clipboard.writeText(fitbitRedirectUri || fitbitRedirectSuggested).then(() => showSuccess('Copied'));
+    navigator.clipboard.writeText(fitbitRedirectUri || fitbitRedirectSuggested).then(() => showSuccess($_('settings_wellness.common.copied')));
   }
 
   async function disconnectGarminFromSettings() {
@@ -502,7 +503,7 @@
     try {
       await NtApi.del('/api/wellness/garmin/disconnect');
       garminConnectionStatus = { ...garminConnectionStatus, connected: false };
-      showSuccess('Disconnected from Garmin');
+      showSuccess($_('settings_wellness.garmin.disconnected'));
     } catch(e) { showError(e.message); }
     disconnectingGarmin = false;
   }
@@ -518,7 +519,7 @@
         window.location.href = url;
       }
     } catch(e) {
-      showError(e.message || 'Could not start Garmin authorization');
+      showError(e.message || $_('settings_wellness.garmin.auth_start_failed'));
       connectingGarmin = false;
     }
   }
@@ -533,12 +534,12 @@
       garminConnectionStatus = null;
       garminConnectionStatus = await NtApi.get('/api/wellness/garmin/status');
       garminEditingCreds = false;
-      showSuccess('Garmin credentials saved');
-    } catch(e) { showError('Failed to save: ' + e.message); }
+      showSuccess($_('settings_wellness.garmin.creds_saved'));
+    } catch(e) { showError($_('settings_wellness.common.save_failed_prefix') + e.message); }
   }
 
   function copyGarminRedirectUri() {
-    navigator.clipboard.writeText(garminRedirectUri || garminRedirectSuggested).then(() => showSuccess('Copied'));
+    navigator.clipboard.writeText(garminRedirectUri || garminRedirectSuggested).then(() => showSuccess($_('settings_wellness.common.copied')));
   }
 
   async function saveWithingsConfig() {
@@ -551,12 +552,12 @@
       withingsConnectionStatus = null;
       withingsConnectionStatus = await NtApi.get('/api/wellness/withings/status');
       withingsEditingCreds = false;
-      showSuccess('Withings credentials saved');
-    } catch (e) { showError('Failed to save: ' + e.message); }
+      showSuccess($_('settings_wellness.withings.creds_saved'));
+    } catch (e) { showError($_('settings_wellness.common.save_failed_prefix') + e.message); }
   }
 
   function copyWithingsRedirectUri() {
-    navigator.clipboard.writeText(withingsRedirectUri || withingsRedirectSuggested).then(() => showSuccess('Copied'));
+    navigator.clipboard.writeText(withingsRedirectUri || withingsRedirectSuggested).then(() => showSuccess($_('settings_wellness.common.copied')));
   }
 </script>
 
@@ -566,8 +567,8 @@
   <div class="card settings-card">
     <div class="setting-row">
       <div>
-        <span class="setting-label">Activity Tracking</span>
-        <div class="setting-desc">Adds a Wellness section for syncing fitness tracker and scale data.</div>
+        <span class="setting-label">{$_('settings_wellness.master.label')}</span>
+        <div class="setting-desc">{$_('settings_wellness.master.desc')}</div>
       </div>
       <Toggle checked={wellnessEnabledVal} on:change={e => { wellnessEnabledVal = e.detail; wellnessEnabled.set(e.detail); }} />
     </div>
@@ -575,7 +576,7 @@
       <div class="setting-divider"></div>
       <div class="setting-row">
         <div>
-          <span class="setting-desc">Sync schedule is configured per device below.</span>
+          <span class="setting-desc">{$_('settings_wellness.master.schedule_note')}</span>
         </div>
       </div>
     {/if}
@@ -583,12 +584,12 @@
 
   {#if wellnessEnabledVal}
     <!-- ── Fitbit ── -->
-    <p class="sub-label" style="padding-top:16px">Fitbit</p>
+    <p class="sub-label" style="padding-top:16px">{$_('settings_wellness.fitbit.title')}</p>
     <div class="card settings-card">
       {#if !isNativeLocal && fitbitEnabledVal && fitbitConnectionStatus?.connected}
         <ConnectionStatus
           status="ok"
-          okLabel="Linked"
+          okLabel={$_('settings_wellness.common.linked')}
           subtext={
             (fitbitConnectionStatus.fitbitUserId
               ? `Fitbit ID: ${fitbitConnectionStatus.fitbitUserId}`
@@ -609,7 +610,7 @@
       {#if isNativeLocal}
         <div class="setting-row">
           <div>
-            <span class="setting-label" style="opacity:0.5">Enable Fitbit</span>
+            <span class="setting-label" style="opacity:0.5">{$_('settings_wellness.fitbit.enable')}</span>
             <div class="setting-desc">Requires a server connection for OAuth authentication. In local mode, use <strong>Health Connect</strong> below to read Fitbit data directly from your Android device.</div>
           </div>
         </div>
@@ -618,7 +619,7 @@
            Keep the toggle so they can manage / disconnect. -->
       <div class="setting-row">
         <div>
-          <span class="setting-label">Enable Fitbit</span>
+          <span class="setting-label">{$_('settings_wellness.fitbit.enable')}</span>
           <div class="setting-desc">Steps, activity, sleep stages, heart rate, HRV, SpO2. Legacy Fitbit Web API is being retired; new connections should use Google Health below.</div>
         </div>
         <Toggle checked={fitbitEnabledVal} on:change={e => { fitbitEnabledVal = e.detail; fitbitEnabled.set(e.detail); }} />
@@ -628,7 +629,7 @@
            Fitbit Web API is being retired; direct new users to Google Health. -->
       <div class="setting-row">
         <div>
-          <span class="setting-label" style="opacity:0.6">Fitbit Web API retired</span>
+          <span class="setting-label" style="opacity:0.6">{$_('settings_wellness.fitbit.retired_label')}</span>
           <div class="setting-desc">The legacy Fitbit Web API is being retired. To sync Fitbit data, connect via <strong>Google Health</strong> below, which uses the same underlying data via Google's Fitness API.</div>
         </div>
       </div>
@@ -638,7 +639,7 @@
         <div class="setting-divider"></div>
         <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px">
           <div>
-            <span class="setting-label">Sync Range</span>
+            <span class="setting-label">{$_('settings_wellness.common.sync_range')}</span>
             <div class="setting-desc">How far back the manual Sync button fetches. Auto-sync always covers today only.</div>
           </div>
           <div style="display:flex;flex-direction:column;gap:6px">
@@ -669,19 +670,19 @@
         </div>
         <div class="setting-divider"></div>
         <div class="setting-row">
-          <span class="setting-label">Sync Mode</span>
+          <span class="setting-label">{$_('settings_wellness.common.sync_mode')}</span>
           <div class="select-wrap" style="width:150px">
             <select class="select sel-sm" bind:value={fitbitSyncModeVal} on:change={e => fitbitSyncMode.set(e.target.value)}>
-              <option value="auto">Auto (on open)</option>
-              <option value="manual">Manual only</option>
-              {#if !isNativeLocal}<option value="scheduled">Scheduled</option>{/if}
+              <option value="auto">{$_('settings_wellness.common.mode_auto')}</option>
+              <option value="manual">{$_('settings_wellness.common.mode_manual')}</option>
+              {#if !isNativeLocal}<option value="scheduled">{$_('settings_wellness.common.mode_scheduled')}</option>{/if}
             </select>
           </div>
         </div>
         {#if fitbitSyncModeVal === 'scheduled'}
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <span class="setting-label">Interval</span>
+            <span class="setting-label">{$_('settings_wellness.common.interval')}</span>
             <div class="select-wrap" style="width:160px">
               <select class="select sel-sm" bind:value={fitbitSyncIntervalVal} on:change={e => fitbitSyncInterval.set(parseInt(e.target.value))}>
                 {#each SYNC_INTERVALS as opt}<option value={opt.value}>{opt.label}</option>{/each}
@@ -691,13 +692,13 @@
           <div class="setting-divider"></div>
           {#if fitbitSyncIntervalVal >= 1440}
             <div class="setting-row">
-              <span class="setting-label">Sync At</span>
+              <span class="setting-label">{$_('settings_wellness.common.sync_at')}</span>
               <TimePicker value={fitbitSyncWindowStartVal || '14:00'} on:change={e => { fitbitSyncWindowStartVal = e.detail; fitbitSyncWindowStart.set(e.detail); fitbitSyncWindowEnd.set(null); }} />
             </div>
           {:else}
             <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px">
               <div>
-                <span class="setting-label">Active Window</span>
+                <span class="setting-label">{$_('settings_wellness.common.active_window')}</span>
                 <div class="setting-desc">Only sync during these hours. Leave blank for all day.</div>
               </div>
               <div style="display:flex;gap:8px;align-items:center">
@@ -735,7 +736,7 @@
         {/if}
         {#if fitbitConnectionStatus === null}
           <div class="setting-row">
-            <span class="setting-desc">Loading connection status…</span>
+            <span class="setting-desc">{$_('settings_wellness.common.loading_status')}</span>
           </div>
         {:else if fitbitConnectionStatus.connected}
           {#if lastSyncResult}
@@ -750,7 +751,7 @@
         {:else if fitbitConnectionStatus.configured && !fitbitEditingCreds}
           <div class="setting-row">
             <div>
-              <span class="setting-label">Not connected</span>
+              <span class="setting-label">{$_('settings_wellness.common.not_connected')}</span>
               <div class="setting-desc">Authorize NutriTrace to read your Fitbit data via Google Health.</div>
             </div>
             <div style="display:flex;gap:8px;align-items:center">
@@ -832,14 +833,14 @@
 
     <!-- ── Garmin (Experimental) ── -->
     <p class="sub-label" style="padding-top:16px">
-      Garmin
-      <span class="labs-badge" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">Experimental</span>
+      {$_('settings_wellness.garmin.title')}
+      <span class="labs-badge" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">{$_('settings_wellness.common.experimental')}</span>
     </p>
     <div class="card settings-card">
       {#if !isNativeLocal && garminEnabledVal && garminConnectionStatus?.connected}
         <ConnectionStatus
           status="ok"
-          okLabel="Linked"
+          okLabel={$_('settings_wellness.common.linked')}
           subtext={
             (garminConnectionStatus.garminUserId || 'Garmin account linked')
             + (garminConnectionStatus.lastSyncedAt ? ` · Last synced ${_timeAgo(garminConnectionStatus.lastSyncedAt)}` : '')
@@ -858,14 +859,14 @@
       {#if isNativeLocal}
         <div class="setting-row">
           <div>
-            <span class="setting-label" style="opacity:0.5">Enable Garmin</span>
+            <span class="setting-label" style="opacity:0.5">{$_('settings_wellness.garmin.enable')}</span>
             <div class="setting-desc">Requires a server connection for OAuth authentication. In local mode, use <strong>Health Connect</strong> below to read Garmin data directly from your Android device.</div>
           </div>
         </div>
       {:else}
       <div class="setting-row">
         <div>
-          <span class="setting-label">Enable Garmin</span>
+          <span class="setting-label">{$_('settings_wellness.garmin.enable')}</span>
           <div class="setting-desc">
             Steps, sleep, heart rate, HRV, SpO2, Body Battery, stress. Requires the <strong>Garmin Health API</strong> partnership.
             <a href="https://developer.garmin.com/gc-developer-program/health-api/" target="_blank" rel="noopener" class="about-link">Apply for access →</a>
@@ -879,7 +880,7 @@
         <div class="setting-divider"></div>
         <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px">
           <div>
-            <span class="setting-label">Sync Range</span>
+            <span class="setting-label">{$_('settings_wellness.common.sync_range')}</span>
             <div class="setting-desc">How far back the manual Sync button fetches.</div>
           </div>
           <div style="display:flex;flex-direction:column;gap:6px">
@@ -910,19 +911,19 @@
         </div>
         <div class="setting-divider"></div>
         <div class="setting-row">
-          <span class="setting-label">Sync Mode</span>
+          <span class="setting-label">{$_('settings_wellness.common.sync_mode')}</span>
           <div class="select-wrap" style="width:150px">
             <select class="select sel-sm" bind:value={garminSyncModeVal} on:change={e => garminSyncMode.set(e.target.value)}>
-              <option value="auto">Auto (on open)</option>
-              <option value="manual">Manual only</option>
-              {#if !isNativeLocal}<option value="scheduled">Scheduled</option>{/if}
+              <option value="auto">{$_('settings_wellness.common.mode_auto')}</option>
+              <option value="manual">{$_('settings_wellness.common.mode_manual')}</option>
+              {#if !isNativeLocal}<option value="scheduled">{$_('settings_wellness.common.mode_scheduled')}</option>{/if}
             </select>
           </div>
         </div>
         {#if garminSyncModeVal === 'scheduled'}
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <span class="setting-label">Interval</span>
+            <span class="setting-label">{$_('settings_wellness.common.interval')}</span>
             <div class="select-wrap" style="width:160px">
               <select class="select sel-sm" bind:value={garminSyncIntervalVal} on:change={e => garminSyncInterval.set(parseInt(e.target.value))}>
                 {#each SYNC_INTERVALS as opt}<option value={opt.value}>{opt.label}</option>{/each}
@@ -932,13 +933,13 @@
           <div class="setting-divider"></div>
           {#if garminSyncIntervalVal >= 1440}
             <div class="setting-row">
-              <span class="setting-label">Sync At</span>
+              <span class="setting-label">{$_('settings_wellness.common.sync_at')}</span>
               <TimePicker value={garminSyncWindowStartVal || '14:00'} on:change={e => { garminSyncWindowStartVal = e.detail; garminSyncWindowStart.set(e.detail); garminSyncWindowEnd.set(null); }} />
             </div>
           {:else}
             <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px">
               <div>
-                <span class="setting-label">Active Window</span>
+                <span class="setting-label">{$_('settings_wellness.common.active_window')}</span>
                 <div class="setting-desc">Only sync during these hours. Leave blank for all day.</div>
               </div>
               <div style="display:flex;gap:8px;align-items:center">
@@ -952,14 +953,14 @@
         <div class="setting-divider"></div>
         {#if garminConnectionStatus === null}
           <div class="setting-row">
-            <span class="setting-desc">Loading connection status…</span>
+            <span class="setting-desc">{$_('settings_wellness.common.loading_status')}</span>
           </div>
         {:else if garminConnectionStatus.connected}
           <!-- Connected state rendered as the top-of-card banner; nothing else here. -->
         {:else if garminConnectionStatus.configured && !garminEditingCreds}
           <div class="setting-row">
             <div>
-              <span class="setting-label">Not connected</span>
+              <span class="setting-label">{$_('settings_wellness.common.not_connected')}</span>
               <div class="setting-desc">Authorize NutriTrace to read your Garmin data.</div>
             </div>
             <div style="display:flex;gap:8px;align-items:center">
@@ -1027,12 +1028,12 @@
     </div>
 
     <!-- ── Withings ── -->
-    <p class="sub-label" style="padding-top:16px">Withings</p>
+    <p class="sub-label" style="padding-top:16px">{$_('settings_wellness.withings.title')}</p>
     <div class="card settings-card">
       {#if !isNativeLocal && withingsEnabledVal && withingsConnectionStatus?.connected}
         <ConnectionStatus
           status="ok"
-          okLabel="Linked"
+          okLabel={$_('settings_wellness.common.linked')}
           subtext={
             (withingsConnectionStatus.withingsUserId ? `User ${withingsConnectionStatus.withingsUserId}` : 'Withings account linked')
             + (withingsConnectionStatus.lastSyncedAt ? ` · Last synced ${_timeAgo(withingsConnectionStatus.lastSyncedAt)}` : '')
@@ -1051,14 +1052,14 @@
       {#if isNativeLocal}
         <div class="setting-row">
           <div>
-            <span class="setting-label" style="opacity:0.5">Enable Withings</span>
+            <span class="setting-label" style="opacity:0.5">{$_('settings_wellness.withings.enable')}</span>
             <div class="setting-desc">Requires a server connection for OAuth authentication. In local mode, use <strong>Health Connect</strong> below to read Withings data directly from your Android device.</div>
           </div>
         </div>
       {:else}
       <div class="setting-row">
         <div>
-          <span class="setting-label">Enable Withings</span>
+          <span class="setting-label">{$_('settings_wellness.withings.enable')}</span>
           <div class="setting-desc">
             Body composition from scales (weight, fat %, muscle, bone mass, and more).
             <a href="https://developer.withings.com/dashboard/" target="_blank" rel="noopener" class="about-link">Developer dashboard →</a>
@@ -1072,7 +1073,7 @@
         <div class="setting-divider"></div>
         <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px">
           <div>
-            <span class="setting-label">Sync Range</span>
+            <span class="setting-label">{$_('settings_wellness.common.sync_range')}</span>
             <div class="setting-desc">How far back the manual Sync button fetches.</div>
           </div>
           <div style="display:flex;flex-direction:column;gap:6px">
@@ -1103,19 +1104,19 @@
         </div>
         <div class="setting-divider"></div>
         <div class="setting-row">
-          <span class="setting-label">Sync Mode</span>
+          <span class="setting-label">{$_('settings_wellness.common.sync_mode')}</span>
           <div class="select-wrap" style="width:150px">
             <select class="select sel-sm" bind:value={withingsSyncModeVal} on:change={e => withingsSyncMode.set(e.target.value)}>
-              <option value="auto">Auto (on open)</option>
-              <option value="manual">Manual only</option>
-              {#if !isNativeLocal}<option value="scheduled">Scheduled</option>{/if}
+              <option value="auto">{$_('settings_wellness.common.mode_auto')}</option>
+              <option value="manual">{$_('settings_wellness.common.mode_manual')}</option>
+              {#if !isNativeLocal}<option value="scheduled">{$_('settings_wellness.common.mode_scheduled')}</option>{/if}
             </select>
           </div>
         </div>
         {#if withingsSyncModeVal === 'scheduled'}
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <span class="setting-label">Interval</span>
+            <span class="setting-label">{$_('settings_wellness.common.interval')}</span>
             <div class="select-wrap" style="width:160px">
               <select class="select sel-sm" bind:value={withingsSyncIntervalVal} on:change={e => withingsSyncInterval.set(parseInt(e.target.value))}>
                 {#each SYNC_INTERVALS as opt}<option value={opt.value}>{opt.label}</option>{/each}
@@ -1125,13 +1126,13 @@
           <div class="setting-divider"></div>
           {#if withingsSyncIntervalVal >= 1440}
             <div class="setting-row">
-              <span class="setting-label">Sync At</span>
+              <span class="setting-label">{$_('settings_wellness.common.sync_at')}</span>
               <TimePicker value={withingsSyncWindowStartVal || '14:00'} on:change={e => { withingsSyncWindowStartVal = e.detail; withingsSyncWindowStart.set(e.detail); withingsSyncWindowEnd.set(null); }} />
             </div>
           {:else}
             <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px">
               <div>
-                <span class="setting-label">Active Window</span>
+                <span class="setting-label">{$_('settings_wellness.common.active_window')}</span>
                 <div class="setting-desc">Only sync during these hours. Leave blank for all day.</div>
               </div>
               <div style="display:flex;gap:8px;align-items:center">
@@ -1145,14 +1146,14 @@
         <div class="setting-divider"></div>
         {#if withingsConnectionStatus === null}
           <div class="setting-row">
-            <span class="setting-desc">Loading connection status…</span>
+            <span class="setting-desc">{$_('settings_wellness.common.loading_status')}</span>
           </div>
         {:else if withingsConnectionStatus.connected}
           <!-- Connected state rendered as the top-of-card banner; nothing else here. -->
         {:else if withingsConnectionStatus.configured && !withingsEditingCreds}
           <div class="setting-row">
             <div>
-              <span class="setting-label">Not connected</span>
+              <span class="setting-label">{$_('settings_wellness.common.not_connected')}</span>
               <div class="setting-desc">Authorize NutriTrace to read your Withings data.</div>
             </div>
             <div style="display:flex;gap:8px;align-items:center">
@@ -1223,13 +1224,13 @@
     <!-- Health Connect (Android only) -->
     {#if isNative}
       <p class="sub-label" style="padding-top:16px">
-        Health Connect
+        {$_('settings_wellness.hc.title')}
       </p>
       <div class="card settings-card">
         {#if healthConnectEnabledVal && healthConnectAvailability === 'Available'}
           <ConnectionStatus
             status="ok"
-            okLabel="Permission granted"
+            okLabel={$_('settings_wellness.hc.permission_granted')}
             subtext={`${healthConnectPermissions.read.length} data type${healthConnectPermissions.read.length === 1 ? '' : 's'} readable from Health Connect`}
           >
             <svelte:fragment slot="action">
@@ -1281,11 +1282,11 @@
           {/if}
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <span class="setting-label">Sync Mode</span>
+            <span class="setting-label">{$_('settings_wellness.common.sync_mode')}</span>
             <div class="select-wrap" style="width:150px">
               <select class="select sel-sm" bind:value={hcSyncModeVal} on:change={e => healthConnectSyncMode.set(e.target.value)}>
-                <option value="auto">Auto (on open)</option>
-                <option value="manual">Manual only</option>
+                <option value="auto">{$_('settings_wellness.common.mode_auto')}</option>
+                <option value="manual">{$_('settings_wellness.common.mode_manual')}</option>
                 <option value="scheduled">Scheduled</option>
               </select>
             </div>
@@ -1293,7 +1294,7 @@
           {#if hcSyncModeVal === 'scheduled'}
             <div class="setting-divider"></div>
             <div class="setting-row">
-              <span class="setting-label">Interval</span>
+              <span class="setting-label">{$_('settings_wellness.common.interval')}</span>
               <div class="select-wrap" style="width:160px">
                 <select class="select sel-sm" bind:value={hcSyncIntervalVal} on:change={e => healthConnectSyncInterval.set(parseInt(e.target.value))}>
                   {#each SYNC_INTERVALS as opt}<option value={opt.value}>{opt.label}</option>{/each}
@@ -1303,13 +1304,13 @@
             <div class="setting-divider"></div>
             {#if hcSyncIntervalVal >= 1440}
               <div class="setting-row">
-                <span class="setting-label">Sync At</span>
+                <span class="setting-label">{$_('settings_wellness.common.sync_at')}</span>
                 <TimePicker value={hcSyncWindowStartVal || '14:00'} on:change={e => { hcSyncWindowStartVal = e.detail; healthConnectSyncWindowStart.set(e.detail); healthConnectSyncWindowEnd.set(null); }} />
               </div>
             {:else}
               <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px">
                 <div>
-                  <span class="setting-label">Active Window</span>
+                  <span class="setting-label">{$_('settings_wellness.common.active_window')}</span>
                   <div class="setting-desc">Only sync during these hours. Leave blank for all day.</div>
                 </div>
                 <div style="display:flex;gap:8px;align-items:center">
@@ -1355,7 +1356,7 @@
          bottom of the wellness group so the placement reads as
          cross-cutting rather than nested under any one wearable. -->
     {#if (fitbitEnabledVal || garminEnabledVal || withingsEnabledVal || healthConnectEnabledVal) && $envLocks?.lifttrace_connected}
-      <p class="sub-label" style="padding-top:16px">LiftTrace</p>
+      <p class="sub-label" style="padding-top:16px">{$_('settings_wellness.lifttrace.title')}</p>
       <div class="card settings-card">
         <div class="setting-row">
           <div>
