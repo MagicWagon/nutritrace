@@ -17,13 +17,16 @@
  * - No push notifications, no background poll.
  *
 
- * Channels (both platforms — Android uses to pick the APK asset, PWA
- * uses to pick which GitHub release the server-update banner compares
- * against):
- * - stable — releases/latest
- * - beta   — releases/tags/dev-latest (labelled "Beta" in the UI to
- *            match Fathom's convention; underlying tag is still
- *            `dev-latest` per feedback_traceapps_dev_release_numbering)
+ * Channels (both platforms; Android uses this to pick the APK asset, PWA
+ * uses it to pick which GitHub release the server-update banner
+ * compares against):
+ * - stable — /releases/latest (last tagged stable release)
+ * - dev    — newest numbered pre-release matching v<M>.<m>.<p>-dev.<n>.
+ *            NOT the literal `dev-latest` tag: that tag_name is the
+ *            string "dev-latest", which parses as no valid semver so
+ *            the version-compare would return equal and never prompt.
+ *            Instead we list /releases, filter to prerelease=true with
+ *            a numbered -dev.N tag, and pick the newest.
  */
 import { APP_VERSION } from './version.js';
 import { isNative } from './platform.js';
@@ -167,22 +170,39 @@ export async function checkForUpdate({ force = false } = {}) {
     if (cached) return cached;
   }
   const channel = getChannel();
-  // 'beta' label is user-facing; underlying GH tag is dev-latest per
-  // feedback_traceapps_dev_release_numbering. Older cached 'dev' values
-  // also map to the same tag for backward compatibility.
-  const path = (channel === 'beta' || channel === 'dev')
-    ? `/releases/tags/dev-latest`
-    : `/releases/latest`;
-  const url = `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}${path}`;
+  const headers = {
+    'Accept':     'application/vnd.github+json',
+    'User-Agent': UA,
+  };
   try {
-    const res = await fetch(url, {
-      headers: {
-        'Accept':     'application/vnd.github+json',
-        'User-Agent': UA,
-      },
-    });
-    if (!res.ok) throw new Error(`GitHub API ${res.status}`);
-    const data = await res.json();
+    let data;
+    if (channel === 'dev' || channel === 'beta') {
+      // Beta is the legacy alias for Dev; kept accepted so older cached
+      // values still resolve. List up to 20 recent releases and pick the
+      // newest that's flagged prerelease with a numbered -dev.N tag.
+      // Ignoring the `dev-latest` floating tag itself (its tag_name is
+      // the string literal, not a semver).
+      const listRes = await fetch(
+        `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/releases?per_page=20`,
+        { headers },
+      );
+      if (!listRes.ok) throw new Error(`GitHub API ${listRes.status}`);
+      const list = await listRes.json();
+      const devTag = /^v\d+\.\d+\.\d+-dev\.\d+$/;
+      const devRelease = list.find(r => r.prerelease && devTag.test(r.tag_name || ''));
+      if (!devRelease) {
+        // No numbered dev release exists yet; nothing to offer.
+        return null;
+      }
+      data = devRelease;
+    } else {
+      const res = await fetch(
+        `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/releases/latest`,
+        { headers },
+      );
+      if (!res.ok) throw new Error(`GitHub API ${res.status}`);
+      data = await res.json();
+    }
     const apkAsset = (data.assets || []).find(a =>
       a.name && a.name.toLowerCase().endsWith('.apk')
     );
@@ -315,7 +335,7 @@ export async function checkServerUpdate() {
   if (isNative) return null; // Server-update banner is PWA-only.
   try {
     const { apiUrl } = await import('./platform.js');
-    const channel = getChannel() === 'beta' || getChannel() === 'dev' ? 'beta' : 'stable';
+    const channel = (getChannel() === 'dev' || getChannel() === 'beta') ? 'dev' : 'stable';
     const res = await fetch(apiUrl(`/api/updates/server-status?channel=${channel}`), {
       credentials: 'include',
     });

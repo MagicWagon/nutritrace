@@ -31,6 +31,9 @@
   } from '../../lib/updates.js';
 
   let channel     = _normalizeChannel(getChannel());
+  // Channel values are internally 'stable' | 'dev'. Older stored
+  // values might be 'beta' (from the pre-rename UI); normalize on
+  // load so the radio + backend queries stay consistent.
   let autoCheck   = getAutoCheck();
   let checking    = false;
   let latest      = null;
@@ -46,11 +49,9 @@
   $: showApkPanel   = isNative;
   $: showServerPanel= !isNative && isAdmin;
 
-  // Older localStorage may hold 'dev' from the previous channel naming;
-  // normalize to 'beta' so the radio + UI stay consistent.
   function _normalizeChannel(v) {
-    if (v === 'dev') { setChannel('beta'); return 'beta'; }
-    return v === 'beta' ? 'beta' : 'stable';
+    if (v === 'beta') { setChannel('dev'); return 'dev'; }
+    return v === 'dev' ? 'dev' : 'stable';
   }
 
   onMount(async () => {
@@ -155,11 +156,11 @@
           <span class="material-symbols-rounded" style="font-size:16px">verified</span>
           {$_('updates.channel.stable')}
         </label>
-        <label class="channel-opt" class:selected={channel === 'beta'}>
-          <input type="radio" name="update-channel" value="beta"
-                 checked={channel === 'beta'} on:change={() => onChannelChange('beta')} />
+        <label class="channel-opt" class:selected={channel === 'dev'}>
+          <input type="radio" name="update-channel" value="dev"
+                 checked={channel === 'dev'} on:change={() => onChannelChange('dev')} />
           <span class="material-symbols-rounded" style="font-size:16px">science</span>
-          {$_('updates.channel.beta')}
+          {$_('updates.channel.dev')}
         </label>
       </div>
     </div>

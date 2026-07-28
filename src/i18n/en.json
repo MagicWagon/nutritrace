@@ -209,8 +209,8 @@
     "channel": {
       "label":  "Update Channel",
       "stable": "Stable",
-      "beta":   "Beta",
-      "help":   "Stable tracks tagged releases. Beta is the rolling development build; expect bugs."
+      "dev":    "Dev",
+      "help":   "Stable tracks tagged releases. Dev is the rolling development build; expect bugs."
     },
     "auto_check":            "Automatically Check for Updates",
     "auto_check_desc":       "Once per day when you open the app.",

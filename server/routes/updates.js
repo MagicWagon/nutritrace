@@ -20,7 +20,7 @@ import { APP_VERSION } from './version-source.js';
 
 const router = Router();
 
-// Cache buckets keyed per channel so switching Stable ↔ Beta doesn't
+// Cache buckets keyed per channel so switching Stable/Dev doesn't
 // return stale data from the other channel. Both TTLs are 24h.
 const CACHE_KEYS = {
   stable: {
@@ -28,18 +28,15 @@ const CACHE_KEYS = {
     checkedAt: 'updates_server_checked_at',
     notesUrl:  'updates_server_notes_url',
   },
-  beta: {
-    latest:    'updates_server_latest_beta',
-    checkedAt: 'updates_server_checked_at_beta',
-    notesUrl:  'updates_server_notes_url_beta',
+  dev: {
+    latest:    'updates_server_latest_dev',
+    checkedAt: 'updates_server_checked_at_dev',
+    notesUrl:  'updates_server_notes_url_dev',
   },
 };
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-
-const GH_URLS = {
-  stable: 'https://api.github.com/repos/TraceApps/nutritrace/releases/latest',
-  beta:   'https://api.github.com/repos/TraceApps/nutritrace/releases/tags/dev-latest',
-};
+const GH_REPO_URL  = 'https://api.github.com/repos/TraceApps/nutritrace';
+const DEV_TAG_RE   = /^v\d+\.\d+\.\d+-dev\.\d+$/;
 const UA = `TraceApps-NutriTrace-Server/${APP_VERSION}`;
 
 function _getCfg(key) {
@@ -52,28 +49,38 @@ function _setCfg(key, value) {
 }
 
 async function _fetchLatest(channel) {
-  const url = GH_URLS[channel] || GH_URLS.stable;
-  const res = await fetch(url, {
-    headers: { 'Accept': 'application/vnd.github+json', 'User-Agent': UA },
-  });
+  const headers = { 'Accept': 'application/vnd.github+json', 'User-Agent': UA };
+  if (channel === 'dev') {
+    // List recent releases and pick the newest that is a numbered
+    // -dev.N pre-release. Skips the `dev-latest` floating tag whose
+    // tag_name is the string literal (not a semver), which would
+    // otherwise defeat version-compare.
+    const res = await fetch(`${GH_REPO_URL}/releases?per_page=20`, { headers });
+    if (!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const list = await res.json();
+    const hit = list.find(r => r.prerelease && DEV_TAG_RE.test(r.tag_name || ''));
+    if (!hit) return { tag: '', notesUrl: '' };
+    return { tag: hit.tag_name || '', notesUrl: hit.html_url || '' };
+  }
+  const res = await fetch(`${GH_REPO_URL}/releases/latest`, { headers });
   if (!res.ok) throw new Error(`GitHub API ${res.status}`);
   const data = await res.json();
-  return {
-    tag: data.tag_name || '',
-    notesUrl: data.html_url || '',
-  };
+  return { tag: data.tag_name || '', notesUrl: data.html_url || '' };
 }
 
 /**
- * GET /api/updates/server-status?channel=stable|beta
+ * GET /api/updates/server-status?channel=stable|dev
  * Admin-only. Returns:
  *   { current, latest, channel, available, notes_url, checked_at }
  * Cached 24h per channel; falls back to cached value if GH is unreachable.
- * Channel maps to a GH release: stable → /releases/latest,
- * beta → /releases/tags/dev-latest.
+ * Channel maps to a GH release: stable = /releases/latest,
+ * dev = newest numbered -dev.N pre-release.
  */
 router.get('/server-status', requireAuth, requireAdmin, wrap(async (req, res) => {
-  const channel = (req.query.channel === 'beta') ? 'beta' : 'stable';
+  // Accept 'beta' as a legacy alias for 'dev' so older clients still
+  // get sensible answers during the rename transition.
+  const raw = req.query.channel;
+  const channel = (raw === 'dev' || raw === 'beta') ? 'dev' : 'stable';
   const keys = CACHE_KEYS[channel];
 
   const now          = Date.now();
