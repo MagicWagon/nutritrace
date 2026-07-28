@@ -2045,7 +2045,7 @@
           on:pointermove={onMealDragMove}
           on:pointerup={onMealDragUp}
           on:pointercancel={onMealDragUp}>
-          {#each meals as _, i}
+          {#each meals as _m, i}
             {#if i > 0}<div class="setting-divider"></div>{/if}
             <div class="setting-row drag-row"
               class:dragging={mealDragFrom === i}
