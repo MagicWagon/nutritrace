@@ -1855,7 +1855,7 @@
                      bind:value={editFat} />
               <span class="qce-macro-unit" style="color:var(--macro-fat)">g</span>
             </div>
-            <span class="qce-macro-label">Fat</span>
+            <span class="qce-macro-label">{$_('diary_deep.fat')}</span>
           </div>
         </div>
         <button class="btn btn-primary w-full" style="margin-top:16px" on:click={saveEditItem}>{$_('diary.edit_item.save')}</button>
@@ -2190,7 +2190,7 @@
           </div>
           <div class="ns-macro-pill" style="background:var(--macro-fat-dim)">
             <span class="ns-macro-val" style="color:var(--macro-fat)">{Math.round(totals.fat || 0)}{#if $macroLegendMode === 'grams' && fatGoal}/{fatGoal}{/if}g</span>
-            <span class="ns-macro-lbl">Fat</span>
+            <span class="ns-macro-lbl">{$_('diary_deep.fat')}</span>
           </div>
         </div>
         <!-- All nutrients — tap a row to drill into top contributors -->
@@ -2255,15 +2255,15 @@
     <div class="ns-macros">
       <div class="ns-macro-pill" style="background:var(--macro-protein-dim)">
         <span class="ns-macro-val" style="color:var(--macro-protein)">{Math.round(_mealTotals.proteins || 0)}g</span>
-        <span class="ns-macro-lbl">Protein</span>
+        <span class="ns-macro-lbl">{$_('diary_deep.protein')}</span>
       </div>
       <div class="ns-macro-pill" style="background:var(--macro-carbs-dim)">
         <span class="ns-macro-val" style="color:var(--macro-carbs)">{Math.round(_mealTotals.carbohydrates || 0)}g</span>
-        <span class="ns-macro-lbl">Carbs</span>
+        <span class="ns-macro-lbl">{$_('diary_deep.carbs')}</span>
       </div>
       <div class="ns-macro-pill" style="background:var(--macro-fat-dim)">
         <span class="ns-macro-val" style="color:var(--macro-fat)">{Math.round(_mealTotals.fat || 0)}g</span>
-        <span class="ns-macro-lbl">Fat</span>
+        <span class="ns-macro-lbl">{$_('diary_deep.fat')}</span>
       </div>
       <div class="ns-macro-pill" style="background:var(--macro-calories-dim)">
         <span class="ns-macro-val" style="color:var(--macro-calories)">{_nsMealEnergy.value.toLocaleString()}</span>

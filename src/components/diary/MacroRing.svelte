@@ -2,6 +2,7 @@
   import { tweened } from 'svelte/motion';
   import { cubicOut } from 'svelte/easing';
   import { slide } from 'svelte/transition';
+  import { _ } from 'svelte-i18n';
   import { energyUnit, macroLegendMode } from '../../stores/settings.js';
   import { Nutrition } from '../../lib/nutrition.js';
 
@@ -169,17 +170,17 @@
     <div class="macro-item">
       <span class="dot protein"></span>
       <span class="macro-val">{macroPcts.protein}%</span>
-      <span class="macro-lbl">Protein</span>
+      <span class="macro-lbl">{$_('diary_deep.protein')}</span>
     </div>
     <div class="macro-item">
       <span class="dot carbs"></span>
       <span class="macro-val">{macroPcts.carbs}%</span>
-      <span class="macro-lbl">Carbs</span>
+      <span class="macro-lbl">{$_('diary_deep.carbs')}</span>
     </div>
     <div class="macro-item">
       <span class="dot fat"></span>
       <span class="macro-val">{macroPcts.fat}%</span>
-      <span class="macro-lbl">Fat</span>
+      <span class="macro-lbl">{$_('diary_deep.fat')}</span>
     </div>
   </div>
 {/if}

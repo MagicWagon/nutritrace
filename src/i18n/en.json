@@ -1080,6 +1080,7 @@
     "optional_macros":          "Optional Macros",
     "protein":                  "Protein",
     "carbs":                    "Carbs",
+    "fat":                      "Fat",
     "serving_size":             "Serving Size",
     "num_servings":             "Number of Servings",
     "total_amount":             "Total Amount",
