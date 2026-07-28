@@ -16,9 +16,14 @@
  * - "Check now" always runs immediately.
  * - No push notifications, no background poll.
  *
- * Channels (Android only):
- * - stable — releases/latest, filters to /^v\d+\.\d+\.\d+$/ tags
- * - dev    — releases/tags/dev-latest
+
+ * Channels (both platforms — Android uses to pick the APK asset, PWA
+ * uses to pick which GitHub release the server-update banner compares
+ * against):
+ * - stable — releases/latest
+ * - beta   — releases/tags/dev-latest (labelled "Beta" in the UI to
+ *            match Fathom's convention; underlying tag is still
+ *            `dev-latest` per feedback_traceapps_dev_release_numbering)
  */
 import { APP_VERSION } from './version.js';
 import { isNative } from './platform.js';
@@ -36,21 +41,66 @@ const THROTTLE_MS = 24 * 60 * 60 * 1000;
 
 const UA = `TraceApps-${APP_NAME}/${APP_VERSION}`;
 
-/** Normalize a semver-like tag to comparable parts. Returns [major, minor, patch] or null. */
+/**
+ * Parse a semver-like tag into { base:[M,m,p], pre:[…] }.
+ * `pre` is the pre-release identifier chain (semver §9): each hyphen-
+ * separated segment after the base version, split into dot-separated
+ * identifiers. Numeric identifiers become numbers so `dev.10 > dev.9`.
+ * Returns null for unparseable input.
+ *
+ * Examples:
+ *   v1.0.4          → { base:[1,0,4], pre:[] }
+ *   v1.1.0-dev.1    → { base:[1,1,0], pre:['dev', 1] }
+ *   v1.1.0-dev.10   → { base:[1,1,0], pre:['dev', 10] }
+ *   v1.1.0-rc.2     → { base:[1,1,0], pre:['rc', 2] }
+ */
 function _parseSemver(tag) {
   if (!tag) return null;
-  const m = /^v?(\d+)\.(\d+)\.(\d+)/.exec(tag);
-  return m ? [parseInt(m[1], 10), parseInt(m[2], 10), parseInt(m[3], 10)] : null;
+  const m = /^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?/.exec(tag);
+  if (!m) return null;
+  const base = [parseInt(m[1], 10), parseInt(m[2], 10), parseInt(m[3], 10)];
+  const pre = m[4]
+    ? m[4].split('.').map(s => /^\d+$/.test(s) ? parseInt(s, 10) : s)
+    : [];
+  return { base, pre };
 }
 
-/** Compare two semver-like tags. Returns 1 if a > b, -1 if a < b, 0 if equal or unparseable. */
+/**
+ * Compare two semver-like tags. Returns 1 if a > b, -1 if a < b, 0 if equal
+ * or unparseable. Follows the semver §11 precedence rules for pre-release
+ * identifiers: numeric identifiers have lower precedence than
+ * non-numeric; longer identifier chains outrank shorter identical
+ * prefixes; a version with a pre-release identifier is LOWER precedence
+ * than the same base without one (so `1.1.0 > 1.1.0-dev.1`, matching
+ * "final release beats any pre-release for that version").
+ */
 export function compareSemver(a, b) {
   const pa = _parseSemver(a);
   const pb = _parseSemver(b);
   if (!pa || !pb) return 0;
   for (let i = 0; i < 3; i++) {
-    if (pa[i] > pb[i]) return 1;
-    if (pa[i] < pb[i]) return -1;
+    if (pa.base[i] > pb.base[i]) return 1;
+    if (pa.base[i] < pb.base[i]) return -1;
+  }
+  // Base versions equal → pre-release comparison.
+  // Empty pre-release (final release) outranks any pre-release.
+  if (pa.pre.length === 0 && pb.pre.length === 0) return 0;
+  if (pa.pre.length === 0) return 1;
+  if (pb.pre.length === 0) return -1;
+  const n = Math.max(pa.pre.length, pb.pre.length);
+  for (let i = 0; i < n; i++) {
+    const ai = pa.pre[i], bi = pb.pre[i];
+    if (ai === undefined) return -1;
+    if (bi === undefined) return 1;
+    if (typeof ai === 'number' && typeof bi === 'number') {
+      if (ai > bi) return 1;
+      if (ai < bi) return -1;
+      continue;
+    }
+    if (typeof ai === 'number') return -1;
+    if (typeof bi === 'number') return 1;
+    if (ai > bi) return 1;
+    if (ai < bi) return -1;
   }
   return 0;
 }
@@ -117,7 +167,10 @@ export async function checkForUpdate({ force = false } = {}) {
     if (cached) return cached;
   }
   const channel = getChannel();
-  const path = channel === 'dev'
+  // 'beta' label is user-facing; underlying GH tag is dev-latest per
+  // feedback_traceapps_dev_release_numbering. Older cached 'dev' values
+  // also map to the same tag for backward compatibility.
+  const path = (channel === 'beta' || channel === 'dev')
     ? `/releases/tags/dev-latest`
     : `/releases/latest`;
   const url = `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}${path}`;
@@ -250,15 +303,20 @@ export function formatAgo(dateOrIso) {
 }
 
 /**
- * Fetch server-update status (PWA + admin only path).
- * Returns { current, latest, available, notes_url, checked_at } or null on
- * failure / non-admin / native app (not applicable).
+ * Fetch server-update status (PWA + admin only path). Passes the user's
+ * current channel to the server so a Beta-channel PWA admin sees
+ * whether the running server is behind the latest dev-latest release
+ * (not the stable one). Server caches per-channel.
+ *
+ * Returns { current, latest, channel, available, notes_url, checked_at }
+ * or null on failure / non-admin / native app (not applicable).
  */
 export async function checkServerUpdate() {
   if (isNative) return null; // Server-update banner is PWA-only.
   try {
     const { apiUrl } = await import('./platform.js');
-    const res = await fetch(apiUrl('/api/updates/server-status'), {
+    const channel = getChannel() === 'beta' || getChannel() === 'dev' ? 'beta' : 'stable';
+    const res = await fetch(apiUrl(`/api/updates/server-status?channel=${channel}`), {
       credentials: 'include',
     });
     if (res.status === 403) return null; // Non-admin — no banner.
