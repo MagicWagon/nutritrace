@@ -53,10 +53,10 @@
   async function biometricLogin() {
     try {
       const bio = await import('../lib/biometric.js');
-      const ok = await bio.authenticate('Sign in to NutriTrace');
+      const ok = await bio.authenticate($_('login.biometric.prompt'));
       if (!ok) return;
       const saved = await bio.readSavedToken();
-      if (!saved) { showError('No saved sign-in. Please use your password once first.'); return; }
+      if (!saved) { showError($_('login.biometric.no_saved')); return; }
       setAuthToken(saved);
       // Bring the auth state up by hitting /me — also refreshes CSRF token.
       await loadAuthState();
@@ -70,7 +70,7 @@
       // logcat 2026-06-09: token in biometric stash expired exactly at
       // the 30-day mark while user kept tapping biometric.
       if (!cached) {
-        showError('Your saved sign-in expired. Use your password to sign in.');
+        showError($_('login.biometric.expired'));
         await bio.clearSavedToken();
         return;
       }
@@ -79,7 +79,7 @@
       push('/');
     } catch (e) {
       console.warn('[login] biometric flow failed:', e);
-      showError('Biometric sign-in failed. Use your password instead.');
+      showError($_('login.biometric.failed'));
     }
   }
 
@@ -217,7 +217,7 @@
           <button class="btn btn-secondary w-full" style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px"
             on:click={biometricLogin} disabled={loading}>
             <span class="material-symbols-rounded" style="font-size:20px">fingerprint</span>
-            <span>Sign In with Biometric</span>
+            <span>{$_('login.biometric.sign_in_button')}</span>
           </button>
         {/if}
 

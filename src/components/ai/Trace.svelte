@@ -1985,8 +1985,8 @@ Diary logging streak: ${ctx.streakText || '(unknown)'}`
     on:keydown={e => e.key === 'Enter' && handleFabClick()}
     role="button"
     tabindex="0"
-    aria-label={recordingMode ? (cancelPreview ? 'Release to cancel' : 'Recording — release to log') : 'Open AI coach (hold to dictate food)'}
-    title={$quickLogEnabled ? 'Tap to chat · hold to log food by voice' : 'AI Assistant'}
+    aria-label={recordingMode ? (cancelPreview ? $_('trace.fab.release_to_cancel') : $_('trace.fab.recording_release')) : $_('trace.fab.open_with_voice_hint')}
+    title={$quickLogEnabled ? $_('trace.fab.tap_chat_hold_voice') : $_('trace.fab.open_short')}
   >
     {#if loading}
       <div class="fab-spinner"></div>
@@ -2073,11 +2073,11 @@ Diary logging streak: ${ctx.streakText || '(unknown)'}`
                the chat UI before the user could even type. -->
           <div class="ai-setup">
             <span class="material-symbols-rounded ai-setup-icon">key</span>
-            <p class="ai-setup-title">API key required</p>
-            <p class="ai-setup-desc">Add your AI provider key in <strong>Settings → AI Assistant</strong> to start chatting.</p>
-            <p class="ai-setup-desc" style="margin-top:4px">Supports Anthropic Claude, OpenAI, and Google Gemini.</p>
+            <p class="ai-setup-title">{$_('trace.setup.api_key_required')}</p>
+            <p class="ai-setup-desc">{@html $_('trace.setup.api_key_desc')}</p>
+            <p class="ai-setup-desc" style="margin-top:4px">{$_('trace.setup.supported_providers')}</p>
             <a href="#/settings" class="btn btn-primary" style="margin-top:16px" on:click={() => panelOpen = false}>
-              Open Settings
+              {$_('trace.setup.open_settings')}
             </a>
           </div>
 

@@ -264,6 +264,13 @@
     "sso_sign_in_with":     "Sign In With {provider}",
     "sso_or":               "or",
     "no_signin_methods":    "No sign-in methods available. Ask your administrator.",
+    "biometric": {
+      "sign_in_button":     "Sign In with Biometric",
+      "prompt":             "Sign in to NutriTrace",
+      "no_saved":           "No saved sign-in. Please use your password once first.",
+      "expired":            "Your saved sign-in expired. Use your password to sign in.",
+      "failed":             "Biometric sign-in failed. Use your password instead."
+    },
     "errors": {
       "failed": "Login failed"
     },
@@ -304,6 +311,35 @@
       "required": "Password is required",
       "mismatch": "Passwords do not match",
       "failed":   "Reset failed"
+    }
+  },
+  "native_setup": {
+    "subtitle":               "Trace Every Bite",
+    "use_locally":            "Use Locally",
+    "use_locally_desc":       "All data stays on this device. Works offline, no server needed. You can connect to a server later in Settings.",
+    "connect_to_server":      "Connect to Server",
+    "connect_to_server_desc": "Sync with your NutriTrace server. Your data is available on all devices and the web app.",
+    "server_url":             "Server URL",
+    "server_url_placeholder": "https://nutritrace.example.com",
+    "server_url_hint":        "After you enter your server, sign-in options (password or SSO) will be shown based on what your server supports.",
+    "back":                   "Back",
+    "checking":               "Checking…",
+    "next":                   "Next",
+    "or":                     "or",
+    "oidc_sign_in_with":      "Sign in with {name}",
+    "username":               "Username",
+    "username_placeholder":   "Your username",
+    "password":               "Password",
+    "password_placeholder":   "Your password",
+    "no_auth_warning":        "This server has no sign-in methods configured. Ask your admin to enable password login or configure an OIDC provider.",
+    "signing_in":             "Signing in…",
+    "sign_in":                "Sign In",
+    "errors": {
+      "server_url_required":  "Enter your server URL",
+      "credentials_required": "Enter your credentials",
+      "browser_open_failed":  "Could not open sign-in browser",
+      "connected":            "Connected to server",
+      "login_failed":         "Login failed"
     }
   },
   "profile": {
@@ -558,7 +594,20 @@
     "panel_label":        "AI Coach Chat",
     "ask_placeholder":    "Ask me anything…",
     "clear_conversation": "Clear Conversation",
-    "attach_image":       "Attach Image"
+    "attach_image":       "Attach Image",
+    "fab": {
+      "release_to_cancel":   "Release to cancel",
+      "recording_release":   "Recording — release to log",
+      "open_with_voice_hint": "Open AI coach (hold to dictate food)",
+      "tap_chat_hold_voice": "Tap to chat · hold to log food by voice",
+      "open_short":          "AI Assistant"
+    },
+    "setup": {
+      "api_key_required":    "API key required",
+      "api_key_desc":        "Add your AI provider key in <strong>Settings → AI Assistant</strong> to start chatting.",
+      "supported_providers": "Supports Anthropic Claude, OpenAI, and Google Gemini.",
+      "open_settings":       "Open Settings"
+    }
   },
   "smart_log": {
     "placeholder": "for breakfast I had 2 eggs and toast"
@@ -595,6 +644,32 @@
     "errors": {
       "no_ingredients": "Please add at least one ingredient"
     }
+  },
+  "statistics_page": {
+    "range": {
+      "last_7d":      "Last 7d",
+      "last_30d":     "Last 30d",
+      "last_90d":     "Last 90d",
+      "this_month":   "This Month",
+      "last_month":   "Last Month",
+      "ytd":          "YTD",
+      "from":         "From",
+      "to":           "To"
+    },
+    "summary": {
+      "average":       "Average",
+      "min":           "Min",
+      "max":           "Max",
+      "logged":        "Logged",
+      "days_unit":     "days"
+    },
+    "empty": {
+      "no_data":            "No data for this period",
+      "hint_food_metric":   "Log food in your diary to see trends here",
+      "hint_wellness":      "Connect a fitness tracker in Settings → Wellness",
+      "hint_other":         "No entries found — try a different date range"
+    },
+    "history_heading":       "History"
   },
   "accept_invite": {
     "title":                "Create Account",
