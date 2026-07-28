@@ -1571,7 +1571,7 @@
 
     <div class="settings-search-bar">
       <span class="material-symbols-rounded settings-search-icon">search</span>
-      <input class="settings-search-input" type="search" placeholder="Search settings…"
+      <input class="settings-search-input" type="search" placeholder={$_('settings_main_deep.search_ph')}
         bind:value={settingsSearch} />
       {#if settingsSearch}
         <button class="settings-search-clear btn-icon" on:click={() => settingsSearch = ''} title="Clear search">
@@ -2058,7 +2058,7 @@
               <!-- svelte-ignore a11y-no-static-element-interactions -->
               <span class="drag-handle material-symbols-rounded" on:pointerdown={e => onMealDragDown(e, i)}>drag_indicator</span>
               <span class="material-symbols-rounded" style="font-size:18px;color:var(--text-3);flex-shrink:0">{mealIcon(meals[i])}</span>
-              <input class="input" style="flex:1;height:36px;min-width:0" placeholder="Meal {i+1}" bind:value={meals[i]} on:blur={autoSaveMeals} />
+              <input class="input" style="flex:1;height:36px;min-width:0" placeholder={$_('settings_main_deep.meal_placeholder', { values: { n: i+1 } })} bind:value={meals[i]} on:blur={autoSaveMeals} />
               {#if meals.length > 1}
                 <button class="btn-icon" style="width:32px;height:32px;color:var(--danger);flex-shrink:0"
                   on:click={() => { meals = meals.filter((_,j) => j !== i); autoSaveMeals(); }} title="Remove meal">
@@ -2136,10 +2136,10 @@
         <div class="card settings-card" style="margin-top:8px">
           <div style="padding:12px 16px 14px">
             <p class="setting-label" style="margin-bottom:10px">{$_('settings_water.add_container')}</p>
-            <input class="input" type="text" placeholder="Name (e.g. My Water Bottle)"
+            <input class="input" type="text" placeholder={$_('settings_main_deep.container_name_ph')}
               bind:value={_newContName} style="margin-bottom:8px" />
             <div style="display:flex;gap:8px;align-items:center">
-              <input class="input" type="number" min="0.1" step="0.1" placeholder="Volume"
+              <input class="input" type="number" min="0.1" step="0.1" placeholder={$_('settings_main_deep.volume_ph')}
                 bind:value={_newContVolume} style="flex:1" />
               <select class="select sel-sm" bind:value={_newContUnit} style="width:86px">
                 <option value="ml">ml</option>
@@ -2741,7 +2741,7 @@
             <div class="form-group" style="padding:10px 16px 14px">
               <label class="form-label" for="usda-key">API Key</label>
               <input id="usda-key" class="input" type="text"
-                placeholder="Paste your USDA API key here"
+                placeholder={$_('wizard_deep.usda_key_ph')}
                 bind:value={usdaApiKey}
                 on:blur={saveUsda}
                 autocomplete="off" style="width:100%" />
@@ -2782,13 +2782,13 @@
               <div style="display:flex;gap:8px;align-items:center">
                 {#if mealieShowToken}
                   <input id="mealie-api-token" class="input" type="text"
-                    placeholder="Bearer token"
+                    placeholder={$_('settings_main_deep.bearer_ph')}
                     bind:value={mealieApiToken}
                     on:blur={saveMealie}
                     autocomplete="off" style="flex:1" />
                 {:else}
                   <input id="mealie-api-token" class="input" type="password"
-                    placeholder="Bearer token"
+                    placeholder={$_('settings_main_deep.bearer_ph')}
                     bind:value={mealieApiToken}
                     on:blur={saveMealie}
                     autocomplete="off" style="flex:1" />
@@ -2888,15 +2888,15 @@
               </div>
               <div class="form-group" style="margin:0">
                 <label class="form-label">{$_('settings_integrations.username')}</label>
-                <input class="input" type="text" placeholder="Your username" bind:value={serverUsername} autocapitalize="off" />
+                <input class="input" type="text" placeholder={$_('settings_main_deep.server_username_ph')} bind:value={serverUsername} autocapitalize="off" />
               </div>
               <div class="form-group" style="margin:0">
                 <label class="form-label">{$_('settings_integrations.password')}</label>
                 <div style="position:relative">
                   {#if serverShowPw}
-                    <input class="input" type="text" placeholder="Your password" bind:value={serverPassword} style="padding-right:40px" />
+                    <input class="input" type="text" placeholder={$_('settings_main_deep.server_password_ph')} bind:value={serverPassword} style="padding-right:40px" />
                   {:else}
-                    <input class="input" type="password" placeholder="Your password" bind:value={serverPassword} style="padding-right:40px" />
+                    <input class="input" type="password" placeholder={$_('settings_main_deep.server_password_ph')} bind:value={serverPassword} style="padding-right:40px" />
                   {/if}
                   <button type="button" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-3);padding:4px" on:click={() => serverShowPw = !serverShowPw}>
                     <span class="material-symbols-rounded" style="font-size:20px">{serverShowPw ? 'visibility_off' : 'visibility'}</span>

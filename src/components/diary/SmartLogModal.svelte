@@ -277,7 +277,7 @@
   <div class="ql-handle"></div>
   <div class="ql-header">
     <span class="material-symbols-rounded" style="color:var(--accent)">auto_awesome</span>
-    <span class="ql-title">Smart Log</span>
+    <span class="ql-title">{$_('smart_log.title')}</span>
     <button class="btn-icon" on:click={close} aria-label={$_('common.close')} style="margin-left:auto">
       <span class="material-symbols-rounded">close</span>
     </button>
@@ -348,13 +348,13 @@
             <div class="ql-row-main">
               <div class="ql-row-name">
                 {m.food?.name || m.item.name}
-                {#if m.source === 'local'}<span class="ql-badge ql-badge-local">Local</span>{/if}
+                {#if m.source === 'local'}<span class="ql-badge ql-badge-local">{$_('smart_log.badge_local')}</span>{/if}
                 {#if m.source === 'off'}<span class="ql-badge ql-badge-off">OFF</span>{/if}
                 {#if m.source === 'meal'}<span class="ql-badge ql-badge-meal">Meal</span>{/if}
-                {#if m.source === 'recipe'}<span class="ql-badge ql-badge-recipe">Recipe</span>{/if}
-                {#if m.source === 'yesterday'}<span class="ql-badge ql-badge-yesterday">Yesterday</span>{/if}
-                {#if isWater}<span class="ql-badge ql-badge-water">Water</span>{/if}
-                {#if !m.food}<span class="ql-badge ql-badge-warn">Not found</span>{/if}
+                {#if m.source === 'recipe'}<span class="ql-badge ql-badge-recipe">{$_('smart_log.badge_recipe')}</span>{/if}
+                {#if m.source === 'yesterday'}<span class="ql-badge ql-badge-yesterday">{$_('smart_log.badge_yesterday')}</span>{/if}
+                {#if isWater}<span class="ql-badge ql-badge-water">{$_('smart_log.badge_water')}</span>{/if}
+                {#if !m.food}<span class="ql-badge ql-badge-warn">{$_('smart_log.badge_not_found')}</span>{/if}
               </div>
               {#if isWater && m.food}
                 <div class="ql-row-meta">{m.food._waterMl} ml — adds to water log</div>

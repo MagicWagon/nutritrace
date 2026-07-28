@@ -1555,7 +1555,7 @@
   {#if loadError}
     <div class="server-error-banner">
       <span class="material-symbols-rounded">cloud_off</span>
-      <span>Could not reach server — <button class="server-error-retry" on:click={load}>Retry</button></span>
+      <span>{$_('foods_deep.cant_reach_retry_msg')}<button class="server-error-retry" on:click={load}>{$_('foods_deep.retry')}</button></span>
     </div>
   {/if}
 
@@ -1971,7 +1971,7 @@
         {/if}
         <div style="display:flex;gap:10px">
           <div style="flex:1">
-            <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:5px">Serving Size</label>
+            <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:5px">{$_('foods_deep.serving_size')}</label>
             <input class="input" type="number" min="0.1" step="0.1" bind:value={item.portion} style="font-size:16px;width:100%" />
           </div>
           <div style="width:100px">
@@ -1979,7 +1979,7 @@
             <UnitPicker bind:value={item.unit} />
           </div>
           <div style="width:72px">
-            <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:5px">Servings</label>
+            <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:5px">{$_('foods_deep.servings')}</label>
             <input class="input" type="number" min="0.1" step="0.1" bind:value={item.servings} style="font-size:16px;width:100%" />
           </div>
         </div>
@@ -2044,7 +2044,7 @@
     {/if}
     <div style="display:flex;gap:12px">
       <div style="flex:1">
-        <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:6px">Serving Size</label>
+        <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:6px">{$_('foods_deep.serving_size')}</label>
         <input class="input" type="number" min="0.1" step="0.1" bind:value={promptPortion}
           style="font-size:16px;width:100%" />
       </div>
@@ -2068,12 +2068,12 @@
       </div>
     {/if}
     <div>
-      <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:6px">Number of Servings</label>
+      <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:6px">{$_('foods_deep.num_servings')}</label>
       <input class="input" type="number" min="0.1" step="0.1" bind:value={promptServings}
         style="font-size:16px;width:100%" />
     </div>
     <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface-2);border-radius:var(--radius-md)">
-      <span style="font-size:13px;color:var(--text-3)">Total Amount</span>
+      <span style="font-size:13px;color:var(--text-3)">{$_('foods_deep.total_amount')}</span>
       <span style="font-size:14px;font-weight:500">{Math.round((parseFloat(promptPortion) || 100) * (parseFloat(promptServings) || 1) * 10) / 10}{promptUnit || 'g'}</span>
     </div>
     <!-- Live nutrition preview (#30) — recomputes with portion/unit/servings changes.
@@ -2134,7 +2134,7 @@
         </div>
       {/each}
       <div style="display:flex;justify-content:space-between;padding:12px;font-weight:600">
-        <span>Total</span>
+        <span>{$_('foods_deep.total')}</span>
         <span>{_yTotEnergy.value.toLocaleString()} {_yTotEnergy.unit}</span>
       </div>
       <button class="btn btn-primary w-full" style="margin-top:8px"
@@ -2178,7 +2178,7 @@
         </div>
       {/each}
       <div style="display:flex;justify-content:space-between;padding:12px;font-weight:600">
-        <span>Total</span>
+        <span>{$_('foods_deep.total')}</span>
         <span>{_mTotEnergy.value.toLocaleString()} {_mTotEnergy.unit}</span>
       </div>
       {#if pickMode}

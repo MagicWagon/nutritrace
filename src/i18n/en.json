@@ -973,6 +973,40 @@
     "hex_code":               "Hex Code",
     "apply_color":            "Apply Color"
   },
+  "fasting": {
+    "start_fasting":       "Start Fasting",
+    "hours_ph":            "Hours",
+    "name_ph":             "Name (optional)",
+    "start":               "Start",
+    "end_fast":            "End Fast",
+    "cancel":              "Cancel"
+  },
+  "smart_log": {
+    "title":               "Smart Log",
+    "badge_local":         "Local",
+    "badge_recipe":        "Recipe",
+    "badge_yesterday":     "Yesterday",
+    "badge_water":         "Water",
+    "badge_not_found":     "Not found"
+  },
+  "foods_deep": {
+    "cant_reach_retry_msg": "Could not reach server, ",
+    "retry":               "Retry",
+    "serving_size":        "Serving Size",
+    "servings":            "Servings",
+    "num_servings":        "Number of Servings",
+    "total_amount":        "Total Amount",
+    "total":               "Total"
+  },
+  "settings_main_deep": {
+    "search_ph":           "Search settings…",
+    "meal_placeholder":    "Meal {n}",
+    "container_name_ph":   "Name (e.g. My Water Bottle)",
+    "volume_ph":           "Volume",
+    "server_username_ph":  "Your username",
+    "server_password_ph":  "Your password",
+    "bearer_ph":           "Bearer token"
+  },
   "wellness_deep": {
     "no_stage_data":            "No stage data available",
     "garmin":                   "Garmin",
