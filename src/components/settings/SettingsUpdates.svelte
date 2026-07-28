@@ -13,9 +13,15 @@
    *   Local Android: Same as regular Android (client-update only).
    *
    * See feature_traceapps_in_app_updates.md for the full spec.
+   *
+   * Styling: uses global .card / .btn-primary / .btn-secondary / .form-*
+   * classes plus the local .row pattern (label left, value/action right).
+   * Avoids `.setting-*` classes that are scoped-local to Settings.svelte
+   * — a Svelte scoped-CSS gotcha bit the first iteration.
    */
   import { onMount } from 'svelte';
   import { _ } from 'svelte-i18n';
+  import Toggle from './Toggle.svelte';
   import { APP_VERSION } from '../../lib/version.js';
   import { isNative } from '../../lib/platform.js';
   import { currentUser } from '../../stores/auth.js';
@@ -38,14 +44,12 @@
   let downloadPct = 0;
   let installFailed = '';
 
-  $: isAdmin = $currentUser?.role === 'admin';
-  $: available = latest && isUpdateAvailable(latest);
-  $: showApkPanel     = isNative;                       // Android only.
-  $: showServerPanel  = !isNative && isAdmin;           // PWA admin only.
+  $: isAdmin        = $currentUser?.role === 'admin';
+  $: available      = latest && isUpdateAvailable(latest);
+  $: showApkPanel   = isNative;                       // Android only.
+  $: showServerPanel= !isNative && isAdmin;           // PWA admin only.
 
   onMount(async () => {
-    // Auto-check (throttled internally to once per 24h) — runs on mount so
-    // opening Settings surfaces any pending update without a manual poke.
     if (autoCheck) {
       await Promise.all([
         isNative ? doCheck(false) : Promise.resolve(),
@@ -69,21 +73,18 @@
   async function doServerCheck() {
     try {
       serverInfo = await checkServerUpdate();
-    } catch {
-      serverInfo = null;
-    }
+    } catch { serverInfo = null; }
   }
 
   function onChannelChange(next) {
     channel = next;
     setChannel(next);
-    // Channel change invalidates the cache; force a fresh check.
     latest = null;
     doCheck(true);
   }
 
-  function onAutoCheckToggle() {
-    autoCheck = !autoCheck;
+  function onAutoCheckToggle(e) {
+    autoCheck = e.detail;
     setAutoCheck(autoCheck);
   }
 
@@ -120,74 +121,93 @@
   }
 </script>
 
+<!-- ── Client update card ──────────────────────────────────────────── -->
 <div class="card settings-card">
-  <!-- ── Client update ─────────────────────────────────────────────── -->
-  <div class="setting-row">
-    <div>
-      <span class="setting-label">{$_('updates.current_version')}</span>
-      <span class="setting-desc">{APP_VERSION}</span>
-    </div>
-  </div>
-
-  {#if showApkPanel}
-    <div class="setting-divider"></div>
-    <div class="setting-row">
-      <div>
-        <span class="setting-label">{$_('updates.channel.label')}</span>
-        <span class="setting-desc">{$_('updates.channel.help')}</span>
+  <div class="body">
+    <div class="row">
+      <div class="row-label">
+        <div class="label-main">{$_('updates.current_version')}</div>
       </div>
-      <div class="channel-picker">
-        <label class="channel-opt">
-          <input type="radio" name="update-channel" value="stable"
-                 checked={channel === 'stable'} on:change={() => onChannelChange('stable')} />
-          <span>{$_('updates.channel.stable')}</span>
-        </label>
-        <label class="channel-opt">
-          <input type="radio" name="update-channel" value="dev"
-                 checked={channel === 'dev'} on:change={() => onChannelChange('dev')} />
-          <span>{$_('updates.channel.dev')}</span>
-        </label>
+      <div class="row-value version-chip">{APP_VERSION}</div>
+    </div>
+
+    {#if showApkPanel}
+      <div class="divider"></div>
+      <div class="row">
+        <div class="row-label">
+          <div class="label-main">{$_('updates.channel.label')}</div>
+          <div class="label-desc">{$_('updates.channel.help')}</div>
+        </div>
+        <div class="row-value channel-picker">
+          <label class="channel-opt" class:selected={channel === 'stable'}>
+            <input type="radio" name="update-channel" value="stable"
+                   checked={channel === 'stable'} on:change={() => onChannelChange('stable')} />
+            {$_('updates.channel.stable')}
+          </label>
+          <label class="channel-opt" class:selected={channel === 'dev'}>
+            <input type="radio" name="update-channel" value="dev"
+                   checked={channel === 'dev'} on:change={() => onChannelChange('dev')} />
+            {$_('updates.channel.dev')}
+          </label>
+        </div>
+      </div>
+    {/if}
+
+    <div class="divider"></div>
+    <div class="row">
+      <div class="row-label">
+        <div class="label-main">{$_('updates.auto_check')}</div>
+        <div class="label-desc">{$_('updates.auto_check_desc')}</div>
+      </div>
+      <div class="row-value">
+        <Toggle checked={autoCheck} on:change={onAutoCheckToggle} />
       </div>
     </div>
-  {/if}
 
-  <div class="setting-divider"></div>
-  <div class="setting-row">
-    <div>
-      <span class="setting-label">{$_('updates.auto_check')}</span>
-      <span class="setting-desc">{$_('updates.auto_check_desc')}</span>
+    <div class="divider"></div>
+    <div class="row">
+      <div class="row-label">
+        <div class="label-main">{$_('updates.last_checked')}</div>
+        <div class="label-desc">
+          {lastChecked ? formatAgo(lastChecked) : $_('updates.last_checked_never')}
+        </div>
+      </div>
+      <div class="row-value">
+        <button class="btn btn-secondary" on:click={() => doCheck(true)} disabled={checking}>
+          {#if checking}
+            <span class="material-symbols-rounded spin" style="font-size:16px">progress_activity</span>
+          {:else}
+            <span class="material-symbols-rounded" style="font-size:16px">refresh</span>
+          {/if}
+          {checking ? $_('updates.checking') : $_('updates.check_now')}
+        </button>
+      </div>
     </div>
-    <input type="checkbox" class="toggle-cb" checked={autoCheck} on:change={onAutoCheckToggle} />
+
+    {#if error}
+      <div class="alert alert-error">
+        <span class="material-symbols-rounded" style="font-size:18px">error</span>
+        {error}
+      </div>
+    {/if}
   </div>
 
-  <div class="setting-divider"></div>
-  <div class="setting-row">
-    <div>
-      <span class="setting-label">{$_('updates.last_checked')}</span>
-      <span class="setting-desc">
-        {lastChecked ? formatAgo(lastChecked) : $_('updates.last_checked_never')}
-      </span>
-    </div>
-    <button class="btn secondary" on:click={() => doCheck(true)} disabled={checking}>
-      {checking ? $_('updates.checking') : $_('updates.check_now')}
-    </button>
-  </div>
-
-  {#if error}
-    <div class="update-error">{error}</div>
-  {/if}
-
-  <!-- ── APK update available (Android only) ──────────────────────── -->
+  <!-- APK update available (Android only) -->
   {#if showApkPanel && available}
-    <div class="setting-divider"></div>
-    <div class="update-available">
-      <div class="update-headline">
-        <span class="material-symbols-rounded" aria-hidden="true">system_update</span>
-        <span>{$_('updates.available_headline', { values: { version: latest.version } })}</span>
+    <div class="update-avail-card">
+      <div class="update-avail-head">
+        <span class="material-symbols-rounded" style="font-size:22px">system_update</span>
+        <div class="update-avail-headings">
+          <div class="update-avail-title">
+            {$_('updates.available_headline', { values: { version: latest.version } })}
+          </div>
+          {#if latest.publishedAt}
+            <div class="update-avail-sub">
+              {$_('updates.released', { values: { when: formatAgo(latest.publishedAt) } })}
+            </div>
+          {/if}
+        </div>
       </div>
-      {#if latest.publishedAt}
-        <div class="update-when">{$_('updates.released', { values: { when: formatAgo(latest.publishedAt) } })}</div>
-      {/if}
 
       {#if latest.notes}
         <details class="update-notes">
@@ -198,6 +218,7 @@
 
       {#if latest.notesUrl}
         <a class="update-link" href={latest.notesUrl} target="_blank" rel="noopener">
+          <span class="material-symbols-rounded" style="font-size:14px">open_in_new</span>
           {$_('updates.view_on_github')}
         </a>
       {/if}
@@ -209,117 +230,237 @@
         </div>
       {:else if latest.apkAsset}
         <div class="update-actions">
-          <button class="btn primary" on:click={doInstall}>{$_('updates.download_install')}</button>
-          <button class="btn secondary" on:click={doSkip}>{$_('updates.skip_this_version')}</button>
+          <button class="btn btn-primary" on:click={doInstall}>
+            <span class="material-symbols-rounded" style="font-size:16px">download</span>
+            {$_('updates.download_install')}
+          </button>
+          <button class="btn btn-secondary" on:click={doSkip}>{$_('updates.skip_this_version')}</button>
         </div>
       {:else}
-        <div class="update-note">{$_('updates.no_apk_asset')}</div>
+        <div class="note">{$_('updates.no_apk_asset')}</div>
       {/if}
 
       {#if installFailed}
-        <div class="update-error">{installFailed}</div>
+        <div class="alert alert-error">
+          <span class="material-symbols-rounded" style="font-size:18px">error</span>
+          {installFailed}
+        </div>
       {/if}
     </div>
   {:else if showApkPanel && latest && !available}
-    <div class="setting-divider"></div>
-    <div class="update-uptodate">
-      <span class="material-symbols-rounded" aria-hidden="true">check_circle</span>
+    <div class="uptodate-tag">
+      <span class="material-symbols-rounded" style="font-size:18px">check_circle</span>
       {$_('updates.up_to_date')}
     </div>
   {/if}
 </div>
 
-<!-- ── Server update (PWA admin only) ───────────────────────────────── -->
+<!-- ── Server update card (PWA admin only) ─────────────────────────── -->
 {#if showServerPanel && serverInfo}
-  <div class="card settings-card server-update-card">
-    <div class="setting-row">
-      <div>
-        <span class="setting-label">{$_('updates.server.heading')}</span>
-        <span class="setting-desc">
-          {$_('updates.server.versions', { values: { current: serverInfo.current, latest: serverInfo.latest } })}
-        </span>
-      </div>
-      {#if serverInfo.available}
-        <span class="badge badge-warn">{$_('updates.server.available_chip')}</span>
-      {:else}
-        <span class="badge badge-ok">{$_('updates.up_to_date')}</span>
-      {/if}
-    </div>
-
-    {#if serverInfo.available}
-      <div class="setting-divider"></div>
-      <div class="server-instructions">
-        <div class="setting-desc">{$_('updates.server.instructions')}</div>
-        <pre class="server-cmd">docker-compose pull && docker-compose up -d</pre>
-        <div class="update-actions">
-          <button class="btn secondary" on:click={copyDockerCommand}>
-            {$_('updates.server.copy_command')}
-          </button>
-          {#if serverInfo.notes_url}
-            <a class="btn secondary" href={serverInfo.notes_url} target="_blank" rel="noopener">
-              {$_('updates.server.view_notes')}
-            </a>
+  <div class="card settings-card server-card">
+    <div class="body">
+      <div class="row">
+        <div class="row-label">
+          <div class="label-main">{$_('updates.server.heading')}</div>
+          <div class="label-desc">
+            {$_('updates.server.versions', { values: { current: serverInfo.current, latest: serverInfo.latest } })}
+          </div>
+        </div>
+        <div class="row-value">
+          {#if serverInfo.available}
+            <span class="badge badge-warn">{$_('updates.server.available_chip')}</span>
+          {:else}
+            <span class="badge badge-ok">
+              <span class="material-symbols-rounded" style="font-size:14px">check_circle</span>
+              {$_('updates.up_to_date')}
+            </span>
           {/if}
         </div>
-        <div class="setting-desc channel-note">
-          {$_('updates.server.channel_note')}
-        </div>
       </div>
-    {/if}
+
+      {#if serverInfo.available}
+        <div class="divider"></div>
+        <div class="server-instructions">
+          <div class="label-desc">{$_('updates.server.instructions')}</div>
+          <pre class="server-cmd">docker-compose pull && docker-compose up -d</pre>
+          <div class="update-actions">
+            <button class="btn btn-secondary" on:click={copyDockerCommand}>
+              <span class="material-symbols-rounded" style="font-size:16px">content_copy</span>
+              {$_('updates.server.copy_command')}
+            </button>
+            {#if serverInfo.notes_url}
+              <a class="btn btn-secondary" href={serverInfo.notes_url} target="_blank" rel="noopener">
+                <span class="material-symbols-rounded" style="font-size:16px">open_in_new</span>
+                {$_('updates.server.view_notes')}
+              </a>
+            {/if}
+          </div>
+          <div class="channel-note">
+            <span class="material-symbols-rounded" style="font-size:14px">info</span>
+            {$_('updates.server.channel_note')}
+          </div>
+        </div>
+      {/if}
+    </div>
   </div>
 {/if}
 
 <style>
-  .channel-picker { display: flex; gap: 12px; }
-  .channel-opt   { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; cursor: pointer; }
-  .update-error  { color: var(--danger, #d32f2f); font-size: 13px; padding: 10px 12px; }
-  .update-available, .update-uptodate {
-    padding: 14px 12px; display: flex; flex-direction: column; gap: 10px;
+  .body { padding: 16px; display: flex; flex-direction: column; gap: 4px; }
+  .row {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; padding: 10px 0;
   }
-  .update-uptodate {
-    flex-direction: row; align-items: center; gap: 8px; color: var(--success, #2e7d32);
+  .row-label { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .label-main { font-size: 14px; font-weight: 600; color: var(--text-1); }
+  .label-desc { font-size: 12px; color: var(--text-2); line-height: 1.35; }
+  .row-value { flex-shrink: 0; }
+  .divider {
+    height: 1px; background: var(--border, rgba(255,255,255,0.08));
+    margin: 4px 0;
   }
-  .update-headline {
-    display: inline-flex; align-items: center; gap: 8px; font-weight: 600; font-size: 15px;
+
+  .version-chip {
+    font-size: 13px; font-weight: 600;
+    padding: 4px 10px; border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 15%, transparent);
+    color: var(--accent);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   }
-  .update-when { font-size: 12px; color: var(--text-2); }
-  .update-notes summary { cursor: pointer; font-size: 13px; color: var(--accent); }
+
+  .channel-picker { display: flex; gap: 6px; }
+  .channel-opt {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px; border-radius: 999px; cursor: pointer;
+    background: var(--surface-2);
+    color: var(--text-2);
+    font-size: 13px; font-weight: 500;
+    border: 1px solid transparent;
+    transition: all 120ms ease;
+  }
+  .channel-opt input { display: none; }
+  .channel-opt.selected {
+    background: color-mix(in srgb, var(--accent) 15%, transparent);
+    color: var(--accent);
+    border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+  .channel-opt:hover:not(.selected) { background: var(--surface-3, var(--surface-2)); }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 14px;
+  }
+
+  .alert {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 12px; border-radius: 8px;
+    margin: 8px 0 0;
+    font-size: 13px;
+  }
+  .alert-error {
+    background: color-mix(in srgb, var(--danger, #d32f2f) 10%, transparent);
+    color: var(--danger, #d32f2f);
+  }
+
+  .update-avail-card {
+    margin: 0 16px 16px;
+    padding: 16px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .update-avail-head {
+    display: flex; align-items: flex-start; gap: 10px;
+    color: var(--accent);
+  }
+  .update-avail-headings { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+  .update-avail-title { font-size: 15px; font-weight: 700; }
+  .update-avail-sub { font-size: 12px; color: var(--text-2); font-weight: 500; }
+
+  .update-notes summary {
+    cursor: pointer; font-size: 13px; color: var(--accent); font-weight: 600;
+    padding: 6px 0;
+  }
   .update-notes pre {
     white-space: pre-wrap; word-wrap: break-word;
-    font-size: 12px; padding: 10px; margin-top: 6px;
-    background: var(--surface-2); border-radius: 8px;
-    max-height: 240px; overflow: auto;
+    font-size: 12px; padding: 12px; margin-top: 6px;
+    background: var(--surface-1); border-radius: 8px;
+    max-height: 260px; overflow: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: var(--text-1);
   }
-  .update-link, .update-actions a {
-    display: inline-block; color: var(--accent); font-size: 13px;
-    text-decoration: none;
+
+  .update-link {
+    display: inline-flex; align-items: center; gap: 4px;
+    color: var(--accent); font-size: 13px; text-decoration: none; font-weight: 500;
   }
   .update-link:hover { text-decoration: underline; }
-  .update-actions {
-    display: flex; gap: 10px; flex-wrap: wrap;
-  }
-  .update-note { font-size: 13px; color: var(--text-2); font-style: italic; }
+
+  .update-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .note { font-size: 13px; color: var(--text-2); font-style: italic; }
+
   .dl-progress { display: flex; flex-direction: column; gap: 6px; }
   .dl-bar {
     height: 8px; background: var(--surface-2); border-radius: 4px; overflow: hidden;
   }
   .dl-fill {
-    height: 100%; background: var(--accent); transition: width 200ms linear;
+    height: 100%; background: var(--accent);
+    transition: width 200ms linear;
   }
-  .dl-pct { font-size: 12px; color: var(--text-2); }
+  .dl-pct { font-size: 12px; color: var(--text-2); font-weight: 500; }
 
-  .server-update-card { margin-top: 12px; }
-  .server-instructions { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .uptodate-tag {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 14px;
+    margin: 0 16px 16px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--success, #2e7d32) 10%, transparent);
+    color: var(--success, #2e7d32);
+    font-size: 13px; font-weight: 600;
+    width: fit-content;
+  }
+
+  .server-card { margin-top: 12px; }
+  .server-instructions { padding: 12px 0 4px; display: flex; flex-direction: column; gap: 12px; }
   .server-cmd {
-    background: var(--surface-2); padding: 10px 12px; border-radius: 8px;
+    background: var(--surface-2); padding: 12px 14px; border-radius: 8px;
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;
     white-space: pre-wrap; word-break: break-all; margin: 0;
+    color: var(--text-1);
+    border: 1px solid var(--border, rgba(255,255,255,0.06));
   }
-  .channel-note { font-size: 12px; font-style: italic; margin-top: 4px; }
+  .channel-note {
+    display: flex; align-items: flex-start; gap: 6px;
+    font-size: 12px; font-style: italic; color: var(--text-2);
+    line-height: 1.4;
+  }
+
   .badge {
-    display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px;
-    font-size: 11px; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px 10px; border-radius: 999px;
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.3px;
   }
-  .badge-warn { background: color-mix(in srgb, var(--warning, #f57c00) 15%, transparent); color: var(--warning, #f57c00); }
-  .badge-ok   { background: color-mix(in srgb, var(--success, #2e7d32) 15%, transparent); color: var(--success, #2e7d32); }
+  .badge-warn {
+    background: color-mix(in srgb, var(--warning, #f57c00) 15%, transparent);
+    color: var(--warning, #f57c00);
+  }
+  .badge-ok {
+    background: color-mix(in srgb, var(--success, #2e7d32) 15%, transparent);
+    color: var(--success, #2e7d32);
+  }
+
+  .spin { animation: spin 1s linear infinite; }
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+
+  @media (max-width: 520px) {
+    .row { flex-wrap: wrap; }
+    .row-value { width: 100%; }
+    .channel-picker { width: 100%; }
+    .channel-opt { flex: 1; justify-content: center; }
+  }
 </style>

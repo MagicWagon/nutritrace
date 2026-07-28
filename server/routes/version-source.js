@@ -1,28 +1,20 @@
 /**
  * version-source.js — resolves the server's APP_VERSION at boot.
  *
- * Reads package.json (the canonical version-bump target per
- * feedback_versioning). Falls back to 'unknown' if the file can't be
- * read; the update-check endpoint just returns available=false in that
- * case (safe default).
+ * Imports the SAME constant the web client uses (src/lib/version.js).
+ * Env var override (TRACEAPPS_APP_VERSION) is honored first so Docker
+ * builds can inject an authoritative value without needing the src/
+ * directory in the runtime image.
+ *
+ * Earlier iteration read package.json via readFileSync + a relative
+ * path from `import.meta.url`; that worked locally but resolved to
+ * 'unknown' inside the deployed Docker container because the compiled
+ * runtime layout differs from the source tree. Importing the shared
+ * constant sidesteps the whole path-resolution question.
  */
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { APP_VERSION as CLIENT_APP_VERSION } from '../../src/lib/version.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-
-let cached = null;
-function _read() {
-  if (cached) return cached;
-  try {
-    const path = join(__dirname, '..', '..', 'package.json');
-    const pkg = JSON.parse(readFileSync(path, 'utf8'));
-    cached = pkg.version ? `v${pkg.version}` : 'unknown';
-  } catch {
-    cached = 'unknown';
-  }
-  return cached;
-}
-
-export const APP_VERSION = _read();
+export const APP_VERSION =
+  process.env.TRACEAPPS_APP_VERSION ||
+  CLIENT_APP_VERSION ||
+  'unknown';
