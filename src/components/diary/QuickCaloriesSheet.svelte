@@ -103,7 +103,7 @@
 
     <label class="form-label" for="qc-name">Name (optional)</label>
     <input id="qc-name" class="input" type="text" maxlength="60"
-           placeholder="Office snack, hotel breakfast..."
+           placeholder={$_('quick_calories.name_ph')}
            bind:value={_name} on:keydown={_onKey} />
 
     <div class="qc-kcal-pill" style="background:var(--macro-calories-dim)">
@@ -114,7 +114,7 @@
       <span class="qc-kcal-unit" style="color:var(--macro-calories)">{_unitLabel.toUpperCase()}</span>
     </div>
 
-    <p class="qc-section-label">Optional Macros</p>
+    <p class="qc-section-label">{$_('quick_calories.optional_macros')}</p>
     <div class="qc-macros">
       <div class="qc-macro-pill" style="background:var(--macro-protein-dim)">
         <div class="qc-macro-val-row">
@@ -124,7 +124,7 @@
                  bind:value={_protein} on:keydown={_onKey} />
           <span class="qc-macro-unit" style="color:var(--macro-protein)">g</span>
         </div>
-        <span class="qc-macro-label">Protein</span>
+        <span class="qc-macro-label">{$_('quick_calories.protein')}</span>
       </div>
       <div class="qc-macro-pill" style="background:var(--macro-carbs-dim)">
         <div class="qc-macro-val-row">
@@ -134,7 +134,7 @@
                  bind:value={_carbs} on:keydown={_onKey} />
           <span class="qc-macro-unit" style="color:var(--macro-carbs)">g</span>
         </div>
-        <span class="qc-macro-label">Carbs</span>
+        <span class="qc-macro-label">{$_('quick_calories.carbs')}</span>
       </div>
       <div class="qc-macro-pill" style="background:var(--macro-fat-dim)">
         <div class="qc-macro-val-row">
@@ -149,7 +149,7 @@
     </div>
 
     <div class="qc-actions">
-      <button class="btn btn-secondary" on:click={() => open = false} disabled={_saving}>Cancel</button>
+      <button class="btn btn-secondary" on:click={() => open = false} disabled={_saving}>{$_('quick_calories.cancel')}</button>
       <button class="btn btn-primary" on:click={_save} disabled={_saving || !_value}>
         {_saving ? 'Adding…' : 'Add'}
       </button>

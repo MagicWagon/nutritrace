@@ -1,5 +1,6 @@
 <script>
   import { createEventDispatcher } from 'svelte';
+  import { _ } from 'svelte-i18n';
   import Sheet from '../ui/Sheet.svelte';
   import Tabs from '../ui/Tabs.svelte';
   import { buildJsonTemplate, buildCsvTemplate } from '../../lib/food-import-template.js';
@@ -101,7 +102,7 @@
     <div class="hint">
       Paste or upload a {activeTab === 0 ? 'JSON' : 'CSV'} file. Each row needs at minimum
       a <code>name</code> and <code>calories</code>; other nutrients are optional.
-      <button class="link-btn" type="button" on:click={downloadTemplate}>Download Template</button>
+      <button class="link-btn" type="button" on:click={downloadTemplate}>{$_('bulk_import.download_template')}</button>
     </div>
 
     {#if activeTab === 0}
@@ -126,7 +127,7 @@
         Upload file
       </button>
       {#if currentText}
-        <button class="btn btn-secondary" type="button" on:click={clearInput}>Clear</button>
+        <button class="btn btn-secondary" type="button" on:click={clearInput}>{$_('bulk_import.clear')}</button>
       {/if}
     </div>
 
@@ -144,7 +145,7 @@
         </div>
 
         {#if results.valid.length > 0}
-          <p class="preview-section-label">Will Import</p>
+          <p class="preview-section-label">{$_('bulk_import.will_import')}</p>
           <ul class="preview-list">
             {#each results.valid as f}
               {@const _e = Nutrition.displayEnergy(f.nutrition.calories || 0, $energyUnit)}
@@ -181,7 +182,7 @@
     {/if}
 
     <div class="footer">
-      <button class="btn btn-secondary" type="button" on:click={close}>Cancel</button>
+      <button class="btn btn-secondary" type="button" on:click={close}>{$_('bulk_import.cancel')}</button>
       <button class="btn btn-primary" type="button" on:click={commit} disabled={!canCommit}>
         Import {results.valid.length || ''}
       </button>

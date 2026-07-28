@@ -973,6 +973,34 @@
     "hex_code":               "Hex Code",
     "apply_color":            "Apply Color"
   },
+  "fasting_insights": {
+    "title":               "Fasting",
+    "avg_duration":        "Avg duration",
+    "longest":             "Longest",
+    "current_streak":      "Current streak",
+    "longest_streak":      "Longest streak"
+  },
+  "bulk_import": {
+    "download_template":   "Download Template",
+    "clear":               "Clear",
+    "will_import":         "Will Import",
+    "cancel":              "Cancel"
+  },
+  "meal_editor_deep": {
+    "readonly_recipe":     "Tap Save to My Catalog to bring this recipe into your catalog and edit it.",
+    "readonly_meal":       "Tap Save to My Catalog to bring this meal into your catalog and edit it.",
+    "notes_ph":            "Optional notes…",
+    "total_amount":        "Total Amount",
+    "take_photo":          "Take Photo",
+    "crop_photo":          "Crop Photo"
+  },
+  "quick_calories": {
+    "name_ph":             "Office snack, hotel breakfast...",
+    "optional_macros":     "Optional Macros",
+    "protein":             "Protein",
+    "carbs":               "Carbs",
+    "cancel":              "Cancel"
+  },
   "fasting": {
     "start_fasting":       "Start Fasting",
     "hours_ph":            "Hours",

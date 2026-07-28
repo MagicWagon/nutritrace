@@ -8,6 +8,7 @@
 <script>
   import { onMount } from 'svelte';
   import { slide } from 'svelte/transition';
+  import { _ } from 'svelte-i18n';
   import { activeFast, fastHistory, loadFasting, fastingStats, deleteFast } from '../../stores/fasting.js';
   import { confirmDialog } from '../../stores/confirmDialog.js';
 
@@ -75,25 +76,25 @@
 <div class="fasting-insights card">
   <div class="fi-header">
     <span class="material-symbols-rounded fi-icon">restaurant</span>
-    <div class="fi-title">Fasting</div>
+    <div class="fi-title">{$_('fasting_insights.title')}</div>
   </div>
 
   <div class="fi-stats">
     <div class="fi-stat">
       <div class="fi-stat-value">{_stats.avg_hours || 0}<span class="fi-stat-unit">h</span></div>
-      <div class="fi-stat-label">Avg duration</div>
+      <div class="fi-stat-label">{$_('fasting_insights.avg_duration')}</div>
     </div>
     <div class="fi-stat">
       <div class="fi-stat-value">{_stats.longest_hours || 0}<span class="fi-stat-unit">h</span></div>
-      <div class="fi-stat-label">Longest</div>
+      <div class="fi-stat-label">{$_('fasting_insights.longest')}</div>
     </div>
     <div class="fi-stat">
       <div class="fi-stat-value">{_stats.current_streak}<span class="fi-stat-unit">d</span></div>
-      <div class="fi-stat-label">Current streak</div>
+      <div class="fi-stat-label">{$_('fasting_insights.current_streak')}</div>
     </div>
     <div class="fi-stat">
       <div class="fi-stat-value">{_stats.longest_streak}<span class="fi-stat-unit">d</span></div>
-      <div class="fi-stat-label">Longest streak</div>
+      <div class="fi-stat-label">{$_('fasting_insights.longest_streak')}</div>
     </div>
   </div>
 

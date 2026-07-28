@@ -731,7 +731,7 @@
       <span class="material-symbols-rounded">lock</span>
       <div>
         <div class="readonly-title">Shared by {meal._shared_by} — read only</div>
-        <div class="readonly-sub">Tap <strong>Save to My Catalog</strong> to bring this {isRecipe ? 'recipe' : 'meal'} into your catalog and edit it.</div>
+        <div class="readonly-sub">{isRecipe ? $_('meal_editor_deep.readonly_recipe') : $_('meal_editor_deep.readonly_meal')}</div>
       </div>
     </div>
   {/if}
@@ -837,7 +837,7 @@
     {#if $foodsShowNotes}
       <div class="card editor-card">
         <div class="editor-card-title">{$_('meal_editor.card_notes')}</div>
-        <textarea class="input" rows="2" placeholder="Optional notes…" bind:value={meal.notes}
+        <textarea class="input" rows="2" placeholder={$_('meal_editor_deep.notes_ph')} bind:value={meal.notes}
           style="resize:vertical;min-height:60px"></textarea>
       </div>
     {/if}
@@ -1061,7 +1061,7 @@
         style="font-size:16px;width:100%" />
     </div>
     <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface-2);border-radius:var(--radius-md)">
-      <span style="font-size:13px;color:var(--text-3)">Total Amount</span>
+      <span style="font-size:13px;color:var(--text-3)">{$_('meal_editor_deep.total_amount')}</span>
       <span style="font-size:14px;font-weight:500">{Math.round((parseFloat(portionAmount) || 100) * (parseFloat(portionQty) || 1) * 10) / 10}{portionUnit || 'g'}</span>
     </div>
     <button class="btn btn-primary w-full" on:click={confirmPortion}>{editingIndex !== null ? $_('meal_editor.save_changes') : $_('meal_editor.add_ingredient')}</button>
@@ -1102,7 +1102,7 @@
   <div class="cam-overlay" role="dialog" aria-modal="true" use:portal>
     <div class="cam-popup">
       <div class="cam-header">
-        <span class="cam-title">Take Photo</span>
+        <span class="cam-title">{$_('meal_editor_deep.take_photo')}</span>
         <button class="btn-icon" on:click={closeCamera} title="Close camera">
           <span class="material-symbols-rounded">close</span>
         </button>
@@ -1124,7 +1124,7 @@
   <div class="cam-overlay" role="dialog" aria-modal="true" use:portal>
     <div class="cam-popup">
       <div class="cam-header">
-        <span class="cam-title">Crop Photo</span>
+        <span class="cam-title">{$_('meal_editor_deep.crop_photo')}</span>
         <button class="btn-icon" on:click={() => { cropOpen = false; cropSrc = ''; }} title="Cancel">
           <span class="material-symbols-rounded">close</span>
         </button>
