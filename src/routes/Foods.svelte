@@ -1495,7 +1495,7 @@
   {#if activeTab === 0 && searchSource === 'local' && $foodsShowCategories && $foodCategories && $foodCategories.length > 0}
     <div class="cat-filter-row">
       <button class="cat-chip" class:active={!activeCategoryFilter}
-        on:click={() => activeCategoryFilter = ''}>All</button>
+        on:click={() => activeCategoryFilter = ''}>{$_('foods.category_all')}</button>
       {#each $foodCategories as cat}
         <button class="cat-chip" class:active={activeCategoryFilter === _catName(cat)}
           on:click={() => activeCategoryFilter = activeCategoryFilter === _catName(cat) ? '' : _catName(cat)}>{$foodsShowLabels ? _catDisplay(cat) : _catName(cat)}</button>
@@ -1545,7 +1545,7 @@
       <button class="meal-section-header" type="button"
         on:click={() => foodsSavedCollapsed.set(!$foodsSavedCollapsed)}
         aria-expanded={!$foodsSavedCollapsed}>
-        <span class="meal-section-label">Saved Meals</span>
+        <span class="meal-section-label">{$_('foods.saved_meals')}</span>
         <span class="material-symbols-rounded meal-section-chevron"
           class:meal-section-chevron-collapsed={$foodsSavedCollapsed}>expand_more</span>
       </button>
@@ -1722,7 +1722,7 @@
           <span class="material-symbols-rounded empty-icon">search_off</span>
           <p>No matches for "{search}"</p>
           {#if activeTab === 0}
-            <p class="empty-state-hint">Try searching Open Food Facts or USDA above</p>
+            <p class="empty-state-hint">{$_('foods.search_empty_hint')}</p>
           {/if}
         </div>
       {:else if !_hideSavedMealsList}
@@ -1957,7 +1957,7 @@
 </div>
 
 <!-- Multi-item portion sheet -->
-<Sheet bind:open={showMultiPortionSheet} title="Set Portions ({multiPortionItems.length} items)">
+<Sheet bind:open={showMultiPortionSheet} title={$_('foods.multi_portion_sheet', { values: { count: multiPortionItems.length } })}>
   <div style="display:flex;flex-direction:column;gap:0;padding-top:4px">
     {#each multiPortionItems as item, i}
       {#if i > 0}<div style="height:1px;background:var(--border);margin:12px 0"></div>{/if}
@@ -2097,7 +2097,7 @@
         <span class="qty-macro-label">fat</span>
       </div>
     </div>
-    <button class="btn btn-primary w-full" on:click={confirmQtyPrompt}>Add to Diary</button>
+    <button class="btn btn-primary w-full" on:click={confirmQtyPrompt}>{$_('foods.add_to_diary')}</button>
   </div>
 </Sheet>
 
@@ -2261,30 +2261,30 @@
       on:click|stopPropagation
       in:slide={{ duration: 140 }}>
       <div class="tier-dropdown-header">
-        <span>OFF data quality</span>
+        <span>{$_('foods.tier.off_data_quality')}</span>
         {#if offTiersFiltered}
-          <button class="tier-reset" on:click={resetOffTiers}>Reset</button>
+          <button class="tier-reset" on:click={resetOffTiers}>{$_('foods.tier.reset')}</button>
         {/if}
       </div>
       <label class="tier-option">
         <input type="checkbox" checked={offTiersActive.has('hi')} on:change={() => toggleOffTier('hi')} />
         <span class="tier-swatch tier-swatch-hi"></span>
-        <span class="tier-label">High <span class="tier-hint">(≥70%)</span></span>
+        <span class="tier-label">{$_('foods.tier.off_high')} <span class="tier-hint">{$_('foods.tier.off_high_hint')}</span></span>
       </label>
       <label class="tier-option">
         <input type="checkbox" checked={offTiersActive.has('mid')} on:change={() => toggleOffTier('mid')} />
         <span class="tier-swatch tier-swatch-mid"></span>
-        <span class="tier-label">Medium <span class="tier-hint">(40-69%)</span></span>
+        <span class="tier-label">{$_('foods.tier.off_medium')} <span class="tier-hint">{$_('foods.tier.off_medium_hint')}</span></span>
       </label>
       <label class="tier-option">
         <input type="checkbox" checked={offTiersActive.has('lo')} on:change={() => toggleOffTier('lo')} />
         <span class="tier-swatch tier-swatch-lo"></span>
-        <span class="tier-label">Low <span class="tier-hint">(&lt;40%)</span></span>
+        <span class="tier-label">{$_('foods.tier.off_low')} <span class="tier-hint">{$_('foods.tier.off_low_hint')}</span></span>
       </label>
       <label class="tier-option">
         <input type="checkbox" checked={offTiersActive.has('unknown')} on:change={() => toggleOffTier('unknown')} />
         <span class="tier-swatch"></span>
-        <span class="tier-label">Unknown <span class="tier-hint">(no data)</span></span>
+        <span class="tier-label">{$_('foods.tier.off_unknown')} <span class="tier-hint">{$_('foods.tier.off_unknown_hint')}</span></span>
       </label>
     </div>
   </div>
@@ -2301,35 +2301,35 @@
       on:click|stopPropagation
       in:slide={{ duration: 140 }}>
       <div class="tier-dropdown-header">
-        <span>USDA data type</span>
+        <span>{$_('foods.tier.usda_data_type')}</span>
         {#if usdaTiersFiltered}
-          <button class="tier-reset" on:click={resetUsdaTiers}>Reset</button>
+          <button class="tier-reset" on:click={resetUsdaTiers}>{$_('foods.tier.reset')}</button>
         {/if}
       </div>
       <label class="tier-option">
         <input type="checkbox" checked={usdaTiersActive.has('Foundation')} on:change={() => toggleUsdaTier('Foundation')} />
         <span class="tier-swatch tier-swatch-hi"></span>
-        <span class="tier-label">Foundation <span class="tier-hint">(curated)</span></span>
+        <span class="tier-label">{$_('foods.tier.usda_foundation')} <span class="tier-hint">{$_('foods.tier.usda_foundation_hint')}</span></span>
       </label>
       <label class="tier-option">
         <input type="checkbox" checked={usdaTiersActive.has('SR Legacy')} on:change={() => toggleUsdaTier('SR Legacy')} />
         <span class="tier-swatch tier-swatch-hi"></span>
-        <span class="tier-label">SR Legacy <span class="tier-hint">(reference)</span></span>
+        <span class="tier-label">{$_('foods.tier.usda_sr_legacy')} <span class="tier-hint">{$_('foods.tier.usda_sr_legacy_hint')}</span></span>
       </label>
       <label class="tier-option">
         <input type="checkbox" checked={usdaTiersActive.has('Survey (FNDDS)')} on:change={() => toggleUsdaTier('Survey (FNDDS)')} />
         <span class="tier-swatch tier-swatch-mid"></span>
-        <span class="tier-label">Survey (FNDDS) <span class="tier-hint">(composite)</span></span>
+        <span class="tier-label">{$_('foods.tier.usda_survey')} <span class="tier-hint">{$_('foods.tier.usda_survey_hint')}</span></span>
       </label>
       <label class="tier-option">
         <input type="checkbox" checked={usdaTiersActive.has('Branded')} on:change={() => toggleUsdaTier('Branded')} />
         <span class="tier-swatch tier-swatch-lo"></span>
-        <span class="tier-label">Branded <span class="tier-hint">(brand-submitted)</span></span>
+        <span class="tier-label">{$_('foods.tier.usda_branded')} <span class="tier-hint">{$_('foods.tier.usda_branded_hint')}</span></span>
       </label>
       <label class="tier-option">
         <input type="checkbox" checked={usdaTiersActive.has('Experimental')} on:change={() => toggleUsdaTier('Experimental')} />
         <span class="tier-swatch tier-swatch-lo"></span>
-        <span class="tier-label">Experimental <span class="tier-hint">(research)</span></span>
+        <span class="tier-label">{$_('foods.tier.usda_experimental')} <span class="tier-hint">{$_('foods.tier.usda_experimental_hint')}</span></span>
       </label>
     </div>
   </div>
