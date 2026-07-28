@@ -110,12 +110,12 @@
         directory: Directory.Documents,
       });
       localZipStatus = '';
-      showSuccess('Backup created');
+      showSuccess($_('settings_backup.toast.backup_created'));
       await loadLocalBackups();
     } catch (e) {
       console.error('[backup] export failed:', e);
       localZipStatus = '';
-      showError('Backup failed: ' + e.message);
+      showError($_('settings_backup.toast.backup_failed_prefix', { values: { error: e.message } }));
     } finally {
       localZipBusy = false;
     }
@@ -136,7 +136,7 @@
 
   async function restoreLocalBackup(filename) {
     if (localZipBusy) return;
-    const yes = confirm(`Restore "${filename}"? Existing data is merged, not erased.`);
+    const yes = confirm($_('settings_backup.confirm.restore_local', { values: { name: filename } }));
     if (!yes) return;
     try {
       const { Filesystem, Directory } = await import('@capacitor/filesystem');
@@ -151,7 +151,7 @@
       await _runImport(new Blob([bytes], { type: 'application/zip' }));
     } catch (e) {
       console.error('[backup] restore failed:', e);
-      showError('Restore failed: ' + e.message);
+      showError($_('settings_backup.toast.restore_failed_prefix', { values: { error: e.message } }));
     }
   }
 
@@ -165,27 +165,27 @@
 
   async function _runImport(file) {
     localZipBusy = true;
-    localZipStatus = 'Reading…';
+    localZipStatus = $_('settings_backup.progress.reading');
     try {
       const { importLocalBackup } = await import('../../lib/local-backup.js');
       const result = await importLocalBackup(file, {
-        onProgress: (pct, label) => { localZipStatus = `${Math.round(pct)}% — ${label}`; },
+        onProgress: (pct, label) => { localZipStatus = $_('settings_backup.progress.percent_label', { values: { percent: Math.round(pct), label } }); },
       });
       const c = result.counts;
-      showSuccess(`Restored ${c.foods} foods · ${c.meals} meals · ${c.recipes} recipes · ${c.diary} days · ${c.wellness} metrics`);
+      showSuccess($_('settings_backup.toast.restored_summary', { values: { foods: c.foods, meals: c.meals, recipes: c.recipes, diary: c.diary, wellness: c.wellness } }));
       localZipStatus = '';
       setTimeout(() => location.reload(), 1500);
     } catch (e) {
       console.error('[backup] import failed:', e);
       localZipStatus = '';
-      showError('Restore failed: ' + e.message);
+      showError($_('settings_backup.toast.restore_failed_prefix', { values: { error: e.message } }));
     } finally {
       localZipBusy = false;
     }
   }
 
   async function deleteLocalBackup(filename) {
-    const yes = confirm(`Delete "${filename}"? This cannot be undone.`);
+    const yes = confirm($_('settings_backup.confirm.delete_local', { values: { name: filename } }));
     if (!yes) return;
     try {
       const { Filesystem, Directory } = await import('@capacitor/filesystem');
@@ -193,7 +193,7 @@
         path: `${LOCAL_BACKUP_DIR}/${filename}`,
         directory: Directory.Documents,
       });
-      showSuccess('Backup deleted');
+      showSuccess($_('settings_backup.toast.backup_deleted'));
       await loadLocalBackups();
     } catch (e) {
       console.error('[backup] delete failed:', e);
@@ -211,17 +211,17 @@
       try {
         const { Share } = await import('@capacitor/share');
         await Share.share({
-          title: 'NutriTrace Backup',
+          title: $_('settings_backup.share.title'),
           text: filename,
           url: uri.uri,
-          dialogTitle: 'Share backup',
+          dialogTitle: $_('settings_backup.share.dialog_title'),
         });
       } catch {
-        showSuccess(`Saved at: ${uri.uri}`);
+        showSuccess($_('settings_backup.toast.share_saved_at', { values: { uri: uri.uri } }));
       }
     } catch (e) {
       console.error('[backup] share failed:', e);
-      showError('Share failed: ' + e.message);
+      showError($_('settings_backup.toast.share_failed_prefix', { values: { error: e.message } }));
     }
   }
 
@@ -317,9 +317,9 @@
     const ms = Date.now() - new Date(iso).getTime();
     if (!Number.isFinite(ms) || ms < 0) return null;
     const hours = ms / 3_600_000;
-    if (hours < 1)   return `${Math.max(1, Math.round(ms / 60_000))} min ago`;
-    if (hours < 36)  return `${Math.round(hours)} hr ago`;
-    return `${Math.round(hours / 24)} days ago`;
+    if (hours < 1)   return $_('settings_backup.full_backup.min_ago', { values: { n: Math.max(1, Math.round(ms / 60_000)) } });
+    if (hours < 36)  return $_('settings_backup.full_backup.hr_ago',  { values: { n: Math.round(hours) } });
+    return $_('settings_backup.full_backup.days_ago', { values: { n: Math.round(hours / 24) } });
   }
   function _nextDueLabel(cfg) {
     if (!cfg || cfg.schedule === 'off') return null;
@@ -355,7 +355,7 @@
         // catch block previously swallowed both fetch errors AND non-2xx
         // responses, leaving the user with a silent empty list.
         const body = await res.json().catch(() => ({}));
-        showError(body?.error || `Couldn't load backups (${res.status})`);
+        showError(body?.error || $_('settings_backup.toast.cant_load_backups', { values: { status: res.status } }));
         return;
       }
       fullBackups = await res.json();
@@ -369,10 +369,10 @@
     try {
       const res  = await fetch(apiUrl('/api/full-backup'), { method: 'POST', ..._fetchOpts() });
       const data = await res.json();
-      if (!res.ok) { showError(data.error || 'Backup failed'); return; }
-      showSuccess('Full backup created');
+      if (!res.ok) { showError(data.error || $_('settings_backup.toast.backup_failed')); return; }
+      showSuccess($_('settings_backup.toast.full_backup_created'));
       await loadFullBackups();
-    } catch { showError('Backup failed'); }
+    } catch { showError($_('settings_backup.toast.backup_failed')); }
     finally   { fullBackupBusy = false; }
   }
 
@@ -389,15 +389,15 @@
     const filename = restoreTarget;
     restoreTarget = null;
     fullBackupBusy = true;
-    restoreStatus = { phase: 'restoring', percent: 40, label: 'Restoring backup…' };
+    restoreStatus = { phase: 'restoring', percent: 40, label: $_('settings_backup.progress.restoring_backup') };
     _scrollToProgress();
     try {
       const res  = await fetch(apiUrl(`/api/full-backup/${encodeURIComponent(filename)}/restore`), { method: 'POST', ..._fetchOpts() });
       const data = await res.json();
-      if (!res.ok) { showError(data.error || 'Restore failed'); restoreStatus = null; return; }
-      restoreStatus = { phase: 'restoring', percent: 100, label: 'Restore complete — reloading…' };
+      if (!res.ok) { showError(data.error || $_('settings_backup.toast.restore_failed')); restoreStatus = null; return; }
+      restoreStatus = { phase: 'restoring', percent: 100, label: $_('settings_backup.progress.restore_complete') };
       setTimeout(() => location.reload(), 1500);
-    } catch (err) { showError('Restore failed: ' + (err.message || 'Unknown error')); restoreStatus = null; }
+    } catch (err) { showError($_('settings_backup.toast.restore_failed_prefix', { values: { error: err.message || 'Unknown error' } })); restoreStatus = null; }
     finally   { fullBackupBusy = false; }
   }
 
@@ -408,7 +408,7 @@
     deleteTarget = null;
     try {
       const res = await fetch(apiUrl(`/api/full-backup/${encodeURIComponent(filename)}`), { method: 'DELETE', ..._fetchOpts() });
-      if (res.ok) { showSuccess('Backup deleted'); await loadFullBackups(); }
+      if (res.ok) { showSuccess($_('settings_backup.toast.backup_deleted')); await loadFullBackups(); }
       else showError($_('common.errors.delete_failed'));
     } catch { showError($_('common.errors.delete_failed')); }
   }
@@ -438,7 +438,7 @@
     if (!uploadRestoreFile) return;
     showUploadRestoreDialog = false;
     fullBackupBusy = true;
-    restoreStatus = { phase: 'uploading', percent: 0, label: 'Uploading backup…' };
+    restoreStatus = { phase: 'uploading', percent: 0, label: $_('settings_backup.progress.uploading') };
     _scrollToProgress();
 
     const file = uploadRestoreFile;
@@ -453,7 +453,7 @@
     xhr.upload.onprogress = ev => {
       if (ev.lengthComputable) {
         const pct = Math.round((ev.loaded / ev.total) * 85);
-        restoreStatus = { phase: 'uploading', percent: pct, label: `Uploading… ${pct}%` };
+        restoreStatus = { phase: 'uploading', percent: pct, label: $_('settings_backup.progress.uploading_pct', { values: { percent: pct } }) };
       }
     };
 
@@ -462,19 +462,19 @@
       if (xhr.status >= 200 && xhr.status < 300) {
         let err = null;
         try { const d = JSON.parse(xhr.responseText); if (d.error) err = d.error; } catch {}
-        if (err) { showError('Restore failed: ' + err); restoreStatus = null; return; }
-        restoreStatus = { phase: 'restoring', percent: 95, label: 'Restoring on server…' };
+        if (err) { showError($_('settings_backup.toast.restore_failed_prefix', { values: { error: err } })); restoreStatus = null; return; }
+        restoreStatus = { phase: 'restoring', percent: 95, label: $_('settings_backup.progress.restoring_on_server') };
         setTimeout(() => {
-          restoreStatus = { phase: 'restoring', percent: 100, label: 'Restore complete — reloading…' };
+          restoreStatus = { phase: 'restoring', percent: 100, label: $_('settings_backup.progress.restore_complete') };
           setTimeout(() => location.reload(), 1000);
         }, 600);
       } else if (xhr.status === 413) {
-        showError('Upload failed: file exceeds the maximum size allowed by your server or reverse proxy. If accessing remotely, try uploading from your local network.');
+        showError($_('settings_backup.toast.upload_too_large'));
         restoreStatus = null;
       } else {
-        let msg = `Server error ${xhr.status}`;
+        let msg = $_('settings_backup.toast.server_error_prefix', { values: { status: xhr.status } });
         try { const d = JSON.parse(xhr.responseText); if (d.error) msg = d.error; } catch {}
-        showError('Restore failed: ' + msg);
+        showError($_('settings_backup.toast.restore_failed_prefix', { values: { error: msg } }));
         restoreStatus = null;
       }
     };
@@ -495,10 +495,10 @@
   async function clearAllData() {
     try {
       await NtApi.del('/api/data');
-      showSuccess('All data cleared');
+      showSuccess($_('settings_backup.toast.all_data_cleared'));
       const { loadAuthState } = await import('../../stores/auth.js');
       await loadAuthState();
-    } catch(e) { showError('Clear failed: ' + e.message); }
+    } catch(e) { showError($_('settings_backup.toast.clear_failed_prefix', { values: { error: e.message } })); }
   }
 
   async function clearAllSettings() {
@@ -513,9 +513,9 @@
       }
       keys.forEach(k => localStorage.removeItem(k));
       DB.setSetting('setupComplete', true);
-      showSuccess('All settings cleared');
+      showSuccess($_('settings_backup.toast.all_settings_cleared'));
       setTimeout(() => location.reload(), 800);
-    } catch(e) { showError('Clear failed: ' + e.message); }
+    } catch(e) { showError($_('settings_backup.toast.clear_failed_prefix', { values: { error: e.message } })); }
   }
 </script>
 
@@ -523,10 +523,10 @@
 
   <!-- Full backup (admin only, server mode only — files stored on server) -->
   {#if $currentUser?.role === 'admin' && !isNativeLocal}
-  <p class="sub-label">Full Backup</p>
+  <p class="sub-label">{$_('settings_backup.sections.full_backup')}</p>
   <div class="card settings-card">
     <div style="padding:12px 16px 4px">
-      <p class="setting-desc" style="margin:0 0 12px">A complete snapshot of everything: all user data, diary, foods, meals, recipes, settings, and uploaded images. Saved on the server and available to download or restore at any time.</p>
+      <p class="setting-desc" style="margin:0 0 12px">{$_('settings_backup.full_backup.desc_server')}</p>
 
       <!-- Auto Backup schedule. Admin sets it once; scheduler.js fires
            backups when due and prunes older archives past the retention
@@ -535,33 +535,33 @@
       {#if scheduleCfg}
         <div class="auto-bk">
           <div class="auto-bk-head">
-            <span class="auto-bk-title">Auto Backup</span>
+            <span class="auto-bk-title">{$_('settings_backup.full_backup.auto_backup')}</span>
             {#if scheduleCfg.envLocked}
-              <span class="env-lock-pill" title="Locked by BACKUP_SCHEDULE / BACKUP_TIME / BACKUP_RETENTION env var">Locked by env</span>
+              <span class="env-lock-pill" title={$_('settings_backup.full_backup.env_lock_title')}>{$_('settings_backup.full_backup.env_lock_pill')}</span>
             {/if}
           </div>
           <div class="auto-bk-fields">
             <label class="auto-bk-field">
-              <span class="auto-bk-label">Schedule</span>
+              <span class="auto-bk-label">{$_('settings_backup.full_backup.schedule')}</span>
               <select class="select sel-sm"
                 bind:value={scheduleCfg.schedule}
                 disabled={scheduleCfg.envLocked || scheduleBusy}
                 on:change={() => saveSchedule({ schedule: scheduleCfg.schedule })}>
-                <option value="off">Off</option>
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
+                <option value="off">{$_('settings_backup.full_backup.schedule_off')}</option>
+                <option value="daily">{$_('settings_backup.full_backup.schedule_daily')}</option>
+                <option value="weekly">{$_('settings_backup.full_backup.schedule_weekly')}</option>
+                <option value="monthly">{$_('settings_backup.full_backup.schedule_monthly')}</option>
               </select>
             </label>
             {#if scheduleCfg.schedule !== 'off'}
               <label class="auto-bk-field">
-                <span class="auto-bk-label">Time</span>
+                <span class="auto-bk-label">{$_('settings_backup.full_backup.time')}</span>
                 <TimePicker value={scheduleCfg.time}
                   disabled={scheduleCfg.envLocked || scheduleBusy}
                   on:change={(e) => saveSchedule({ time: e.detail })} />
               </label>
               <label class="auto-bk-field">
-                <span class="auto-bk-label">Keep Last</span>
+                <span class="auto-bk-label">{$_('settings_backup.full_backup.keep_last')}</span>
                 <input class="input" type="number" min="1" max="99"
                   bind:value={scheduleCfg.retention}
                   disabled={scheduleCfg.envLocked || scheduleBusy}
@@ -574,24 +574,26 @@
               {#if scheduleCfg.lastAutoError}
                 <div class="auto-bk-status-row error">
                   <span class="material-symbols-rounded" style="font-size:16px">error</span>
-                  <span>Last auto-backup failed: {scheduleCfg.lastAutoError}</span>
+                  <span>{$_('settings_backup.full_backup.last_failed', { values: { error: scheduleCfg.lastAutoError } })}</span>
                 </div>
               {/if}
               {#if scheduleCfg.lastAutoRun}
                 <div class="auto-bk-status-row">
                   <span class="material-symbols-rounded" style="font-size:16px">check_circle</span>
-                  <span>Last auto-backup: {_formatRelative(scheduleCfg.lastAutoRun)}</span>
+                  <span>{$_('settings_backup.full_backup.last_success', { values: { when: _formatRelative(scheduleCfg.lastAutoRun) } })}</span>
                 </div>
               {/if}
               {#if _nextDueLabel(scheduleCfg)}
                 <div class="auto-bk-status-row">
                   <span class="material-symbols-rounded" style="font-size:16px">schedule</span>
-                  <span>Next: {_nextDueLabel(scheduleCfg)}</span>
+                  <span>{$_('settings_backup.full_backup.next', { values: { when: _nextDueLabel(scheduleCfg) } })}</span>
                 </div>
               {/if}
               {#if scheduleCfg.retention}
                 <div class="auto-bk-status-row subtle">
-                  Keeps the {scheduleCfg.retention} newest backup{scheduleCfg.retention === 1 ? '' : 's'}; older archives prune automatically after each run.
+                  {scheduleCfg.retention === 1
+                    ? $_('settings_backup.full_backup.retention_note',        { values: { n: scheduleCfg.retention } })
+                    : $_('settings_backup.full_backup.retention_note_plural', { values: { n: scheduleCfg.retention } })}
                 </div>
               {/if}
             </div>
@@ -604,14 +606,14 @@
         <button class="btn btn-primary" style="height:36px;font-size:13px"
           on:click={createFullBackup} disabled={fullBackupBusy}>
           {#if fullBackupBusy}
-            <span class="material-symbols-rounded spin" style="font-size:16px">autorenew</span> Working…
+            <span class="material-symbols-rounded spin" style="font-size:16px">autorenew</span> {$_('settings_backup.full_backup.working')}
           {:else}
-            <span class="material-symbols-rounded" style="font-size:16px">add_circle</span> Create Backup
+            <span class="material-symbols-rounded" style="font-size:16px">add_circle</span> {$_('settings_backup.full_backup.create')}
           {/if}
         </button>
         <button class="btn btn-secondary" style="height:36px;font-size:13px"
           on:click={pickUploadRestore} disabled={fullBackupBusy}>
-          <span class="material-symbols-rounded" style="font-size:16px">upload</span> Upload &amp; Restore
+          <span class="material-symbols-rounded" style="font-size:16px">upload</span> {$_('settings_backup.full_backup.upload_restore')}
         </button>
       </div>
       {#if restoreStatus}
@@ -629,11 +631,10 @@
 
     {#if fullBackups.length > 0}
       <div class="setting-divider"></div>
-      <!-- Table header -->
       <div class="backup-table-header">
-        <span>Name</span>
-        <span>Created</span>
-        <span>Size</span>
+        <span>{$_('settings_backup.full_backup.col_name')}</span>
+        <span>{$_('settings_backup.full_backup.col_created')}</span>
+        <span>{$_('settings_backup.full_backup.col_size')}</span>
         <span></span>
       </div>
       <div class="setting-divider"></div>
@@ -646,14 +647,14 @@
           <div class="backup-actions">
             <button class="btn btn-secondary backup-action-btn"
               on:click={() => downloadFullBackup(bk.filename)}>
-              <span class="material-symbols-rounded" style="font-size:15px">download</span> Download
+              <span class="material-symbols-rounded" style="font-size:15px">download</span> {$_('settings_backup.full_backup.download')}
             </button>
             <button class="btn btn-secondary backup-action-btn"
               on:click={() => { restoreTarget = bk.filename; showRestoreDialog = true; }} disabled={fullBackupBusy}>
-              <span class="material-symbols-rounded" style="font-size:15px">restore</span> Restore
+              <span class="material-symbols-rounded" style="font-size:15px">restore</span> {$_('settings_backup.full_backup.restore')}
             </button>
             <button class="btn-icon" style="color:var(--danger);padding:0 4px"
-              on:click={() => { deleteTarget = bk.filename; showDeleteBkDialog = true; }} title="Delete backup">
+              on:click={() => { deleteTarget = bk.filename; showDeleteBkDialog = true; }} title={$_('settings_backup.full_backup.delete_title')}>
               <span class="material-symbols-rounded" style="font-size:20px">delete</span>
             </button>
           </div>
@@ -661,16 +662,16 @@
       {/each}
     {:else}
       <div class="setting-divider"></div>
-      <p style="padding:12px 16px;font-size:13px;color:var(--text-3);margin:0">No backups yet — click Create Backup to get started.</p>
+      <p style="padding:12px 16px;font-size:13px;color:var(--text-3);margin:0">{$_('settings_backup.full_backup.empty_server')}</p>
     {/if}
   </div>
   {/if}
 
   {#if isNativeLocal}
-  <p class="sub-label">Full Backup</p>
+  <p class="sub-label">{$_('settings_backup.sections.full_backup')}</p>
   <div class="card settings-card">
     <div style="padding:12px 16px 4px">
-      <p class="setting-desc" style="margin:0 0 12px">A complete snapshot of everything: all foods, meals, recipes, diary, wellness data, workouts, settings, AND embedded image files. Saved to your device's Documents folder, ready for phone-to-phone transfer without needing a server.</p>
+      <p class="setting-desc" style="margin:0 0 12px">{$_('settings_backup.full_backup.desc_local')}</p>
 
       <!-- Auto Backup (local mode). Runs JS-side while the app is open,
            fires when due, saves to Documents/nutritrace-backups/ with an
@@ -682,28 +683,28 @@
       {#if localScheduleCfg}
         <div class="auto-bk">
           <div class="auto-bk-head">
-            <span class="auto-bk-title">Auto Backup</span>
+            <span class="auto-bk-title">{$_('settings_backup.full_backup.auto_backup')}</span>
           </div>
           <div class="auto-bk-fields">
             <label class="auto-bk-field">
-              <span class="auto-bk-label">Schedule</span>
+              <span class="auto-bk-label">{$_('settings_backup.full_backup.schedule')}</span>
               <select class="select sel-sm"
                 value={localScheduleCfg.schedule}
                 on:change={(e) => saveLocalSchedule({ schedule: e.target.value })}>
-                <option value="off">Off</option>
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
+                <option value="off">{$_('settings_backup.full_backup.schedule_off')}</option>
+                <option value="daily">{$_('settings_backup.full_backup.schedule_daily')}</option>
+                <option value="weekly">{$_('settings_backup.full_backup.schedule_weekly')}</option>
+                <option value="monthly">{$_('settings_backup.full_backup.schedule_monthly')}</option>
               </select>
             </label>
             {#if localScheduleCfg.schedule !== 'off'}
               <label class="auto-bk-field">
-                <span class="auto-bk-label">Time</span>
+                <span class="auto-bk-label">{$_('settings_backup.full_backup.time')}</span>
                 <TimePicker value={localScheduleCfg.time}
                   on:change={(e) => saveLocalSchedule({ time: e.detail })} />
               </label>
               <label class="auto-bk-field">
-                <span class="auto-bk-label">Keep Last</span>
+                <span class="auto-bk-label">{$_('settings_backup.full_backup.keep_last')}</span>
                 <input class="input" type="number" min="1" max="99"
                   value={localScheduleCfg.retention}
                   on:change={(e) => saveLocalSchedule({ retention: e.target.value })} />
@@ -715,23 +716,25 @@
               {#if localScheduleCfg.lastAutoError}
                 <div class="auto-bk-status-row error">
                   <span class="material-symbols-rounded" style="font-size:16px">error</span>
-                  <span>Last auto-backup failed: {localScheduleCfg.lastAutoError}</span>
+                  <span>{$_('settings_backup.full_backup.last_failed', { values: { error: localScheduleCfg.lastAutoError } })}</span>
                 </div>
               {/if}
               {#if localScheduleCfg.lastAutoRun}
                 <div class="auto-bk-status-row">
                   <span class="material-symbols-rounded" style="font-size:16px">check_circle</span>
-                  <span>Last auto-backup: {_formatRelative(localScheduleCfg.lastAutoRun)}</span>
+                  <span>{$_('settings_backup.full_backup.last_success', { values: { when: _formatRelative(localScheduleCfg.lastAutoRun) } })}</span>
                 </div>
               {/if}
               {#if _nextDueLabel(localScheduleCfg)}
                 <div class="auto-bk-status-row">
                   <span class="material-symbols-rounded" style="font-size:16px">schedule</span>
-                  <span>Next: {_nextDueLabel(localScheduleCfg)} (fires when app is open)</span>
+                  <span>{$_('settings_backup.full_backup.next_when_open', { values: { when: _nextDueLabel(localScheduleCfg) } })}</span>
                 </div>
               {/if}
               <div class="auto-bk-status-row subtle">
-                Keeps the {localScheduleCfg.retention} newest auto-backup{localScheduleCfg.retention === 1 ? '' : 's'}; manual exports are never pruned.
+                {localScheduleCfg.retention === 1
+                  ? $_('settings_backup.full_backup.retention_note_local',        { values: { n: localScheduleCfg.retention } })
+                  : $_('settings_backup.full_backup.retention_note_local_plural', { values: { n: localScheduleCfg.retention } })}
               </div>
             </div>
           {/if}
@@ -743,14 +746,14 @@
         <button class="btn btn-primary" style="height:36px;font-size:13px"
           on:click={exportLocalZip} disabled={localZipBusy}>
           {#if localZipBusy}
-            <span class="material-symbols-rounded spin" style="font-size:16px">autorenew</span> Working…
+            <span class="material-symbols-rounded spin" style="font-size:16px">autorenew</span> {$_('settings_backup.full_backup.working')}
           {:else}
-            <span class="material-symbols-rounded" style="font-size:16px">add_circle</span> Create Backup
+            <span class="material-symbols-rounded" style="font-size:16px">add_circle</span> {$_('settings_backup.full_backup.create')}
           {/if}
         </button>
         <button class="btn btn-secondary" style="height:36px;font-size:13px"
           on:click={importLocalZip} disabled={localZipBusy}>
-          <span class="material-symbols-rounded" style="font-size:16px">upload</span> Upload &amp; Restore
+          <span class="material-symbols-rounded" style="font-size:16px">upload</span> {$_('settings_backup.full_backup.upload_restore')}
         </button>
       </div>
       {#if localZipStatus}
@@ -766,9 +769,9 @@
     {#if localBackups.length > 0}
       <div class="setting-divider"></div>
       <div class="backup-table-header">
-        <span>Name</span>
-        <span>Created</span>
-        <span>Size</span>
+        <span>{$_('settings_backup.full_backup.col_name')}</span>
+        <span>{$_('settings_backup.full_backup.col_created')}</span>
+        <span>{$_('settings_backup.full_backup.col_size')}</span>
         <span></span>
       </div>
       <div class="setting-divider"></div>
@@ -781,14 +784,14 @@
           <div class="backup-actions">
             <button class="btn btn-secondary backup-action-btn"
               on:click={() => shareLocalBackup(bk.filename)}>
-              <span class="material-symbols-rounded" style="font-size:15px">share</span> Share
+              <span class="material-symbols-rounded" style="font-size:15px">share</span> {$_('settings_backup.full_backup.share')}
             </button>
             <button class="btn btn-secondary backup-action-btn"
               on:click={() => restoreLocalBackup(bk.filename)} disabled={localZipBusy}>
-              <span class="material-symbols-rounded" style="font-size:15px">restore</span> Restore
+              <span class="material-symbols-rounded" style="font-size:15px">restore</span> {$_('settings_backup.full_backup.restore')}
             </button>
             <button class="btn-icon" style="color:var(--danger);padding:0 4px"
-              on:click={() => deleteLocalBackup(bk.filename)} title="Delete backup">
+              on:click={() => deleteLocalBackup(bk.filename)} title={$_('settings_backup.full_backup.delete_title')}>
               <span class="material-symbols-rounded" style="font-size:20px">delete</span>
             </button>
           </div>
@@ -796,18 +799,18 @@
       {/each}
     {:else}
       <div class="setting-divider"></div>
-      <p style="padding:12px 16px;font-size:13px;color:var(--text-3);margin:0">No backups yet — tap Create Backup to get started.</p>
+      <p style="padding:12px 16px;font-size:13px;color:var(--text-3);margin:0">{$_('settings_backup.full_backup.empty_local')}</p>
     {/if}
   </div>
   {/if}
   <!-- Danger zone -->
-  <p class="sub-label danger-zone-label">Danger Zone</p>
+  <p class="sub-label danger-zone-label">{$_('settings_backup.sections.danger_zone')}</p>
   <div class="card settings-card danger-zone-card">
     <button class="setting-row setting-action danger" on:click={() => showClearDialog = true}>
       <span class="material-symbols-rounded si" style="color:var(--danger)">delete_forever</span>
       <div>
-        <span class="setting-label" style="color:var(--danger)">Clear all data</span>
-        <div class="setting-desc">Permanently deletes all diary entries, foods, meals, and body stats. Settings and credentials are kept.</div>
+        <span class="setting-label" style="color:var(--danger)">{$_('settings_backup.danger.clear_data')}</span>
+        <div class="setting-desc">{$_('settings_backup.danger.clear_data_desc')}</div>
       </div>
       <span class="material-symbols-rounded" style="font-size:18px;color:var(--danger);flex-shrink:0">chevron_right</span>
     </button>
@@ -815,57 +818,56 @@
     <button class="setting-row setting-action danger" on:click={() => showClearSettingsDialog = true}>
       <span class="material-symbols-rounded si" style="color:var(--danger)">manage_history</span>
       <div>
-        <span class="setting-label" style="color:var(--danger)">Clear all settings</span>
-        <div class="setting-desc">Resets all preferences, credentials, and API keys to defaults. Food and diary data are kept.</div>
+        <span class="setting-label" style="color:var(--danger)">{$_('settings_backup.danger.clear_settings')}</span>
+        <div class="setting-desc">{$_('settings_backup.danger.clear_settings_desc')}</div>
       </div>
       <span class="material-symbols-rounded" style="font-size:18px;color:var(--danger);flex-shrink:0">chevron_right</span>
     </button>
-    <!-- Delete my account lives in Profile → Danger zone (single source of truth). -->
   </div>
 
 </div>
 
 <Dialog bind:open={showClearDialog}
-  title="Clear all data"
-  message="This will permanently delete all diary entries, foods, meals, and body stats. Settings and credentials are kept. This cannot be undone."
-  confirmText="Delete all data"
-  cancelText="Cancel"
+  title={$_('settings_backup.dialogs.clear_data_title')}
+  message={$_('settings_backup.dialogs.clear_data_msg')}
+  confirmText={$_('settings_backup.dialogs.clear_data_confirm')}
+  cancelText={$_('settings_backup.dialogs.cancel')}
   dangerous
   on:confirm={clearAllData}
 />
 
 <Dialog bind:open={showClearSettingsDialog}
-  title="Clear all settings"
-  message="This will reset all preferences, credentials, and API keys to defaults. Food and diary data are kept. This cannot be undone."
-  confirmText="Clear all settings"
-  cancelText="Cancel"
+  title={$_('settings_backup.dialogs.clear_settings_title')}
+  message={$_('settings_backup.dialogs.clear_settings_msg')}
+  confirmText={$_('settings_backup.dialogs.clear_settings_confirm')}
+  cancelText={$_('settings_backup.dialogs.cancel')}
   dangerous
   on:confirm={clearAllSettings}
 />
 
 <Dialog bind:open={showRestoreDialog}
-  title="Restore backup?"
-  message="This will replace all current data with the contents of this backup. This cannot be undone."
-  confirmText="Restore"
-  cancelText="Cancel"
+  title={$_('settings_backup.dialogs.restore_title')}
+  message={$_('settings_backup.dialogs.restore_msg')}
+  confirmText={$_('settings_backup.dialogs.restore_confirm')}
+  cancelText={$_('settings_backup.dialogs.cancel')}
   dangerous
   on:confirm={confirmRestoreFullBackup}
 />
 
 <Dialog bind:open={showUploadRestoreDialog}
-  title="Restore from uploaded file?"
-  message="This will replace all current data with the contents of the uploaded backup. This cannot be undone."
-  confirmText="Restore"
-  cancelText="Cancel"
+  title={$_('settings_backup.dialogs.upload_restore_title')}
+  message={$_('settings_backup.dialogs.upload_restore_msg')}
+  confirmText={$_('settings_backup.dialogs.restore_confirm')}
+  cancelText={$_('settings_backup.dialogs.cancel')}
   dangerous
   on:confirm={confirmUploadRestore}
 />
 
 <Dialog bind:open={showDeleteBkDialog}
-  title="Delete backup?"
-  message="This backup file will be permanently removed from the server."
-  confirmText="Delete"
-  cancelText="Cancel"
+  title={$_('settings_backup.dialogs.delete_backup_title')}
+  message={$_('settings_backup.dialogs.delete_backup_msg')}
+  confirmText={$_('settings_backup.dialogs.delete_backup_confirm')}
+  cancelText={$_('settings_backup.dialogs.cancel')}
   dangerous
   on:confirm={confirmDeleteFullBackup}
 />

@@ -964,6 +964,107 @@
       "prefer_wearable_desc":    "When LiftTrace sends a completed workout's estimated calories burned…"
     }
   },
+  "settings_backup": {
+    "toast": {
+      "backup_created":         "Backup created",
+      "backup_failed":          "Backup failed",
+      "backup_failed_prefix":   "Backup failed: {error}",
+      "restore_failed":         "Restore failed",
+      "restore_failed_prefix":  "Restore failed: {error}",
+      "restored_summary":       "Restored {foods} foods · {meals} meals · {recipes} recipes · {diary} days · {wellness} metrics",
+      "backup_deleted":         "Backup deleted",
+      "share_failed_prefix":    "Share failed: {error}",
+      "share_saved_at":         "Saved at: {uri}",
+      "full_backup_created":    "Full backup created",
+      "cant_load_backups":      "Couldn't load backups ({status})",
+      "upload_too_large":       "Upload failed: file exceeds the maximum size allowed by your server or reverse proxy. If accessing remotely, try uploading from your local network.",
+      "server_error_prefix":    "Server error {status}",
+      "all_data_cleared":       "All data cleared",
+      "all_settings_cleared":   "All settings cleared",
+      "clear_failed_prefix":    "Clear failed: {error}"
+    },
+    "confirm": {
+      "restore_local":  "Restore \"{name}\"? Existing data is merged, not erased.",
+      "delete_local":   "Delete \"{name}\"? This cannot be undone."
+    },
+    "share": {
+      "title":         "NutriTrace Backup",
+      "dialog_title":  "Share backup"
+    },
+    "progress": {
+      "reading":               "Reading…",
+      "percent_label":         "{percent}% — {label}",
+      "restoring_backup":      "Restoring backup…",
+      "restore_complete":      "Restore complete — reloading…",
+      "uploading":             "Uploading backup…",
+      "uploading_pct":         "Uploading… {percent}%",
+      "restoring_on_server":   "Restoring on server…"
+    },
+    "sections": {
+      "full_backup":  "Full Backup",
+      "danger_zone":  "Danger Zone"
+    },
+    "full_backup": {
+      "desc_server": "A complete snapshot of everything: all user data, diary, foods, meals, recipes, settings, and uploaded images. Saved on the server and available to download or restore at any time.",
+      "desc_local":  "A complete snapshot of everything: all foods, meals, recipes, diary, wellness data, workouts, settings, AND embedded image files. Saved to your device's Documents folder, ready for phone-to-phone transfer without needing a server.",
+      "auto_backup":            "Auto Backup",
+      "env_lock_title":         "Locked by BACKUP_SCHEDULE / BACKUP_TIME / BACKUP_RETENTION env var",
+      "env_lock_pill":          "Locked by env",
+      "schedule":               "Schedule",
+      "schedule_off":           "Off",
+      "schedule_daily":         "Daily",
+      "schedule_weekly":        "Weekly",
+      "schedule_monthly":       "Monthly",
+      "time":                   "Time",
+      "keep_last":              "Keep Last",
+      "last_failed":            "Last auto-backup failed: {error}",
+      "last_success":           "Last auto-backup: {when}",
+      "next":                   "Next: {when}",
+      "next_when_open":         "Next: {when} (fires when app is open)",
+      "retention_note":         "Keeps the {n} newest backup; older archives prune automatically after each run.",
+      "retention_note_plural":  "Keeps the {n} newest backups; older archives prune automatically after each run.",
+      "retention_note_local":         "Keeps the {n} newest auto-backup; manual exports are never pruned.",
+      "retention_note_local_plural":  "Keeps the {n} newest auto-backups; manual exports are never pruned.",
+      "working":                "Working…",
+      "create":                 "Create Backup",
+      "upload_restore":         "Upload & Restore",
+      "col_name":               "Name",
+      "col_created":            "Created",
+      "col_size":               "Size",
+      "download":               "Download",
+      "restore":                "Restore",
+      "share":                  "Share",
+      "delete_title":           "Delete backup",
+      "empty_server":           "No backups yet — click Create Backup to get started.",
+      "empty_local":            "No backups yet — tap Create Backup to get started.",
+      "min_ago":                "{n} min ago",
+      "hr_ago":                 "{n} hr ago",
+      "days_ago":               "{n} days ago"
+    },
+    "danger": {
+      "clear_data":       "Clear all data",
+      "clear_data_desc":  "Permanently deletes all diary entries, foods, meals, and body stats. Settings and credentials are kept.",
+      "clear_settings":   "Clear all settings",
+      "clear_settings_desc": "Resets all preferences, credentials, and API keys to defaults. Food and diary data are kept."
+    },
+    "dialogs": {
+      "clear_data_title":   "Clear all data",
+      "clear_data_msg":     "This will permanently delete all diary entries, foods, meals, and body stats. Settings and credentials are kept. This cannot be undone.",
+      "clear_data_confirm": "Delete all data",
+      "clear_settings_title":   "Clear all settings",
+      "clear_settings_msg":     "This will reset all preferences, credentials, and API keys to defaults. Food and diary data are kept. This cannot be undone.",
+      "clear_settings_confirm": "Clear all settings",
+      "restore_title":     "Restore backup?",
+      "restore_msg":       "This will replace all current data with the contents of this backup. This cannot be undone.",
+      "restore_confirm":   "Restore",
+      "upload_restore_title": "Restore from uploaded file?",
+      "upload_restore_msg":   "This will replace all current data with the contents of the uploaded backup. This cannot be undone.",
+      "delete_backup_title":   "Delete backup?",
+      "delete_backup_msg":     "This backup file will be permanently removed from the server.",
+      "delete_backup_confirm": "Delete",
+      "cancel":                "Cancel"
+    }
+  },
   "settings_notifications": {
     "toast": {
       "test_sent":     "Test sent, check your device",
