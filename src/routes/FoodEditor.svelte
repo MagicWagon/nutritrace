@@ -763,7 +763,7 @@
   <div class="page-content editor-content" class:readonly-content={_readOnly} inert={_readOnly || null}>
     <!-- Photo -->
     <div class="card editor-card photo-card">
-      <div class="editor-card-title">Photo</div>
+      <div class="editor-card-title">{$_('food_editor.card_photo')}</div>
       <div class="photo-preview-wrap">
         {#if food.imgUrl}
           <img class="photo-preview-img" src={food.imgUrl} alt="Food" />
@@ -805,7 +805,7 @@
       <div class="cam-overlay" role="dialog" aria-modal="true" use:portal>
         <div class="cam-popup">
           <div class="cam-header">
-            <span class="cam-title">Take Photo</span>
+            <span class="cam-title">{$_('food_editor.take_photo')}</span>
             <button class="btn-icon" on:click={stopCamera} aria-label="Cancel" title="Close camera">
               <span class="material-symbols-rounded">close</span>
             </button>
@@ -827,12 +827,12 @@
       <div class="cam-overlay" role="dialog" aria-modal="true" use:portal>
         <div class="cam-popup">
           <div class="cam-header">
-            <span class="cam-title">Crop Photo</span>
+            <span class="cam-title">{$_('food_editor.crop_photo')}</span>
             <button class="btn-icon" on:click={() => { showCrop = false; cropSrc = ''; }} aria-label="Cancel" title="Cancel">
               <span class="material-symbols-rounded">close</span>
             </button>
           </div>
-          <p class="crop-hint">Drag the box to reposition</p>
+          <p class="crop-hint">{$_('food_editor.crop_hint')}</p>
           <div class="crop-container"
             on:mousemove={cropMoveDrag}
             on:touchmove={cropMoveDrag}
@@ -854,23 +854,23 @@
 
     <!-- Basic info -->
     <div class="card editor-card">
-      <div class="editor-card-title">Basic Info</div>
+      <div class="editor-card-title">{$_('food_editor.card_basic')}</div>
       <div class="form-group">
         <label class="form-label">Name *</label>
         <input class="input" placeholder={$_('food_editor.name_placeholder')} bind:value={food.name} />
       </div>
       <div class="form-group">
-        <label class="form-label">Brand</label>
+        <label class="form-label">{$_('food_editor.field_brand')}</label>
         <input class="input" placeholder={$_('food_editor.brand_placeholder')} bind:value={food.brand} />
       </div>
       <div class="form-row" style="align-items:flex-end">
         <div class="form-group" style="flex:1">
-          <label class="form-label">Serving Size</label>
+          <label class="form-label">{$_('food_editor.field_serving_size')}</label>
           <input class="input" type="number" min="0" bind:value={food.portion}
             on:input={onPortionInput} />
         </div>
         <div class="form-group" style="width:100px">
-          <label class="form-label">Unit</label>
+          <label class="form-label">{$_('food_editor.field_unit')}</label>
           <UnitPicker bind:value={food.unit} />
         </div>
         <button class="btn-icon link-btn" class:linked title={linked ? 'All fields scale proportionally' : 'Fields are independent'}
@@ -887,7 +887,7 @@
            always flows in, just the editor is hidden by default. -->
       {#if _showUnitMetadataUI}
       <div class="form-group">
-        <label class="form-label">Nutrition Basis</label>
+        <label class="form-label">{$_('food_editor.field_nutrition_basis')}</label>
         <div class="basis-toggle">
           <button type="button" class="basis-opt" class:active={food.nutrition_basis === 'g'}
             on:click={() => food.nutrition_basis = food.nutrition_basis === 'g' ? null : 'g'}>
@@ -907,7 +907,7 @@
            the first row from serving_size + serving_quantity; users can
            edit, add, or remove rows. Issues #69 + #70. -->
       <div class="form-group">
-        <label class="form-label">Serving Units</label>
+        <label class="form-label">{$_('food_editor.field_serving_units')}</label>
         <div class="alt-units">
           {#each (food.alt_units || []) as row, i}
             <div class="alt-unit-row">
@@ -943,7 +943,7 @@
         <label class="form-label">Density (g/ml)</label>
         <div style="display:flex;align-items:center;gap:6px">
           <input class="input" type="number" min="0" step="0.01"
-            placeholder="Optional"
+            placeholder={$_('food_editor.placeholder_optional')}
             value={food.density_g_ml ?? ''}
             on:input={e => food.density_g_ml = e.target.value === '' ? null : Number(e.target.value)} />
           <span style="color:var(--text-3);font-size:13px">g/ml</span>
@@ -954,9 +954,9 @@
       </div>
       {/if}
       <div class="form-group">
-        <label class="form-label">Barcode</label>
+        <label class="form-label">{$_('food_editor.field_barcode')}</label>
         <div class="barcode-input-wrap">
-          <input class="input barcode-input" type="text" inputmode="numeric" placeholder="Optional" bind:value={food.barcode} />
+          <input class="input barcode-input" type="text" inputmode="numeric" placeholder={$_('food_editor.placeholder_optional')} bind:value={food.barcode} />
           <button type="button" class="btn-scan-inline" title="Scan barcode" aria-label="Scan barcode"
             on:click={() => editorScannerOpen = true}>
             <span class="material-symbols-rounded">barcode_scanner</span>
@@ -1019,7 +1019,7 @@
     <!-- Categories -->
     {#if $foodsShowCategories && ($foodCategories || []).length > 0}
       <div class="card editor-card">
-        <div class="editor-card-title">Categories</div>
+        <div class="editor-card-title">{$_('food_editor.card_categories')}</div>
         <div class="cat-chips">
           {#each $foodCategories as cat}
             <button class="chip" class:accent={(food.categories||[]).includes(_catName(cat))}
@@ -1037,7 +1037,7 @@
     <!-- Notes -->
     {#if $foodsShowNotes}
       <div class="card editor-card">
-        <div class="editor-card-title">Notes</div>
+        <div class="editor-card-title">{$_('food_editor.card_notes')}</div>
         <textarea class="input textarea" placeholder="Optional notes" bind:value={food.notes}></textarea>
       </div>
     {/if}
@@ -1045,7 +1045,7 @@
     <!-- Nutrition -->
     <div class="card editor-card">
       <div class="editor-card-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-        <span>Nutrition</span>
+        <span>{$_('food_editor.card_nutrition')}</span>
         {#if $aiEffectivelyEnabled}
           <button class="scan-label-btn" on:click={scanLabel} disabled={scanningLabel}
             title="Take a photo of the nutrition label to fill these fields"

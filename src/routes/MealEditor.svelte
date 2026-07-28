@@ -740,7 +740,7 @@
 
     <!-- Photo -->
     <div class="card editor-card">
-      <div class="editor-card-title">Photo</div>
+      <div class="editor-card-title">{$_('meal_editor.card_photo')}</div>
       <div class="photo-preview-wrap">
         {#if photoPreviewUrl}
           <img src={photoPreviewUrl} alt="food" class="photo-preview-img" />
@@ -818,7 +818,7 @@
     <!-- Categories -->
     {#if $foodsShowCategories && $foodCategories && $foodCategories.length > 0}
       <div class="card editor-card">
-        <div class="editor-card-title">Categories</div>
+        <div class="editor-card-title">{$_('meal_editor.card_categories')}</div>
         <div class="cat-chips">
           {#each $foodCategories as cat}
             <button class="chip" class:accent={(meal.categories||[]).includes(_catName(cat))}
@@ -836,7 +836,7 @@
     <!-- Notes -->
     {#if $foodsShowNotes}
       <div class="card editor-card">
-        <div class="editor-card-title">Notes</div>
+        <div class="editor-card-title">{$_('meal_editor.card_notes')}</div>
         <textarea class="input" rows="2" placeholder="Optional notes…" bind:value={meal.notes}
           style="resize:vertical;min-height:60px"></textarea>
       </div>
@@ -910,7 +910,7 @@
           <span class="ingredient-list-total">{_ftrEnergy.value.toLocaleString()} {_ftrEnergy.unit} · {meal.items.length} {meal.items.length === 1 ? 'item' : 'items'}</span>
           <button class="ingredient-add-row" on:click={openPicker}>
             <span class="material-symbols-rounded">add</span>
-            <span>Add Ingredient</span>
+            <span>{$_('meal_editor.add_ingredient')}</span>
           </button>
         </div>
       {/if}
@@ -919,7 +919,7 @@
     <!-- Nutrition totals -->
     {#if meal.items.length > 0}
       <div class="card editor-card">
-        <div class="editor-card-title">Nutrition Totals</div>
+        <div class="editor-card-title">{$_('meal_editor.card_nutrition_totals')}</div>
         {#each _orderedNutriments.filter(n => (showAllNutrients ? true : _isVisibleByDefault(n)) && totals[n.id]) as n}
           {@const _kjMode = n.id === 'calories' && $energyUnit === 'kJ'}
           <div style="display:flex;justify-content:space-between;padding:4px 0">
@@ -942,7 +942,7 @@
 {#if showPicker}
   <div class="picker-overlay" role="dialog" aria-modal="true">
     <div class="picker-header">
-      <button class="btn-icon" on:click={() => { showPicker = false; pickerSearch = ''; selectedIngredients = new Set(); }} title="Back">
+      <button class="btn-icon" on:click={() => { showPicker = false; pickerSearch = ''; selectedIngredients = new Set(); }} title={$_('meal_editor.back')}>
         <span class="material-symbols-rounded">arrow_back</span>
       </button>
       {#if selectedIngredients.size > 0}
@@ -952,9 +952,9 @@
           <span class="material-symbols-rounded">check</span>
         </button>
       {:else}
-        <input class="input picker-search-input" placeholder="Search…" bind:value={pickerSearch} autofocus />
+        <input class="input picker-search-input" placeholder={$_('meal_editor.search_placeholder')} bind:value={pickerSearch} autofocus />
         {#if pickerTab === 0 && ($offEnabled || pickerFoods.some(f => f.barcode))}
-          <button class="btn-icon" on:click={() => _pickerScannerOpen = true} aria-label="Scan barcode" title="Scan barcode">
+          <button class="btn-icon" on:click={() => _pickerScannerOpen = true} aria-label={$_('meal_editor.scan_barcode')} title={$_('meal_editor.scan_barcode')}>
             <span class="material-symbols-rounded">barcode_scanner</span>
           </button>
         {/if}
@@ -1046,17 +1046,17 @@
   <div style="display:flex;flex-direction:column;gap:16px;padding-top:8px">
     <div style="display:flex;gap:12px">
       <div style="flex:1">
-        <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:6px">Serving Size</label>
+        <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:6px">{$_('meal_editor.field_serving_size')}</label>
         <input class="input" type="number" min="0.1" step="0.1" bind:value={portionAmount}
           style="font-size:16px;width:100%" />
       </div>
       <div style="width:100px">
-        <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:6px">Unit</label>
+        <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:6px">{$_('meal_editor.field_unit')}</label>
         <UnitPicker bind:value={portionUnit} />
       </div>
     </div>
     <div>
-      <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:6px">Quantity</label>
+      <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:6px">{$_('meal_editor.field_quantity')}</label>
       <input class="input" type="number" min="0.01" step="0.1" bind:value={portionQty}
         style="font-size:16px;width:100%" />
     </div>
@@ -1064,7 +1064,7 @@
       <span style="font-size:13px;color:var(--text-3)">Total Amount</span>
       <span style="font-size:14px;font-weight:500">{Math.round((parseFloat(portionAmount) || 100) * (parseFloat(portionQty) || 1) * 10) / 10}{portionUnit || 'g'}</span>
     </div>
-    <button class="btn btn-primary w-full" on:click={confirmPortion}>{editingIndex !== null ? 'Save Changes' : 'Add Ingredient'}</button>
+    <button class="btn btn-primary w-full" on:click={confirmPortion}>{editingIndex !== null ? $_('meal_editor.save_changes') : $_('meal_editor.add_ingredient')}</button>
   </div>
 </Sheet>
 
@@ -1077,11 +1077,11 @@
         <span style="font-size:13px;font-weight:600;color:var(--text-1)">{item.food.name}</span>
         <div style="display:flex;gap:10px">
           <div style="flex:1">
-            <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:5px">Serving Size</label>
+            <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:5px">{$_('meal_editor.field_serving_size')}</label>
             <input class="input" type="number" min="0.1" step="0.1" bind:value={item.portion} style="width:100%;font-size:16px" />
           </div>
           <div style="width:100px">
-            <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:5px">Unit</label>
+            <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:5px">{$_('meal_editor.field_unit')}</label>
             <UnitPicker bind:value={item.unit} />
           </div>
           <div style="width:60px">
@@ -1143,7 +1143,7 @@
           on:keydown={() => {}}></div>
       </div>
       <div class="cam-footer">
-        <button class="btn btn-primary cam-capture-btn" on:click={confirmCrop}>Use This Crop</button>
+        <button class="btn btn-primary cam-capture-btn" on:click={confirmCrop}>{$_('meal_editor.use_this_crop')}</button>
       </div>
     </div>
   </div>
