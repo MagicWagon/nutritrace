@@ -711,9 +711,6 @@
       "open_settings":       "Open Settings"
     }
   },
-  "smart_log": {
-    "placeholder": "for breakfast I had 2 eggs and toast"
-  },
   "goals_page": {
     "adaptive": {
       "title":           "Adaptive TDEE",
@@ -1021,6 +1018,7 @@
     "cancel":              "Cancel"
   },
   "smart_log": {
+    "placeholder":         "for breakfast I had 2 eggs and toast",
     "title":               "Smart Log",
     "badge_local":         "Local",
     "badge_recipe":        "Recipe",
@@ -1186,6 +1184,9 @@
       "save_copy_failed":      "Could not save copy: {error}",
       "save_failed":           "Save failed: {error}",
       "unknown_error":         "unknown error"
+    },
+    "errors": {
+      "name_required":         "Please enter a name"
     }
   },
   "meal_editor": {
