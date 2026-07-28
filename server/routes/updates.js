@@ -27,11 +27,15 @@ const CACHE_KEYS = {
     latest:    'updates_server_latest',
     checkedAt: 'updates_server_checked_at',
     notesUrl:  'updates_server_notes_url',
+    notes:     'updates_server_notes',
+    publishedAt: 'updates_server_published_at',
   },
   dev: {
     latest:    'updates_server_latest_dev',
     checkedAt: 'updates_server_checked_at_dev',
     notesUrl:  'updates_server_notes_url_dev',
+    notes:     'updates_server_notes_dev',
+    publishedAt: 'updates_server_published_at_dev',
   },
 };
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -50,6 +54,7 @@ function _setCfg(key, value) {
 
 async function _fetchLatest(channel) {
   const headers = { 'Accept': 'application/vnd.github+json', 'User-Agent': UA };
+  let data;
   if (channel === 'dev') {
     // List recent releases and pick the newest that is a numbered
     // -dev.N pre-release. Skips the `dev-latest` floating tag whose
@@ -59,13 +64,19 @@ async function _fetchLatest(channel) {
     if (!res.ok) throw new Error(`GitHub API ${res.status}`);
     const list = await res.json();
     const hit = list.find(r => r.prerelease && DEV_TAG_RE.test(r.tag_name || ''));
-    if (!hit) return { tag: '', notesUrl: '' };
-    return { tag: hit.tag_name || '', notesUrl: hit.html_url || '' };
+    if (!hit) return { tag: '', notesUrl: '', notes: '', publishedAt: '' };
+    data = hit;
+  } else {
+    const res = await fetch(`${GH_REPO_URL}/releases/latest`, { headers });
+    if (!res.ok) throw new Error(`GitHub API ${res.status}`);
+    data = await res.json();
   }
-  const res = await fetch(`${GH_REPO_URL}/releases/latest`, { headers });
-  if (!res.ok) throw new Error(`GitHub API ${res.status}`);
-  const data = await res.json();
-  return { tag: data.tag_name || '', notesUrl: data.html_url || '' };
+  return {
+    tag:         data.tag_name    || '',
+    notesUrl:    data.html_url    || '',
+    notes:       data.body        || '',
+    publishedAt: data.published_at || '',
+  };
 }
 
 /**
@@ -93,20 +104,28 @@ router.get('/server-status', requireAuth, requireAdmin, wrap(async (req, res) =>
   const checkedAtMs  = checkedAtRaw ? Date.parse(checkedAtRaw) : 0;
   const cached       = _getCfg(keys.latest);
   const cachedUrl    = _getCfg(keys.notesUrl);
+  const cachedNotes  = _getCfg(keys.notes);
+  const cachedPub    = _getCfg(keys.publishedAt);
 
-  let latest    = cached;
-  let notesUrl  = cachedUrl || '';
-  let checkedAt = checkedAtRaw;
+  let latest      = cached;
+  let notesUrl    = cachedUrl   || '';
+  let notes       = cachedNotes || '';
+  let publishedAt = cachedPub   || '';
+  let checkedAt   = checkedAtRaw;
 
   if (force || !cached || now - checkedAtMs > CACHE_TTL_MS) {
     try {
       const fresh = await _fetchLatest(channel);
-      latest    = fresh.tag;
-      notesUrl  = fresh.notesUrl;
-      checkedAt = new Date().toISOString();
-      _setCfg(keys.latest, latest);
-      _setCfg(keys.notesUrl, notesUrl);
-      _setCfg(keys.checkedAt, checkedAt);
+      latest      = fresh.tag;
+      notesUrl    = fresh.notesUrl;
+      notes       = fresh.notes;
+      publishedAt = fresh.publishedAt;
+      checkedAt   = new Date().toISOString();
+      _setCfg(keys.latest,      latest);
+      _setCfg(keys.notesUrl,    notesUrl);
+      _setCfg(keys.notes,       notes);
+      _setCfg(keys.publishedAt, publishedAt);
+      _setCfg(keys.checkedAt,   checkedAt);
     } catch (e) {
       // Serve stale cache on failure.
       if (!cached) return res.status(503).json({ error: 'GitHub API unreachable and no cached version.' });
@@ -115,12 +134,14 @@ router.get('/server-status', requireAuth, requireAdmin, wrap(async (req, res) =>
 
   const available = !!(latest && APP_VERSION && APP_VERSION !== 'unknown' && _semverGt(latest, APP_VERSION));
   res.json({
-    current:    APP_VERSION,
+    current:      APP_VERSION,
     latest,
     channel,
     available,
-    notes_url:  notesUrl,
-    checked_at: checkedAt,
+    notes,
+    notes_url:    notesUrl,
+    published_at: publishedAt,
+    checked_at:   checkedAt,
   });
 }));
 

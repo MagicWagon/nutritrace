@@ -289,20 +289,30 @@
       {#if serverInfo.available}
         <div class="divider"></div>
         <div class="server-instructions">
-          <div class="label-desc">{$_('updates.server.instructions')}</div>
+          {#if serverInfo.published_at}
+            <div class="server-when">
+              {$_('updates.released', { values: { when: formatAgo(serverInfo.published_at) } })}
+            </div>
+          {/if}
+          {#if serverInfo.notes}
+            <details class="update-notes" open>
+              <summary>{$_('updates.release_notes_heading')}</summary>
+              <pre>{serverInfo.notes}</pre>
+            </details>
+          {/if}
+          {#if serverInfo.notes_url}
+            <a class="update-link" href={serverInfo.notes_url} target="_blank" rel="noopener">
+              <span class="material-symbols-rounded" style="font-size:14px">open_in_new</span>
+              {$_('updates.view_on_github')}
+            </a>
+          {/if}
+
+          <div class="label-desc" style="margin-top:8px">{$_('updates.server.instructions')}</div>
           <pre class="server-cmd">docker-compose pull && docker-compose up -d</pre>
-          <div class="update-actions">
-            <button class="btn btn-secondary" on:click={copyDockerCommand}>
-              <span class="material-symbols-rounded" style="font-size:16px">content_copy</span>
-              {$_('updates.server.copy_command')}
-            </button>
-            {#if serverInfo.notes_url}
-              <a class="btn btn-secondary" href={serverInfo.notes_url} target="_blank" rel="noopener">
-                <span class="material-symbols-rounded" style="font-size:16px">open_in_new</span>
-                {$_('updates.server.view_notes')}
-              </a>
-            {/if}
-          </div>
+          <button class="btn btn-secondary" style="align-self:flex-start" on:click={copyDockerCommand}>
+            <span class="material-symbols-rounded" style="font-size:16px">content_copy</span>
+            {$_('updates.server.copy_command')}
+          </button>
           <div class="channel-note">
             <span class="material-symbols-rounded" style="font-size:14px">info</span>
             {$_('updates.server.channel_note')}
@@ -470,7 +480,8 @@
     padding: 0 0 10px 30px;
     font-size: 12px; color: var(--text-2);
   }
-  .server-instructions { padding: 12px 0 4px; display: flex; flex-direction: column; gap: 12px; }
+  .server-instructions { padding: 12px 0 4px; display: flex; flex-direction: column; gap: 10px; }
+  .server-when { font-size: 12px; color: var(--text-2); font-weight: 500; }
   .server-cmd {
     background: var(--surface-2); padding: 12px 14px; border-radius: 8px;
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;

@@ -258,6 +258,17 @@ export async function downloadAndInstallApk(latest, onProgress) {
 
   const path = `updates/${latest.apkAsset.name}`;
 
+  // Filesystem.downloadFile accepts { recursive: true } but that flag
+  // doesn't reliably create the parent directory on Capacitor 8's
+  // Android side — the underlying openFileOutput call throws ENOENT
+  // when updates/ doesn't already exist. Ensure it up-front.
+  try {
+    await Filesystem.mkdir({ path: 'updates', directory: Directory.Data, recursive: true });
+  } catch (e) {
+    // ok if it already exists — plugin throws "Directory exists" in that case.
+    if (!/exist/i.test(e?.message || '')) throw e;
+  }
+
   // Wire native progress events (Capacitor Filesystem 5.0+). Silently
   // no-ops on older builds — fall back to a fake 0 → 100 flip on
   // completion so the UI doesn't just hang without feedback.
