@@ -56,16 +56,20 @@ async function _fetchLatest(channel) {
   const headers = { 'Accept': 'application/vnd.github+json', 'User-Agent': UA };
   let data;
   if (channel === 'dev') {
-    // List recent releases and pick the newest that is a numbered
-    // -dev.N pre-release. Skips the `dev-latest` floating tag whose
-    // tag_name is the string literal (not a semver), which would
-    // otherwise defeat version-compare.
-    const res = await fetch(`${GH_REPO_URL}/releases?per_page=20`, { headers });
+    // List recent releases, filter to numbered -dev.N pre-releases,
+    // then SORT by semver descending. GH's /releases endpoint doesn't
+    // guarantee semver order — `dev.10` typically sorts after `dev.2`
+    // in the default list, so picking `[0]` returns the wrong newest.
+    // Skips the `dev-latest` floating tag whose tag_name is the string
+    // literal (not a semver), which would defeat version-compare.
+    const res = await fetch(`${GH_REPO_URL}/releases?per_page=30`, { headers });
     if (!res.ok) throw new Error(`GitHub API ${res.status}`);
     const list = await res.json();
-    const hit = list.find(r => r.prerelease && DEV_TAG_RE.test(r.tag_name || ''));
-    if (!hit) return { tag: '', notesUrl: '', notes: '', publishedAt: '' };
-    data = hit;
+    const devReleases = list
+      .filter(r => r.prerelease && DEV_TAG_RE.test(r.tag_name || ''))
+      .sort((a, b) => _semverCompare(b.tag_name, a.tag_name));
+    if (devReleases.length === 0) return { tag: '', notesUrl: '', notes: '', publishedAt: '' };
+    data = devReleases[0];
   } else {
     const res = await fetch(`${GH_REPO_URL}/releases/latest`, { headers });
     if (!res.ok) throw new Error(`GitHub API ${res.status}`);
@@ -158,6 +162,35 @@ function _parseSemver(tag) {
     ? m[4].split('.').map(s => /^\d+$/.test(s) ? parseInt(s, 10) : s)
     : [];
   return { base, pre };
+}
+
+function _semverCompare(a, b) {
+  const pa = _parseSemver(a);
+  const pb = _parseSemver(b);
+  if (!pa || !pb) return 0;
+  for (let i = 0; i < 3; i++) {
+    if (pa.base[i] > pb.base[i]) return 1;
+    if (pa.base[i] < pb.base[i]) return -1;
+  }
+  if (pa.pre.length === 0 && pb.pre.length === 0) return 0;
+  if (pa.pre.length === 0) return 1;
+  if (pb.pre.length === 0) return -1;
+  const n = Math.max(pa.pre.length, pb.pre.length);
+  for (let i = 0; i < n; i++) {
+    const ai = pa.pre[i], bi = pb.pre[i];
+    if (ai === undefined) return -1;
+    if (bi === undefined) return 1;
+    if (typeof ai === 'number' && typeof bi === 'number') {
+      if (ai > bi) return 1;
+      if (ai < bi) return -1;
+      continue;
+    }
+    if (typeof ai === 'number') return -1;
+    if (typeof bi === 'number') return 1;
+    if (ai > bi) return 1;
+    if (ai < bi) return -1;
+  }
+  return 0;
 }
 
 function _semverGt(a, b) {

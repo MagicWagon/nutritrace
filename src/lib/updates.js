@@ -178,23 +178,27 @@ export async function checkForUpdate({ force = false } = {}) {
     let data;
     if (channel === 'dev' || channel === 'beta') {
       // Beta is the legacy alias for Dev; kept accepted so older cached
-      // values still resolve. List up to 20 recent releases and pick the
-      // newest that's flagged prerelease with a numbered -dev.N tag.
-      // Ignoring the `dev-latest` floating tag itself (its tag_name is
-      // the string literal, not a semver).
+      // values still resolve. List up to 30 recent releases, filter to
+      // numbered -dev.N pre-releases, then SORT by semver descending —
+      // GH's /releases endpoint doesn't guarantee semver order (dev.10
+      // sorts after dev.2 in GH's default ordering, so `list[0]` picks
+      // dev.9 even when dev.10 exists). Ignoring the `dev-latest`
+      // floating tag itself (its tag_name is the string literal, not
+      // a semver).
       const listRes = await fetch(
-        `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/releases?per_page=20`,
+        `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/releases?per_page=30`,
         { headers },
       );
       if (!listRes.ok) throw new Error(`GitHub API ${listRes.status}`);
       const list = await listRes.json();
       const devTag = /^v\d+\.\d+\.\d+-dev\.\d+$/;
-      const devRelease = list.find(r => r.prerelease && devTag.test(r.tag_name || ''));
-      if (!devRelease) {
-        // No numbered dev release exists yet; nothing to offer.
+      const devReleases = list
+        .filter(r => r.prerelease && devTag.test(r.tag_name || ''))
+        .sort((a, b) => compareSemver(b.tag_name, a.tag_name));
+      if (devReleases.length === 0) {
         return null;
       }
-      data = devRelease;
+      data = devReleases[0];
     } else {
       const res = await fetch(
         `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/releases/latest`,
