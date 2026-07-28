@@ -661,7 +661,7 @@
                   class:input-active={!SYNC_RANGE_ALL_VALUES.has(wellnessSyncRangeVal)}
                   value={wellnessSyncRangeVal}
                   on:change={e => { const v = Math.max(1, Math.min(CUSTOM_MAX_FITBIT, parseInt(e.target.value)||1)); wellnessSyncRangeVal = v; wellnessSyncRange.set(v); }}
-                  placeholder="days" title="Custom number of days (max {CUSTOM_MAX_FITBIT})" />
+                  placeholder={$_('settings_wellness.common.custom_days_ph')} title={$_('settings_wellness.common.custom_days_title', { values: { max: CUSTOM_MAX_FITBIT } })} />
                 <span class="setting-desc" style="margin:0">days</span>
               </div>
             </div>
@@ -702,9 +702,9 @@
                 <div class="setting-desc">Only sync during these hours. Leave blank for all day.</div>
               </div>
               <div style="display:flex;gap:8px;align-items:center">
-                <TimePicker value={fitbitSyncWindowStartVal} placeholder="Start" on:change={e => { fitbitSyncWindowStartVal = e.detail; fitbitSyncWindowStart.set(e.detail || null); }} />
+                <TimePicker value={fitbitSyncWindowStartVal} placeholder={$_('settings_wellness.common.time_start')} on:change={e => { fitbitSyncWindowStartVal = e.detail; fitbitSyncWindowStart.set(e.detail || null); }} />
                 <span style="color:var(--text-3)">to</span>
-                <TimePicker value={fitbitSyncWindowEndVal} placeholder="End" on:change={e => { fitbitSyncWindowEndVal = e.detail; fitbitSyncWindowEnd.set(e.detail || null); }} />
+                <TimePicker value={fitbitSyncWindowEndVal} placeholder={$_('settings_wellness.common.time_end')} on:change={e => { fitbitSyncWindowEndVal = e.detail; fitbitSyncWindowEnd.set(e.detail || null); }} />
               </div>
             </div>
           {/if}
@@ -755,11 +755,11 @@
               <div class="setting-desc">Authorize NutriTrace to read your Fitbit data via Google Health.</div>
             </div>
             <div style="display:flex;gap:8px;align-items:center">
-              <button class="btn btn-ghost" style="height:32px;padding:0 10px;font-size:13px" on:click={() => fitbitEditingCreds = true} title="Change API credentials">
+              <button class="btn btn-ghost" style="height:32px;padding:0 10px;font-size:13px" on:click={() => fitbitEditingCreds = true} title={$_('settings_wellness.common.change_creds_title')}>
                 <span class="material-symbols-rounded" style="font-size:16px">edit</span>
               </button>
               <button class="btn btn-primary" style="height:32px;padding:0 12px;font-size:13px" on:click={connectFitbitFromSettings} disabled={connectingFitbit}>
-                {connectingFitbit ? 'Connecting…' : 'Connect'}
+                {connectingFitbit ? $_('settings_wellness.common.connecting') : $_('settings_wellness.common.connect')}
               </button>
             </div>
           </div>
@@ -769,7 +769,7 @@
                longer accepts new app registrations). -->
           <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:12px">
             <div>
-              <span class="setting-label">API Credentials</span>
+              <span class="setting-label">{$_('settings_wellness.common.api_credentials')}</span>
               <div class="setting-desc" style="line-height:1.5">
                 Fitbit setup now uses Google Cloud Console (legacy dev.fitbit.com no
                 longer accepts new app registrations). Create an OAuth 2.0 client
@@ -779,40 +779,40 @@
             </div>
             <div style="width:100%;display:flex;flex-direction:column;gap:8px">
               <div class="form-group" style="margin:0">
-                <label class="form-label">Client ID</label>
+                <label class="form-label">{$_('settings_wellness.common.client_id')}</label>
                 <input class="input" type="text" autocomplete="off" placeholder="From Google Cloud Console → APIs & Services → Credentials"
                   bind:value={fitbitClientId} />
               </div>
               <div class="form-group" style="margin:0">
-                <label class="form-label">Client Secret</label>
+                <label class="form-label">{$_('settings_wellness.common.client_secret')}</label>
                 <div style="display:flex;gap:6px">
                   {#if fitbitShowSecret}
                     <input class="input" type="text" autocomplete="new-password" placeholder="••••••••" bind:value={fitbitClientSecret} style="flex:1" />
                   {:else}
                     <input class="input" type="password" autocomplete="new-password" placeholder="••••••••" bind:value={fitbitClientSecret} style="flex:1" />
                   {/if}
-                  <button class="btn-icon" on:click={() => fitbitShowSecret = !fitbitShowSecret} title={fitbitShowSecret ? 'Hide' : 'Show'}>
+                  <button class="btn-icon" on:click={() => fitbitShowSecret = !fitbitShowSecret} title={fitbitShowSecret ? $_('settings_wellness.common.hide') : $_('settings_wellness.common.show')}>
                     <span class="material-symbols-rounded">{fitbitShowSecret ? 'visibility_off' : 'visibility'}</span>
                   </button>
                 </div>
               </div>
               <div class="form-group" style="margin:0">
-                <label class="form-label">Redirect URI</label>
+                <label class="form-label">{$_('settings_wellness.common.redirect_uri')}</label>
                 <div class="setting-desc" style="margin-bottom:4px">Add this exact URI to your Google Cloud OAuth client's Authorized redirect URIs list</div>
                 <div style="display:flex;gap:6px">
                   <input class="input" type="url" placeholder={fitbitRedirectSuggested} bind:value={fitbitRedirectUri} style="flex:1;font-size:12px" />
-                  <button class="btn-icon" title="Use suggested" on:click={() => fitbitRedirectUri = fitbitRedirectSuggested}><span class="material-symbols-rounded">auto_awesome</span></button>
-                  <button class="btn-icon" on:click={copyRedirectUri} title="Copy URI"><span class="material-symbols-rounded">content_copy</span></button>
+                  <button class="btn-icon" title={$_('settings_wellness.common.use_suggested')} on:click={() => fitbitRedirectUri = fitbitRedirectSuggested}><span class="material-symbols-rounded">auto_awesome</span></button>
+                  <button class="btn-icon" on:click={copyRedirectUri} title={$_('settings_wellness.common.copy_uri')}><span class="material-symbols-rounded">content_copy</span></button>
                 </div>
                 <div class="setting-desc" style="font-size:11px;margin-top:2px">Format: <code style="font-size:11px">https://your-domain.com/api/wellness/google-health/callback</code></div>
               </div>
-              <button class="btn btn-primary" style="align-self:flex-end" on:click={saveFitbitConfig}>{fitbitEditingCreds ? 'Save' : 'Save & Connect'}</button>
+              <button class="btn btn-primary" style="align-self:flex-end" on:click={saveFitbitConfig}>{fitbitEditingCreds ? $_('settings_wellness.common.save') : $_('settings_wellness.common.save_and_connect')}</button>
             </div>
           </div>
         {/if}
         <div class="setting-divider"></div>
         <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px">
-          <span class="setting-label">Visible Metrics</span>
+          <span class="setting-label">{$_('settings_wellness.common.visible_metrics')}</span>
           <div class="chip-group" style="flex-wrap:wrap;gap:6px">
             {#each FITBIT_METRICS as m}
               <button class="chip" class:chip-active={$wellnessMetrics == null || $wellnessMetrics.includes(m.id)}
@@ -823,7 +823,7 @@
         <div class="setting-divider"></div>
         <div class="setting-row">
           <div>
-            <span class="setting-label">Workout History</span>
+            <span class="setting-label">{$_('settings_wellness.common.workout_history')}</span>
             <div class="setting-desc">Show recorded workouts with GPS route maps in the Movement tab. Requires a GPS-enabled device.</div>
           </div>
           <Toggle checked={workoutsEnabledVal} on:change={e => { workoutsEnabledVal = e.detail; workoutsEnabled.set(e.detail); }} />
@@ -902,7 +902,7 @@
                   class:input-active={!SYNC_RANGE_ALL_VALUES.has(garminSyncRangeVal)}
                   value={garminSyncRangeVal}
                   on:change={e => { const v = Math.max(1, Math.min(CUSTOM_MAX_GARMIN, parseInt(e.target.value)||1)); garminSyncRangeVal = v; garminSyncRange.set(v); }}
-                  placeholder="days" title="Custom number of days (max {CUSTOM_MAX_GARMIN})" />
+                  placeholder={$_('settings_wellness.common.custom_days_ph')} title={$_('settings_wellness.common.custom_days_title', { values: { max: CUSTOM_MAX_GARMIN } })} />
                 <span class="setting-desc" style="margin:0">days</span>
               </div>
             </div>
@@ -943,9 +943,9 @@
                 <div class="setting-desc">Only sync during these hours. Leave blank for all day.</div>
               </div>
               <div style="display:flex;gap:8px;align-items:center">
-                <TimePicker value={garminSyncWindowStartVal} placeholder="Start" on:change={e => { garminSyncWindowStartVal = e.detail; garminSyncWindowStart.set(e.detail || null); }} />
+                <TimePicker value={garminSyncWindowStartVal} placeholder={$_('settings_wellness.common.time_start')} on:change={e => { garminSyncWindowStartVal = e.detail; garminSyncWindowStart.set(e.detail || null); }} />
                 <span style="color:var(--text-3)">to</span>
-                <TimePicker value={garminSyncWindowEndVal} placeholder="End" on:change={e => { garminSyncWindowEndVal = e.detail; garminSyncWindowEnd.set(e.detail || null); }} />
+                <TimePicker value={garminSyncWindowEndVal} placeholder={$_('settings_wellness.common.time_end')} on:change={e => { garminSyncWindowEndVal = e.detail; garminSyncWindowEnd.set(e.detail || null); }} />
               </div>
             </div>
           {/if}
@@ -964,18 +964,18 @@
               <div class="setting-desc">Authorize NutriTrace to read your Garmin data.</div>
             </div>
             <div style="display:flex;gap:8px;align-items:center">
-              <button class="btn btn-ghost" style="height:32px;padding:0 10px;font-size:13px" on:click={() => garminEditingCreds = true} title="Change API credentials">
+              <button class="btn btn-ghost" style="height:32px;padding:0 10px;font-size:13px" on:click={() => garminEditingCreds = true} title={$_('settings_wellness.common.change_creds_title')}>
                 <span class="material-symbols-rounded" style="font-size:16px">edit</span>
               </button>
               <button class="btn btn-primary" style="height:32px;padding:0 12px;font-size:13px" on:click={connectGarminFromSettings} disabled={connectingGarmin}>
-                {connectingGarmin ? 'Connecting…' : 'Connect'}
+                {connectingGarmin ? $_('settings_wellness.common.connecting') : $_('settings_wellness.common.connect')}
               </button>
             </div>
           </div>
         {:else}
           <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:12px">
             <div>
-              <span class="setting-label">API Credentials</span>
+              <span class="setting-label">{$_('settings_wellness.common.api_credentials')}</span>
               <div class="setting-desc" style="line-height:1.4">
                 OAuth 1.0a credentials from your approved Garmin Health API app. Redirect URI must match exactly.
                 <a href="https://developer.garmin.com/gc-developer-program/health-api/" target="_blank" rel="noopener" class="about-link">Get API credentials →</a>
@@ -995,28 +995,28 @@
                   {:else}
                     <input class="input" type="password" autocomplete="new-password" placeholder="••••••••" bind:value={garminConsumerSecret} style="flex:1" />
                   {/if}
-                  <button class="btn-icon" on:click={() => garminShowSecret = !garminShowSecret} title={garminShowSecret ? 'Hide' : 'Show'}>
+                  <button class="btn-icon" on:click={() => garminShowSecret = !garminShowSecret} title={garminShowSecret ? $_('settings_wellness.common.hide') : $_('settings_wellness.common.show')}>
                     <span class="material-symbols-rounded">{garminShowSecret ? 'visibility_off' : 'visibility'}</span>
                   </button>
                 </div>
               </div>
               <div class="form-group" style="margin:0">
-                <label class="form-label">Redirect URI</label>
+                <label class="form-label">{$_('settings_wellness.common.redirect_uri')}</label>
                 <div class="setting-desc" style="margin-bottom:4px">Register this exact URI in your Garmin app settings</div>
                 <div style="display:flex;gap:6px">
                   <input class="input" type="url" placeholder={garminRedirectSuggested} bind:value={garminRedirectUri} style="flex:1;font-size:12px" />
-                  <button class="btn-icon" title="Use suggested" on:click={() => garminRedirectUri = garminRedirectSuggested}><span class="material-symbols-rounded">auto_awesome</span></button>
-                  <button class="btn-icon" on:click={copyGarminRedirectUri} title="Copy URI"><span class="material-symbols-rounded">content_copy</span></button>
+                  <button class="btn-icon" title={$_('settings_wellness.common.use_suggested')} on:click={() => garminRedirectUri = garminRedirectSuggested}><span class="material-symbols-rounded">auto_awesome</span></button>
+                  <button class="btn-icon" on:click={copyGarminRedirectUri} title={$_('settings_wellness.common.copy_uri')}><span class="material-symbols-rounded">content_copy</span></button>
                 </div>
                 <div class="setting-desc" style="font-size:11px;margin-top:2px">Format: <code style="font-size:11px">https://your-domain.com/api/wellness/garmin/callback</code></div>
               </div>
-              <button class="btn btn-primary" style="align-self:flex-end" on:click={saveGarminConfig}>{garminEditingCreds ? 'Save' : 'Save & Connect'}</button>
+              <button class="btn btn-primary" style="align-self:flex-end" on:click={saveGarminConfig}>{garminEditingCreds ? $_('settings_wellness.common.save') : $_('settings_wellness.common.save_and_connect')}</button>
             </div>
           </div>
         {/if}
         <div class="setting-divider"></div>
         <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px">
-          <span class="setting-label">Visible Metrics</span>
+          <span class="setting-label">{$_('settings_wellness.common.visible_metrics')}</span>
           <div class="chip-group" style="flex-wrap:wrap;gap:6px">
             {#each GARMIN_METRICS as m}
               <button class="chip" class:chip-active={$wellnessMetrics == null || $wellnessMetrics.includes(m.id)}
@@ -1095,7 +1095,7 @@
                   class:input-active={!SYNC_RANGE_ALL_VALUES.has(withingsSyncRangeVal)}
                   value={withingsSyncRangeVal}
                 on:change={e => { const v = Math.max(1, Math.min(CUSTOM_MAX_WITHINGS, parseInt(e.target.value)||1)); withingsSyncRangeVal = v; withingsSyncRange.set(v); }}
-                placeholder="days" title="Custom number of days (max {CUSTOM_MAX_WITHINGS})" />
+                placeholder={$_('settings_wellness.common.custom_days_ph')} title={$_('settings_wellness.common.custom_days_title', { values: { max: CUSTOM_MAX_WITHINGS } })} />
               <span class="setting-desc" style="margin:0">days</span>
             </div>
             </div>
@@ -1136,9 +1136,9 @@
                 <div class="setting-desc">Only sync during these hours. Leave blank for all day.</div>
               </div>
               <div style="display:flex;gap:8px;align-items:center">
-                <TimePicker value={withingsSyncWindowStartVal} placeholder="Start" on:change={e => { withingsSyncWindowStartVal = e.detail; withingsSyncWindowStart.set(e.detail || null); }} />
+                <TimePicker value={withingsSyncWindowStartVal} placeholder={$_('settings_wellness.common.time_start')} on:change={e => { withingsSyncWindowStartVal = e.detail; withingsSyncWindowStart.set(e.detail || null); }} />
                 <span style="color:var(--text-3)">to</span>
-                <TimePicker value={withingsSyncWindowEndVal} placeholder="End" on:change={e => { withingsSyncWindowEndVal = e.detail; withingsSyncWindowEnd.set(e.detail || null); }} />
+                <TimePicker value={withingsSyncWindowEndVal} placeholder={$_('settings_wellness.common.time_end')} on:change={e => { withingsSyncWindowEndVal = e.detail; withingsSyncWindowEnd.set(e.detail || null); }} />
               </div>
             </div>
           {/if}
@@ -1157,11 +1157,11 @@
               <div class="setting-desc">Authorize NutriTrace to read your Withings data.</div>
             </div>
             <div style="display:flex;gap:8px;align-items:center">
-              <button class="btn btn-ghost" style="height:32px;padding:0 10px;font-size:13px" on:click={() => withingsEditingCreds = true} title="Change API credentials">
+              <button class="btn btn-ghost" style="height:32px;padding:0 10px;font-size:13px" on:click={() => withingsEditingCreds = true} title={$_('settings_wellness.common.change_creds_title')}>
                 <span class="material-symbols-rounded" style="font-size:16px">edit</span>
               </button>
               <button class="btn btn-primary" style="height:32px;padding:0 12px;font-size:13px" on:click={connectWithingsFromSettings} disabled={connectingWithings}>
-                {connectingWithings ? 'Connecting…' : 'Connect'}
+                {connectingWithings ? $_('settings_wellness.common.connecting') : $_('settings_wellness.common.connect')}
               </button>
             </div>
           </div>
@@ -1169,7 +1169,7 @@
           <!-- No credentials yet — show inline setup form -->
           <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:12px">
             <div>
-              <span class="setting-label">API Credentials</span>
+              <span class="setting-label">{$_('settings_wellness.common.api_credentials')}</span>
               <div class="setting-desc" style="line-height:1.4">
                 Create a Withings developer account and a new application of type "Personal use" or "Public Cloud Partner". Then paste the Client ID + Secret here and add the redirect URI below to your app's authorized list.
                 <a href="https://developer.withings.com/dashboard/" target="_blank" rel="noopener" class="about-link">Withings developer dashboard →</a>
@@ -1177,40 +1177,40 @@
             </div>
             <div style="width:100%;display:flex;flex-direction:column;gap:8px">
               <div class="form-group" style="margin:0">
-                <label class="form-label">Client ID</label>
+                <label class="form-label">{$_('settings_wellness.common.client_id')}</label>
                 <input class="input" type="text" autocomplete="off" placeholder="e.g. abc123def456"
                   bind:value={withingsClientId} />
               </div>
               <div class="form-group" style="margin:0">
-                <label class="form-label">Client Secret</label>
+                <label class="form-label">{$_('settings_wellness.common.client_secret')}</label>
                 <div style="display:flex;gap:6px">
                   {#if withingsShowSecret}
                     <input class="input" type="text" autocomplete="new-password" placeholder="••••••••" bind:value={withingsClientSecret} style="flex:1" />
                   {:else}
                     <input class="input" type="password" autocomplete="new-password" placeholder="••••••••" bind:value={withingsClientSecret} style="flex:1" />
                   {/if}
-                  <button class="btn-icon" on:click={() => withingsShowSecret = !withingsShowSecret} title={withingsShowSecret ? 'Hide' : 'Show'}>
+                  <button class="btn-icon" on:click={() => withingsShowSecret = !withingsShowSecret} title={withingsShowSecret ? $_('settings_wellness.common.hide') : $_('settings_wellness.common.show')}>
                     <span class="material-symbols-rounded">{withingsShowSecret ? 'visibility_off' : 'visibility'}</span>
                   </button>
                 </div>
               </div>
               <div class="form-group" style="margin:0">
-                <label class="form-label">Redirect URI</label>
+                <label class="form-label">{$_('settings_wellness.common.redirect_uri')}</label>
                 <div class="setting-desc" style="margin-bottom:4px">Add this exact URI to your Withings app's redirect URL list</div>
                 <div style="display:flex;gap:6px">
                   <input class="input" type="url" placeholder={withingsRedirectSuggested} bind:value={withingsRedirectUri} style="flex:1;font-size:12px" />
-                  <button class="btn-icon" title="Use suggested" on:click={() => withingsRedirectUri = withingsRedirectSuggested}><span class="material-symbols-rounded">auto_awesome</span></button>
-                  <button class="btn-icon" on:click={copyWithingsRedirectUri} title="Copy URI"><span class="material-symbols-rounded">content_copy</span></button>
+                  <button class="btn-icon" title={$_('settings_wellness.common.use_suggested')} on:click={() => withingsRedirectUri = withingsRedirectSuggested}><span class="material-symbols-rounded">auto_awesome</span></button>
+                  <button class="btn-icon" on:click={copyWithingsRedirectUri} title={$_('settings_wellness.common.copy_uri')}><span class="material-symbols-rounded">content_copy</span></button>
                 </div>
                 <div class="setting-desc" style="font-size:11px;margin-top:2px">Format: <code style="font-size:11px">https://your-domain.com/api/wellness/withings/callback</code></div>
               </div>
-              <button class="btn btn-primary" style="align-self:flex-end" on:click={saveWithingsConfig}>{withingsEditingCreds ? 'Save' : 'Save & Connect'}</button>
+              <button class="btn btn-primary" style="align-self:flex-end" on:click={saveWithingsConfig}>{withingsEditingCreds ? $_('settings_wellness.common.save') : $_('settings_wellness.common.save_and_connect')}</button>
             </div>
           </div>
         {/if}
         <div class="setting-divider"></div>
         <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px">
-          <span class="setting-label">Visible Metrics</span>
+          <span class="setting-label">{$_('settings_wellness.common.visible_metrics')}</span>
           <div class="chip-group" style="flex-wrap:wrap;gap:6px">
             {#each WITHINGS_METRICS as m}
               <button class="chip" class:chip-active={$wellnessMetrics == null || $wellnessMetrics.includes(m.id)}
@@ -1314,9 +1314,9 @@
                   <div class="setting-desc">Only sync during these hours. Leave blank for all day.</div>
                 </div>
                 <div style="display:flex;gap:8px;align-items:center">
-                  <TimePicker value={hcSyncWindowStartVal} placeholder="Start" on:change={e => { hcSyncWindowStartVal = e.detail; healthConnectSyncWindowStart.set(e.detail || null); }} />
+                  <TimePicker value={hcSyncWindowStartVal} placeholder={$_('settings_wellness.common.time_start')} on:change={e => { hcSyncWindowStartVal = e.detail; healthConnectSyncWindowStart.set(e.detail || null); }} />
                   <span style="color:var(--text-3)">to</span>
-                  <TimePicker value={hcSyncWindowEndVal} placeholder="End" on:change={e => { hcSyncWindowEndVal = e.detail; healthConnectSyncWindowEnd.set(e.detail || null); }} />
+                  <TimePicker value={hcSyncWindowEndVal} placeholder={$_('settings_wellness.common.time_end')} on:change={e => { hcSyncWindowEndVal = e.detail; healthConnectSyncWindowEnd.set(e.detail || null); }} />
                 </div>
               </div>
             {/if}
@@ -1334,7 +1334,7 @@
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px">
-            <span class="setting-label">Visible Metrics</span>
+            <span class="setting-label">{$_('settings_wellness.common.visible_metrics')}</span>
             <div class="chip-group" style="flex-wrap:wrap;gap:6px">
               {#each HC_METRICS as m}
                 <button class="chip" class:chip-active={$wellnessMetrics == null || $wellnessMetrics.includes(m.id)}

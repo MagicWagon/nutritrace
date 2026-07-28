@@ -906,7 +906,14 @@
       "experimental":         "Experimental",
       "save_failed_prefix":   "Failed to save: ",
       "sync_failed":          "Sync failed: {error}",
-      "reset_visible_metrics": "Reset all visible metrics"
+      "reset_visible_metrics": "Reset all visible metrics",
+      "workout_history":      "Workout History",
+      "workout_history_desc": "Show recorded workouts with GPS route maps in the Movement tab. Requires a GPS-enabled device.",
+      "custom_days_ph":       "days",
+      "custom_days_title":    "Custom number of days (max {max})",
+      "authorize_desc":       "Authorize NutriTrace to read your {provider} data.",
+      "authorize_desc_fitbit": "Authorize NutriTrace to read your Fitbit data via Google Health.",
+      "server_only_desc":     "Requires a server connection for OAuth authentication. In local mode, use Health Connect below to read {provider} data directly from your Android device."
     },
     "fitbit": {
       "title":                 "Fitbit",
