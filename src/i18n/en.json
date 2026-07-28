@@ -973,6 +973,17 @@
     "hex_code":               "Hex Code",
     "apply_color":            "Apply Color"
   },
+  "time_picker": {
+    "hour":          "Hour",
+    "minute":        "Minute",
+    "cancel":        "Cancel",
+    "set_time":      "Set Time"
+  },
+  "nutrition_facts": {
+    "title":         "Nutrition Facts",
+    "serving_size":  "Serving Size",
+    "amount_per":    "Amount Per Serving"
+  },
   "fasting_insights": {
     "title":               "Fasting",
     "avg_duration":        "Avg duration",
