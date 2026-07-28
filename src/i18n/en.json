@@ -964,6 +964,90 @@
       "prefer_wearable_desc":    "When LiftTrace sends a completed workout's estimated calories burned…"
     }
   },
+  "settings_api_tokens": {
+    "toast": {
+      "load_failed":            "Failed to load tokens",
+      "scope_required":         "At least one scope required",
+      "create_failed":          "Create failed",
+      "revoke_failed":          "Revoke failed",
+      "revoked":                "Token revoked",
+      "copied":                 "Token copied to clipboard",
+      "copy_failed":            "Could not copy. Select and copy manually."
+    },
+    "intro_before":       "Bearer tokens for sister TraceApps (LiftTrace, CookTrace",
+    "intro_middle":       ") or other authorized integrations to read or write your data via the federation API at",
+    "intro_dev":          "(in development)",
+    "intro_see":          "See",
+    "just_created": {
+      "title":            "New token:",
+      "warn":             "Copy this token now. You won't be able to see it again.",
+      "copy":             "Copy",
+      "saved":            "I've saved it"
+    },
+    "empty": {
+      "title":            "No tokens yet",
+      "desc":             "Create one below to let an external app read your data."
+    },
+    "row": {
+      "revoke_title":     "Revoke",
+      "scopes_label":     "scopes:",
+      "scopes_none":      "none",
+      "last_used":        "last used {when}",
+      "expires":          "expires {when}",
+      "never":            "never",
+      "just_now":         "just now",
+      "min_ago":          "{n}m ago",
+      "hr_ago":           "{n}h ago",
+      "day_ago":          "{n}d ago"
+    },
+    "form": {
+      "new_token":        "New token",
+      "name":             "Name *",
+      "name_ph":          "e.g. CookTrace, my homelab dashboard",
+      "scopes":           "Scopes *",
+      "expires_label":    "Expires after (days, optional)",
+      "expires_ph":       "Leave empty to never expire",
+      "cancel":           "Cancel",
+      "creating":         "Creating…",
+      "create":           "Create token"
+    },
+    "confirm": {
+      "revoke_title":     "Revoke \"{name}\"?",
+      "revoke_msg":       "Apps using this token will immediately stop working. This cannot be undone, you would need to mint a new token and update each connected app.",
+      "revoke_confirm":   "Revoke"
+    }
+  },
+  "settings_import_export": {
+    "toast": {
+      "backup_exported":         "Backup exported",
+      "backup_restored_reload":  "Backup restored, reloading...",
+      "export_failed_prefix":    "Export failed: {error}",
+      "import_failed_prefix":    "Import failed: {error}",
+      "csv_exported":            "CSV exported",
+      "activity_csv_exported":   "Activity CSV exported",
+      "imported_foods":          "Imported {n} foods",
+      "imported_foods_one":      "Imported {n} food",
+      "imported_foods_skipped":  "Imported {n} foods ({skipped} duplicate barcodes skipped)",
+      "imported_food_skipped":   "Imported {n} food ({skipped} duplicate barcode skipped)",
+      "unknown_error":           "Unknown error"
+    },
+    "sections": {
+      "import":                  "Import",
+      "export":                  "Export"
+    },
+    "actions": {
+      "bulk_import":                 "Bulk Import Foods",
+      "bulk_import_desc":            "Paste JSON or upload a CSV to add multiple foods at once. Useful for foods that aren't on Open Food Facts. A template is provided so an LLM can extract label data into the right shape.",
+      "import_json":                 "Import JSON Backup",
+      "import_json_desc":            "Restores from a previously exported JSON file. Merges with existing data, does not erase what's already here.",
+      "export_json":                 "Export JSON Backup",
+      "export_json_desc":            "Lighter portable format, JSON only, no images. Useful for sharing data between accounts or quick text-based exports.",
+      "export_diary_csv":            "Export Diary As CSV",
+      "export_diary_csv_desc":       "Downloads your full diary history as a spreadsheet. Useful for analysis in Excel or Google Sheets.",
+      "export_activity_csv":         "Export Activity As CSV",
+      "export_activity_csv_desc":    "Downloads your full manual activity log (name, calories, duration, distance, MET) as a spreadsheet."
+    }
+  },
   "settings_trace": {
     "toast": {
       "connected":     "Trace AI connected, assistant is ready",

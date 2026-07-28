@@ -60,7 +60,7 @@
       const r = await fetch(apiUrl('/api/admin/api-tokens'), {
         credentials: 'include', headers: _csrfHeaders(),
       });
-      if (!r.ok) throw new Error('Failed to load tokens');
+      if (!r.ok) throw new Error($_('settings_api_tokens.toast.load_failed'));
       const data = await r.json();
       tokens = data.tokens || [];
       knownScopes = data.known_scopes || [];
@@ -82,7 +82,7 @@
   async function createNewToken() {
     if (creating) return;
     if (!newName.trim()) { showError($_('common.errors.name_required')); return; }
-    if (newScopes.size === 0) { showError('At least one scope required'); return; }
+    if (newScopes.size === 0) { showError($_('settings_api_tokens.toast.scope_required')); return; }
 
     creating = true;
     try {
@@ -102,7 +102,7 @@
         }),
       });
       const data = await r.json();
-      if (!r.ok) { showError(data.error || 'Create failed'); return; }
+      if (!r.ok) { showError(data.error || $_('settings_api_tokens.toast.create_failed')); return; }
 
       justCreatedRaw = data.raw;
       justCreatedName = data.token.name;
@@ -120,9 +120,9 @@
 
   async function revokeOne(t) {
     if (!await confirmDialog({
-      title: `Revoke "${t.name}"?`,
-      message: 'Apps using this token will immediately stop working. This cannot be undone — you would need to mint a new token and update each connected app.',
-      confirmText: 'Revoke',
+      title: $_('settings_api_tokens.confirm.revoke_title', { values: { name: t.name } }),
+      message: $_('settings_api_tokens.confirm.revoke_msg'),
+      confirmText: $_('settings_api_tokens.confirm.revoke_confirm'),
       dangerous: true,
     })) return;
     try {
@@ -131,9 +131,9 @@
       });
       if (!r.ok) {
         const data = await r.json().catch(() => ({}));
-        showError(data.error || 'Revoke failed'); return;
+        showError(data.error || $_('settings_api_tokens.toast.revoke_failed')); return;
       }
-      showSuccess('Token revoked');
+      showSuccess($_('settings_api_tokens.toast.revoked'));
       await load();
     } catch (e) {
       showError(e.message);
@@ -143,9 +143,9 @@
   async function copyRaw() {
     try {
       await navigator.clipboard.writeText(justCreatedRaw);
-      showSuccess('Token copied to clipboard');
+      showSuccess($_('settings_api_tokens.toast.copied'));
     } catch {
-      showError('Could not copy. Select and copy manually.');
+      showError($_('settings_api_tokens.toast.copy_failed'));
     }
   }
 
@@ -155,24 +155,23 @@
   }
 
   function _fmtRelative(iso) {
-    if (!iso) return 'never';
+    if (!iso) return $_('settings_api_tokens.row.never');
     const d = new Date(iso.includes('T') ? iso : iso.replace(' ', 'T') + 'Z');
     if (isNaN(d)) return iso;
     const ms = Date.now() - d.getTime();
     const sec = Math.floor(ms / 1000);
-    if (sec < 60) return 'just now';
-    if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
-    if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`;
-    if (sec < 86400 * 30) return `${Math.floor(sec / 86400)}d ago`;
+    if (sec < 60) return $_('settings_api_tokens.row.just_now');
+    if (sec < 3600) return $_('settings_api_tokens.row.min_ago', { values: { n: Math.floor(sec / 60) } });
+    if (sec < 86400) return $_('settings_api_tokens.row.hr_ago',  { values: { n: Math.floor(sec / 3600) } });
+    if (sec < 86400 * 30) return $_('settings_api_tokens.row.day_ago', { values: { n: Math.floor(sec / 86400) } });
     return d.toLocaleDateString();
   }
 </script>
 
 <div class="section-body" transition:slide={{ duration: 180 }}>
       <p class="sub-label" style="padding:0 0 6px">
-        Bearer tokens for sister TraceApps (LiftTrace, CookTrace <em>(in development)</em>) or
-        other authorized integrations to read or write your data via the federation API at
-        <code>/api/v1/</code>. See
+        {$_('settings_api_tokens.intro_before')} <em>{$_('settings_api_tokens.intro_dev')}</em>){$_('settings_api_tokens.intro_middle')}
+        <code>/api/v1/</code>. {$_('settings_api_tokens.intro_see')}
         <a href="https://github.com/traceapps/nutritrace/blob/main/docs/federation.md" target="_blank" rel="noopener">docs/federation.md</a>.
       </p>
 
@@ -180,20 +179,20 @@
         <div class="just-created" transition:slide={{ duration: 160 }}>
           <div class="just-created-title">
             <span class="material-symbols-rounded">key</span>
-            New token: <strong>{justCreatedName}</strong>
+            {$_('settings_api_tokens.just_created.title')} <strong>{justCreatedName}</strong>
           </div>
           <p class="just-created-warn">
-            Copy this token now. You won't be able to see it again.
+            {$_('settings_api_tokens.just_created.warn')}
           </p>
           <div class="just-created-row">
             <code class="just-created-value" title={justCreatedRaw}>{justCreatedRaw}</code>
             <button class="btn btn-secondary" style="height:32px;font-size:12px;padding:0 12px" on:click={copyRaw}>
               <span class="material-symbols-rounded" style="font-size:14px">content_copy</span>
-              Copy
+              {$_('settings_api_tokens.just_created.copy')}
             </button>
           </div>
           <button class="btn btn-ghost" style="margin-top:8px;width:100%" on:click={dismissJustCreated}>
-            I've saved it
+            {$_('settings_api_tokens.just_created.saved')}
           </button>
         </div>
       {/if}
@@ -203,8 +202,8 @@
           <Spinner block size="sm" />
         {:else if tokens.length === 0}
           <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:4px;padding:14px 16px">
-            <span class="setting-label">No tokens yet</span>
-            <span class="setting-desc">Create one below to let an external app read your data.</span>
+            <span class="setting-label">{$_('settings_api_tokens.empty.title')}</span>
+            <span class="setting-desc">{$_('settings_api_tokens.empty.desc')}</span>
           </div>
         {:else}
           {#each tokens as t, i (t.id)}
@@ -213,12 +212,12 @@
               <div class="token-info">
                 <span class="token-name">{t.name}</span>
                 <span class="token-meta text-3 text-sm">
-                  scopes: {t.scopes.join(', ') || 'none'}
-                  · last used {_fmtRelative(t.last_used_at)}
-                  {#if t.expires_at} · expires {_fmtRelative(t.expires_at)}{/if}
+                  {$_('settings_api_tokens.row.scopes_label')} {t.scopes.join(', ') || $_('settings_api_tokens.row.scopes_none')}
+                  · {$_('settings_api_tokens.row.last_used', { values: { when: _fmtRelative(t.last_used_at) } })}
+                  {#if t.expires_at} · {$_('settings_api_tokens.row.expires', { values: { when: _fmtRelative(t.expires_at) } })}{/if}
                 </span>
               </div>
-              <button class="btn-icon" title="Revoke" on:click={() => revokeOne(t)}>
+              <button class="btn-icon" title={$_('settings_api_tokens.row.revoke_title')} on:click={() => revokeOne(t)}>
                 <span class="material-symbols-rounded" style="color:var(--danger)">delete</span>
               </button>
             </div>
@@ -229,16 +228,16 @@
           {#if !showCreateForm}
             <button class="btn btn-secondary" style="width:100%" on:click={() => showCreateForm = true}>
               <span class="material-symbols-rounded" style="font-size:18px">add</span>
-              New token
+              {$_('settings_api_tokens.form.new_token')}
             </button>
           {:else}
             <div class="create-form" transition:slide={{ duration: 160 }}>
               <div class="form-group">
-                <label class="form-label">Name *</label>
-                <input class="input" type="text" placeholder="e.g. CookTrace, my homelab dashboard" bind:value={newName} />
+                <label class="form-label">{$_('settings_api_tokens.form.name')}</label>
+                <input class="input" type="text" placeholder={$_('settings_api_tokens.form.name_ph')} bind:value={newName} />
               </div>
               <div class="form-group">
-                <label class="form-label">Scopes *</label>
+                <label class="form-label">{$_('settings_api_tokens.form.scopes')}</label>
                 <div class="scope-grid">
                   {#each knownScopes as s (s)}
                     <label class="scope-option">
@@ -249,13 +248,13 @@
                 </div>
               </div>
               <div class="form-group">
-                <label class="form-label">Expires after (days, optional)</label>
-                <input class="input" type="number" min="1" placeholder="Leave empty to never expire" bind:value={newExpiresDays} />
+                <label class="form-label">{$_('settings_api_tokens.form.expires_label')}</label>
+                <input class="input" type="number" min="1" placeholder={$_('settings_api_tokens.form.expires_ph')} bind:value={newExpiresDays} />
               </div>
               <div style="display:flex;gap:8px;margin-top:8px">
-                <button class="btn btn-ghost" style="flex:1" on:click={() => { showCreateForm = false; newName = ''; }}>Cancel</button>
+                <button class="btn btn-ghost" style="flex:1" on:click={() => { showCreateForm = false; newName = ''; }}>{$_('settings_api_tokens.form.cancel')}</button>
                 <button class="btn btn-primary" style="flex:2" on:click={createNewToken} disabled={creating}>
-                  {creating ? 'Creating…' : 'Create token'}
+                  {creating ? $_('settings_api_tokens.form.creating') : $_('settings_api_tokens.form.create')}
                 </button>
               </div>
             </div>
