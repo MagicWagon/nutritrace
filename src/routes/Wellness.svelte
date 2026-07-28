@@ -1635,7 +1635,7 @@
                     {/each}
                   </div>
                 {:else}
-                  <p class="text-3 text-sm" style="padding:0 0 8px">No stage data available</p>
+                  <p class="text-3 text-sm" style="padding:0 0 8px">{$_('wellness_deep.no_stage_data')}</p>
                 {/if}
               </div>
             {/if}
@@ -1790,7 +1790,7 @@
               <div class="card" style="margin-top:12px;padding:16px">
                 <div class="sleep-stages-header" style="margin-bottom:12px">
                   <span class="wl-brand-icon" style="font-size:16px;color:var(--accent)"><GarminIcon /></span>
-                  <span class="sleep-stages-title">Garmin</span>
+                  <span class="sleep-stages-title">{$_('wellness_deep.garmin')}</span>
                 </div>
                 <div class="metric-grid">
                   {#each GARMIN_METRICS.filter(m => isVisible(m.id)) as m}
@@ -1818,7 +1818,7 @@
                   <div class="si-header">
                     <span class="material-symbols-rounded si-icon">battery_charging_full</span>
                     <div class="si-title-wrap">
-                      <span class="si-title">Daily Readiness</span>
+                      <span class="si-title">{$_('wellness_deep.daily_readiness')}</span>
                       <span class="si-sub">Calibrating… {readiness.data_days}/{readiness.needed} nights with HRV data</span>
                     </div>
                   </div>
@@ -1828,7 +1828,7 @@
                     <div class="readiness-header-left">
                       <span class="material-symbols-rounded si-icon">battery_charging_full</span>
                       <div class="si-title-wrap">
-                        <span class="si-title">Daily Readiness</span>
+                        <span class="si-title">{$_('wellness_deep.daily_readiness')}</span>
                         <span class="si-sub">
                           HRV baseline {readiness.hrv_baseline} ms{readiness.rhr_baseline != null ? ` · RHR baseline ${readiness.rhr_baseline} bpm` : ''} · {readiness.data_days} days
                         </span>
@@ -1845,15 +1845,15 @@
                       <span class="rd-val" style="color:{readiness.hrv_score >= 65 ? 'var(--accent)' : readiness.hrv_score >= 50 ? '#f59e0b' : '#ef4444'}">{readiness.hrv_score}</span>
                     </div>
                     <div class="readiness-driver">
-                      <span class="rd-label">Resting HR</span>
+                      <span class="rd-label">{$_('wellness_deep.resting_hr')}</span>
                       <span class="rd-val" style="color:{readiness.rhr_score >= 65 ? 'var(--accent)' : readiness.rhr_score >= 50 ? '#f59e0b' : '#ef4444'}">{readiness.rhr_score}</span>
                     </div>
                     <div class="readiness-driver">
-                      <span class="rd-label">Sleep</span>
+                      <span class="rd-label">{$_('wellness_deep.sleep')}</span>
                       <span class="rd-val" style="color:{readiness.sleep_score_used >= 65 ? 'var(--accent)' : readiness.sleep_score_used >= 50 ? '#f59e0b' : '#ef4444'}">{readiness.sleep_score_used}</span>
                     </div>
                     <div class="readiness-driver">
-                      <span class="rd-label">Penalties</span>
+                      <span class="rd-label">{$_('wellness_deep.penalties')}</span>
                       <span class="rd-val" class:rd-penalty={(readiness.activity_penalty + readiness.interaction_penalty) > 0}>
                         {(readiness.activity_penalty + readiness.interaction_penalty) > 0 ? `−${readiness.activity_penalty + readiness.interaction_penalty}` : '—'}
                       </span>
@@ -1890,7 +1890,7 @@
                   <div class="readiness-header-left">
                     <span class="material-symbols-rounded si-icon">self_improvement</span>
                     <div class="si-title-wrap">
-                      <span class="si-title">Resilience</span>
+                      <span class="si-title">{$_('wellness_deep.resilience')}</span>
                       <span class="si-sub">Score: {Math.round(displayData.resilience_score ?? 0)} / 100</span>
                     </div>
                   </div>
@@ -1901,15 +1901,15 @@
                 <p class="resilience-text">{_resText}</p>
                 <div class="readiness-drivers">
                   <div class="readiness-driver">
-                    <span class="rd-label">Physical Calmness</span>
+                    <span class="rd-label">{$_('wellness_deep.physical_calmness')}</span>
                     <span class="rd-val">{Math.round(displayData.resilience_calmness ?? 0)}<span style="font-size:11px;font-weight:500;color:var(--text-3)"> / 30</span></span>
                   </div>
                   <div class="readiness-driver">
-                    <span class="rd-label">Activity Balance</span>
+                    <span class="rd-label">{$_('wellness_deep.activity_balance')}</span>
                     <span class="rd-val">{Math.round(displayData.resilience_activity ?? 0)}<span style="font-size:11px;font-weight:500;color:var(--text-3)"> / 40</span></span>
                   </div>
                   <div class="readiness-driver">
-                    <span class="rd-label">Sleep Patterns</span>
+                    <span class="rd-label">{$_('wellness_deep.sleep_patterns')}</span>
                     <span class="rd-val">{Math.round(displayData.resilience_sleep ?? 0)}<span style="font-size:11px;font-weight:500;color:var(--text-3)"> / 30</span></span>
                   </div>
                 </div>
@@ -1956,7 +1956,7 @@
             <div class="card" style="margin-top:12px;padding:16px">
               <div class="sleep-stages-header" style="margin-bottom:12px">
                 <span class="material-symbols-rounded" style="color:var(--accent)">biotech</span>
-                <span class="sleep-stages-title">Body Scan Scores</span>
+                <span class="sleep-stages-title">{$_('wellness_deep.body_scan_scores')}</span>
               </div>
               <div class="metric-grid">
                 {#each BODY_SCORE_METRICS.filter(m => isVisible(m.id)) as m}
@@ -1982,15 +1982,15 @@
             <div class="card" style="margin-top:12px;padding:16px">
               <div class="sleep-stages-header" style="margin-bottom:4px">
                 <span class="material-symbols-rounded" style="color:var(--accent)">accessibility_new</span>
-                <span class="sleep-stages-title">Segmental Analysis</span>
+                <span class="sleep-stages-title">{$_('wellness_deep.segmental_analysis')}</span>
               </div>
               <p style="font-size:0.75rem;color:var(--text-3);margin:0 0 12px;line-height:1.4">
-                <strong>Muscle</strong> = contractile muscle tissue. <strong>Lean</strong> = all non-fat tissue (muscle + bone + water). Lean is always higher than muscle. These values are absolute weights — percentages in device apps may use a different calculation.
+                {$_('wellness_deep.muscle_lean_note')}
               </p>
               <div class="segmental-table">
                 <div class="seg-header">
                   <span></span>
-                  <span>Muscle</span>
+                  <span>{$_('wellness_deep.muscle')}</span>
                   <span>Lean</span>
                 </div>
                 {#each [
@@ -2027,7 +2027,7 @@
             <div class="connect-icon-wrap">
               <span class="material-symbols-rounded connect-icon">scale</span>
             </div>
-            <h2 class="connect-title">Connect Withings</h2>
+            <h2 class="connect-title">{$_('wellness_deep.connect_withings')}</h2>
             <p class="connect-desc">
               Sync body composition from your Withings scale. Weight, body fat %, muscle mass, bone mass, and more — automatically filled into your diary.
             </p>
@@ -2128,7 +2128,7 @@
       {:else if w.has_gps}
         <div class="workout-map-placeholder">
           <span class="material-symbols-rounded">map</span>
-          <span>No GPS data available</span>
+          <span>{$_('wellness_deep.no_gps')}</span>
           <button class="btn btn-ghost" style="margin-top:8px;font-size:13px" on:click={() => _loadGpsData(w)}>
             <span class="material-symbols-rounded" style="font-size:16px">refresh</span> Retry
           </button>
@@ -2139,12 +2139,12 @@
       <div class="workout-stats-grid">
         <div class="workout-stat">
           <span class="workout-stat-val">{_fmtDuration(w.duration_ms)}</span>
-          <span class="workout-stat-lbl">Duration</span>
+          <span class="workout-stat-lbl">{$_('wellness_deep.duration')}</span>
         </div>
         {#if w.distance_km != null}
           <div class="workout-stat">
             <span class="workout-stat-val">{_fmtWorkoutDist(w.distance_km)}</span>
-            <span class="workout-stat-lbl">Distance</span>
+            <span class="workout-stat-lbl">{$_('wellness_deep.distance')}</span>
           </div>
         {/if}
         {#if w.calories}
@@ -2157,19 +2157,19 @@
         {#if w.steps}
           <div class="workout-stat">
             <span class="workout-stat-val">{w.steps.toLocaleString()}</span>
-            <span class="workout-stat-lbl">Steps</span>
+            <span class="workout-stat-lbl">{$_('wellness_deep.steps')}</span>
           </div>
         {/if}
         {#if w.avg_hr}
           <div class="workout-stat">
             <span class="workout-stat-val">{w.avg_hr}</span>
-            <span class="workout-stat-lbl">Avg HR</span>
+            <span class="workout-stat-lbl">{$_('wellness_deep.avg_hr')}</span>
           </div>
         {/if}
         {#if w.max_hr}
           <div class="workout-stat">
             <span class="workout-stat-val">{w.max_hr}</span>
-            <span class="workout-stat-lbl">Peak HR</span>
+            <span class="workout-stat-lbl">{$_('wellness_deep.peak_hr')}</span>
           </div>
         {/if}
       </div>

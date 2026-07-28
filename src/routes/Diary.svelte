@@ -1504,7 +1504,7 @@
         <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
         <div class="diary-notes-header" on:click={toggleNotes}>
           <span class="material-symbols-rounded diary-notes-icon">edit_note</span>
-          <span class="diary-notes-label">Day Notes</span>
+          <span class="diary-notes-label">{$_('diary_deep.day_notes')}</span>
           {#if _notesText && !notesExpanded}
             <span class="diary-notes-preview text-3 text-sm truncate">{_notesText}</span>
           {/if}
@@ -1569,8 +1569,8 @@
       <div class="dbb-toggle-row">
         <button class="dbb-toggle-pill" on:click|stopPropagation={toggleTotalsMode}
           aria-label="Toggle consumed/remaining">
-          <span class="dbb-tp-opt" class:dbb-tp-active={_totalsMode === 'consumed'}>Consumed</span>
-          <span class="dbb-tp-opt" class:dbb-tp-active={_totalsMode === 'remaining'}>Remaining</span>
+          <span class="dbb-tp-opt" class:dbb-tp-active={_totalsMode === 'consumed'}>{$_('diary_deep.consumed')}</span>
+          <span class="dbb-tp-opt" class:dbb-tp-active={_totalsMode === 'remaining'}>{$_('diary_deep.remaining')}</span>
         </button>
       </div>
       <!-- Mode-aware calorie + macro row -->
@@ -1661,7 +1661,7 @@
          when the user scrolls through the day's water log. -->
     <div class="wc-banner-strip">
       <WaterBanner />
-      <h2 class="wc-banner-title">Water</h2>
+      <h2 class="wc-banner-title">{$_('diary_deep.water')}</h2>
     </div>
 
     <div class="wc-inner">
@@ -1718,7 +1718,7 @@
     </div>
 
     <!-- Quick-add grid -->
-    <p class="section-title" style="padding:4px 0 8px;text-align:center">Quick Add</p>
+    <p class="section-title" style="padding:4px 0 8px;text-align:center">{$_('diary_deep.quick_add')}</p>
     <div class="wc-grid">
       {#if _waterContainers.length > 0}
         {#each _waterContainers as cont (cont.id)}
@@ -1796,7 +1796,7 @@
     {:else}
       <div class="wc-empty-log">
         <span class="material-symbols-rounded wc-empty-icon">water_drop</span>
-        <p class="text-3 text-sm">No water logged yet today</p>
+        <p class="text-3 text-sm">{$_('diary_deep.no_water_today')}</p>
       </div>
     {/if}
 
@@ -1816,7 +1816,7 @@
         {@const _qcUnit = $energyUnit === 'kJ' ? 'kJ' : 'kcal'}
         <label class="form-label" for="qce-name">Name (optional)</label>
         <input id="qce-name" class="input" type="text" maxlength="60"
-               placeholder="Office snack, hotel breakfast..."
+               placeholder={$_('diary_deep.qce_name_ph')}
                bind:value={editName} />
         <div class="qce-kcal-pill" style="background:var(--macro-calories-dim);margin-top:12px">
           <input class="qce-kcal-input" type="number" inputmode="numeric"
@@ -1825,7 +1825,7 @@
                  bind:value={editKcalDisplay} />
           <span class="qce-kcal-unit" style="color:var(--macro-calories)">{_qcUnit.toUpperCase()}</span>
         </div>
-        <p class="qce-section-label">Optional Macros</p>
+        <p class="qce-section-label">{$_('diary_deep.optional_macros')}</p>
         <div class="qce-macros">
           <div class="qce-macro-pill" style="background:var(--macro-protein-dim)">
             <div class="qce-macro-val-row">
@@ -1835,7 +1835,7 @@
                      bind:value={editProtein} />
               <span class="qce-macro-unit" style="color:var(--macro-protein)">g</span>
             </div>
-            <span class="qce-macro-label">Protein</span>
+            <span class="qce-macro-label">{$_('diary_deep.protein')}</span>
           </div>
           <div class="qce-macro-pill" style="background:var(--macro-carbs-dim)">
             <div class="qce-macro-val-row">
@@ -1845,7 +1845,7 @@
                      bind:value={editCarbs} />
               <span class="qce-macro-unit" style="color:var(--macro-carbs)">g</span>
             </div>
-            <span class="qce-macro-label">Carbs</span>
+            <span class="qce-macro-label">{$_('diary_deep.carbs')}</span>
           </div>
           <div class="qce-macro-pill" style="background:var(--macro-fat-dim)">
             <div class="qce-macro-val-row">
@@ -1862,7 +1862,7 @@
       {:else}
       <div style="display:flex;gap:12px;margin-bottom:16px">
         <div style="flex:1">
-          <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:4px">Serving Size</label>
+          <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:4px">{$_('diary_deep.serving_size')}</label>
           <input class="input" type="number" min="0.1" step="0.1" bind:value={editPortion} style="width:100%" />
         </div>
         <div style="width:100px">
@@ -1871,11 +1871,11 @@
         </div>
       </div>
       <div style="margin-bottom:16px">
-        <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:4px">Number of Servings</label>
+        <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:4px">{$_('diary_deep.num_servings')}</label>
         <input class="input" type="number" min="0.1" step="0.1" bind:value={editQuantity} style="width:100%" />
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface-2);border-radius:var(--radius-md);margin-bottom:16px">
-        <span style="font-size:13px;color:var(--text-3)">Total Amount</span>
+        <span style="font-size:13px;color:var(--text-3)">{$_('diary_deep.total_amount')}</span>
         <span style="font-size:14px;font-weight:500">{Math.round((parseFloat(editPortion) || 100) * (parseFloat(editQuantity) || 1) * 10) / 10}{editUnit}</span>
       </div>
       <div class="edit-macros">
@@ -2009,7 +2009,7 @@
         </select>
       </label>
       <div class="copy-date-actions">
-        <button class="btn btn-ghost" on:click={() => showCopySheet = false} disabled={copyBusy}>Cancel</button>
+        <button class="btn btn-ghost" on:click={() => showCopySheet = false} disabled={copyBusy}>{$_('diary_deep.cancel')}</button>
         <button class="btn btn-primary" on:click={onConfirmCopy} disabled={!copyDate || copyBusy}>
           {copyBusy ? 'Copying…' : 'Copy'}
         </button>
@@ -2036,7 +2036,7 @@
       <div class="sheet-handle"></div>
       <p class="sheet-title">Save {actionMealIdx != null ? meals[actionMealIdx] : 'meal'} to library</p>
       <label class="copy-date-label">
-        <span>Meal name</span>
+        <span>{$_('diary_deep.meal_name')}</span>
         <input type="text" bind:value={saveAsMealName} bind:this={saveAsMealNameInput}
           class="copy-date-input" placeholder="e.g. Usual breakfast" />
       </label>
@@ -2045,7 +2045,7 @@
       </p>
       <div class="copy-date-actions">
         <button class="btn btn-ghost" disabled={saveAsMealSaving}
-          on:click={() => showSaveAsMeal = false}>Cancel</button>
+          on:click={() => showSaveAsMeal = false}>{$_('diary_deep.cancel')}</button>
         <button class="btn btn-primary" disabled={saveAsMealSaving || !saveAsMealName.trim()}
           on:click={doSaveAsMeal}>{saveAsMealSaving ? 'Saving…' : 'Save'}</button>
       </div>
@@ -2071,7 +2071,7 @@
     <div class="bs-sheet" on:click|stopPropagation on:keydown={() => {}}>
       <div class="sheet-handle"></div>
       <div class="sheet-header-row">
-        <h3 class="sheet-title">Body Stats</h3>
+        <h3 class="sheet-title">{$_('diary_deep.body_stats')}</h3>
         <button class="btn-icon sheet-close-btn" on:click={() => diaryShowBodyStats.set(false)} aria-label="Close" title="Close">
           <span class="material-symbols-rounded">close</span>
         </button>
@@ -2137,7 +2137,7 @@
     <div class="ns-sheet" on:click|stopPropagation on:keydown={() => {}}>
       <div class="sheet-handle"></div>
       <div class="sheet-header-row">
-        <h3 class="sheet-title">Nutrition Summary</h3>
+        <h3 class="sheet-title">{$_('diary_deep.nutrition_summary')}</h3>
         <div style="display:flex;align-items:center;gap:8px">
           <span class="text-3 text-sm">{formatDateSub($currentDate, $dateFormat)}</span>
           <button class="btn-icon sheet-close-btn" on:click={() => diaryShowNutritionSummary.set(false)} aria-label="Close" title="Close">
@@ -2182,11 +2182,11 @@
         <div class="ns-macros">
           <div class="ns-macro-pill" style="background:var(--macro-protein-dim)">
             <span class="ns-macro-val" style="color:var(--macro-protein)">{Math.round(totals.proteins || 0)}{#if $macroLegendMode === 'grams' && protGoal}/{protGoal}{/if}g</span>
-            <span class="ns-macro-lbl">Protein</span>
+            <span class="ns-macro-lbl">{$_('diary_deep.protein')}</span>
           </div>
           <div class="ns-macro-pill" style="background:var(--macro-carbs-dim)">
             <span class="ns-macro-val" style="color:var(--macro-carbs)">{Math.round(totals.carbohydrates || 0)}{#if $macroLegendMode === 'grams' && carbGoal}/{carbGoal}{/if}g</span>
-            <span class="ns-macro-lbl">Carbs</span>
+            <span class="ns-macro-lbl">{$_('diary_deep.carbs')}</span>
           </div>
           <div class="ns-macro-pill" style="background:var(--macro-fat-dim)">
             <span class="ns-macro-val" style="color:var(--macro-fat)">{Math.round(totals.fat || 0)}{#if $macroLegendMode === 'grams' && fatGoal}/{fatGoal}{/if}g</span>

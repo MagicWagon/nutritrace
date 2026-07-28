@@ -692,8 +692,8 @@
             {#if !intSkipped.off}
               <div class="int-fields">
                 <a href="https://world.openfoodfacts.org/cgi/user.pl" target="_blank" rel="noopener" class="about-link" style="font-size:13px">Create an OFF account →</a>
-                <input class="input" type="text"     placeholder="Username (optional)" bind:value={intOFFUser}  autocomplete="username" />
-                <input class="input" type="password" placeholder="Password (optional)" bind:value={intOFFPass}  autocomplete="current-password" />
+                <input class="input" type="text"     placeholder={$_('wizard_deep.off_user_ph')} bind:value={intOFFUser}  autocomplete="username" />
+                <input class="input" type="password" placeholder={$_('wizard_deep.off_pass_ph')} bind:value={intOFFPass}  autocomplete="current-password" />
               </div>
             {/if}
           </div>
@@ -704,7 +704,7 @@
               <div class="int-card-icon">🔬</div>
               <div class="int-card-info">
                 <div class="int-card-title">{$_('wizard.integrations_cards.usda')}</div>
-                <div class="int-card-sub">Search the USDA food and nutrient database</div>
+                <div class="int-card-sub">{$_('wizard_deep.usda_search')}</div>
               </div>
               {#if intSkipped.usda}
                 <button class="int-restore-btn" on:click={() => intSkipped = {...intSkipped, usda: false}}>{$_('wizard.integrations_cards.configure')}</button>
@@ -715,7 +715,7 @@
             {#if !intSkipped.usda}
               <div class="int-fields">
                 <a href="https://fdc.nal.usda.gov/api-key-signup" target="_blank" rel="noopener" class="about-link" style="font-size:13px">Get a free API key →</a>
-                <input class="input" type="text" placeholder="Paste your USDA API key here" bind:value={intUSDARKey} />
+                <input class="input" type="text" placeholder={$_('wizard_deep.usda_key_ph')} bind:value={intUSDARKey} />
               </div>
             {/if}
           </div>
@@ -736,8 +736,8 @@
             </div>
             {#if !intSkipped.mealie}
               <div class="int-fields">
-                <input class="input" type="url"  placeholder="Mealie URL (e.g. http://mealie:9000)" bind:value={intMealieUrl} />
-                <input class="input" type="password" placeholder="API Token" bind:value={intMealieToken} autocomplete="off" />
+                <input class="input" type="url"  placeholder={$_('wizard_deep.mealie_url_ph')} bind:value={intMealieUrl} />
+                <input class="input" type="password" placeholder={$_('wizard_deep.mealie_token_ph')} bind:value={intMealieToken} autocomplete="off" />
               </div>
             {/if}
           </div>
@@ -749,7 +749,7 @@
                 <div class="int-card-icon">🤖</div>
                 <div class="int-card-info">
                   <div class="int-card-title">{$_('wizard.integrations_cards.ai')}</div>
-                  <div class="int-card-sub int-locked-label">Configured via environment variables</div>
+                  <div class="int-card-sub int-locked-label">{$_('wizard_deep.env_locked')}</div>
                 </div>
                 <span class="material-symbols-rounded int-lock-icon">lock</span>
               </div>
@@ -775,7 +775,7 @@
                     <option value="openai">OpenAI (ChatGPT)</option>
                     <option value="gemini">Google (Gemini)</option>
                   </select>
-                  <input class="input" type="password" placeholder="API Key" bind:value={intAIKey} autocomplete="off" />
+                  <input class="input" type="password" placeholder={$_('wizard_deep.api_key_ph')} bind:value={intAIKey} autocomplete="off" />
                 </div>
               {/if}
             </div>
@@ -825,7 +825,7 @@
             <div class="int-card-head">
               <div class="int-card-icon">🔔</div>
               <div class="int-card-info">
-                <div class="int-card-title">Enable Notifications</div>
+                <div class="int-card-title">{$_('wizard_deep.enable_notifications')}</div>
                 <div class="int-card-sub">Reminders, goal celebrations, and health alerts</div>
               </div>
               <Toggle checked={notifEnabled} on:change={e => notifEnabled = e.detail} />
@@ -837,7 +837,7 @@
               <div class="int-card-head">
                 <div class="int-card-icon">💧</div>
                 <div class="int-card-info">
-                  <div class="int-card-title">Hydration Reminders</div>
+                  <div class="int-card-title">{$_('wizard_deep.hydration_reminders')}</div>
                   <div class="int-card-sub">Periodic reminders to drink water (8am–10pm)</div>
                 </div>
                 <Toggle checked={notifWater} on:change={e => notifWater = e.detail} />
@@ -848,7 +848,7 @@
               <div class="int-card-head">
                 <div class="int-card-icon">🍽️</div>
                 <div class="int-card-info">
-                  <div class="int-card-title">Meal Reminders</div>
+                  <div class="int-card-title">{$_('wizard_deep.meal_reminders')}</div>
                   <div class="int-card-sub">Daily reminders to log breakfast, lunch, and dinner</div>
                 </div>
                 <Toggle checked={notifMeals} on:change={e => notifMeals = e.detail} />
@@ -859,7 +859,7 @@
               <div class="int-card-head">
                 <div class="int-card-icon">🎯</div>
                 <div class="int-card-info">
-                  <div class="int-card-title">Goal Celebrations</div>
+                  <div class="int-card-title">{$_('wizard_deep.goal_celebrations')}</div>
                   <div class="int-card-sub">Celebrate when you hit your daily nutrition, water, or step goals</div>
                 </div>
                 <Toggle checked={notifGoals} on:change={e => notifGoals = e.detail} />
@@ -870,7 +870,7 @@
               <div class="int-card-head">
                 <div class="int-card-icon">⚠️</div>
                 <div class="int-card-info">
-                  <div class="int-card-title">Wellness Alerts</div>
+                  <div class="int-card-title">{$_('wizard_deep.wellness_alerts')}</div>
                   <div class="int-card-sub">Alerts when HRV drops, sleep declines, or heart rate spikes</div>
                 </div>
                 <Toggle checked={notifWellness} on:change={e => notifWellness = e.detail} />
@@ -889,7 +889,7 @@
         {@const _factorLabel = _goalFactor === 0.8 ? 'Lose −20%' : _goalFactor === 1.2 ? 'Gain +20%' : 'Maintain'}
         <div class="summary-card">
           <div class="tdee-row">
-            <div class="tdee-label">Starting TDEE</div>
+            <div class="tdee-label">{$_('wizard_deep.starting_tdee')}</div>
             <div class="tdee-value">{_tdeeDisp.value.toLocaleString()}</div>
             <div class="tdee-unit">{_tdeeDisp.unit} / day</div>
             <div class="tdee-help">Total Daily Energy Expenditure · Mifflin-St Jeor + activity level</div>
@@ -901,24 +901,24 @@
               <strong>{_goalDisp.value.toLocaleString()} {_goalDisp.unit}/day</strong>
             </div>
             <div class="summary-row">
-              <span class="text-3">Water Goal</span>
+              <span class="text-3">{$_('wizard_deep.water_goal')}</span>
               <strong>{waterGoal >= 1000 ? (waterGoal / 1000).toFixed(1) + ' L' : waterGoal + ' ml'}/day</strong>
             </div>
             <div class="summary-row">
-              <span class="text-3">Current Weight</span>
+              <span class="text-3">{$_('wizard_deep.current_weight')}</span>
               <span>{weight} {wUnit}</span>
             </div>
             <div class="summary-row">
-              <span class="text-3">Target Weight</span>
+              <span class="text-3">{$_('wizard_deep.target_weight')}</span>
               <span>{targetW} {wUnit}</span>
             </div>
             <div class="summary-row">
-              <span class="text-3">Activity Level</span>
+              <span class="text-3">{$_('wizard_deep.activity_level')}</span>
               <span>{ACTIVITY_LEVELS.find(l=>l.value===activity)?.label || activity}</span>
             </div>
           </div>
           <p class="text-3" style="font-size:12px;margin-top:12px;text-align:center;line-height:1.5">
-            You can adjust these anytime in Settings. After about a month of logging, <strong>Adaptive Mode</strong> in Settings → Goals can refine your goal based on your actual weight trend.
+            {$_('wizard_deep.adjust_note')}
           </p>
         </div>
       {/if}
