@@ -27,10 +27,12 @@
     checkForUpdate, isUpdateAvailable, downloadAndInstallApk,
     getChannel, setChannel, getAutoCheck, setAutoCheck,
     getLastChecked, formatAgo, checkServerUpdate,
-    skipVersion,
+    skipVersion, getUpdateCacheInfo, clearUpdateCache, formatBytes,
   } from '../../lib/updates.js';
 
   let channel     = _normalizeChannel(getChannel());
+  let cacheInfo   = null;         // { files, totalBytes } — populated onMount on native only
+  let clearing    = false;
   // Channel values are internally 'stable' | 'dev'. Older stored
   // values might be 'beta' (from the pre-rename UI); normalize on
   // load so the radio + backend queries stay consistent.
@@ -61,7 +63,25 @@
         !isNative && isAdmin ? doServerCheck() : Promise.resolve(),
       ]);
     }
+    if (isNative) await refreshCacheInfo();
   });
+
+  async function refreshCacheInfo() {
+    cacheInfo = await getUpdateCacheInfo();
+  }
+
+  async function doClearCache() {
+    clearing = true;
+    try {
+      await clearUpdateCache();
+      await refreshCacheInfo();
+      showSuccess($_('updates.storage.cleared'));
+    } catch (e) {
+      showError(e?.message || String(e));
+    } finally {
+      clearing = false;
+    }
+  }
 
   async function doCheck(force = true) {
     checking = true;
@@ -107,6 +127,7 @@
     try {
       await downloadAndInstallApk(latest, pct => { downloadPct = pct; });
       showSuccess($_('updates.install_starting'));
+      await refreshCacheInfo();
     } catch (e) {
       installFailed = e?.message || String(e);
       showError($_('updates.install_failed'));
@@ -258,6 +279,37 @@
     <div class="uptodate-tag">
       <span class="material-symbols-rounded" style="font-size:18px">check_circle</span>
       {$_('updates.up_to_date')}
+    </div>
+  {/if}
+
+  <!-- Storage: what's cached under Directory.Data/updates/ (Android only) -->
+  {#if showApkPanel && cacheInfo}
+    <div class="divider" style="margin: 0 16px"></div>
+    <div class="storage-block">
+      <div class="storage-header">
+        <div class="storage-title">
+          <span class="material-symbols-rounded" style="font-size:18px">sd_storage</span>
+          {$_('updates.storage.heading')}
+        </div>
+        <div class="storage-total">{formatBytes(cacheInfo.totalBytes)}</div>
+      </div>
+
+      {#if cacheInfo.files.length === 0}
+        <div class="storage-empty">{$_('updates.storage.empty')}</div>
+      {:else}
+        <ul class="storage-list">
+          {#each cacheInfo.files as f (f.name)}
+            <li class="storage-item">
+              <span class="storage-name" title={f.name}>{f.name}</span>
+              <span class="storage-size">{formatBytes(f.size)}</span>
+            </li>
+          {/each}
+        </ul>
+        <button class="btn btn-secondary" on:click={doClearCache} disabled={clearing}>
+          <span class="material-symbols-rounded" style="font-size:16px">delete_sweep</span>
+          {clearing ? $_('updates.storage.clearing') : $_('updates.storage.clear_now')}
+        </button>
+      {/if}
     </div>
   {/if}
 </div>
@@ -463,6 +515,49 @@
     transition: width 200ms linear;
   }
   .dl-pct { font-size: 12px; color: var(--text-2); font-weight: 500; }
+
+  .storage-block {
+    padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .storage-header {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px;
+  }
+  .storage-title {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 13px; font-weight: 600; color: var(--text-1);
+  }
+  .storage-total {
+    font-size: 13px; font-weight: 600; color: var(--text-2);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .storage-empty {
+    font-size: 12px; color: var(--text-2); font-style: italic;
+  }
+  .storage-list {
+    list-style: none; margin: 0; padding: 0;
+    display: flex; flex-direction: column; gap: 4px;
+    background: var(--surface-2);
+    border-radius: 8px;
+    padding: 8px 10px;
+  }
+  .storage-item {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px;
+    font-size: 12px;
+  }
+  .storage-name {
+    flex: 1; min-width: 0;
+    color: var(--text-1);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .storage-size {
+    flex-shrink: 0;
+    color: var(--text-2);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
 
   .uptodate-tag {
     display: inline-flex; align-items: center; gap: 6px;

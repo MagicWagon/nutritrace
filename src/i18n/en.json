@@ -232,6 +232,13 @@
     "no_apk_asset":          "This release has no APK asset attached.",
     "banner_cta":            "Tap to view what's new and install.",
     "banner_view":           "View",
+    "storage": {
+      "heading":     "Cached Update APKs",
+      "empty":       "No cached APKs. Cleanup passes ran successfully.",
+      "clear_now":   "Clear Now",
+      "clearing":    "Clearing…",
+      "cleared":     "Cache cleared."
+    },
     "server": {
       "heading":          "Server Update",
       "versions":         "Server is on {current}. Latest release: {latest}.",

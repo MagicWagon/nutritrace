@@ -251,6 +251,67 @@ function _apkVersionFromName(name) {
 }
 
 /**
+ * Return the current state of Directory.Data/updates/ so the Settings
+ * panel can show users what's cached. Native-only; PWA returns null.
+ * Result: { files: [{name, size, version}], totalBytes }.
+ * Silent-on-error: any FS problem yields an empty result rather than
+ * throwing, since this is purely diagnostic UX.
+ */
+export async function getUpdateCacheInfo() {
+  if (!isNative) return null;
+  try {
+    const { Filesystem, Directory } = await import('@capacitor/filesystem');
+    let listing;
+    try {
+      listing = await Filesystem.readdir({ path: 'updates', directory: Directory.Data });
+    } catch { return { files: [], totalBytes: 0 }; }
+    const raw = listing?.files || [];
+    const files = raw
+      .map(f => {
+        const name = typeof f === 'string' ? f : f?.name;
+        if (!name) return null;
+        const size = typeof f === 'object' ? Number(f.size || 0) : 0;
+        return { name, size, version: _apkVersionFromName(name) || '' };
+      })
+      .filter(Boolean);
+    const totalBytes = files.reduce((sum, f) => sum + f.size, 0);
+    return { files, totalBytes };
+  } catch {
+    return { files: [], totalBytes: 0 };
+  }
+}
+
+/**
+ * Manually wipe everything under Directory.Data/updates/. Exposed to
+ * the Settings panel as a "Clear Now" button so users can reclaim
+ * space without waiting for the next boot cleanup pass. Native-only.
+ */
+export async function clearUpdateCache() {
+  if (!isNative) return;
+  try {
+    const { Filesystem, Directory } = await import('@capacitor/filesystem');
+    const listing = await Filesystem.readdir({ path: 'updates', directory: Directory.Data }).catch(() => null);
+    for (const f of (listing?.files || [])) {
+      const name = typeof f === 'string' ? f : f?.name;
+      if (name) {
+        try {
+          await Filesystem.deleteFile({ path: `updates/${name}`, directory: Directory.Data });
+        } catch { /* keep going */ }
+      }
+    }
+  } catch { /* best-effort */ }
+}
+
+/** Format a byte count into a compact human-readable string. */
+export function formatBytes(n) {
+  if (!n || n < 0) return '0 B';
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`;
+  return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`;
+}
+
+/**
  * Wipe stale APKs from Directory.Data/updates/. Called at app boot AND
  * before each fresh download. Two invariants:
  *   - After a successful in-app update, the APK that triggered the
