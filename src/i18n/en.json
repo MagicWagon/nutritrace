@@ -964,6 +964,56 @@
       "prefer_wearable_desc":    "When LiftTrace sends a completed workout's estimated calories burned…"
     }
   },
+  "settings_email": {
+    "intro":                  "Used for password resets and user invites",
+    "env_lock_banner":        "Configured via environment variables, changes are disabled.",
+    "banner": {
+      "configured":           "Configured",
+      "last_test_sent":       "Last Test Sent",
+      "error_hint":           "Check host, credentials, and from address",
+      "send_test":            "Send Test",
+      "no_test":              "No test has been sent yet",
+      "sent_to":              "Sent to {recipient}. Use Send Test again any time to re-verify.",
+      "sent_generic":         "Use Send Test again any time to re-verify"
+    },
+    "toast": {
+      "test_sent":            "SMTP test email sent to {recipient}",
+      "test_failed_prefix":   "SMTP test failed: {detail}",
+      "host_required":        "SMTP test failed: host required",
+      "invalid_email":        "Enter a valid email address",
+      "http_prefix":          "HTTP {status}",
+      "network_error":        "network error"
+    },
+    "form": {
+      "host":                 "SMTP Host",
+      "host_ph":              "e.g. smtp.example.com",
+      "port":                 "Port",
+      "tls":                  "TLS",
+      "username":             "Username",
+      "username_ph":          "SMTP username or email",
+      "password":             "Password",
+      "password_ph":          "SMTP password or app password",
+      "hide":                 "Hide",
+      "show":                 "Show",
+      "hide_pass_aria":       "Hide password",
+      "show_pass_aria":       "Show password",
+      "change":               "Change",
+      "change_pass_title":    "Change password",
+      "pass_saved_hint":      "Password saved. Tap Change to replace it.",
+      "from":                 "From Address",
+      "from_ph":              "NutriTrace <noreply@example.com>",
+      "saved":                "Saved",
+      "saving":               "Saving…",
+      "save":                 "Save"
+    },
+    "test_dialog": {
+      "title":                "Send Test Email",
+      "question":             "Where should we send the test?",
+      "recipient_ph":         "you@example.com",
+      "cancel":               "Cancel",
+      "send":                 "Send"
+    }
+  },
   "settings_api_tokens": {
     "toast": {
       "load_failed":            "Failed to load tokens",
