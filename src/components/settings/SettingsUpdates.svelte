@@ -72,7 +72,7 @@
         lastChecked = getLastChecked();
         if (!latest) error = $_('updates.check_failed');
       } else if (isAdmin) {
-        await doServerCheck();
+        await doServerCheck({ force });
         lastChecked = new Date();
       }
     } finally {
@@ -80,9 +80,9 @@
     }
   }
 
-  async function doServerCheck() {
+  async function doServerCheck({ force = false } = {}) {
     try {
-      serverInfo = await checkServerUpdate();
+      serverInfo = await checkServerUpdate({ force });
     } catch { serverInfo = null; }
   }
 

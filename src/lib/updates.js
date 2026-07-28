@@ -324,19 +324,22 @@ export function formatAgo(dateOrIso) {
 
 /**
  * Fetch server-update status (PWA + admin only path). Passes the user's
- * current channel to the server so a Beta-channel PWA admin sees
- * whether the running server is behind the latest dev-latest release
- * (not the stable one). Server caches per-channel.
+ * current channel to the server so a Dev-channel PWA admin sees
+ * whether the running server is behind the latest -dev.N release
+ * (not the stable one). Server caches per-channel for 24h; pass
+ * force=true to bypass that cache (used by the manual "Check Now"
+ * button so a newly-published -dev.N is picked up immediately).
  *
  * Returns { current, latest, channel, available, notes_url, checked_at }
  * or null on failure / non-admin / native app (not applicable).
  */
-export async function checkServerUpdate() {
+export async function checkServerUpdate({ force = false } = {}) {
   if (isNative) return null; // Server-update banner is PWA-only.
   try {
     const { apiUrl } = await import('./platform.js');
     const channel = (getChannel() === 'dev' || getChannel() === 'beta') ? 'dev' : 'stable';
-    const res = await fetch(apiUrl(`/api/updates/server-status?channel=${channel}`), {
+    const qs = `?channel=${channel}${force ? '&force=1' : ''}`;
+    const res = await fetch(apiUrl(`/api/updates/server-status${qs}`), {
       credentials: 'include',
     });
     if (res.status === 403) return null; // Non-admin — no banner.

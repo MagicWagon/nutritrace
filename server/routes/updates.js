@@ -81,6 +81,11 @@ router.get('/server-status', requireAuth, requireAdmin, wrap(async (req, res) =>
   // get sensible answers during the rename transition.
   const raw = req.query.channel;
   const channel = (raw === 'dev' || raw === 'beta') ? 'dev' : 'stable';
+  // Manual "Check Now" in the PWA panel passes force=1 to bypass the
+  // 24h server-side cache. Without this, a `latest` value cached before
+  // a new -dev.N was published would keep showing as "you're up to date"
+  // for the rest of the 24h window even after `dev-latest` moved.
+  const force = req.query.force === '1' || req.query.force === 'true';
   const keys = CACHE_KEYS[channel];
 
   const now          = Date.now();
@@ -93,7 +98,7 @@ router.get('/server-status', requireAuth, requireAdmin, wrap(async (req, res) =>
   let notesUrl  = cachedUrl || '';
   let checkedAt = checkedAtRaw;
 
-  if (!cached || now - checkedAtMs > CACHE_TTL_MS) {
+  if (force || !cached || now - checkedAtMs > CACHE_TTL_MS) {
     try {
       const fresh = await _fetchLatest(channel);
       latest    = fresh.tag;
