@@ -729,6 +729,60 @@
       "no_ingredients": "Please add at least one ingredient"
     }
   },
+  "wellness_page": {
+    "nav": {
+      "prev_day":         "Previous day",
+      "next_day":         "Next day",
+      "jump_to_date":     "Jump to date"
+    },
+    "sync": {
+      "health_connect":   "Sync Health Connect",
+      "fitbit":           "Sync Fitbit",
+      "fitbit_with_user": "Sync Fitbit · {user}",
+      "garmin":           "Sync Garmin",
+      "garmin_with_user": "Sync Garmin · {user}",
+      "withings":         "Sync Withings",
+      "withings_with_user": "Sync Withings · User {user}"
+    },
+    "empty": {
+      "no_integrations":       "No integrations enabled",
+      "no_integrations_desc":  "Enable Fitbit or Withings in <strong>Settings → Wellness</strong> to start syncing health data.",
+      "no_device":             "No Device Connected",
+      "no_device_native_desc": "Connect to your NutriTrace server in <strong>Settings → Server Connection</strong> and link a wellness device to see your data here.",
+      "no_device_desc":        "Connect a wellness device in <strong>Settings → Wellness</strong> to start tracking your health data."
+    },
+    "chip": {
+      "activity":   "Activity",
+      "sleep":      "Sleep",
+      "heart":      "Heart",
+      "body":       "Body",
+      "steps_activity": "Steps & Activity",
+      "heart_hrv":  "Heart Rate & HRV",
+      "spo2":       "SpO2",
+      "breathing_rate":  "Breathing Rate"
+    },
+    "connect": {
+      "fitbit_title":   "Connect Fitbit",
+      "fitbit_desc":    "Authorize NutriTrace to read your Fitbit data via Google Health. You'll be redirected to Google to approve access, then brought back here.",
+      "fitbit_button":  "Connect Fitbit",
+      "connecting":     "Connecting…"
+    },
+    "metric_group": {
+      "sleep_stages":    "Sleep Stages",
+      "sleep_debt":      "Sleep Debt",
+      "daily_readiness": "Daily Readiness",
+      "resilience":      "Resilience",
+      "hrv":             "HRV",
+      "resting_hr":      "Resting HR",
+      "sleep":           "Sleep",
+      "physical_calmness":"Physical Calmness",
+      "activity_balance": "Activity Balance",
+      "sleep_patterns":  "Sleep Patterns"
+    },
+    "hint": {
+      "tap_sync":      "Tap Sync to pull the latest data from your connected device."
+    }
+  },
   "statistics_page": {
     "range": {
       "last_7d":      "Last 7d",

@@ -1362,7 +1362,7 @@
     {#if $healthConnectEnabled && isNative}
       <button class="wl-sync-icon-btn" class:wl-syncing={hcSyncing}
         on:click={syncHealthConnectManual} disabled={hcSyncing}
-        title="Sync Health Connect">
+        title={$_('wellness_page.sync.health_connect')}>
         {#if hcSyncing}
           <span class="material-symbols-rounded wl-spin-icon">autorenew</span>
         {:else}
@@ -1373,7 +1373,7 @@
     {#if status?.connected}
       <button class="wl-sync-icon-btn" class:wl-syncing={syncing}
         on:click={() => sync()} disabled={syncing}
-        title="Sync Fitbit{status.fitbitUserId ? ' · ' + status.fitbitUserId : ''}">
+        title={status.fitbitUserId ? $_('wellness_page.sync.fitbit_with_user', { values: { user: status.fitbitUserId } }) : $_('wellness_page.sync.fitbit')}>
         {#if syncing}
           <span class="material-symbols-rounded wl-spin-icon">autorenew</span>
         {:else}
@@ -1384,7 +1384,7 @@
     {#if garminStatus?.connected}
       <button class="wl-sync-icon-btn" class:wl-syncing={garminSyncing}
         on:click={() => syncGarmin()} disabled={garminSyncing}
-        title="Sync Garmin{garminStatus.garminUserId ? ' · ' + garminStatus.garminUserId : ''}">
+        title={garminStatus.garminUserId ? $_('wellness_page.sync.garmin_with_user', { values: { user: garminStatus.garminUserId } }) : $_('wellness_page.sync.garmin')}>
         {#if garminSyncing}
           <span class="material-symbols-rounded wl-spin-icon">autorenew</span>
         {:else}
@@ -1395,7 +1395,7 @@
     {#if withingsStatus?.connected}
       <button class="wl-sync-icon-btn" class:wl-syncing={withingsSyncing}
         on:click={() => syncWithings()} disabled={withingsSyncing}
-        title="Sync Withings{withingsStatus.withingsUserId ? ' · User ' + withingsStatus.withingsUserId : ''}">
+        title={withingsStatus.withingsUserId ? $_('wellness_page.sync.withings_with_user', { values: { user: withingsStatus.withingsUserId } }) : $_('wellness_page.sync.withings')}>
         {#if withingsSyncing}
           <span class="material-symbols-rounded wl-spin-icon">autorenew</span>
         {:else}
@@ -1407,14 +1407,14 @@
 
   <!-- Date navigation sub-bar — sticky below header, same pattern as Diary -->
   <div class="wl-date-bar">
-    <button class="btn-icon accent" on:click={prevDay} aria-label="Previous day" title="Previous day">
+    <button class="btn-icon accent" on:click={prevDay} aria-label={$_('wellness_page.nav.prev_day')} title={$_('wellness_page.nav.prev_day')}>
       <span class="material-symbols-rounded">chevron_left</span>
     </button>
-    <button class="date-btn" on:click={openDatePicker} title="Jump to date">
+    <button class="date-btn" on:click={openDatePicker} title={$_('wellness_page.nav.jump_to_date')}>
       <span class="date-label">{fmtDate(dateStr)}</span>
       <span class="date-sub">{fmtDateSub(dateStr)}</span>
     </button>
-    <button class="btn-icon accent" on:click={nextDay} disabled={isToday} aria-label="Next day" title="Next day">
+    <button class="btn-icon accent" on:click={nextDay} disabled={isToday} aria-label={$_('wellness_page.nav.next_day')} title={$_('wellness_page.nav.next_day')}>
       <span class="material-symbols-rounded">chevron_right</span>
     </button>
   </div>
@@ -1433,15 +1433,13 @@
         <div class="connect-icon-wrap">
           <span class="material-symbols-rounded connect-icon">monitor_heart</span>
         </div>
-        <h2 class="connect-title">No integrations enabled</h2>
-        <p class="connect-desc">
-          Enable Fitbit or Withings in <strong>Settings → Wellness</strong> to start syncing health data.
-        </p>
+        <h2 class="connect-title">{$_('wellness_page.empty.no_integrations')}</h2>
+        <p class="connect-desc">{@html $_('wellness_page.empty.no_integrations_desc')}</p>
         <div class="connect-chips">
-          <span class="connect-chip"><span class="material-symbols-rounded">directions_walk</span> Activity</span>
-          <span class="connect-chip"><span class="material-symbols-rounded">bedtime</span> Sleep</span>
-          <span class="connect-chip"><span class="material-symbols-rounded">favorite</span> Heart</span>
-          <span class="connect-chip"><span class="material-symbols-rounded">scale</span> Body</span>
+          <span class="connect-chip"><span class="material-symbols-rounded">directions_walk</span> {$_('wellness_page.chip.activity')}</span>
+          <span class="connect-chip"><span class="material-symbols-rounded">bedtime</span> {$_('wellness_page.chip.sleep')}</span>
+          <span class="connect-chip"><span class="material-symbols-rounded">favorite</span> {$_('wellness_page.chip.heart')}</span>
+          <span class="connect-chip"><span class="material-symbols-rounded">scale</span> {$_('wellness_page.chip.body')}</span>
         </div>
       </div>
 
@@ -1454,18 +1452,18 @@
         <div class="tab-pill" style="left:{_wlPillLeft};width:{_wlPillWidth}"></div>
         {#if fitbitAvailable || garminAvailable || healthConnectAvailable}
           <button class="tab-btn" class:active={activeTab === 'activity'} on:click={() => activeTab = 'activity'}>
-            <span class="material-symbols-rounded tab-icon">directions_walk</span> Activity
+            <span class="material-symbols-rounded tab-icon">directions_walk</span> {$_('wellness_page.chip.activity')}
           </button>
           <button class="tab-btn" class:active={activeTab === 'sleep'} on:click={() => activeTab = 'sleep'}>
-            <span class="material-symbols-rounded tab-icon">bedtime</span> Sleep
+            <span class="material-symbols-rounded tab-icon">bedtime</span> {$_('wellness_page.chip.sleep')}
           </button>
           <button class="tab-btn" class:active={activeTab === 'heart'} on:click={() => activeTab = 'heart'}>
-            <span class="material-symbols-rounded tab-icon">favorite</span> Heart
+            <span class="material-symbols-rounded tab-icon">favorite</span> {$_('wellness_page.chip.heart')}
           </button>
         {/if}
         {#if withingsAvailable || healthConnectAvailable}
           <button class="tab-btn" class:active={activeTab === 'body'} on:click={() => activeTab = 'body'}>
-            <span class="material-symbols-rounded tab-icon">monitor_weight</span> Body
+            <span class="material-symbols-rounded tab-icon">monitor_weight</span> {$_('wellness_page.chip.body')}
           </button>
         {/if}
       </div>
@@ -1483,15 +1481,11 @@
                 <span class="material-symbols-rounded connect-icon">monitor_heart</span>
               </div>
               {#if isNative && !getServerUrl()}
-                <h2 class="connect-title">No Device Connected</h2>
-                <p class="connect-desc">
-                  Connect to your NutriTrace server in <strong>Settings → Server Connection</strong> and link a wellness device to see your data here.
-                </p>
+                <h2 class="connect-title">{$_('wellness_page.empty.no_device')}</h2>
+                <p class="connect-desc">{@html $_('wellness_page.empty.no_device_native_desc')}</p>
               {:else}
-                <h2 class="connect-title">No Device Connected</h2>
-                <p class="connect-desc">
-                  Connect a wellness device in <strong>Settings → Wellness</strong> to start tracking your health data.
-                </p>
+                <h2 class="connect-title">{$_('wellness_page.empty.no_device')}</h2>
+                <p class="connect-desc">{@html $_('wellness_page.empty.no_device_desc')}</p>
               {/if}
             </div>
           {:else}
@@ -1499,23 +1493,20 @@
               <div class="connect-icon-wrap">
                 <span class="material-symbols-rounded connect-icon">monitor_heart</span>
               </div>
-              <h2 class="connect-title">Connect Fitbit</h2>
-              <p class="connect-desc">
-                Authorize NutriTrace to read your Fitbit data via Google Health. You'll be redirected
-                to Google to approve access, then brought back here.
-              </p>
+              <h2 class="connect-title">{$_('wellness_page.connect.fitbit_title')}</h2>
+              <p class="connect-desc">{$_('wellness_page.connect.fitbit_desc')}</p>
               <div class="connect-chips">
-                <span class="connect-chip"><span class="material-symbols-rounded">directions_walk</span> Steps &amp; Activity</span>
-                <span class="connect-chip"><span class="material-symbols-rounded">bedtime</span> Sleep</span>
-                <span class="connect-chip"><span class="material-symbols-rounded">favorite</span> Heart Rate &amp; HRV</span>
-                <span class="connect-chip"><span class="material-symbols-rounded">water_drop</span> SpO2</span>
-                <span class="connect-chip"><span class="material-symbols-rounded">air</span> Breathing Rate</span>
+                <span class="connect-chip"><span class="material-symbols-rounded">directions_walk</span> {$_('wellness_page.chip.steps_activity')}</span>
+                <span class="connect-chip"><span class="material-symbols-rounded">bedtime</span> {$_('wellness_page.chip.sleep')}</span>
+                <span class="connect-chip"><span class="material-symbols-rounded">favorite</span> {$_('wellness_page.chip.heart_hrv')}</span>
+                <span class="connect-chip"><span class="material-symbols-rounded">water_drop</span> {$_('wellness_page.chip.spo2')}</span>
+                <span class="connect-chip"><span class="material-symbols-rounded">air</span> {$_('wellness_page.chip.breathing_rate')}</span>
               </div>
               <button class="btn btn-primary connect-btn" on:click={connect} disabled={connecting}>
                 {#if connecting}
-                  <span class="material-symbols-rounded spin">autorenew</span> Connecting…
+                  <span class="material-symbols-rounded spin">autorenew</span> {$_('wellness_page.connect.connecting')}
                 {:else}
-                  <span class="material-symbols-rounded">link</span> Connect Fitbit
+                  <span class="material-symbols-rounded">link</span> {$_('wellness_page.connect.fitbit_button')}
                 {/if}
               </button>
             </div>
@@ -1601,7 +1592,7 @@
               <div class="card sleep-stages-card">
                 <div class="sleep-stages-header">
                   <span class="material-symbols-rounded" style="color:var(--accent)">bar_chart</span>
-                  <span class="sleep-stages-title">Sleep Stages</span>
+                  <span class="sleep-stages-title">{$_('wellness_page.metric_group.sleep_stages')}</span>
                   {#if displayData.sleep_duration_min != null}
                     {@const s = fmtSleep(displayData.sleep_duration_min)}
                     <span class="sleep-total">{s.value}</span>
@@ -1722,7 +1713,7 @@
                 <div class="si-header">
                   <span class="material-symbols-rounded si-icon">battery_low</span>
                   <div class="si-title-wrap">
-                    <span class="si-title">Sleep Debt</span>
+                    <span class="si-title">{$_('wellness_page.metric_group.sleep_debt')}</span>
                     <span class="si-sub">Last {sleepDebt.nights} nights</span>
                   </div>
                   <span class="si-value {sleepDebt.debtMin === 0 ? 'si-good' : sleepDebt.debtMin < 120 ? 'si-warn' : 'si-bad'}">
