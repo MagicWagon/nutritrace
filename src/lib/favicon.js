@@ -6,48 +6,48 @@
  * can't tell the browser tabs apart when the favicon is always the
  * same green mark. Rendering the favicon per-accent means each install
  * that picks a distinct accent gets a visually distinct tab, no admin
- * customization or icon uploads required (see issue #108 discussion).
+ * customization or icon uploads required (see issue #108).
  *
- * Implementation: build a tiny 64×64 SVG at runtime, encode as a data
- * URL, and hot-swap every <link rel="icon"> in the head. Browsers
- * honour the change immediately for the tab icon (and the address-bar
- * icon in Firefox). The PNG icons in public/icons/ stay untouched —
- * they're still the install/PWA icons and remain the "green NT" mark
- * so nothing about the app's identity changes.
+ * Design: keep the NutriTrace fork silhouette from the full logo (so
+ * the mark stays recognizable at a glance), tint it with the accent
+ * hex, drop the background gradient. A plain letterform ("N") reads
+ * fine at 16px but loses all brand identity across the family; the
+ * fork glyph is the identifiable NT mark.
  *
- * The SVG is intentionally simple (a rounded-square badge with the "N"
- * glyph, tinted in the accent) instead of a scaled-down version of the
- * full logo. Full-logo detail is illegible at 16×16 anyway, and a
- * bold letterform reads instantly at every zoom level a browser might
- * render the favicon at.
+ * The full logo also includes a "trace line" chart element — omitted
+ * here because at favicon sizes both shapes fighting for pixels turns
+ * into noise. The fork alone reads instantly.
+ *
+ * Implementation: build a tiny 512×512 SVG at runtime, encode as a
+ * data URL, and hot-swap every <link rel="icon"> in the head.
+ * The PNG icons in public/icons/ stay untouched — they're still the
+ * install/PWA icons and remain the "green NT" mark.
  */
 import { ACCENT_HEX } from './accent-hex.js';
 
 // Named accents → the "dark-theme" hex (matches the picker in Settings).
-// Custom hex accents pass through unchanged. Fallback for anything we
-// don't recognise: mint dark, so behaviour matches today's default.
+// Custom hex accents pass through unchanged. Fallback: mint dark.
 function _resolveHex(accentValue) {
   if (typeof accentValue !== 'string') return '#4FFFB0';
   if (/^#[0-9a-fA-F]{6}$/.test(accentValue)) return accentValue;
   return ACCENT_HEX[accentValue] || '#4FFFB0';
 }
 
-/** True when the given hex reads as "light" — used to flip the glyph
- *  colour to dark on pale accents (yellow/lime/cyan) so the "N" stays
- *  legible against its own background. */
-function _isLight(hex) {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return lum > 0.62;
-}
-
-/** Build the SVG source for a given accent hex. */
+/** Build the SVG source for a given accent hex. Fork-shape lifted from
+ *  public/icons/logo.svg (three tines + neck + handle), flattened to
+ *  solid strokes/fills in the accent color, on a dark rounded-square
+ *  background so the mark reads on any browser chrome color. */
 function _svgFor(accentHex) {
-  const glyphFill = _isLight(accentHex) ? '#0A0B0F' : '#FFFFFF';
-  // Kept as a single line so the URL-encoded data URI stays compact.
-  return `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='${accentHex}'/><text x='32' y='46' text-anchor='middle' font-family='-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif' font-size='42' font-weight='800' fill='${glyphFill}'>N</text></svg>`;
+  return `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'>
+<rect width='512' height='512' rx='96' fill='#0A0B0F'/>
+<rect x='118' y='92' width='22' height='118' rx='11' fill='${accentHex}'/>
+<rect x='161' y='92' width='22' height='118' rx='11' fill='${accentHex}'/>
+<rect x='204' y='92' width='22' height='118' rx='11' fill='${accentHex}'/>
+<path d='M 129 208 C 129 248 172 260 172 260 C 172 260 215 248 215 208' fill='none' stroke='${accentHex}' stroke-width='22' stroke-linecap='round' stroke-linejoin='round'/>
+<rect x='161' y='257' width='22' height='166' rx='11' fill='${accentHex}'/>
+<path d='M 172 423 C 224 402 302 318 422 148' fill='none' stroke='${accentHex}' stroke-width='20' stroke-linecap='round'/>
+<circle cx='422' cy='148' r='18' fill='${accentHex}'/>
+</svg>`.replace(/\n\s*/g, '');
 }
 
 /**

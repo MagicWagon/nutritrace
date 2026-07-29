@@ -3701,6 +3701,7 @@
   .setting-row {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 12px;
     padding: 13px 16px;
     min-height: 50px;
