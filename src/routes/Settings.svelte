@@ -3718,6 +3718,16 @@
   :global(.setting-row > div), :global(.setting-row > span.setting-label) {
     flex: 1 1 0; min-width: 0;
   }
+  /* Control-side wrappers (dropdowns, colour swatches, action buttons)
+     must NOT grow — the rule above catches every direct <div>, which
+     was expanding .select-wrap and floating dropdown pills in the
+     middle of the row. Explicit opt-out keeps them at their intrinsic
+     width so justify-content:space-between pins them to the right. */
+  :global(.setting-row > .select-wrap),
+  :global(.setting-row > .seg-group),
+  :global(.setting-row > .env-lock-pill) {
+    flex: 0 0 auto;
+  }
   /* Reset for column-direction setting-rows. Children of a column-flex
      .setting-row should take their natural content height — the rule
      above gives them flex-basis:0 which collapses them down to the parent's
