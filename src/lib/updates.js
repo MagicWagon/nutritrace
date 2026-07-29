@@ -191,7 +191,13 @@ export async function checkForUpdate({ force = false } = {}) {
       );
       if (!listRes.ok) throw new Error(`GitHub API ${listRes.status}`);
       const list = await listRes.json();
-      const devTag = /^v\d+\.\d+\.\d+-dev\.\d+$/;
+      // Accept both the legacy dotted format (v1.1.0-dev.14) and the
+      // new no-dot format (v1.1.0-dev16). The switch was made mid-v1.1
+      // for semver compliance (numeric identifiers can't have leading
+      // zeros, so `dev.09` is invalid semver but `dev09` parses fine
+      // as a single non-numeric identifier). Both parse cleanly and
+      // compare correctly via compareSemver's pre-release chain rules.
+      const devTag = /^v\d+\.\d+\.\d+-dev\.?\d+$/;
       const devReleases = list
         .filter(r => r.prerelease && devTag.test(r.tag_name || ''))
         .sort((a, b) => compareSemver(b.tag_name, a.tag_name));
