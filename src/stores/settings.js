@@ -567,11 +567,36 @@ export function applyAccentColor(value) {
   } else {
     document.documentElement.setAttribute('data-accent', value);
   }
-  // Also refresh the browser-tab favicon to match. Lets multi-instance
-  // self-hosters tell tabs apart via each install's accent (#108) with
-  // no admin-facing customization.
-  import('../lib/favicon.js').then(({ updateFavicon }) => updateFavicon(value)).catch(() => {});
+  // Tint the browser-chrome tab bar to match the accent. Chromium
+  // reads <meta name="theme-color"> and paints the address-bar strip
+  // (and the top of the focused tab on Android) with it, so multi-
+  // instance self-hosters can spot which install a tab belongs to at
+  // a glance. Favicon stays the branded NT logo (issue #108 pushback).
+  _applyThemeColor(value);
   accentColor.set(value);
+}
+
+/** Resolve any accent value (named, hex, or fallback) to a hex string.
+ *  Kept simple so we don't have to import the full picker metadata. */
+function _accentToHex(value) {
+  if (typeof value !== 'string') return null;
+  if (/^#[0-9a-fA-F]{6}$/.test(value)) return value;
+  // Names match ACCENT_COLORS in Settings.svelte's picker; both files
+  // must stay in sync when accents are added.
+  const NAMED = {
+    mint:   '#4FFFB0', blue:  '#4FC3F7', red:    '#FF7070',
+    purple: '#CE93D8', orange:'#FFB547', teal:   '#4DD0E1',
+    pink:   '#F48FB1', yellow:'#FFF176', indigo: '#9FA8DA',
+    lime:   '#C5E1A5', rose:  '#FF80AB', cyan:   '#80DEEA',
+  };
+  return NAMED[value] || null;
+}
+
+function _applyThemeColor(accentValue) {
+  const hex = _accentToHex(accentValue);
+  if (!hex) return; // Unrecognised — leave whatever applyAppearance set.
+  const meta = document.getElementById('theme-color-meta');
+  if (meta) meta.content = hex;
 }
 
 /** Apply an appearance change and update the DOM + theme-color meta */
@@ -585,8 +610,13 @@ export function applyAppearance(value) {
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   const dark = value === 'dark' || (value === 'system' && prefersDark);
   document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  // Re-apply the accent-tinted browser-chrome color; falling back to
+  // the bg-based colour only when no accent is loaded yet (very early
+  // boot). Without this, changing appearance would stomp the accent
+  // tint until the user touched the accent picker again.
+  const accentHex = _accentToHex(_lastAppliedAccent);
   const meta = document.getElementById('theme-color-meta');
-  if (meta) meta.content = dark ? '#0A0B0F' : '#F5F7FA';
+  if (meta) meta.content = accentHex || (dark ? '#0A0B0F' : '#F5F7FA');
   appearance.set(value);
 }
 
