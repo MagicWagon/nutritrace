@@ -567,6 +567,10 @@ export function applyAccentColor(value) {
   } else {
     document.documentElement.setAttribute('data-accent', value);
   }
+  // Also refresh the browser-tab favicon to match. Lets multi-instance
+  // self-hosters tell tabs apart via each install's accent (#108) with
+  // no admin-facing customization.
+  import('../lib/favicon.js').then(({ updateFavicon }) => updateFavicon(value)).catch(() => {});
   accentColor.set(value);
 }
 
