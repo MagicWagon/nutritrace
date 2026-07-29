@@ -85,33 +85,41 @@
   let lastSyncAt = null;
   let _nowTick = Date.now(); // re-render the "X ago" label every 30s
   let _syncing = false;
+  let _liveSyncState = { online: true, connectionIssue: null };
+  $: _serverReachable = _liveSyncState.online && !_liveSyncState.connectionIssue;
+  $: _syncBusy = _syncing || _liveSyncState.syncing;
 
   async function manualSync() {
-    if (_syncing) return;
+    if (_syncBusy) return;
     _syncing = true;
+    // Let Svelte paint the busy label even if fullSync returns immediately.
+    await tick();
     try {
       const { fullSync } = await import('../lib/sync.js');
-      await fullSync(); // visible mode (shows the sync bar in App.svelte)
+      const result = await fullSync(false, true, true);
+      if (result?.reason === 'busy') {
+        console.info('[sync] manual refresh skipped because another sync is already running');
+      }
     } catch (e) {
-      showError(e.message || 'Sync failed');
+      console.error('[sync] settings refresh failed:', e);
     } finally {
       _syncing = false;
     }
   }
 
-  function _fmtTimeAgo(iso) {
-    if (!iso) return 'never';
+  function _fmtTimeAgo(iso, translate) {
+    if (!iso) return translate('sync.time.never');
     const ms = _nowTick - new Date(iso).getTime();
-    if (ms < 0) return 'just now';
+    if (ms < 0) return translate('sync.time.just_now');
     const s = Math.floor(ms / 1000);
-    if (s < 10)  return 'just now';
-    if (s < 60)  return `${s}s ago`;
+    if (s < 10)  return translate('sync.time.just_now');
+    if (s < 60)  return translate('sync.time.seconds_ago', { values: { count: s } });
     const m = Math.floor(s / 60);
-    if (m < 60)  return `${m}m ago`;
+    if (m < 60)  return translate('sync.time.minutes_ago', { values: { count: m } });
     const h = Math.floor(m / 60);
-    if (h < 24)  return `${h}h ago`;
+    if (h < 24)  return translate('sync.time.hours_ago', { values: { count: h } });
     const d = Math.floor(h / 24);
-    return `${d}d ago`;
+    return translate('sync.time.days_ago', { values: { count: d } });
   }
 
   // ── Server Connection (native only) ─────────────────────────────────────
@@ -1515,39 +1523,46 @@
 
   // ── Env-lock state — which admin sections are locked by environment vars ───
   let envLocks = { smtp: false, ai: false, ai_enabled: false };
-  onMount(async () => {
-    try {
-      const res = await fetch(apiUrl('/api/app-config/env-locks'), _fetchOpts());
-      if (res.ok) {
-        envLocks = await res.json();
-        // Keep the global store in sync so Trace.svelte's FAB gate updates
-        // when an admin flips env-locked state and revisits Settings.
-        const { envLocks: globalEnvLocks } = await import('../stores/settings.js');
-        globalEnvLocks.set(envLocks);
-      }
-    } catch {}
-
+  onMount(() => {
     // Native server mode: surface last-sync time in Server Connection card.
-    // Pull the persisted timestamp from sync_meta (survives across sessions),
-    // then keep it live by subscribing to the in-memory syncState store.
+    // Subscribe before any server request: env-locks can remain pending while
+    // the server is unreachable, but connection status must still update.
+    let mounted = true;
     let _syncStoreUnsub = null;
     let _tickInterval = null;
     if (isNative && getServerUrl()) {
-      try {
-        const { dbGetSyncMeta } = await import('../lib/db-native.js');
-        lastSyncAt = await dbGetSyncMeta('last_sync_at');
-      } catch {}
-      try {
-        const { syncState } = await import('../lib/sync.js');
+      import('../lib/sync.js').then(({ syncState }) => {
+        if (!mounted) return;
         _syncStoreUnsub = syncState.subscribe(s => {
+          _liveSyncState = s;
           if (s.lastSync) lastSyncAt = s.lastSync;
         });
-      } catch {}
+      }).catch(() => {});
+      import('../lib/db-native.js').then(({ dbGetSyncMeta }) => dbGetSyncMeta('last_sync_at'))
+        .then(value => { if (mounted && value) lastSyncAt = value; })
+        .catch(() => {});
       // Re-render the "X ago" label every 30s so it stays accurate without
       // requiring a manual refresh.
       _tickInterval = setInterval(() => { _nowTick = Date.now(); }, 30000);
     }
+
+    // This request is independent from the live sync-state subscription.
+    // Do not let an unreachable server block the Server Connection card.
+    (async () => {
+      try {
+        const res = await fetch(apiUrl('/api/app-config/env-locks'), _fetchOpts());
+        if (res.ok && mounted) {
+          const locks = await res.json();
+          if (!mounted) return;
+          envLocks = locks;
+          const { envLocks: globalEnvLocks } = await import('../stores/settings.js');
+          if (mounted) globalEnvLocks.set(envLocks);
+        }
+      } catch {}
+    })();
+
     return () => {
+      mounted = false;
       if (_syncStoreUnsub) _syncStoreUnsub();
       if (_tickInterval) clearInterval(_tickInterval);
       _stopOffMirrorPolling();
@@ -2841,22 +2856,24 @@
           {#if serverMode === 'server' && getServerUrl()}
             <div class="setting-row">
               <div>
-                <span class="setting-label">Connected</span>
+                <span class="setting-label">{_serverReachable ? $_('sync.connected') : $_('sync.server_unavailable')}</span>
                 <div class="setting-desc">{getServerUrl()}</div>
               </div>
-              <span class="material-symbols-rounded" style="color:var(--success, #22c55e);font-size:22px">cloud_done</span>
+              <span class="material-symbols-rounded" style:color={_serverReachable ? 'var(--success, #22c55e)' : 'var(--error, #f87171)'} style="font-size:22px">
+                {_serverReachable ? 'cloud_done' : 'cloud_off'}
+              </span>
             </div>
             <div class="setting-divider"></div>
             <div class="setting-row">
               <div>
-                <span class="setting-label">Last Synced</span>
+                <span class="setting-label">{$_('sync.last_synced')}</span>
                 <div class="setting-desc">
-                  {#key _nowTick}{_fmtTimeAgo(lastSyncAt)}{/key}
+                  {#key _nowTick}{_fmtTimeAgo(lastSyncAt, $_)}{/key}
                 </div>
               </div>
-              <button class="btn btn-secondary" style="height:32px;font-size:12px;padding:0 12px;display:flex;align-items:center;gap:6px" on:click={manualSync} disabled={_syncing}>
-                <span class="material-symbols-rounded" class:spin={_syncing} style="font-size:16px">{_syncing ? 'autorenew' : 'sync'}</span>
-                {_syncing ? 'Syncing…' : 'Sync now'}
+              <button class="btn btn-secondary" style="height:32px;font-size:12px;padding:0 12px;display:flex;align-items:center;gap:6px" on:click={manualSync} disabled={_syncBusy}>
+                <span class="material-symbols-rounded server-sync-icon" class:spin={_syncBusy} style="font-size:16px">autorenew</span>
+                {_syncBusy ? $_('sync.syncing') : (_serverReachable ? $_('sync.sync_now') : $_('sync.retry'))}
               </button>
             </div>
             <div class="setting-divider"></div>
@@ -3971,4 +3988,11 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
   .spin { animation: spin 1s linear infinite; display: inline-block; }
+  @keyframes server-sync-spin {
+    to { transform: rotate(360deg); }
+  }
+  .server-sync-icon.spin {
+    transform-origin: center;
+    animation: server-sync-spin 0.8s linear infinite;
+  }
 </style>

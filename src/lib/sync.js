@@ -23,7 +23,7 @@ import {
   dbUpsertWorkoutFromServer, dbUpsertActivityFromServer,
   dbGetPendingWorkouts, dbSetWorkoutServerId,
 } from './db-native.js';
-import { writable } from 'svelte/store';
+import { get, writable } from 'svelte/store';
 
 /** Sync state — reactive store for UI */
 export const syncState = writable({
@@ -33,6 +33,8 @@ export const syncState = writable({
   lastSync: null,
   error: null,
   online: true,
+  connectionIssue: null,
+  showErrorBanner: false,
 });
 
 let _syncing = false;
@@ -99,25 +101,105 @@ function _baseUrl() {
 
 /** Check if the server is reachable */
 let _lastOfflineAt = 0;
-export async function checkOnline() {
-  // If we went offline recently, skip the network check for 15s to avoid slow timeouts
-  if (_lastOfflineAt && Date.now() - _lastOfflineAt < 15000) {
-    return false;
+let _lastOnlineAt = 0;
+let _onlineCheckPromise = null;
+const OFFLINE_RETRY_DELAY_MS = 15000;
+const ONLINE_CHECK_CACHE_MS = 15000;
+
+/** True while the health-check circuit breaker is suppressing redundant requests. */
+export function isServerKnownUnavailable() {
+  return !!_lastOfflineAt && Date.now() - _lastOfflineAt < OFFLINE_RETRY_DELAY_MS;
+}
+
+async function _networkSnapshot() {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return { connected: false, connectionType: 'none' };
   }
+  try {
+    const { Network } = await import('@capacitor/network');
+    return await Network.getStatus();
+  } catch {
+    return {
+      connected: typeof navigator === 'undefined' ? true : navigator.onLine !== false,
+      connectionType: 'unknown',
+    };
+  }
+}
+
+function _serverHost() {
+  try { return new URL(getServerUrl()).hostname; }
+  catch { return getServerUrl() || 'server'; }
+}
+
+function _connectionIssue({ network, error = null, status = null }) {
+  const noNetwork = !network?.connected || network?.connectionType === 'none';
+  return {
+    kind: noNetwork ? 'no_network' : status ? 'server_error' : 'server_unreachable',
+    host: _serverHost(),
+    connectionType: network?.connectionType || 'unknown',
+    status,
+    detail: error?.message || null,
+    at: new Date().toISOString(),
+  };
+}
+
+function _publishConnectionIssue(issue, showErrorBanner = false) {
+  syncState.update(s => ({
+    ...s,
+    online: false,
+    connectionIssue: issue,
+    // Automatic checks update compact status only. Once explicitly requested,
+    // detailed feedback remains until dismissal or a successful connection.
+    ...(showErrorBanner ? { showErrorBanner: true } : {}),
+  }));
+}
+
+async function _probeServer(showErrorBanner = false) {
   try {
     const res = await fetch(apiUrl('/api/health'), {
       headers: _headers(),
       signal: AbortSignal.timeout(3000),
     });
     const online = res.ok;
-    if (!online) _lastOfflineAt = Date.now();
-    else _lastOfflineAt = 0;
-    syncState.update(s => ({ ...s, online }));
+    if (!online) {
+      _lastOnlineAt = 0;
+      _lastOfflineAt = Date.now();
+      const network = await _networkSnapshot();
+      const issue = _connectionIssue({ network, status: res.status });
+      console.warn(`[sync] server health check failed: host=${issue.host} network=${issue.connectionType} status=${res.status}`);
+      _publishConnectionIssue(issue, showErrorBanner);
+    } else {
+      _lastOfflineAt = 0;
+      _lastOnlineAt = Date.now();
+      syncState.update(s => ({ ...s, online: true, connectionIssue: null, showErrorBanner: false }));
+    }
     return online;
-  } catch {
+  } catch (error) {
+    _lastOnlineAt = 0;
     _lastOfflineAt = Date.now();
-    syncState.update(s => ({ ...s, online: false }));
+    const network = await _networkSnapshot();
+    const issue = _connectionIssue({ network, error });
+    console.warn(`[sync] server unreachable: host=${issue.host} network=${issue.connectionType} error=${error?.message || String(error)}`);
+    _publishConnectionIssue(issue, showErrorBanner);
     return false;
+  }
+}
+
+export async function checkOnline(force = false, showErrorBanner = false) {
+  // Reuse one in-flight probe so initial sync and the burst of debounced
+  // settings writes do not all test the same unreachable server in parallel.
+  if (!force && isServerKnownUnavailable()) return false;
+  if (!force && _lastOnlineAt && Date.now() - _lastOnlineAt < ONLINE_CHECK_CACHE_MS) {
+    return true;
+  }
+  if (!force && _onlineCheckPromise) return _onlineCheckPromise;
+  if (force) return _probeServer(showErrorBanner);
+
+  _onlineCheckPromise = _probeServer(showErrorBanner);
+  try {
+    return await _onlineCheckPromise;
+  } finally {
+    _onlineCheckPromise = null;
   }
 }
 
@@ -473,29 +555,36 @@ export async function pushAllFromDevice() {
     counts[t] = r?.values?.[0]?.n || 0;
   }
 
-  // Trigger a full sync — this pushes everything we just marked pending.
-  // Run non-silent so the user sees the sync bar progressing.
-  await fullSync(false);
+  // Trigger a user-requested full sync — this pushes everything we just
+  // marked pending and may surface detailed failure feedback.
+  await fullSync(false, false, true);
   return { pushed: counts };
 }
 
 /** Full sync — push then pull then cache images
  * @param {boolean} silent - If true, don't show sync bar unless there are actual changes
+ * @param {boolean} forceCheck - Ignore cached connectivity and probe now
+ * @param {boolean} showFailureBanner - Surface failure details requested by the user
  */
-export async function fullSync(silent = false) {
-  if (_syncing) return;
-  if (!getAuthToken()) return;
+export async function fullSync(silent = false, forceCheck = false, showFailureBanner = false) {
+  if (_syncing) return { ok: false, reason: 'busy' };
+  if (!getAuthToken()) return { ok: false, reason: 'not_authenticated' };
   _syncing = true;
-  if (!silent) {
-    syncState.update(s => ({ ...s, syncing: true, error: null, phase: 'pushing', progress: 'Pushing local changes…' }));
-  }
+  // Keep every sync consumer (including Settings) aware of background syncs.
+  // Silent controls progress copy, not whether a sync is actually in flight.
+  syncState.update(s => ({
+    ...s,
+    syncing: true,
+    error: null,
+    ...(silent ? {} : { phase: 'pushing', progress: 'Pushing local changes…' }),
+  }));
 
   try {
-    const online = await checkOnline();
+    const online = await checkOnline(forceCheck, showFailureBanner);
     if (!online) {
-      syncState.update(s => ({ ...s, syncing: false, phase: '' }));
+      syncState.update(s => ({ ...s, syncing: false, phase: '', progress: '' }));
       _syncing = false;
-      return;
+      return { ok: false, reason: 'offline', issue: get(syncState).connectionIssue };
     }
 
     // Read Health Connect data (if enabled) before push so it's included
@@ -572,24 +661,42 @@ export async function fullSync(silent = false) {
     // and "not connected" indicators forever. Reported by user 2026-06-09
     // after the biometric expired-stash fix landed them back on Login,
     // they re-signed in, sync succeeded, but the error banner stayed.
-    syncState.update(s => ({ ...s, syncing: false, phase: '', progress: '', lastSync: now, online: true, error: null }));
+    syncState.update(s => ({
+      ...s,
+      syncing: false,
+      phase: '',
+      progress: '',
+      lastSync: now,
+      online: true,
+      connectionIssue: null,
+      showErrorBanner: false,
+      error: null,
+    }));
     // Notify the app that sync completed — pages should refresh data
     window.dispatchEvent(new CustomEvent('nt:sync-complete'));
+    return { ok: true };
   } catch (e) {
     // Log e.message + e.code + e.stack so future issue reports don't come
     // back with just `Error` from the Capacitor SQLite bridge — the plugin
     // strips useful details before propagating, and 'Error' alone in a bug
     // report is unactionable. #89 spent a full audit pass narrowing down
     // exactly which push step was throwing because we didn't have a message.
-    const { get } = await import('svelte/store');
     const phase = get(syncState)?.phase || '';
     console.error('[sync] error:', e?.message || String(e), '| code:', e?.code || '(none)', '| phase:', phase, '|', e?.stack || '');
-    syncState.update(s => ({ ...s, syncing: false, phase: '', progress: '', error: e.message || 'Sync failed (see console)' }));
+    syncState.update(s => ({
+      ...s,
+      syncing: false,
+      phase: '',
+      progress: '',
+      error: e.message || 'Sync failed (see console)',
+      ...(showFailureBanner ? { showErrorBanner: true } : {}),
+    }));
     // Notify on sync failure
     try {
       const { notify } = await import('./notifications.js');
       await notify('notifSyncFailures', 'Sync Failed', e.message || 'Could not sync with server');
     } catch {}
+    return { ok: false, reason: 'error', error: e?.message || null };
   } finally {
     _syncing = false;
   }

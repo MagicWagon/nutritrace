@@ -11,14 +11,142 @@
   import { DB, localDateStr } from './lib/db.js';
   import { currentDate, loadEntry } from './stores/diary.js';
   import { navStyle, applyAccentColor, accentColor, applyAppearance, appearance, disableAnimations, sidebarPersistent, language, pageBanners, bannerStyle, bannerAnimation } from './stores/settings.js';
-  import { locale } from 'svelte-i18n';
+  import { locale, _ } from 'svelte-i18n';
   import { currentUser, userMgmtActive, setupRequired, loadAuthState, handleOidcCallback } from './stores/auth.js';
   import { needsNativeSetup, isNative, getNativeMode, getServerUrl, apiUrl } from './lib/platform.js';
+  import { describeConnectionIssue } from './lib/connection-message.js';
   import { writable } from 'svelte/store';
 
   // Sync state — mirrored from the real sync store (dynamically imported)
-  const syncState = writable({ syncing: false, phase: '', progress: '', lastSync: null, error: null, online: true });
+  const syncState = writable({ syncing: false, phase: '', progress: '', lastSync: null, error: null, online: true, connectionIssue: null, showErrorBanner: false });
   $: _syncModeActive = isNative && getNativeMode() === 'server';
+  $: _serverReachable = $syncState.online && !$syncState.connectionIssue;
+  $: _connectionCopy = describeConnectionIssue($syncState.connectionIssue, $_, true);
+  $: _syncBannerCopy = $syncState.showErrorBanner && _connectionCopy
+    ? { ..._connectionCopy, icon: 'cloud_off' }
+    : ($syncState.showErrorBanner && $syncState.error
+    ? { title: $_('sync.error_title'), detail: $syncState.error, icon: 'error' }
+    : null);
+  let _retryingConnection = false;
+  const PULL_SYNC_SLOP = 10;
+  const PULL_SYNC_THRESHOLD = 64;
+  const PULL_SYNC_MAX = 88;
+  let _pullStartX = 0;
+  let _pullStartY = 0;
+  let _pullDistance = 0;
+  let _pullTracking = false;
+  let _pullRefreshing = false;
+
+  function _waitForSyncIdle(timeoutMs = 30000) {
+    if (!$syncState.syncing) return Promise.resolve();
+    return new Promise(resolve => {
+      let unsubscribe;
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        // A Svelte subscription invokes immediately, possibly before the
+        // unsubscribe function has been assigned.
+        queueMicrotask(() => unsubscribe?.());
+        resolve();
+      };
+      const timer = setTimeout(finish, timeoutMs);
+      unsubscribe = syncState.subscribe(state => {
+        if (!state.syncing) finish();
+      });
+    });
+  }
+
+  async function _runForcedSync() {
+    const { fullSync } = await import('./lib/sync.js');
+    let result = await fullSync(false, true, true);
+    if (result?.reason === 'busy') {
+      console.info('[sync] manual refresh queued behind active sync');
+      await _waitForSyncIdle();
+      result = await fullSync(false, true, true);
+    }
+    return result;
+  }
+
+  async function _retryServerConnection() {
+    if (_retryingConnection) return;
+    _retryingConnection = true;
+    try {
+      await _runForcedSync();
+    } finally {
+      _retryingConnection = false;
+    }
+  }
+
+  async function _dismissSyncBanner() {
+    const { syncState: realSyncState } = await import('./lib/sync.js');
+    // Keep the underlying connection issue so the cloud badge and Settings
+    // status remain accurate; only dismiss the detailed manual-feedback UI.
+    realSyncState.update(state => ({ ...state, showErrorBanner: false, error: null }));
+  }
+
+  function _startPullSync(event) {
+    if (!_syncModeActive || needsLogin || showNativeSetup || sidebarOpen || _pullRefreshing) return;
+    // Listen at window level because the fixed top bar and portalled offline
+    // banner both sit outside <main>. Dialogs, sheets, sidebars and bottom
+    // navigation retain their own touch handling.
+    if (event.target.closest?.('[role="dialog"], .sheet-backdrop, .sidebar-panel, .sidebar-backdrop, .bottom-nav')) return;
+    const pageScroller = document.querySelector('.page-transition');
+    if (event.touches.length !== 1 || (pageScroller?.scrollTop || 0) > 0) return;
+    _pullStartX = event.touches[0].clientX;
+    _pullStartY = event.touches[0].clientY;
+    _pullDistance = 0;
+    _pullTracking = true;
+  }
+
+  function _movePullSync(event) {
+    if (!_pullTracking || event.touches.length !== 1) return;
+    const dx = event.touches[0].clientX - _pullStartX;
+    const dy = event.touches[0].clientY - _pullStartY;
+    if (
+      (Math.abs(dx) > PULL_SYNC_SLOP && Math.abs(dx) > Math.abs(dy)) ||
+      dy < -PULL_SYNC_SLOP
+    ) {
+      _pullTracking = false;
+      _pullDistance = 0;
+      return;
+    }
+    // Ignore normal finger jitter so a slightly imprecise tap on a header
+    // control is not converted into a pull gesture.
+    if (dy <= PULL_SYNC_SLOP) return;
+    event.preventDefault();
+    _pullDistance = Math.min(PULL_SYNC_MAX, (dy - PULL_SYNC_SLOP) * 0.5);
+  }
+
+  async function _finishPullSync() {
+    if (!_pullTracking) return;
+    const shouldSync = _pullDistance >= PULL_SYNC_THRESHOLD;
+    _pullTracking = false;
+    if (!shouldSync) {
+      _pullDistance = 0;
+      return;
+    }
+
+    _pullRefreshing = true;
+    _pullDistance = PULL_SYNC_THRESHOLD;
+    try {
+      console.info(`[sync] pull-to-refresh triggered: online=${_serverReachable}`);
+      const result = await _runForcedSync();
+      console.info(`[sync] pull-to-refresh completed: ${result?.reason || (result?.ok ? 'ok' : 'unknown')}`);
+    } catch (e) {
+      console.error('[sync] pull-to-refresh failed:', e);
+    } finally {
+      _pullRefreshing = false;
+      _pullDistance = 0;
+    }
+  }
+
+  function _cancelPullSync() {
+    if (_pullRefreshing) return;
+    _pullTracking = false;
+    _pullDistance = 0;
+  }
 
   // Drive svelte-i18n's active locale from the user's saved language setting.
   // Fires on mount + on every change, so picking a new value in the Settings
@@ -355,7 +483,7 @@
       import('./lib/sync.js').then((mod) => {
         mod.syncState.subscribe(v => syncState.set(v));
         mod.startNetworkMonitor();
-        mod.fullSync(); // Initial sync (visible)
+        mod.fullSync(); // Initial automatic sync; failure stays in compact status
         // Periodic sync every 30 seconds (silent — only shows bar if changes found)
         setInterval(() => mod.fullSync(true), 30000);
         // Sync on app resume (visible)
@@ -496,6 +624,13 @@
   }
 </script>
 
+<svelte:window
+  on:touchstart|capture={_startPullSync}
+  on:touchmove|nonpassive|capture={_movePullSync}
+  on:touchend|capture={_finishPullSync}
+  on:touchcancel|capture={_cancelPullSync}
+/>
+
 <!-- Native setup gate — shown on first launch on Android/iOS -->
 {#if showNativeSetup}
   <NativeSetup />
@@ -517,7 +652,7 @@
       aria-label="Open menu"
     >
       <span class="material-symbols-rounded">menu</span>
-      {#if _syncModeActive && !$syncState.online}
+      {#if _syncModeActive && !_serverReachable}
         <span class="conn-badge conn-offline">
           <span class="material-symbols-rounded" style="font-size:10px">cloud_off</span>
         </span>
@@ -527,24 +662,62 @@
   </header>
 {/if}
 
-<!-- Sync error bar (native server mode only — only surfaces real problems) -->
-{#if _syncModeActive && !needsLogin && $syncState.error}
-  <div class="sync-bar sync-bar-error"
-    use:portal transition:slide={{ duration: 200 }}>
-    <span class="material-symbols-rounded sync-bar-icon">error</span>
-    <span>Sync error</span>
+<!-- Portalled so page transforms cannot trap it in a lower stacking context.
+     The safe-area + header offset keeps it below Android system chrome and
+     the app's compact header instead of covering the clock or hamburger. -->
+{#if _syncModeActive && !needsLogin && _syncBannerCopy}
+  <div
+    class="sync-connection-banner"
+    use:portal
+    transition:slide={{ duration: $disableAnimations ? 0 : 200 }}
+    role="status"
+    aria-live="assertive"
+  >
+    <span class="material-symbols-rounded sync-connection-icon">{_syncBannerCopy.icon}</span>
+    <div class="sync-connection-copy">
+      <strong>{_syncBannerCopy.title}</strong>
+      <span>{_syncBannerCopy.detail}</span>
+    </div>
+    <button
+      class="sync-retry"
+      on:click={_retryServerConnection}
+      disabled={_retryingConnection}
+    >
+      {_retryingConnection ? $_('sync.retrying') : $_('sync.retry')}
+    </button>
+    <button
+      class="sync-dismiss"
+      on:click={_dismissSyncBanner}
+      aria-label={$_('sync.dismiss_message')}
+    >
+      <span class="material-symbols-rounded">close</span>
+    </button>
+  </div>
+{/if}
+
+{#if _syncModeActive && (_pullDistance > 0 || _pullRefreshing)}
+  <div
+    class="pull-sync-indicator"
+    class:ready-to-sync={_pullDistance >= PULL_SYNC_THRESHOLD}
+    use:portal
+    style:transform={`translate(-50%, ${Math.round(_pullDistance * 0.45)}px)`}
+    aria-hidden="true"
+  >
+    <span class="material-symbols-rounded" class:pull-sync-spin={_pullRefreshing}>
+      {_pullRefreshing ? 'autorenew' : 'arrow_downward'}
+    </span>
   </div>
 {/if}
 
 <!-- Page content -->
 {#key $location}
-  <div
+  <main
     class="page-transition"
     class:has-topbar={showNav}
     in:fade={{ duration: $disableAnimations ? 0 : 180 }}
   >
     <Router {routes} />
-  </div>
+  </main>
 {/key}
 
 {#if showNav && ($navStyle === 'bottom' || $navStyle === 'both')}
@@ -641,29 +814,99 @@
     color: #fff;
   }
 
-  /* ── Sync status bar ── */
-  .sync-bar {
+  /* ── Actionable server-connection banner ── */
+  .sync-connection-banner {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 200;
+    top: calc(var(--safe-top) + 60px);
+    left: calc(var(--sidebar-w, 0px) + 12px);
+    right: 12px;
+    z-index: 250;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    color: var(--error, #f87171);
+    background: color-mix(in srgb, var(--error, #f87171) 8%, var(--surface-2));
+    border: 1px solid color-mix(in srgb, var(--error, #f87171) 25%, var(--border));
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    font-size: 12px;
+    font-weight: 500;
+    transition: left 0.25s ease;
+  }
+  .sync-connection-icon {
+    flex: 0 0 auto;
+    font-size: 18px;
+  }
+  .sync-connection-copy {
+    min-width: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    line-height: 1.35;
+  }
+  .sync-connection-copy strong { font-size: 13px; }
+  .sync-connection-copy span {
+    color: var(--text-2);
+    font-weight: 400;
+  }
+  .sync-retry,
+  .sync-dismiss {
+    flex: 0 0 auto;
+    border: 0;
+    color: var(--error, #f87171);
+    background: transparent;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .sync-retry:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+  .sync-dismiss {
+    display: flex;
+    align-items: center;
+    padding: 2px;
+  }
+  .sync-dismiss .material-symbols-rounded { font-size: 18px; }
+
+  /* ── Native pull-to-sync indicator ── */
+  .pull-sync-indicator {
+    position: fixed;
+    top: calc(var(--safe-top) + 8px);
+    left: calc(var(--sidebar-w, 0px) + (100vw - var(--sidebar-w, 0px)) / 2);
+    z-index: 251;
+    width: 36px;
+    height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    padding: 6px 16px;
-    font-size: 12px;
-    font-weight: 500;
+    color: var(--text-2);
+    background: var(--surface-3);
+    border: 1px solid var(--border-strong);
+    border-radius: 50%;
+    box-shadow: var(--shadow-lg);
+    pointer-events: none;
+    transition: color 120ms, border-color 120ms;
+  }
+  .pull-sync-indicator.ready-to-sync {
     color: var(--accent);
-    background: color-mix(in srgb, var(--accent) 8%, var(--bg));
-    border-bottom: 1px solid color-mix(in srgb, var(--accent) 15%, transparent);
-    transition: background 0.3s, color 0.3s;
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
   }
-  .sync-bar-error {
-    color: var(--error, #f87171);
-    background: color-mix(in srgb, var(--error, #f87171) 8%, transparent);
-    border-color: color-mix(in srgb, var(--error, #f87171) 15%, transparent);
+  .pull-sync-indicator .material-symbols-rounded {
+    font-size: 20px;
+    transition: transform 120ms;
   }
-  .sync-bar-icon { font-size: 16px; }
+  .pull-sync-indicator.ready-to-sync .material-symbols-rounded {
+    transform: rotate(180deg);
+  }
+  @keyframes pull-sync-spin {
+    to { transform: rotate(360deg); }
+  }
+  .pull-sync-indicator .pull-sync-spin {
+    animation: pull-sync-spin 0.8s linear infinite;
+  }
+
 </style>

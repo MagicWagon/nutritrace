@@ -132,6 +132,15 @@ export function _applySetting(key, value) {
 }
 function _isLoggedIn() { return !!localStorage.getItem('wl:userId'); }
 function _shouldSyncToServer() { return _isLoggedIn() && !(isNative && !getServerUrl()); }
+async function _serverRequestDeferred() {
+  if (!isNative) return false;
+  try {
+    const { checkOnline } = await import('../lib/sync.js');
+    return !(await checkOnline());
+  } catch {
+    return false;
+  }
+}
 export function scheduleSave(key, value) {
   if (!SERVER_SETTINGS.has(key)) return;
   if (_suppressSync) return;
@@ -139,6 +148,10 @@ export function scheduleSave(key, value) {
   _saveQueue[key] = setTimeout(async () => {
     // Try direct push to server (fast path when online)
     if (!_shouldSyncToServer()) return;
+    if (await _serverRequestDeferred()) {
+      _dlog(`[settings] deferring ${key} push — server is currently unreachable`);
+      return;
+    }
 
     // Snapshot the row's updated_at BEFORE the network push so the
     // mark-synced step afterward can detect if the user re-edited the same
@@ -235,6 +248,10 @@ export async function bulkSet(settingsObj) {
 
   // Step 3: single bulk API call (only if we should sync to server)
   if (!_shouldSyncToServer() || userPrefEntries.length === 0) return;
+  if (await _serverRequestDeferred()) {
+    _dlog(`[settings] deferring bulk push — server is currently unreachable`);
+    return;
+  }
   try {
     const url = _settingsUrl() + '/bulk';
     const bulkObj = Object.fromEntries(userPrefEntries);
@@ -275,6 +292,7 @@ export async function bulkSet(settingsObj) {
  */
 export async function loadServerSettings() {
   if (!_shouldSyncToServer()) return;
+  if (await _serverRequestDeferred()) return;
   try {
     const res = await fetch(_settingsUrl(), { credentials: 'include', headers: _authHeaders(), signal: AbortSignal.timeout(8000) });
     if (!res.ok) return;
