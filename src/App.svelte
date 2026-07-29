@@ -180,6 +180,17 @@
       import('./lib/updates.js').then(({ cleanUpdateCache }) => {
         cleanUpdateCache();
       }).catch(() => { /* ignore */ });
+
+      // Tap-handler for the OS "update available" notification. Routes
+      // into Settings → Updates so the user lands on the install action
+      // one tap after the notification. Registered here (not in the
+      // banner) because the notification can arrive when the banner
+      // isn't mounted — e.g. app was cold-started via the tap.
+      import('./lib/notifications.js').then(({ registerUpdateTapListener }) => {
+        registerUpdateTapListener(() => {
+          import('svelte-spa-router').then(({ push }) => push('/settings'));
+        });
+      }).catch(() => { /* ignore */ });
     }
 
     // Android back button: navigate back or confirm exit

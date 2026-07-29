@@ -28,6 +28,15 @@
     checkForUpdate, isUpdateAvailable, getAutoCheck,
     getSkippedVersion, skipVersion,
   } from '../lib/updates.js';
+  import {
+    isUpdateNotificationPermissionGranted, showUpdateNotification,
+  } from '../lib/notifications.js';
+
+  // Remembers which version we already posted the OS notification for so
+  // we don't re-post on every app open (the notification stays in the
+  // shade until dismissed; re-scheduling with the same ID replaces it
+  // and would reset the user's dismissal, defeating the point).
+  const NOTIFIED_KEY = 'nt_updates_notified_version';
 
   let latest      = null;
   let visible     = false;
@@ -37,12 +46,32 @@
     if (!getAutoCheck()) return;
     try {
       latest = await checkForUpdate({ force: false });
-      if (latest && isUpdateAvailable(latest)) {
-        const skipped = getSkippedVersion();
-        if (skipped !== latest.version) visible = true;
+      if (!latest || !isUpdateAvailable(latest)) return;
+      const skipped = getSkippedVersion();
+      if (skipped === latest.version) return;
+
+      // Suppression: if the OS notification channel is available, post
+      // there instead of showing the banner. Users who granted permission
+      // get a proper, dismissible OS notification and a clean app UI.
+      // Users who denied permission still get the banner as fallback.
+      if (await isUpdateNotificationPermissionGranted()) {
+        const alreadyNotified = _getNotifiedVersion() === latest.version;
+        if (!alreadyNotified) {
+          const posted = await showUpdateNotification(latest);
+          if (posted) _setNotifiedVersion(latest.version);
+        }
+        return; // banner stays hidden
       }
+      visible = true;
     } catch { /* silent — this is best-effort */ }
   });
+
+  function _getNotifiedVersion() {
+    try { return localStorage.getItem(NOTIFIED_KEY) || ''; } catch { return ''; }
+  }
+  function _setNotifiedVersion(v) {
+    try { localStorage.setItem(NOTIFIED_KEY, v); } catch {}
+  }
 
   function goToUpdates() {
     push('/settings');

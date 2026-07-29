@@ -128,6 +128,13 @@
       await downloadAndInstallApk(latest, pct => { downloadPct = pct; });
       showSuccess($_('updates.install_starting'));
       await refreshCacheInfo();
+      // System installer is now up — clear the shade notification so the
+      // user isn't left with a stale "update available" once they've
+      // acted on it.
+      try {
+        const { cancelUpdateNotification } = await import('../../lib/notifications.js');
+        await cancelUpdateNotification();
+      } catch { /* silent */ }
     } catch (e) {
       installFailed = e?.message || String(e);
       showError($_('updates.install_failed'));
