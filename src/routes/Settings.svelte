@@ -3791,13 +3791,12 @@
     color: var(--text-3);
     padding: 4px 2px 2px;
   }
-  /* width:auto stops the global .select { width:100% } from blowing the
-     dropdown out to the full row width, which would squeeze the
-     adjacent .setting-label into a 1ch column and (combined with
-     overflow-wrap:anywhere on labels) stack the label vertically one
-     character per line. max-width keeps wider option text from
-     overflowing the card. */
-  .sel-sm { height: 36px; font-size: 13px; width: auto; max-width: 100%; }
+  /* Fill the .select-wrap so the CSS chevron (positioned 14px from the
+     wrap's right edge) sits inside the visible pill instead of floating
+     off to one side. Every .setting-row wrap has an explicit width
+     (150px etc.) and .select-wrap opts out of flex-grow, so this
+     doesn't blow the dropdown out to fill the whole row anymore. */
+  .sel-sm { height: 36px; font-size: 13px; width: 100%; max-width: 100%; }
 
   .cat-chips-wrap {
     display: flex; flex-wrap: wrap; gap: 8px;

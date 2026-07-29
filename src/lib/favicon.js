@@ -58,16 +58,37 @@ function _svgFor(accentHex) {
 }
 
 /**
- * Update every favicon link in the document head to reflect the given
- * accent value. Safe to call on every accent change; browsers replace
- * the tab icon in place without a flicker.
+ * Update the favicon to reflect the given accent value.
+ *
+ * Implementation note: index.html declares `<link rel="icon" type="image/png"…>`
+ * for the 512 and 192 PNGs. Just swapping the href to a data:image/svg+xml
+ * URL leaves the `type="image/png"` mismatch in place and browsers can
+ * quietly ignore the update. Rather than mutate the existing links, we
+ * REMOVE any prior tinted-favicon element we injected, then prepend a
+ * fresh `<link rel="icon" type="image/svg+xml">` at the head. Browsers
+ * pick the last-declared (or best-typed) icon, so putting our SVG at
+ * the top with the correct MIME wins over the fallback PNGs — and
+ * removing prior injections keeps the head from growing on repeated
+ * accent changes.
  *
  * No-ops server-side (SSR / build) since there's no document there.
  */
+const INJECTED_ID = 'nt-accent-favicon';
+
 export function updateFavicon(accentValue) {
   if (typeof document === 'undefined') return;
   const hex = _resolveHex(accentValue);
   const dataUrl = 'data:image/svg+xml;utf8,' + encodeURIComponent(_svgFor(hex));
-  const links = document.querySelectorAll('link[rel="icon"], link[rel="apple-touch-icon"]');
-  links.forEach(link => link.setAttribute('href', dataUrl));
+
+  // Drop any prior injection so we don't stack head elements on repeated calls.
+  document.getElementById(INJECTED_ID)?.remove();
+
+  const link = document.createElement('link');
+  link.id = INJECTED_ID;
+  link.rel = 'icon';
+  link.type = 'image/svg+xml';
+  link.href = dataUrl;
+  // Insert at the very start of <head> — browsers pick the first icon
+  // they understand, and the correct-typed SVG will beat the later PNGs.
+  document.head.insertBefore(link, document.head.firstChild);
 }
