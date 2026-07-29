@@ -49,6 +49,7 @@ return `403 Forbidden`. Available scopes:
 |-------------------|----------------------------------------------------------------------------------|
 | `read:foods`      | List + read foods owned by the user. Used by CookTrace (in private development). |
 | `write:workouts`  | Push completed workouts to the user's wellness data via `POST /api/v1/workouts`. Used by LiftTrace so its calorie estimates feed NutriTrace's dynamic-TDEE calculations. |
+| `write:body-measurements` | Push scale readings (weight, body composition) via `POST /api/v1/body-measurements`. Aimed at Home Assistant, Node-RED, Gadgetbridge and other headless integrations that pull data from BLE smart scales the phone can't see. |
 
 Future scopes (`read:meals`, `read:diary`, etc.) will be added alongside
 the endpoints they unlock; gating tokens on scopes the server can't
@@ -140,6 +141,105 @@ Response:
 
 Fetch a single food by its NutriTrace id. Returns `404` if the food
 doesn't exist or is not readable by the token's user.
+
+### `POST /api/v1/body-measurements`
+
+**Requires scope:** `write:body-measurements`.
+
+Record a scale reading (weight + body composition) for the
+authenticated user. Values land in `diary.body_stats` for the day
+derived from `measured_at` (server local timezone), the same row
+that the manual body-stats UI, the Withings sync, and the diary
+view all read from.
+
+**Semantics.** Overwrites only the fields the payload actually sends.
+Anything already in `body_stats` under other keys stays untouched, so
+a HA-pushed weight doesn't stomp a manual `notes` entry. Send the
+same measurement twice → last write wins (fine for idempotency: same
+values, same result).
+
+**Request body** — snake_case or camelCase accepted; snake_case wins
+on collision. Only `measured_at` is required; any subset of the
+measurement fields can be provided.
+
+```json
+{
+  "measured_at":    "2026-07-25T16:10:51Z",
+  "source":         "home-assistant",
+
+  "weight":         76.9,
+  "body_fat":       21.2,
+  "muscle_mass":    56.14,
+  "bone_mass":      3.01,
+  "body_water":     54,
+  "lean_body_mass": 60,
+
+  "bmi":            24.3,
+  "visceral_fat":   11,
+  "protein":        20.7,
+  "bmr":            1590,
+  "metabolic_age":  28,
+  "impedance":      465,
+  "body_score":     73
+}
+```
+
+**Field → storage mapping.** The first six map to NT's native
+`body_stats` keys used by the diary UI:
+
+| Wire field       | Unit | Storage key            |
+|------------------|------|------------------------|
+| `weight`         | kg   | `weight_kg`            |
+| `body_fat`       | %    | `body_fat_pct`         |
+| `muscle_mass`    | kg   | `muscle_mass_kg`       |
+| `bone_mass`      | kg   | `bone_mass_kg`         |
+| `body_water`     | %    | `body_water_pct`       |
+| `lean_body_mass` | kg   | `lean_body_mass_kg`    |
+
+The remaining fields (`bmi`, `visceral_fat`, `protein`, `bmr`,
+`metabolic_age`, `impedance`, `body_score`) are stored under their
+wire names in the same JSON blob. NT doesn't render them today but
+they round-trip cleanly if the UI ever exposes them, and they're
+included in server backups.
+
+**Validation.** Each numeric field is range-checked against a
+sanity envelope (e.g. `weight` 10-500 kg, `body_fat` 1-80 %). Any
+out-of-range value rejects the whole request with
+`400 out_of_range` and a `field` pointer, so a mis-scaled
+integration (grams instead of kg) fails loudly instead of
+corrupting the diary.
+
+**Response** — `201 Created`:
+
+```json
+{
+  "ok":     true,
+  "date":   "2026-07-25",
+  "stored": ["weight_kg", "body_fat_pct", "muscle_mass_kg", "bone_mass_kg"]
+}
+```
+
+`stored` lists the storage keys that were actually written, so the
+integration can log/confirm what landed.
+
+**Example** — one-liner from a Home Assistant automation:
+
+```bash
+curl -X POST https://nutritrace.example.com/api/v1/body-measurements \
+  -H 'Authorization: Bearer nt_pat_...' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "measured_at": "2026-07-25T07:12:00Z",
+    "source":      "xiaomi-bodymiscale",
+    "weight":      76.9,
+    "body_fat":    21.2
+  }'
+```
+
+**Reading data back.** `GET /api/v1/body-measurements` is not yet
+implemented — this phase is write-only, matching the "push from
+integration → NT is the source of truth" pattern. Read endpoints
+will be added on demand.
 
 ---
 

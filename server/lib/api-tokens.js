@@ -27,6 +27,11 @@ export const KNOWN_SCOPES = new Set([
   // log completed-workout calorie burns into the user's wellness data so
   // the dynamic-TDEE calc has the additional energy expenditure.
   'write:workouts',
+  // write:body-measurements unlocks POST /api/v1/body-measurements —
+  // for Home Assistant / Node-RED / Gadgetbridge and other headless
+  // integrations pushing smart-scale readings straight to the server
+  // (BLE → HA → NT), skipping the phone/Health-Connect roundtrip.
+  'write:body-measurements',
 ]);
 
 function _hash(raw) {
