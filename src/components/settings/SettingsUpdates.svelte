@@ -149,6 +149,53 @@
     latest = null;
   }
 
+  /** Primary-button state machine. One button drives the panel: check → detect
+   *  → download → install. The label + click handler + colour change with
+   *  state so the panel never shows two competing "do the thing" controls. */
+  $: primaryState = downloading      ? 'downloading'
+                  : checking         ? 'checking'
+                  : (showApkPanel && available) ? 'install'
+                                         : 'check';
+
+  /** Minimal markdown → HTML for GitHub release notes. Not a full renderer;
+   *  covers what our own release notes actually use: **bold**, `code`,
+   *  [text](url), - bullets, ### headings, blank-line paragraphs, and line
+   *  breaks. Escapes raw text FIRST so user-provided release bodies can't
+   *  inject arbitrary HTML. Deliberately no external markdown lib (~5KB
+   *  saving; scope is small enough to hand-roll safely). */
+  function _renderNotes(md) {
+    if (!md) return '';
+    const esc = md
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    const lines = esc.split('\n');
+    const out = [];
+    let inList = false;
+    for (const raw of lines) {
+      const line = raw.trimEnd();
+      if (line.startsWith('- ') || line.startsWith('* ')) {
+        if (!inList) { out.push('<ul>'); inList = true; }
+        out.push('<li>' + _renderInline(line.slice(2)) + '</li>');
+      } else {
+        if (inList) { out.push('</ul>'); inList = false; }
+        if (!line.trim()) { out.push('<br />'); }
+        else if (line.startsWith('### '))      out.push('<h4>' + _renderInline(line.slice(4)) + '</h4>');
+        else if (line.startsWith('## '))       out.push('<h3>' + _renderInline(line.slice(3)) + '</h3>');
+        else if (line.startsWith('# '))        out.push('<h3>' + _renderInline(line.slice(2)) + '</h3>');
+        else                                    out.push('<p>' + _renderInline(line) + '</p>');
+      }
+    }
+    if (inList) out.push('</ul>');
+    return out.join('');
+  }
+  function _renderInline(s) {
+    return s
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/`([^`]+)`/g,       '<code>$1</code>')
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  }
+
   async function copyDockerCommand() {
     const cmd = 'docker-compose pull && docker-compose up -d';
     try {
@@ -204,20 +251,50 @@
       </div>
     </div>
 
-    <button class="btn-check" on:click={() => doCheck(true)} disabled={checking}>
-      {#if checking}
-        <span class="material-symbols-rounded spin">progress_activity</span>
-        {$_('updates.checking')}
+    <!-- Single primary action. Label + colour swap with state
+         (check-now / checking / download-and-install / downloading %)
+         so the panel never shows two competing controls. -->
+    <button
+      class="btn-primary-action"
+      class:is-install={primaryState === 'install'}
+      class:is-busy={primaryState === 'checking' || primaryState === 'downloading'}
+      disabled={primaryState === 'checking' || primaryState === 'downloading' || (primaryState === 'install' && !latest?.apkAsset)}
+      on:click={() => primaryState === 'install' ? doInstall() : doCheck(true)}
+    >
+      {#if primaryState === 'downloading'}
+        <div class="btn-progress-fill" style="width:{downloadPct}%"></div>
+        <span class="btn-label">
+          <span class="material-symbols-rounded spin">progress_activity</span>
+          {$_('updates.downloading', { values: { percent: downloadPct } })}
+        </span>
+      {:else if primaryState === 'checking'}
+        <span class="btn-label">
+          <span class="material-symbols-rounded spin">progress_activity</span>
+          {$_('updates.checking')}
+        </span>
+      {:else if primaryState === 'install'}
+        <span class="btn-label">
+          <span class="material-symbols-rounded">download</span>
+          {$_('updates.download_install')}
+        </span>
       {:else}
-        <span class="material-symbols-rounded">refresh</span>
-        {$_('updates.check_now')}
+        <span class="btn-label">
+          <span class="material-symbols-rounded">refresh</span>
+          {$_('updates.check_now')}
+        </span>
       {/if}
     </button>
 
-    <div class="last-checked">
-      {$_('updates.last_checked')}:
-      <strong>{lastChecked ? formatAgo(lastChecked) : $_('updates.last_checked_never')}</strong>
-    </div>
+    {#if primaryState === 'install'}
+      <button class="btn-skip" on:click={doSkip}>
+        {$_('updates.skip_this_version')}
+      </button>
+    {:else if primaryState === 'check'}
+      <div class="last-checked">
+        {$_('updates.last_checked')}:
+        <strong>{lastChecked ? formatAgo(lastChecked) : $_('updates.last_checked_never')}</strong>
+      </div>
+    {/if}
 
     {#if error}
       <div class="alert alert-error">
@@ -225,68 +302,43 @@
         {error}
       </div>
     {/if}
+    {#if installFailed}
+      <div class="alert alert-error">
+        <span class="material-symbols-rounded" style="font-size:18px">error</span>
+        {installFailed}
+      </div>
+    {/if}
   </div>
 
-  <!-- APK update available (Android only) -->
+  <!-- "What's new" — only shown when an update is available on native.
+       Collapsed by default; user taps to expand. Version + release age
+       live in the summary so users see what they'd be installing before
+       committing to reading the full notes. -->
   {#if showApkPanel && available}
-    <div class="update-avail-card">
-      <div class="update-avail-head">
-        <span class="material-symbols-rounded" style="font-size:22px">system_update</span>
-        <div class="update-avail-headings">
-          <div class="update-avail-title">
-            {$_('updates.available_headline', { values: { version: latest.version } })}
-          </div>
-          {#if latest.publishedAt}
-            <div class="update-avail-sub">
-              {$_('updates.released', { values: { when: formatAgo(latest.publishedAt) } })}
-            </div>
-          {/if}
-        </div>
+    <details class="whats-new">
+      <summary>
+        <span class="material-symbols-rounded whats-new-chev">chevron_right</span>
+        <span class="whats-new-title">
+          {$_('updates.available_headline', { values: { version: latest.version } })}
+        </span>
+        {#if latest.publishedAt}
+          <span class="whats-new-when">{formatAgo(latest.publishedAt)}</span>
+        {/if}
+      </summary>
+      <div class="whats-new-body">
+        {#if latest.notes}
+          <div class="whats-new-md">{@html _renderNotes(latest.notes)}</div>
+        {:else}
+          <p class="note">{$_('updates.no_release_notes')}</p>
+        {/if}
+        {#if latest.notesUrl}
+          <a class="update-link" href={latest.notesUrl} target="_blank" rel="noopener">
+            {$_('updates.view_on_github')}
+            <span class="material-symbols-rounded" style="font-size:14px">open_in_new</span>
+          </a>
+        {/if}
       </div>
-
-      {#if latest.notes}
-        <details class="update-notes" open>
-          <summary>{$_('updates.release_notes_heading')}</summary>
-          <pre>{latest.notes}</pre>
-        </details>
-      {/if}
-
-      {#if latest.notesUrl}
-        <a class="update-link" href={latest.notesUrl} target="_blank" rel="noopener">
-          <span class="material-symbols-rounded" style="font-size:14px">open_in_new</span>
-          {$_('updates.view_on_github')}
-        </a>
-      {/if}
-
-      {#if downloading}
-        <div class="dl-progress">
-          <div class="dl-bar"><div class="dl-fill" style="width:{downloadPct}%"></div></div>
-          <div class="dl-pct">{$_('updates.downloading', { values: { percent: downloadPct } })}</div>
-        </div>
-      {:else if latest.apkAsset}
-        <div class="update-actions">
-          <button class="btn btn-primary" on:click={doInstall}>
-            <span class="material-symbols-rounded" style="font-size:16px">download</span>
-            {$_('updates.download_install')}
-          </button>
-          <button class="btn btn-secondary" on:click={doSkip}>{$_('updates.skip_this_version')}</button>
-        </div>
-      {:else}
-        <div class="note">{$_('updates.no_apk_asset')}</div>
-      {/if}
-
-      {#if installFailed}
-        <div class="alert alert-error">
-          <span class="material-symbols-rounded" style="font-size:18px">error</span>
-          {installFailed}
-        </div>
-      {/if}
-    </div>
-  {:else if showApkPanel && latest && !available}
-    <div class="uptodate-tag">
-      <span class="material-symbols-rounded" style="font-size:18px">check_circle</span>
-      {$_('updates.up_to_date')}
-    </div>
+    </details>
   {/if}
 
   <!-- Storage: what's cached under Directory.Data/updates/ (Android only) -->
@@ -438,19 +490,53 @@
   }
   .channel-opt:hover:not(.selected) { color: var(--text-1); }
 
-  .btn-check {
+  /* Single primary action button — same visual slot across every state
+     (check / checking / install / downloading). Colour flips to accent
+     when an update is queued so it reads as the recommended action;
+     progress fill grows across the background during download so the
+     UI never shifts layout. */
+  .btn-primary-action {
+    position: relative;
     width: 100%;
-    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-    padding: 12px 16px; margin-top: 12px;
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 14px 16px; margin-top: 12px;
     border-radius: 10px; border: none; cursor: pointer;
-    background: var(--accent); color: white;
+    background: var(--surface-2); color: var(--text-1);
     font-size: 14px; font-weight: 600;
-    transition: opacity 120ms ease, transform 120ms ease;
+    overflow: hidden;
+    transition: background 160ms ease, opacity 120ms ease, transform 120ms ease;
   }
-  .btn-check:not(:disabled):hover { opacity: 0.92; }
-  .btn-check:not(:disabled):active { transform: scale(0.98); }
-  .btn-check:disabled { opacity: 0.6; cursor: not-allowed; }
-  .btn-check .material-symbols-rounded { font-size: 18px; }
+  .btn-primary-action.is-install {
+    background: var(--accent); color: white;
+  }
+  .btn-primary-action:not(:disabled):hover { opacity: 0.92; }
+  .btn-primary-action:not(:disabled):active { transform: scale(0.98); }
+  .btn-primary-action:disabled { cursor: not-allowed; opacity: 0.88; }
+  .btn-primary-action.is-busy { cursor: progress; opacity: 1; }
+  .btn-primary-action .btn-label {
+    position: relative; z-index: 1;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .btn-primary-action .material-symbols-rounded { font-size: 18px; }
+  .btn-progress-fill {
+    position: absolute; inset: 0 auto 0 0;
+    background: color-mix(in srgb, var(--accent) 60%, transparent);
+    transition: width 200ms linear;
+    z-index: 0;
+  }
+
+  /* Skip link. Small centered text button, sits under the install
+     action when an update is available. Discoverable but low-emphasis
+     so it doesn't compete with the primary action. */
+  .btn-skip {
+    display: block;
+    margin: 8px auto 0;
+    padding: 6px 12px;
+    border: none; background: transparent; cursor: pointer;
+    font-size: 12px; color: var(--text-2);
+    text-decoration: underline; text-underline-offset: 3px;
+  }
+  .btn-skip:hover { color: var(--text-1); }
 
   .last-checked {
     text-align: center;
@@ -458,6 +544,55 @@
     margin-top: 8px;
   }
   .last-checked strong { color: var(--text-1); font-weight: 600; }
+
+  /* Collapsible release-notes panel. Chevron rotates when open; body
+     is markdown-rendered inline. */
+  .whats-new {
+    margin: 0 16px 16px;
+    border-radius: 10px;
+    background: var(--surface-2);
+    border: 1px solid var(--border, rgba(255,255,255,0.06));
+    overflow: hidden;
+  }
+  .whats-new summary {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 14px;
+    cursor: pointer;
+    list-style: none;
+    font-size: 13px; font-weight: 600; color: var(--text-1);
+  }
+  .whats-new summary::-webkit-details-marker { display: none; }
+  .whats-new-chev {
+    font-size: 20px; color: var(--text-2);
+    transition: transform 160ms ease;
+  }
+  .whats-new[open] .whats-new-chev { transform: rotate(90deg); }
+  .whats-new-title { flex: 1; min-width: 0; }
+  .whats-new-when {
+    font-size: 11px; font-weight: 500; color: var(--text-2);
+  }
+  .whats-new-body {
+    padding: 4px 16px 16px;
+    display: flex; flex-direction: column; gap: 10px;
+    border-top: 1px solid var(--border, rgba(255,255,255,0.06));
+    max-height: 320px; overflow: auto;
+  }
+  .whats-new-md {
+    font-size: 13px; color: var(--text-1); line-height: 1.5;
+  }
+  .whats-new-md h3 { font-size: 14px; margin: 12px 0 4px; }
+  .whats-new-md h4 { font-size: 13px; margin: 10px 0 4px; color: var(--text-2); }
+  .whats-new-md p { margin: 0 0 6px; }
+  .whats-new-md ul { margin: 4px 0 8px; padding-left: 20px; }
+  .whats-new-md li { margin: 2px 0; }
+  .whats-new-md code {
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    padding: 1px 5px; border-radius: 4px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+  }
+  .whats-new-md a { color: var(--accent); }
+  .whats-new-md strong { font-weight: 700; }
 
   .btn {
     display: inline-flex; align-items: center; gap: 6px;
