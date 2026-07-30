@@ -242,7 +242,7 @@
 
     <div class="divider"></div>
     <div class="row">
-      <div class="row-label">
+      <div class="row-label label-stack">
         <div class="label-main">{$_('updates.auto_check')}</div>
         <div class="label-desc">{$_('updates.auto_check_desc')}</div>
       </div>
@@ -444,6 +444,14 @@
   .row-label {
     flex: 1; min-width: 0;
     display: flex; align-items: center; gap: 10px;
+  }
+  /* When the row has a label + description pair (no icon on the left),
+     stack them vertically so the label always fits on one line and the
+     description sits underneath it. Used by rows like Auto-Check. */
+  .row-label.label-stack {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
   }
   .row-icon { color: var(--accent); font-size: 20px; flex-shrink: 0; }
   .label-main { font-size: 14px; font-weight: 600; color: var(--text-1); }
