@@ -363,6 +363,63 @@ async function _applySchema(db) {
   } catch (e) {
     console.debug('[db-native] sodium/salt backfill skipped:', e?.message);
   }
+
+  // Diary items shrink (issue #125): trim historical diary rows that stored
+  // the full source food/recipe on every item. New writes use the reference
+  // shape via _toReferenceShape in stores/diary.js; this one-shot pass
+  // shrinks pre-existing rows so they don't push a bloated payload on the
+  // next sync. Does NOT bump updated_at — the write is a local cleanup, not
+  // a semantic edit, and bumping would cause dbMarkSynced predicates and
+  // server-side timestamp comparisons to churn every diary row.
+  try {
+    const flag = await db.query(`SELECT value FROM sync_meta WHERE key = 'diary_items_shrunk_v1'`);
+    const done = (flag?.values || [])[0]?.value === 'done';
+    if (!done) {
+      const n = await _shrinkDiaryItems(db);
+      if (n > 0) console.log(`[db-native] shrunk diary items on ${n} rows`);
+      await db.run(
+        `INSERT OR REPLACE INTO sync_meta (key, value) VALUES ('diary_items_shrunk_v1', 'done')`
+      );
+    }
+  } catch (e) {
+    console.debug('[db-native] diary items shrink skipped:', e?.message);
+  }
+}
+
+// Mirror of server/db.js diary items shrink migration. See stores/diary.js
+// _KEEP_FIELDS for the canonical list — must stay in sync.
+const _DIARY_KEEP = new Set([
+  'meal', 'addedAt', 'type',
+  'id', 'food_server_id', 'is_recipe',
+  'name', 'brand', 'portion', 'unit', 'quantity',
+  'nutrition', 'notes', 'imgUrl',
+]);
+function _shrinkDiaryItem(it) {
+  if (!it || typeof it !== 'object') return it;
+  const out = {};
+  for (const k of Object.keys(it)) {
+    if (_DIARY_KEEP.has(k)) out[k] = it[k];
+  }
+  if (Array.isArray(it._splitItems)) out._splitItems = it._splitItems.map(_shrinkDiaryItem);
+  return out;
+}
+async function _shrinkDiaryItems(db) {
+  let changed = 0;
+  const r = await db.query(`SELECT id, items FROM diary WHERE items IS NOT NULL AND items != '[]' AND deleted_at IS NULL`);
+  const rows = r?.values || [];
+  for (const row of rows) {
+    let parsed;
+    try { parsed = JSON.parse(row.items || '[]'); } catch { continue; }
+    if (!Array.isArray(parsed) || !parsed.length) continue;
+    const shrunk = parsed.map(_shrinkDiaryItem);
+    const before = row.items.length;
+    const after = JSON.stringify(shrunk);
+    if (after.length < before) {
+      await db.run(`UPDATE diary SET items = ? WHERE id = ?`, [after, row.id]);
+      changed++;
+    }
+  }
+  return changed;
 }
 
 // Mirror of server/db.js _backfillSodiumSalt. Fills the missing field via
@@ -706,6 +763,54 @@ function _parseMealRow(row) {
 
 // ── Diary ─────────────────────────────────────────────────────────────────
 
+// Mirror of server-side hydrateItems (server/lib/diary-helpers.js). Re-attaches
+// each diary item's source-food render-time fields (nutrition_basis, alt_units,
+// density_g_ml, category, barcode) at read time, so the stored snapshot can
+// stay minimal. Wide-history fields (name/brand/nutrition/portion/unit/
+// quantity/notes) are NOT hydrated — they stay from the snapshot, preserving
+// "edit the source food later, keep the diary log the same" semantics.
+// Recipe items (is_recipe truthy) skip hydration — splitRecipeItem fetches
+// the meal on demand for ingredient data.
+const _HYDRATE_FIELDS = ['nutrition_basis', 'alt_units', 'density_g_ml', 'category', 'barcode'];
+async function _hydrateItems(items) {
+  if (!Array.isArray(items) || !items.length) return items;
+  try {
+    const foodIds = new Set();
+    for (const it of items) {
+      if (it && !it.is_recipe) {
+        const id = it.food_server_id ?? it.id;
+        if (typeof id === 'number') foodIds.add(id);
+      }
+    }
+    if (!foodIds.size) return items.map(_hydrateSplitChildren);
+    const db = await getDb();
+    const placeholders = Array.from(foodIds).map(() => '?').join(',');
+    const r = await db.query(
+      `SELECT id, nutrition_basis, alt_units, density_g_ml, category, barcode
+       FROM foods WHERE id IN (${placeholders}) AND deleted_at IS NULL`,
+      Array.from(foodIds)
+    );
+    const byId = new Map(_rows(r).map(row => [row.id, row]));
+    return Promise.all(items.map(async it => {
+      if (!it || it.is_recipe) return await _hydrateSplitChildren(it);
+      const id = it.food_server_id ?? it.id;
+      const src = typeof id === 'number' ? byId.get(id) : null;
+      if (!src) return await _hydrateSplitChildren(it);
+      const out = { ...it };
+      for (const k of _HYDRATE_FIELDS) {
+        if (src[k] != null && it[k] == null) out[k] = src[k];
+      }
+      return await _hydrateSplitChildren(out);
+    }));
+  } catch {
+    return items;
+  }
+}
+async function _hydrateSplitChildren(item) {
+  if (!item || !Array.isArray(item._splitItems) || !item._splitItems.length) return item;
+  return { ...item, _splitItems: await _hydrateItems(item._splitItems) };
+}
+
 // Mirror of server-side freshenItemImages (server/lib/diary-helpers.js).
 //
 // IMPORTANT: this LIVE-RESOLVES every diary item's imgUrl from the local
@@ -771,7 +876,7 @@ export async function dbGetDiaryDate(date) {
   );
   const row = _row(r);
   if (!row) return null;
-  const items = await _freshenItemImages(_parseJson(row.items, []));
+  const items = await _freshenItemImages(await _hydrateItems(_parseJson(row.items, [])));
   return {
     ...row,
     items,
@@ -810,7 +915,7 @@ export async function dbGetAllDiary() {
   // (≤90 days) finish in a few ms.
   return Promise.all(rawRows.map(async row => ({
     ...row,
-    items:      await _freshenItemImages(_parseJson(row.items, [])),
+    items:      await _freshenItemImages(await _hydrateItems(_parseJson(row.items, []))),
     body_stats: _parseJson(row.body_stats, {}),
     water:      _parseJson(row.water, []),
     notes:      row.notes || '',

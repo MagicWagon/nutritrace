@@ -25,7 +25,8 @@
     prevDay, nextDay, loadEntry, removeDiaryItem, updateDiaryItem, saveBodyStats,
     copyMealItems, moveMealItems, clearMealItems, copyMealToDate, saveDiaryNote,
     splitRecipeItem, removeSplitChild, updateSplitChild,
-    diaryShowNutritionSummary, diaryShowBodyStats, diaryLoadError
+    diaryShowNutritionSummary, diaryShowBodyStats, diaryLoadError,
+    buildDiaryWritePayload
   } from '../stores/diary.js';
   import { mealNames, goals, energyUnit, weightUnit, lengthUnit, navStyle,
            diaryShowBrands, diaryShowThumbnails,
@@ -736,11 +737,7 @@
     currentEntry.subscribe(v => ent = v)();
     if (!ent) return;
     const updated = { ...ent, items: ent.items.filter((_, i) => !toDelete.has(i)) };
-    await NtApi.saveDiaryDate($currentDate, {
-      items:       updated.items,
-      body_stats:  updated.bodyStats || {},
-      water:       updated.water,
-    });
+    await NtApi.saveDiaryDate($currentDate, buildDiaryWritePayload(updated));
     await loadEntry($currentDate);
     showSuccess(`${count} item${count !== 1 ? 's' : ''} removed`);
     exitSelectMode();
@@ -981,11 +978,7 @@
     const _use24 = $timeFormat === '24h';
     const log = { amount: ml, time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: !_use24 }) };
     const updated = { ...ent, water: [...(ent?.water || []), log] };
-    await NtApi.saveDiaryDate($currentDate, {
-      items: updated.items || [],
-      body_stats: updated.bodyStats || {},
-      water: updated.water,
-    });
+    await NtApi.saveDiaryDate($currentDate, buildDiaryWritePayload(updated));
     await loadEntry($currentDate);
     _waterCustomAmt  = '';
     _waterShowCustom = false;
@@ -1012,11 +1005,7 @@
     currentEntry.subscribe(v => ent = v)();
     if (!ent) return;
     const water = (ent.water || []).filter((_, i) => i !== index);
-    await NtApi.saveDiaryDate($currentDate, {
-      items: ent.items || [],
-      body_stats: ent.bodyStats || {},
-      water,
-    });
+    await NtApi.saveDiaryDate($currentDate, buildDiaryWritePayload({ ...ent, water }));
     await loadEntry($currentDate);
   }
 
@@ -1043,11 +1032,7 @@
     currentEntry.subscribe(v => ent = v)();
     if (!ent) return;
     const water = (ent.water || []).map((l, idx) => idx === i ? { ...l, amount: ml } : l);
-    await NtApi.saveDiaryDate($currentDate, {
-      items: ent.items || [],
-      body_stats: ent.bodyStats || {},
-      water,
-    });
+    await NtApi.saveDiaryDate($currentDate, buildDiaryWritePayload({ ...ent, water }));
     _waterEditIndex = -1;
     await loadEntry($currentDate);
   }
@@ -1095,11 +1080,7 @@
         const entry = $currentEntry;
         if (entry && entry.items && index < entry.items.length) {
           const updated = { ...entry, items: entry.items.filter((_, i) => i !== index) };
-          await NtApi.saveDiaryDate($currentDate, {
-            items: updated.items,
-            body_stats: updated.bodyStats || updated.body_stats || {},
-            water: updated.water || [],
-          });
+          await NtApi.saveDiaryDate($currentDate, buildDiaryWritePayload(updated));
           await loadEntry($currentDate);
           showSuccess('Item replaced');
         }

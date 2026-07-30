@@ -20,7 +20,7 @@ router.use(requireAuth);
 
 const uid = req => userMgmtActive() ? req.user?.id : null;
 
-import { freshenItemImages } from '../lib/diary-helpers.js';
+import { freshenItemImages, hydrateItems } from '../lib/diary-helpers.js';
 
 // Issues #69 + #70: normalize alt_units before storing. Accepts null /
 // already-serialized string / array of {abbr, grams}. Filters malformed
@@ -55,7 +55,7 @@ function parse(row) {
 function parseDiary(row) {
   const parsed = parse(row);
   if (parsed && Array.isArray(parsed.items)) {
-    parsed.items = freshenItemImages(parsed.items);
+    parsed.items = freshenItemImages(hydrateItems(parsed.items));
   }
   return parsed;
 }
