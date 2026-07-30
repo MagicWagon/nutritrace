@@ -44,6 +44,35 @@
       "cant_start_mic":        "Impossible de démarrer le microphone"
     }
   },
+  "sync": {
+    "sync_now": "Synchroniser maintenant",
+    "syncing": "Synchronisation…",
+    "retry": "Réessayer",
+    "retrying": "Nouvelle tentative…",
+    "dismiss_message": "Fermer le message de synchronisation",
+    "error_title": "Échec de la synchronisation",
+    "connected": "Connecté",
+    "server_unavailable": "Serveur indisponible",
+    "last_synced": "Dernière synchronisation",
+    "time": {
+      "never": "jamais",
+      "just_now": "à l’instant",
+      "seconds_ago": "il y a {count} s",
+      "minutes_ago": "il y a {count} min",
+      "hours_ago": "il y a {count} h",
+      "days_ago": "il y a {count} j"
+    },
+    "connection": {
+      "server_fallback": "serveur",
+      "no_network_title": "Aucune connexion réseau",
+      "cant_reach_title": "Impossible de joindre {host}",
+      "reconnect": "Reconnectez-vous à Internet.",
+      "server_error": "Le serveur a renvoyé le code HTTP {status}. Réessayez dans quelques instants.",
+      "mobile_data": "Vous êtes connecté via les données mobiles. Ce serveur peut nécessiter votre Wi-Fi domestique ou votre VPN.",
+      "check_connection": "Vérifiez votre Wi-Fi, votre VPN ou le serveur.",
+      "saved_locally": "Vos modifications sont enregistrées localement et se synchroniseront automatiquement."
+    }
+  },
   "settings": {
     "appearance": {
       "section":          "Apparence",
