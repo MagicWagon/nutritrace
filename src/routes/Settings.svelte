@@ -3047,6 +3047,23 @@
       {/if}
     {/if}
 
+    <!-- Updates — in-app version check + APK install (Android) + admin server-update banner (PWA).
+         Sits in the App section (not Admin) so non-admin members on
+         multi-user instances can still reach their per-device update
+         controls. The server-update sub-panel inside is admin-gated
+         internally. Canonical position across TraceApps: right before
+         Diagnostics. -->
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'updates')} on:click={() => toggleSection('updates')}>
+      <span class="material-symbols-rounded si">system_update</span>
+      <span>{$_('settings.updates.section')}</span>
+      <span class="material-symbols-rounded chevron" class:rotated={openSections.updates}>expand_more</span>
+    </button>
+    {#if sectionOpen(openSections, settingsQuery, 'updates') && sectionVisible(settingsQuery, 'updates')}
+      <div class="section-body" transition:slide={{ duration: 180 }}>
+        <SettingsUpdates />
+      </div>
+    {/if}
+
     <!-- Diagnostics -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'helpImprove')} on:click={() => toggleSection('helpImprove')}>
       <span class="material-symbols-rounded si">troubleshoot</span>
@@ -3152,18 +3169,6 @@
       <SettingsApiTokens expanded={openSections.apiTokens} />
     {/if}
     {/if}
-    {/if}
-
-    <!-- Updates — in-app version check + APK install (Android) + admin server-update banner (PWA). -->
-    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'updates')} on:click={() => toggleSection('updates')}>
-      <span class="material-symbols-rounded si">system_update</span>
-      <span>{$_('settings.updates.section')}</span>
-      <span class="material-symbols-rounded chevron" class:rotated={openSections.updates}>expand_more</span>
-    </button>
-    {#if sectionOpen(openSections, settingsQuery, 'updates') && sectionVisible(settingsQuery, 'updates')}
-      <div class="section-body" transition:slide={{ duration: 180 }}>
-        <SettingsUpdates />
-      </div>
     {/if}
 
     <!-- About — standalone footer item, no group label. Always last. -->
