@@ -4,7 +4,7 @@
   import { location, push } from 'svelte-spa-router';
   import { _ } from 'svelte-i18n';
   import { createEventDispatcher } from 'svelte';
-  import { resolveAssetUrl, isNative } from '../../lib/platform.js';
+  import { resolveAssetUrl, iconUrl, isNative } from '../../lib/platform.js';
   import { currentUser, userMgmtActive, logout } from '../../stores/auth.js';
   import { wellnessEnabled, fitbitEnabled, withingsEnabled, garminEnabled, googleHealthEnabled, healthConnectEnabled } from '../../stores/settings.js';
   import WellnessIcon from '../icons/WellnessIcon.svelte';
@@ -89,7 +89,7 @@
   >
     <!-- App branding -->
     <div class="sidebar-brand">
-      <img class="brand-icon" src={resolveAssetUrl('/icons/logo.png')} alt="NutriTrace" />
+      <img class="brand-icon" src={iconUrl('/icons/logo.png')} alt="NutriTrace" />
       <div class="brand-text">
         <span class="brand-name">NutriTrace</span>
         <span class="brand-tagline">Trace Every Bite — Personal Nutrition Tracker</span>

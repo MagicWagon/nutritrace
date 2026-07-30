@@ -3,6 +3,10 @@
 import { setAppVersion } from './lib/log-capture.js';
 import { APP_VERSION } from './lib/version.js';
 setAppVersion(APP_VERSION);
+// Exposed for iconUrl() in platform.js: appended to every icon <img>
+// src as ?v=<version> so a shipped icon fix isn't hidden behind the
+// browser's aggressive PNG cache on the next boot.
+if (typeof window !== 'undefined') window.__NT_VERSION__ = APP_VERSION;
 
 import './styles/tokens.css';
 import './styles/base.css';
