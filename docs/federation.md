@@ -194,13 +194,23 @@ measurement fields can be provided.
 | `muscle_mass`    | kg   | `muscle_mass_kg`       |
 | `bone_mass`      | kg   | `bone_mass_kg`         |
 | `body_water`     | %    | `body_water_pct`       |
-| `lean_body_mass` | kg   | `lean_body_mass_kg`    |
+| `lean_body_mass` | kg   | `lean_mass_kg`         |
 
 The remaining fields (`bmi`, `visceral_fat`, `protein`, `bmr`,
 `metabolic_age`, `impedance`, `body_score`) are stored under their
 wire names in the same JSON blob. NT doesn't render them today but
 they round-trip cleanly if the UI ever exposes them, and they're
 included in server backups.
+
+**Where the values show up.** Every numeric metric writes to two
+places, matching the Withings sync pattern:
+
+- **`diary.body_stats`** — populates the Body Stats card on the diary
+  page for that date.
+- **`wellness_data`** with `source='federation'` — populates the
+  Wellness → Body tab (Weight, Body Fat, Muscle Mass, Bone Mass,
+  Body Water, Lean Mass, etc.) so all six standard metrics render
+  alongside anything synced from Withings / Fitbit / Health Connect.
 
 **Validation.** Each numeric field is range-checked against a
 sanity envelope (e.g. `weight` 10-500 kg, `body_fat` 1-80 %). Any

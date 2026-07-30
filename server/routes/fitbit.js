@@ -671,17 +671,24 @@ router.get('/data', wrap((req, res) => {
   const u = uid(req);
   const { date, from, to } = req.query;
 
+  // Fitbit endpoint doubles as the "generic non-vendor-specific wellness
+  // read" the UI hits when no per-vendor endpoint applies. Includes
+  // `federation` (the /api/v1/body-measurements source used by HA /
+  // Node-RED / Gadgetbridge pushes) so those readings show up in
+  // Wellness → Body alongside Fitbit + Health Connect data. Health
+  // Connect stays last in the ordering so its values win on any tie
+  // (same metric on same day from multiple sources).
   const orderHcLast = `ORDER BY CASE source WHEN 'health_connect' THEN 2 ELSE 1 END`;
   let rows;
   if (date) {
     rows = db.prepare(
-      `SELECT * FROM wellness_data WHERE user_id=? AND date=? AND source IN ('fitbit', 'health_connect') ${orderHcLast}`
+      `SELECT * FROM wellness_data WHERE user_id=? AND date=? AND source IN ('fitbit', 'health_connect', 'federation') ${orderHcLast}`
     ).all(u, date);
   } else {
     const start = from || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
     const end   = to   || new Date().toISOString().slice(0, 10);
     rows = db.prepare(
-      `SELECT * FROM wellness_data WHERE user_id=? AND date>=? AND date<=? AND source IN ('fitbit', 'health_connect') ORDER BY date, CASE source WHEN 'health_connect' THEN 2 ELSE 1 END`
+      `SELECT * FROM wellness_data WHERE user_id=? AND date>=? AND date<=? AND source IN ('fitbit', 'health_connect', 'federation') ORDER BY date, CASE source WHEN 'health_connect' THEN 2 ELSE 1 END`
     ).all(u, start, end);
   }
 

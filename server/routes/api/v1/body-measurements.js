@@ -29,7 +29,7 @@
  *     muscle_mass:   56.14,  // kg   → body_stats.muscle_mass_kg
  *     bone_mass:     3.01,   // kg   → body_stats.bone_mass_kg
  *     body_water:    54,     // %    → body_stats.body_water_pct
- *     lean_body_mass:60,     // kg   → body_stats.lean_body_mass_kg
+ *     lean_body_mass:60,     // kg   → body_stats.lean_mass_kg
  *
  *     // Extra metrics NT doesn't render (yet). Preserved in body_stats
  *     // JSON under the same key names so nothing is lost:
@@ -58,13 +58,18 @@ const router = Router();
 // verbatim (so extras like `bmi`, `visceral_fat`, `body_score` land
 // safely without needing a schema change every time a new scale
 // vendor invents a metric).
+//
+// Key names match what the Wellness → Body UI reads and what the
+// Withings sync writes (server/routes/withings.js BODY_STAT_TYPES +
+// WELLNESS_TYPES) so the same metric from either integration ends up
+// under the same key.
 const FIELD_MAP = {
   weight:         'weight_kg',
   body_fat:       'body_fat_pct',
   muscle_mass:    'muscle_mass_kg',
   bone_mass:      'bone_mass_kg',
   body_water:     'body_water_pct',
-  lean_body_mass: 'lean_body_mass_kg',
+  lean_body_mass: 'lean_mass_kg',      // matches Wellness UI + Withings
 };
 
 // Rough sanity ranges so a mis-configured integration posting garbage
@@ -194,6 +199,28 @@ router.post('/', requireScope('write:body-measurements'), wrap((req, res) => {
         body_stats = excluded.body_stats,
         updated_at = excluded.updated_at
     `).run(u, date, JSON.stringify(merged));
+  }
+
+  // Also mirror every numeric metric to wellness_data with
+  // source='federation'. Wellness → Body reads from wellness_data
+  // (not from diary.body_stats), so without this the fields would
+  // land in the diary card but stay invisible in Wellness. Matches
+  // the Withings sync pattern: it writes to BOTH tables so the
+  // per-source Wellness views can render the data. Uses the same
+  // (user_id, date, source, metric_type) uniqueness so re-posting
+  // the same day upserts in place.
+  const insertWellness = db.prepare(`
+    INSERT INTO wellness_data (user_id, date, source, metric_type, value, metadata, synced_at)
+    VALUES (?, ?, 'federation', ?, ?, ?, datetime('now'))
+    ON CONFLICT(user_id, date, source, metric_type)
+    DO UPDATE SET value = excluded.value, metadata = excluded.metadata, synced_at = excluded.synced_at
+  `);
+  const wellnessUid = u == null ? 0 : u;
+  const wellnessMeta = source ? JSON.stringify({ source }) : '{}';
+  for (const [key, value] of Object.entries(updates)) {
+    if (key.startsWith('_')) continue;
+    if (typeof value !== 'number' || !Number.isFinite(value)) continue;
+    insertWellness.run(wellnessUid, date, key, value, wellnessMeta);
   }
 
   res.status(201).json({
