@@ -9,6 +9,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **Accent-tinted browser chrome.** The browser's tab bar / address strip now picks up your current accent color via `<meta name="theme-color">`. Running multiple instances side by side (personal + family, or NT + CT + LT together) — pick a distinct accent per install and the tabs are visually different at a glance. Favicon and icons stay the branded NutriTrace mark.
+- **Pull-to-refresh sync + smarter connection banner (Android).** In native server mode, swipe down from the top of any page to trigger a manual sync. When sync fails, the on-screen banner now analyzes what went wrong (no network vs cellular-only vs server unreachable vs HTTP error) with actionable copy and a Retry button, instead of a generic "sync error". Contributed by @librarian (#124).
+
 - **In-app updates.** New Settings → Updates panel checks GitHub Releases
   for a newer version and, on Android, downloads the signed APK with a
   progress bar and hands off to the system installer via FileProvider.
@@ -20,6 +23,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- **SMTP "Username" field relabeled to "Email or Username".** Most SMTP providers (Gmail, Outlook, etc.) want the full email as the username. Label change removes the guesswork.
 - **Fitbit connect card hidden for new users.** Fitbit's Web API is being
   wound down; Google Health is the recommended path forward. Users who
   already have Fitbit connected continue to see the card and their data
@@ -27,6 +31,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   existing connections.
 
 ### Fixed
+
+- **App icon no longer shows a white halo.** The bundled icon PNGs had ~15px of solid white padding baked into their corners. On tinted browser chrome the halo was visible around the tab favicon; in-app the icon looked framed. Corners now clear cleanly through to the tab background. Icon URLs also cache-busted with the app version so shipped icon fixes actually take effect without users needing to clear their browser cache.
+- **Create Admin form password field no longer crushed** (#122). The password input on the Enable User Management form was rendering as a colored sliver because of a flex-layout bug. Password + Confirm now sit symmetrically side-by-side, each with its own eye toggle sharing show/hide state.
+- **Bundled assets load offline again.** In native server mode, `/icons/`, `/fonts/`, `/templates/`, and `/vendor/` paths were being rewritten to the configured server URL even though those assets ship inside the Android APK. When the server was unreachable, icons and fonts silently disappeared. Now short-circuits to the WebView's local origin. Contributed by @librarian (#123).
 
 - **OpenAI-compatible endpoints accept vision requests again** (#114).
   Image content blocks are normalised on the AI proxy before
