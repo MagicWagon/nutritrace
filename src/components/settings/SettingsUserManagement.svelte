@@ -10,6 +10,7 @@
   import { push } from 'svelte-spa-router';
   import { validatePassword } from '../../lib/validation.js';
   import { confirmDialog } from '../../stores/confirmDialog.js';
+  import { envLocks } from '../../stores/settings.js';
   import Dialog from '../ui/Dialog.svelte';
 
   // ── User Management state ────────────────────────────────────────────────────
@@ -31,6 +32,7 @@
   let enableShowPass = false;
   let enableAdminConf = '';
   let enableAdminName = '';
+  let enableAdminEmail = '';
   let enableUmError   = '';
   let enableUmLoading = false;
 
@@ -181,6 +183,10 @@
           username:  enableAdminUser.trim(),
           password:  enableAdminPass,
           full_name: enableAdminName.trim() || undefined,
+          // Only sent when SMTP is env-configured (field only rendered
+          // in that case). Server stores it on the user row so password
+          // reset / admin invites can email them later.
+          email:     enableAdminEmail.trim().toLowerCase() || undefined,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -211,7 +217,7 @@
       }
       await loadAuthState();
       showEnableUm = false;
-      enableAdminUser = ''; enableAdminPass = ''; enableAdminConf = ''; enableAdminName = '';
+      enableAdminUser = ''; enableAdminPass = ''; enableAdminConf = ''; enableAdminName = ''; enableAdminEmail = '';
       await loadUsers();
       showSuccess($_('settings.users.toast_um_enabled'));
     } catch(e) { enableUmError = $_('settings.users.err_could_not_reach_server'); }
@@ -650,6 +656,20 @@
               <input class="input" style="flex:1;min-width:0" type="text" bind:value={enableAdminUser} placeholder={$_('settings.users.username_required')} autocomplete="username" />
               <input class="input" style="flex:1;min-width:0" type="text" bind:value={enableAdminName} placeholder={$_('settings.users.full_name')} />
             </div>
+            <!-- Optional admin email — only shown when SMTP is env-locked
+                 (docker-compose configured), so we know at boot the server
+                 can actually send from it. In the default "SMTP configured
+                 via Settings UI post-install" path, SMTP isn't up yet at
+                 this point so the field would be dead weight. Stored on
+                 the user row for later password-reset / invite emails. -->
+            {#if $envLocks?.smtp}
+              <div class="um-form-row">
+                <input class="input" style="flex:1;min-width:0" type="email"
+                  bind:value={enableAdminEmail}
+                  placeholder={$_('settings.users.email_optional')}
+                  autocomplete="email" />
+              </div>
+            {/if}
             <!-- Symmetric password + confirm row: each field wrapped in its own
                  flex:1 group with an eye toggle at its right edge. Both eyes
                  flip the same shared `enableShowPass` state so clicking either
