@@ -2,7 +2,7 @@
   import { onMount, tick } from 'svelte';
   import { get } from 'svelte/store';
   import { slide, fade } from 'svelte/transition';
-  import { push } from 'svelte-spa-router';
+  import { push, querystring } from 'svelte-spa-router';
   import { portal } from '../lib/portal.js';
   import { getLogBufferText, clearLogBuffer, isVerboseLogging, setVerboseLogging, getLogFileUri, getLastCrashFileUri, hasCrashReport, clearCrashReport } from '../lib/log-capture.js';
   import Toggle from '../components/settings/Toggle.svelte';
@@ -313,9 +313,17 @@
   // sub-page (/settings/<slug>) instead of expanding it inline. On a
   // sub-page tapping the same section behaves as "back to index" so the
   // control is never a dead-click.
+  //
+  // If the user has an active search query, forward it as ?q=<query> so
+  // the sub-page can auto-scroll to the matching setting on land — turns
+  // "type 'dark' → see Appearance row → tap → scroll to Dark mode" into
+  // a single tap.
   function toggleSection(key) {
     if (currentSection === key) push('/settings');
-    else push(`/settings/${key}`);
+    else {
+      const q = settingsQuery ? `?q=${encodeURIComponent(settingsQuery)}` : '';
+      push(`/settings/${key}${q}`);
+    }
   }
 
   // ── Settings search ────────────────────────────────────────────────────────
@@ -423,6 +431,56 @@
   // on:click handler instead of a reactive `openSections.wellness`
   // block. Mirror that side-effect for the drill-in path.
   $: if (currentSection === 'wellness') wellnessRef?.loadWellnessConfig();
+
+  // ── Deep-link search scroll ────────────────────────────────────────────
+  // When the user searches on the main page then drills into a section,
+  // the query travels along as ?q=<term>. On sub-page mount we scan the
+  // rendered section body for the first row whose label OR description
+  // text contains that term, scroll it into view, and briefly highlight
+  // it. Turns "type 'dark' → tap Appearance" into a single-tap jump to
+  // the Dark mode row.
+  //
+  // No per-setting index: we just walk the DOM. This works out of the
+  // box for every setting whose visible label text matches the query,
+  // and stays correct automatically as settings are added or renamed.
+  $: _urlQuery = $querystring ? new URLSearchParams($querystring).get('q') : null;
+
+  // Fire the scroll exactly once per (section, query) landing. Keyed
+  // memo prevents a re-run loop when _scheduleDeepLinkScroll ends up
+  // touching any store the reactive statement transitively depends on.
+  let _lastDeepLinkKey = null;
+  $: {
+    const key = `${currentSection || ''}|${_urlQuery || ''}`;
+    if (currentSection && _urlQuery && key !== _lastDeepLinkKey) {
+      _lastDeepLinkKey = key;
+      _scheduleDeepLinkScroll(_urlQuery);
+    }
+  }
+
+  async function _scheduleDeepLinkScroll(q) {
+    // Wait two ticks so the section body's slide-in transition has
+    // laid out its final geometry before we measure/scroll.
+    await tick();
+    await new Promise(r => setTimeout(r, 60));
+    const q_norm = q.toLowerCase().trim();
+    if (!q_norm) return;
+    const scope = document.querySelector('.subpage-view');
+    if (!scope) return;
+    const candidates = scope.querySelectorAll(
+      '.setting-label, .setting-desc, .sub-label, .setting-row'
+    );
+    let hit = null;
+    for (const el of candidates) {
+      if ((el.textContent || '').toLowerCase().includes(q_norm)) { hit = el; break; }
+    }
+    if (!hit) return;
+    // Climb to the enclosing .setting-row for the highlight anchor —
+    // gives a nicer highlight box than lighting up just the label span.
+    const row = hit.closest('.setting-row') || hit;
+    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    row.classList.add('deep-link-highlight');
+    setTimeout(() => row.classList.remove('deep-link-highlight'), 2200);
+  }
 
   // ── Appearance ─────────────────────────────────────────────────────────────
   const ACCENT_COLORS = [
@@ -3639,6 +3697,21 @@
   .settings-back:hover  { background: var(--surface-2); }
   .settings-back:active { background: var(--surface-3); }
   .settings-back .material-symbols-rounded { font-size: 24px; }
+
+  /* Deep-link highlight — glows the target .setting-row for ~2s after
+     a search-driven drill-in scrolls to it. Uses box-shadow (not
+     border/outline) so it never nudges layout mid-scroll. Pulse
+     ramps fast, decays gently — enough to catch the eye without
+     turning into visual noise if the user is already reading. */
+  :global(.setting-row.deep-link-highlight) {
+    animation: deep-link-pulse 2s cubic-bezier(.2, .8, .2, 1) both;
+    border-radius: 8px;
+  }
+  @keyframes deep-link-pulse {
+    0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%,  transparent); background-color: transparent; }
+    12%  { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 45%, transparent); background-color: color-mix(in srgb, var(--accent) 14%, transparent); }
+    100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%,  transparent); background-color: transparent; }
+  }
 
   /* Settings header + search bar pinned together. Single sticky-top wrapper
      is more reliable than two separate sticky elements with computed offsets.
