@@ -64,7 +64,19 @@
       push(`/settings/${key}${q}`);
     }
   }
-  function backToIndex() { push('/settings'); }
+  // Reverse the peel-in animation on tap: swap the back button + title
+  // into their -out classes so the reversed CSS keyframe plays, then
+  // navigate after the animation completes. Guards against double-tap
+  // starting a second exit while the first is still playing.
+  let _leaving = false;
+  async function backToIndex() {
+    if (_leaving) return;
+    _leaving = true;
+    // Match the -out animation duration below (240ms) so the button
+    // finishes retreating into the title before /settings mounts.
+    await new Promise(r => setTimeout(r, 240));
+    push('/settings');
+  }
 
   // ── Settings search (index only) ───────────────────────────────────────
   let settingsSearch = '';
@@ -291,12 +303,15 @@
              /settings/:section as different routes and unmounts the
              whole component between them — Svelte transitions can't
              span that boundary. -->
-        <button class="settings-back back-peel-in"
+        <button class="settings-back"
+                class:back-peel-in={!_leaving}
+                class:back-peel-out={_leaving}
                 on:click={backToIndex}
                 aria-label={$_('common.back')}>
           <span class="material-symbols-rounded">arrow_back</span>
         </button>
-        <h1 class="title-slide-in">
+        <h1 class:title-slide-in={!_leaving}
+            class:title-slide-out={_leaving}>
           {SECTION_META[currentSection]?.titleKey ? $_(SECTION_META[currentSection].titleKey) : currentSection}
         </h1>
       {:else}
@@ -603,18 +618,22 @@
     animation: back-peel 320ms cubic-bezier(0.34, 1.4, 0.64, 1) 80ms both;
   }
   @keyframes back-peel {
-    from {
-      width: 0;
-      margin-right: 0;
-      opacity: 0;
-      transform: scale(0.4);
-    }
-    to {
-      width: 40px;
-      margin-right: 8px;
-      opacity: 1;
-      transform: scale(1);
-    }
+    from { width: 0;    margin-right: 0;  opacity: 0; transform: scale(0.4); }
+    to   { width: 40px; margin-right: 8px; opacity: 1; transform: scale(1);   }
+  }
+  /* Reverse of back-peel: on tap, the arrow retreats back into the
+     title (width collapses to 0, opacity fades, scales down). Faster
+     than the entry (240ms vs 320ms) and easing-in so the motion feels
+     decisive — you tapped, it's leaving. The backToIndex handler waits
+     this duration before navigating so the animation completes. */
+  .back-peel-out {
+    overflow: hidden;
+    transform-origin: left center;
+    animation: back-peel-reverse 240ms cubic-bezier(0.4, 0, 0.6, 1) both;
+  }
+  @keyframes back-peel-reverse {
+    from { width: 40px; margin-right: 8px; opacity: 1; transform: scale(1);   }
+    to   { width: 0;    margin-right: 0;  opacity: 0; transform: scale(0.4); }
   }
   /* Title slides right slightly to make room for the appearing back
      button, so the two motions feel connected. Same delay so they
@@ -625,6 +644,15 @@
   @keyframes title-slide {
     from { opacity: 0; transform: translateX(-16px); }
     to   { opacity: 1; transform: translateX(0);      }
+  }
+  /* Reverse: on back tap, title slides back left as the arrow
+     collapses. Same 240ms as .back-peel-out so both finish together. */
+  .title-slide-out {
+    animation: title-slide-back 240ms cubic-bezier(0.4, 0, 0.6, 1) both;
+  }
+  @keyframes title-slide-back {
+    from { opacity: 1; transform: translateX(0);      }
+    to   { opacity: 0; transform: translateX(-16px); }
   }
 
   /* Deep-link highlight — glows the target .setting-row for ~2s after
