@@ -12,6 +12,24 @@ const config: CapacitorConfig = {
       keystorePath: undefined,
       keystoreAlias: undefined,
     },
+    // Allow the HTTPS WebView to load HTTP resources (images, fetches) from
+    // the user's server. Self-hosted deployments overwhelmingly run over
+    // plain HTTP on LAN; without this, Chromium's mixed-content block
+    // refuses to load uploaded food photos, meal images, etc. from an
+    // http:// server. It worked before the hostname flip only because
+    // Chromium special-cases https://localhost as a "potentially
+    // trustworthy" origin exempt from mixed-content rules — .local
+    // doesn't get that exemption. Setting this to true configures the
+    // Android WebView with setMixedContentMode(MIXED_CONTENT_ALWAYS_ALLOW),
+    // which is safe here because the WebView origin is a local virtual URL
+    // served by Capacitor's AssetLoader — no network attacker can inject
+    // into it. Keeping the WebView on HTTPS (androidScheme below) preserves
+    // secure-context status, which the html5-qrcode barcode scanner needs
+    // for getUserMedia. NOTE: this option lives under `android`, NOT
+    // `server` — Capacitor reads it from either `android.allowMixedContent`
+    // or the top-level `allowMixedContent`. Putting it under `server` is
+    // silently ignored.
+    allowMixedContent: true,
   },
   server: {
     // WebView identity for Android autofill. Without an explicit hostname

@@ -176,7 +176,7 @@ export async function loadImageMap() {
     // Must stay in sync with CACHE_VERSION in image-cache.js. Treated as a
     // small magic number on purpose to avoid creating a cross-file import
     // just for this one constant; only image-cache.js writes it.
-    const IMAGE_CACHE_VERSION = 2;
+    const IMAGE_CACHE_VERSION = 3;
     const vr = await db.query(`SELECT value FROM sync_meta WHERE key = 'image_cache_version'`, []);
     const storedVersion = parseInt(vr?.values?.[0]?.value || '1', 10);
     if (storedVersion !== IMAGE_CACHE_VERSION) { _imageMap = {}; return; }
