@@ -11,8 +11,6 @@
   // deep-link scroll) and the shared CSS descendants need via :global.
 
   import { onMount, tick } from 'svelte';
-  import { fly, fade } from 'svelte/transition';
-  import { cubicOut } from 'svelte/easing';
   import { push, querystring } from 'svelte-spa-router';
   import { _ } from 'svelte-i18n';
 
@@ -285,19 +283,24 @@
              Back button + title use fly + fade so drilling in / out
              animates instead of the arrow just popping into existence
              between the hamburger and the title. -->
-        <button class="settings-back"
+        <!-- Back button "peels out" from the left edge of the section
+             title: starts at width 0 hidden behind the title, expands
+             to its full 40px while sliding left + fading in. Uses a
+             CSS keyframe (runs on-mount) rather than a Svelte transition
+             because svelte-spa-router treats /settings and
+             /settings/:section as different routes and unmounts the
+             whole component between them — Svelte transitions can't
+             span that boundary. -->
+        <button class="settings-back back-peel-in"
                 on:click={backToIndex}
-                aria-label={$_('common.back')}
-                in:fly={{ x: -12, duration: 220, easing: cubicOut }}
-                out:fade={{ duration: 140 }}>
+                aria-label={$_('common.back')}>
           <span class="material-symbols-rounded">arrow_back</span>
         </button>
-        <h1 in:fly={{ x: 12, duration: 220, easing: cubicOut }}
-            out:fade={{ duration: 140 }}>
+        <h1 class="title-slide-in">
           {SECTION_META[currentSection]?.titleKey ? $_(SECTION_META[currentSection].titleKey) : currentSection}
         </h1>
       {:else}
-        <h1 in:fade={{ duration: 180 }}>{$_('routes.settings.title')}</h1>
+        <h1>{$_('routes.settings.title')}</h1>
       {/if}
     </header>
 
@@ -586,6 +589,43 @@
   .settings-back:hover  { background: var(--surface-2); }
   .settings-back:active { background: var(--surface-3); }
   .settings-back .material-symbols-rounded { font-size: 24px; }
+
+  /* Back button peel-in — the button appears to unfold from the left
+     edge of the section title. Width interpolates from 0 to 40px so
+     the title text slides right to make room, giving the visual of
+     the arrow emerging from behind the title. Delayed slightly (80ms)
+     so the title appears first, then the arrow reveals. Scale + opacity
+     add polish. Overflow:hidden clips the icon during the width
+     transition so it doesn't spill out prematurely. */
+  .back-peel-in {
+    overflow: hidden;
+    transform-origin: left center;
+    animation: back-peel 320ms cubic-bezier(0.34, 1.4, 0.64, 1) 80ms both;
+  }
+  @keyframes back-peel {
+    from {
+      width: 0;
+      margin-right: 0;
+      opacity: 0;
+      transform: scale(0.4);
+    }
+    to {
+      width: 40px;
+      margin-right: 8px;
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  /* Title slides right slightly to make room for the appearing back
+     button, so the two motions feel connected. Same delay so they
+     happen together. */
+  .title-slide-in {
+    animation: title-slide 320ms cubic-bezier(0.34, 1.4, 0.64, 1) 80ms both;
+  }
+  @keyframes title-slide {
+    from { opacity: 0; transform: translateX(-16px); }
+    to   { opacity: 1; transform: translateX(0);      }
+  }
 
   /* Deep-link highlight — glows the target .setting-row for ~2s after
      a search-driven drill-in scrolls to it. Uses box-shadow (not
