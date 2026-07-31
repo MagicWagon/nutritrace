@@ -719,7 +719,7 @@
   </div>
 {/if}
 
-{#if _syncModeActive && (_pullDistance > 0 || _pullRefreshing)}
+{#if _syncModeActive && !sidebarOpen && (_pullDistance > 0 || _pullRefreshing)}
   <div
     class="pull-sync-indicator"
     class:ready-to-sync={_pullDistance >= PULL_SYNC_THRESHOLD}
