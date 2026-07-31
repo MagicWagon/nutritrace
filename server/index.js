@@ -87,13 +87,20 @@ router.use('/api/diary',       express.json({ limit: '5mb' }));
 router.use(express.json({ limit: '1mb' }));
 router.use(cookieParser());
 
-// CORS — allow cross-origin requests from Android app (https://localhost) and same-origin
+// CORS — allow cross-origin requests from the Android app and same-origin.
+// Capacitor WebView origins we accept:
+//   https://localhost                — legacy default before the hostname flip
+//   http://localhost                 — legacy http scheme
+//   https://app.nutritrace.local     — current app identity (see
+//                                      capacitor.config.ts for why)
+// Same-host origins are always allowed (PWA served from this instance).
 router.use((req, res, next) => {
   const origin = req.headers.origin;
   if (origin) {
-    // Allow Capacitor WebView (https://localhost) and same-host origins
     const host = req.headers.host;
-    const isCapacitor = origin === 'https://localhost' || origin === 'http://localhost';
+    const isCapacitor = origin === 'https://localhost'
+      || origin === 'http://localhost'
+      || origin === 'https://app.nutritrace.local';
     const isSameHost = host && origin.includes(host);
     if (isCapacitor || isSameHost) {
       res.setHeader('Access-Control-Allow-Origin', origin);

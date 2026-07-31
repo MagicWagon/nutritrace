@@ -23,6 +23,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- **Bitwarden / password managers now show a real app identifier instead of "localhost" (Android).** The Android app used to serve its WebView from `https://localhost/`, so autofill entries saved through Bitwarden / 1Password / etc. showed up as "localhost" — indistinguishable from any other localhost app. NutriTrace now identifies itself as `app.nutritrace.local`, which reads clearly in autofill dialogs and in your saved-credentials list. **One-time upgrade cost:** the origin change orphans locally cached web-only state, so on first launch after upgrading you'll need to re-enter your server URL + log in again (server-connected users), and your theme / accent / display prefs will reset to defaults (standalone users). **Your food, meal, and diary data is unaffected** — that lives in a local SQLite database that's separate from the WebView.
 - **SMTP "Username" field relabeled to "Email or Username".** Most SMTP providers (Gmail, Outlook, etc.) want the full email as the username. Label change removes the guesswork.
 - **Fitbit connect card hidden for new users.** Fitbit's Web API is being
   wound down; Google Health is the recommended path forward. Users who

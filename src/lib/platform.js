@@ -216,9 +216,17 @@ export function iconUrl(path) {
   return `${resolved}?v=${encodeURIComponent(v)}`;
 }
 
+// WebView's own origin — historically https://localhost, now
+// https://app.nutritrace.local after the hostname flip for password-
+// manager identity. Resolved once at load time; any absolute URL that
+// begins with this origin is already a bundled asset served from the
+// APK and doesn't need further path resolution.
+const _webviewOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+
 export function resolveAssetUrl(path) {
   if (!path) return path;
-  if (path.startsWith('data:') || path.startsWith('file:') || path.startsWith('https://localhost')) return path;
+  if (path.startsWith('data:') || path.startsWith('file:')) return path;
+  if (_webviewOrigin && path.startsWith(_webviewOrigin)) return path;
   if (isNative) {
     // Vite copies public/ to the root of the local Capacitor web bundle.
     if (_isBundledAssetPath(path)) return path;
