@@ -11,6 +11,8 @@
   // deep-link scroll) and the shared CSS descendants need via :global.
 
   import { onMount, tick } from 'svelte';
+  import { fly, fade } from 'svelte/transition';
+  import { cubicOut } from 'svelte/easing';
   import { push, querystring } from 'svelte-spa-router';
   import { _ } from 'svelte-i18n';
 
@@ -278,13 +280,24 @@
              the default title so the user always knows where they are and
              how to get out. Back always goes to /settings (never uses
              history.back so a bookmark or link-share into a sub-page
-             behaves the same as an internal drill-in). -->
-        <button class="settings-back" on:click={backToIndex} aria-label={$_('common.back')}>
+             behaves the same as an internal drill-in).
+
+             Back button + title use fly + fade so drilling in / out
+             animates instead of the arrow just popping into existence
+             between the hamburger and the title. -->
+        <button class="settings-back"
+                on:click={backToIndex}
+                aria-label={$_('common.back')}
+                in:fly={{ x: -12, duration: 220, easing: cubicOut }}
+                out:fade={{ duration: 140 }}>
           <span class="material-symbols-rounded">arrow_back</span>
         </button>
-        <h1>{SECTION_META[currentSection]?.titleKey ? $_(SECTION_META[currentSection].titleKey) : currentSection}</h1>
+        <h1 in:fly={{ x: 12, duration: 220, easing: cubicOut }}
+            out:fade={{ duration: 140 }}>
+          {SECTION_META[currentSection]?.titleKey ? $_(SECTION_META[currentSection].titleKey) : currentSection}
+        </h1>
       {:else}
-        <h1>{$_('routes.settings.title')}</h1>
+        <h1 in:fade={{ duration: 180 }}>{$_('routes.settings.title')}</h1>
       {/if}
     </header>
 

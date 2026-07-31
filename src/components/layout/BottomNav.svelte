@@ -20,9 +20,13 @@
     ? [...BASE_TABS.slice(0, 2), WELLNESS_TAB, ...BASE_TABS.slice(2)]
     : BASE_TABS;
 
+  // Prefix-match so nested routes (/settings/appearance,
+  // /foods/edit/123, etc.) still light up the parent tab. Root '/'
+  // is exact-match only — otherwise every route would trigger it.
   $: activeIdx = (() => {
     const base = $location.split('?')[0];
-    const idx = tabs.findIndex(t => t.path === base);
+    let idx = tabs.findIndex(t => t.path !== '/' && (base === t.path || base.startsWith(t.path + '/')));
+    if (idx < 0) idx = tabs.findIndex(t => t.path === base);
     return idx >= 0 ? idx : 0;
   })();
 
