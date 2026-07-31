@@ -308,8 +308,14 @@
     setTimeout(() => window.location.reload(), 300);
   }
 
+  // Drill-in navigation replaces the old accordion toggle. On the index
+  // (/settings), tapping a section-toggle button routes to the section's
+  // sub-page (/settings/<slug>) instead of expanding it inline. On a
+  // sub-page tapping the same section behaves as "back to index" so the
+  // control is never a dead-click.
   function toggleSection(key) {
-    openSections = { ...openSections, [key]: !openSections[key] };
+    if (currentSection === key) push('/settings');
+    else push(`/settings/${key}`);
   }
 
   // ── Settings search ────────────────────────────────────────────────────────
@@ -346,14 +352,77 @@
     about:             ['about','version','nutritrace'],
   };
 
-  function sectionVisible(query, key) {
+  // ── Drill-in navigation (per-section) ──────────────────────────────────
+  // svelte-spa-router passes route params via a `params` prop. When the
+  // URL is /settings/<slug>, currentSection = <slug> and we render only
+  // that section's body under a back-arrow header ("sub-page view"). On
+  // /settings alone, we render the list of section-toggle rows ("index
+  // view"). Reactively re-derived so the two predicates below re-run
+  // whenever the user navigates in either direction without needing
+  // per-call arg wiring.
+  export let params = {};
+  $: currentSection = params?.section || null;
+
+  // Section metadata — slug → title i18n key + icon. Used by the sub-page
+  // header to show the section name.
+  const SECTION_META = {
+    appearance:        { titleKey: 'settings.appearance.section',        icon: 'contrast' },
+    regional:          { titleKey: 'settings.regional.section',          icon: 'public' },
+    diary:             { titleKey: 'settings.diary.section',             icon: 'menu_book' },
+    water:             { titleKey: 'settings.water.section',             icon: 'water_drop' },
+    foods:             { titleKey: 'settings.foods.section',             icon: 'lunch_dining' },
+    goals:             { titleKey: 'settings.goals.section',             icon: 'flag' },
+    bodyStats:         { titleKey: 'settings.body_stats.section',        icon: 'straighten' },
+    statistics:        { titleKey: 'settings.statistics.section',        icon: 'bar_chart' },
+    nutrients:         { titleKey: 'settings.nutrients.section',         icon: 'science' },
+    categories:        { titleKey: 'settings.categories.section',        icon: 'category' },
+    customUnits:       { titleKey: 'settings_stats.custom_units',        icon: 'straighten' },
+    connectedServices: { titleKey: 'settings.connected_services.section',icon: 'link' },
+    ai:                { titleKey: 'settings.ai.section',                icon: 'bolt' },
+    wellness:          { titleKey: 'settings.wellness.section',          icon: 'favorite' },
+    serverConnection:  { titleKey: 'settings.server.section',            icon: 'cloud' },
+    notifications:     { titleKey: 'settings.notifications.section',     icon: 'notifications' },
+    backup:            { titleKey: 'settings.backup.section',            icon: 'archive' },
+    importExport:      { titleKey: 'settings.importExport.section',      icon: 'import_export' },
+    sharing:           { titleKey: 'settings.sharing.section',           icon: 'group' },
+    updates:           { titleKey: 'settings.updates.section',           icon: 'system_update' },
+    helpImprove:       { titleKey: 'settings.diagnostics.section',       icon: 'troubleshoot' },
+    users:             { titleKey: 'settings.users.section',             icon: 'group' },
+    authentication:    { titleKey: 'settings.authentication.section',    icon: 'shield_person' },
+    email:             { titleKey: 'settings.email.section',             icon: 'mail' },
+    apiTokens:         { titleKey: null,                                 icon: 'key' },
+    about:             { titleKey: 'settings.about.section',             icon: 'info' },
+  };
+
+  // Reactive predicates. `currentSection` truthy → sub-page mode:
+  //  - sectionVisible only true for the current section, so every other
+  //    toggle button + its body stay hidden without needing an
+  //    {#if !currentSection} wrapper around each of the 25 sections in
+  //    the template.
+  //  - sectionOpen forces the current section's body open on land.
+  // `currentSection` null → index mode: keyword filter + no bodies open
+  // (drill-in replaces accordion; bodies are one nav-click away).
+  $: sectionVisible = (query, key) => {
+    if (currentSection) return key === currentSection;
     if (!query) return true;
     return (SECTION_KEYWORDS[key] || []).some(kw => kw.includes(query));
+  };
+  $: sectionOpen = (_sections, _query, key) => currentSection === key;
+
+  function backToIndex() { push('/settings'); }
+
+  // Ensure the sub-page always opens with its body flagged open in the
+  // openSections map. Fires the existing reactive lazy-load blocks
+  // (backup/users/authentication) so drilling in loads their data
+  // just like clicking the old accordion toggle used to.
+  $: if (currentSection && !openSections[currentSection]) {
+    openSections = { ...openSections, [currentSection]: true };
   }
 
-  function sectionOpen(sections, query, key) {
-    return sections[key] || (!!query && sectionVisible(query, key));
-  }
+  // Wellness is the one section whose lazy-load lives on the toggle's
+  // on:click handler instead of a reactive `openSections.wellness`
+  // block. Mirror that side-effect for the drill-in path.
+  $: if (currentSection === 'wellness') wellnessRef?.loadWellnessConfig();
 
   // ── Appearance ─────────────────────────────────────────────────────────────
   const ACCENT_COLORS = [
@@ -1581,22 +1650,36 @@
        class of header-height vs sub-bar-top mismatch bugs. -->
   <div class="settings-sticky-top">
     <header class="page-header" class:banner-gradient={$bannerStyle === 'gradient'} class:banner-animated={$bannerStyle === 'animated'}>
-      <h1>{$_('routes.settings.title')}</h1>
+      {#if currentSection}
+        <!-- Sub-page header: back arrow + current section title. Replaces
+             the default title so the user always knows where they are and
+             how to get out. Back always goes to /settings (never uses
+             history.back so a bookmark or link-share into a sub-page
+             behaves the same as an internal drill-in). -->
+        <button class="settings-back" on:click={backToIndex} aria-label={$_('common.back')}>
+          <span class="material-symbols-rounded">arrow_back</span>
+        </button>
+        <h1>{SECTION_META[currentSection]?.titleKey ? $_(SECTION_META[currentSection].titleKey) : currentSection}</h1>
+      {:else}
+        <h1>{$_('routes.settings.title')}</h1>
+      {/if}
     </header>
 
-    <div class="settings-search-bar">
-      <span class="material-symbols-rounded settings-search-icon">search</span>
-      <input class="settings-search-input" type="search" placeholder={$_('settings_main_deep.search_ph')}
-        bind:value={settingsSearch} />
-      {#if settingsSearch}
-        <button class="settings-search-clear btn-icon" on:click={() => settingsSearch = ''} title="Clear search">
-          <span class="material-symbols-rounded" style="font-size:18px">close</span>
-        </button>
-      {/if}
-    </div>
+    {#if !currentSection}
+      <div class="settings-search-bar">
+        <span class="material-symbols-rounded settings-search-icon">search</span>
+        <input class="settings-search-input" type="search" placeholder={$_('settings_main_deep.search_ph')}
+          bind:value={settingsSearch} />
+        {#if settingsSearch}
+          <button class="settings-search-clear btn-icon" on:click={() => settingsSearch = ''} title="Clear search">
+            <span class="material-symbols-rounded" style="font-size:18px">close</span>
+          </button>
+        {/if}
+      </div>
+    {/if}
   </div>
 
-  <div class="page-content settings-content">
+  <div class="page-content settings-content" class:subpage-view={!!currentSection}>
 
     <!-- ── Profile hero — identity card at the top of Settings.
          Avatar + name (nickname → full name → "My Profile" fallback) +
@@ -2104,12 +2187,14 @@
         <div class="card settings-card">
           <div class="setting-row">
             <span class="setting-label">{$_('settings_water.display_unit')}</span>
-            <select class="select sel-sm" value={$waterUnit} on:change={e => waterUnit.set(e.target.value)}>
-              <option value="ml">Milliliters (ml)</option>
-              <option value="oz">Fluid ounces (fl oz)</option>
-              <option value="L">Liters (L)</option>
-              <option value="G">Gallons (G)</option>
-            </select>
+            <div class="select-wrap" style="width:180px">
+              <select class="select sel-sm" value={$waterUnit} on:change={e => waterUnit.set(e.target.value)}>
+                <option value="ml">Milliliters (ml)</option>
+                <option value="oz">Fluid ounces (fl oz)</option>
+                <option value="L">Liters (L)</option>
+                <option value="G">Gallons (G)</option>
+              </select>
+            </div>
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
@@ -3527,6 +3612,34 @@
   .settings-content { display: flex; flex-direction: column; gap: 0; }
   .hidden { display: none !important; }
 
+  /* Sub-page view: hide the index-only chrome (section-toggle rows,
+     group labels, profile hero) so only the current section's body
+     renders under the back-arrow header. Cheaper than adding an
+     {#if !currentSection} wrapper around each of the 25 sections in
+     the template. */
+  .subpage-view :global(.section-toggle) { display: none; }
+  .subpage-view :global(.settings-group-label) { display: none; }
+  .subpage-view :global(.profile-hero) { display: none; }
+  /* Kill the slide transition on land — the body is already visible
+     the moment the sub-page mounts, an entry animation would just be
+     a 180ms delay before the user can interact. */
+  .subpage-view :global(.section-body) { animation: none !important; }
+
+  /* Back arrow — icon-only button, sits before the section title in
+     the sub-page header. */
+  .settings-back {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 40px; height: 40px;
+    margin-right: 8px;
+    border: none; background: transparent; cursor: pointer;
+    color: var(--text-1);
+    border-radius: 50%;
+    transition: background-color 120ms ease;
+  }
+  .settings-back:hover  { background: var(--surface-2); }
+  .settings-back:active { background: var(--surface-3); }
+  .settings-back .material-symbols-rounded { font-size: 24px; }
+
   /* Settings header + search bar pinned together. Single sticky-top wrapper
      is more reliable than two separate sticky elements with computed offsets.
      The nested .page-header switches to static so it doesn't double-stick
@@ -3707,8 +3820,15 @@
     width: 28px; height: 28px; border-radius: 50%;
     border: 2px solid var(--border); flex-shrink: 0;
   }
-  .chevron { font-size: 20px; color: var(--text-3); margin-left: auto; transition: transform var(--dur-base) var(--ease-out); }
-  .chevron.rotated { transform: rotate(180deg); }
+  /* Chevron: was a down-arrow that rotated 180deg to signal accordion-
+     open state. Drill-in has no expanded state on the index — every
+     section row navigates to its own sub-page — so the chevron now
+     points right permanently (rotate -90deg turns the down-arrow into
+     a right-arrow, the universal "drill in" signal). `.rotated` is a
+     no-op leftover from the previous behavior; leaving it in the CSS
+     avoids editing every section-toggle button in the template. */
+  .chevron { font-size: 20px; color: var(--text-3); margin-left: auto; transform: rotate(-90deg); }
+  .chevron.rotated { transform: rotate(-90deg); }
 
   .section-body { padding: 12px var(--page-px); display: flex; flex-direction: column; gap: 10px; }
 
