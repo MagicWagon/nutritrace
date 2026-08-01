@@ -49,6 +49,14 @@
       <span>{$_('settings_about.server_from')} <a href="https://github.com/traceapps/nutritrace" target="_blank" rel="noopener" class="about-link">{$_('settings_about.server_open_source')}</a> {$_('settings_about.server_license')}</span>
     </div>
     <div class="setting-divider"></div>
+    <!-- Weblate credit line (Libre plan attribution). Passive callout —
+         users who care about translations can follow through to help;
+         everyone else just reads it as a credit. -->
+    <div class="about-row">
+      <span class="material-symbols-rounded about-feat-icon">translate</span>
+      <span>{$_('settings_about.translations_from')} <a href="https://hosted.weblate.org/engage/nutritrace/" target="_blank" rel="noopener" class="about-link">Weblate</a></span>
+    </div>
+    <div class="setting-divider"></div>
     <div class="about-row" style="flex-direction:column;align-items:flex-start;gap:8px">
       <div style="display:flex;align-items:center;gap:8px">
         <span class="material-symbols-rounded about-feat-icon">volunteer_activism</span>

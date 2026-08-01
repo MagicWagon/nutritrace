@@ -987,6 +987,7 @@
     "server_from":            "Server:",
     "server_open_source":     "Open Source",
     "server_license":         "(AGPL-3.0)",
+    "translations_from":      "Translations powered by",
     "support_dev":            "Support Development"
   },
   "settings_merge": {
