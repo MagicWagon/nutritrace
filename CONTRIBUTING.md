@@ -25,9 +25,17 @@ Thanks for your interest in NutriTrace.
 
 ## Translations
 
-NutriTrace uses [svelte-i18n](https://github.com/kaisermann/svelte-i18n) with one JSON file per locale in `src/i18n/`. The English file at `src/i18n/en.json` is the source of truth. Adding a new language is straightforward and you do not need to touch any other code.
+NutriTrace uses [svelte-i18n](https://github.com/kaisermann/svelte-i18n) with one JSON file per locale in `src/i18n/`. The English file at `src/i18n/en.json` is the source of truth.
 
-### Adding a new language
+### Preferred: Weblate (no code required)
+
+The easiest way to contribute translations is via [Weblate](https://hosted.weblate.org/projects/nutritrace/) — a browser-based translation platform that syncs directly with this repo. Pick a language, translate strings inline, and commits land as PRs automatically. No git, no JSON syntax, no code. You can also request a new language from within Weblate; the maintainer will register it in `src/i18n/index.js` and add it to the Settings language picker after the first batch of strings comes in.
+
+[![Translation status](https://hosted.weblate.org/widget/nutritrace/multi-auto.svg)](https://hosted.weblate.org/engage/nutritrace/)
+
+### Alternative: adding a new language via PR
+
+If you'd rather bootstrap a language locally and open a PR directly:
 
 1. Copy `src/i18n/en.json` to `src/i18n/<code>.json` where `<code>` is the BCP-47 short code (`fr`, `de`, `nl`, `es`, `pt`, `ja`, etc.).
 2. Translate the values. Leave the keys exactly as they are. Keep `{placeholder}` tokens and any HTML tags (`<strong>`, `<code>`, `<br>`) intact and in the right grammatical position for your language.

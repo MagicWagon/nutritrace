@@ -150,11 +150,19 @@ The database schema migrates automatically on startup.
 
 Part of the **TraceApps** family. Sister apps: [CookTrace](https://github.com/traceapps/cooktrace) for recipes and pantry, [LiftTrace](https://github.com/traceapps/lifttrace) for weightlifting. Full docs for all three at [traceapps.github.io/docs](https://traceapps.github.io/docs/).
 
+## Translations
+
+NutriTrace is translated with [Weblate](https://weblate.org/), a free web platform for libre translation projects. No coding required — pick your language, translate the strings, submit. Missing keys fall back to English at runtime, so partial translations are safe to release.
+
+[![Translation status](https://hosted.weblate.org/widget/nutritrace/svg-badge.svg)](https://hosted.weblate.org/engage/nutritrace/)
+
+Start translating at [hosted.weblate.org/projects/nutritrace/](https://hosted.weblate.org/projects/nutritrace/). See [CONTRIBUTING.md](CONTRIBUTING.md#translations) for domain-specific guidance (regulatory nutrition terms, proper nouns, tone).
+
 ## Roadmap, changelog, contributing, license
 
 - See [ROADMAP.md](ROADMAP.md) for what's next.
 - [CHANGELOG.md](CHANGELOG.md) tracks per-release changes.
-- Contributions welcome; see [CONTRIBUTING.md](CONTRIBUTING.md) for translations (single JSON file per locale), coding conventions, and the volunteer thread.
+- Contributions welcome; see [CONTRIBUTING.md](CONTRIBUTING.md) for coding conventions, translation workflow, and the volunteer thread.
 - Licensed under [AGPL-3.0](LICENSE), entire codebase including the Android app source.
 
 ## Support
