@@ -35,8 +35,18 @@
     ['pt','Portuguese'],['nl','Dutch'],['pl','Polish'],['ru','Russian'],['ja','Japanese'],
     ['zh','Chinese'],['ar','Arabic'],['ko','Korean']
   ];
-  const OFF_COUNTRY_OPTS = ['World','United States','United Kingdom','Australia','Canada',
-    'France','Germany','Spain','Italy','Mexico','Brazil','Japan','China','India'];
+  // Alphabetized (World stays first as the "no filter" default). Kept
+  // aligned with the OFF regions where user demand actually shows up:
+  // Anglosphere, Western Europe + Nordics, Central/Eastern Europe,
+  // LATAM, APAC, and SA. Adding new entries: keep alphabetical order
+  // and confirm the country has a corresponding en:<slug> tag on
+  // openfoodfacts.org before shipping.
+  const OFF_COUNTRY_OPTS = ['World',
+    'Argentina','Australia','Austria','Belgium','Brazil','Canada','Chile','China',
+    'Denmark','Finland','France','Germany','India','Ireland','Italy','Japan',
+    'Mexico','Netherlands','New Zealand','Norway','Poland','Portugal','Singapore',
+    'South Africa','South Korea','Spain','Sweden','Switzerland','United Kingdom',
+    'United States'];
   let offSearchLanguage = DB.getSetting('offSearchLanguage', 'en');
   let offSearchCountry  = DB.getSetting('offSearchCountry',  'World');
   let offUploadCountry  = DB.getSetting('offUploadCountry',  'Auto');
