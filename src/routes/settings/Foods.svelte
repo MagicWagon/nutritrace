@@ -5,8 +5,12 @@
   import {
     foodsShowCategories, foodsShowLabels, foodsShowNotes, foodsShowThumbnails,
     foodsShowYesterdayMeals, foodsSort, mealsSort, recipesSort,
+    foodsDefaultSource, offEnabled, usdaEnabled,
     barcodeBeep, barcodeFlashlight, cropPhotos,
   } from '../../stores/settings.js';
+  import { DB } from '../../lib/db.js';
+  // Mealie is a plain localStorage flag (not a store), unlike OFF/USDA.
+  const _mealieEnabled = DB.getSetting('mealieEnabled', false);
 </script>
 
 <div class="section-body">
@@ -34,6 +38,22 @@
     <div class="setting-row">
       <div><span class="setting-label">Show Yesterday's Meals</span><div class="setting-desc">Pin yesterday's meals as quick-add cards in the Meals tab. Tap the info icon to see what's in each one.</div></div>
       <Toggle checked={$foodsShowYesterdayMeals} on:change={e => foodsShowYesterdayMeals.set(e.detail)} />
+    </div>
+    <div class="setting-divider"></div>
+    <div class="setting-row">
+      <div>
+        <span class="setting-label">{$_('settings_foods_picker.default_source')}</span>
+        <div class="setting-desc">{$_('settings_foods_picker.default_source_desc')}</div>
+      </div>
+      <div class="select-wrap" style="width:160px">
+        <select class="select sel-sm" value={$foodsDefaultSource} on:change={e => foodsDefaultSource.set(e.target.value)}>
+          <option value="all">{$_('foods.sources.all')}</option>
+          <option value="local">{$_('foods.sources.local')}</option>
+          {#if $offEnabled}<option value="off">OFF</option>{/if}
+          {#if $usdaEnabled}<option value="usda">USDA</option>{/if}
+          {#if _mealieEnabled}<option value="mealie">Mealie</option>{/if}
+        </select>
+      </div>
     </div>
     <div class="setting-divider"></div>
     <div class="setting-row">

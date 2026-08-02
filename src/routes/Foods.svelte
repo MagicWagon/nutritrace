@@ -23,7 +23,7 @@
   import { Mealie } from '../lib/mealieApi.js';
   import { resolveAssetUrl } from '../lib/platform.js';
   import { offCountryTagToFlag, offCountryTagToName } from '../lib/off-country-flag.js';
-  import { foodsShowThumbnails, foodsShowCategories, foodsShowLabels, foodsShowNotes, foodsSort, mealsSort, recipesSort, foodCategories, foodsShowYesterdayMeals, foodsYesterdayCollapsed, foodsSavedCollapsed, mealNames, usdaEnabled, usdaApiKey, offEnabled, offSearchCountry, offSearchLanguage, catName as _catName, catDisplay as _catDisplay, pageBanners, bannerStyle, energyUnit } from '../stores/settings.js';
+  import { foodsShowThumbnails, foodsShowCategories, foodsShowLabels, foodsShowNotes, foodsSort, mealsSort, recipesSort, foodCategories, foodsShowYesterdayMeals, foodsYesterdayCollapsed, foodsSavedCollapsed, mealNames, usdaEnabled, usdaApiKey, offEnabled, offSearchCountry, offSearchLanguage, foodsDefaultSource, catName as _catName, catDisplay as _catDisplay, pageBanners, bannerStyle, energyUnit } from '../stores/settings.js';
   import { mealIcon } from '../lib/mealIcon.js';
 
   // Query string params
@@ -80,7 +80,12 @@
   $: _hideSavedMealsList = _savedMealsHeaderVisible && $foodsSavedCollapsed;
 
   let search = '';
-  let searchSource = 'local';
+  // Initial source chip. Reads the user's saved default (Settings → Foods →
+  // Default search source). Requested via #128 — power users who add new
+  // foods frequently prefer 'all' so it fans out to OFF/USDA/Mealie on
+  // every visit rather than starting on My Foods. Existing users default
+  // to 'local' (unchanged behaviour).
+  let searchSource = foodsDefaultSource.get() || 'local';
   const _mealieEnabled = DB.getSetting('mealieEnabled',  false);
   // OFF / USDA / Mealie are food databases — only meaningful on the Foods tab.
   // Meals + Recipes tabs only get Local + From Others (when shared content exists).

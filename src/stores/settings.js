@@ -35,6 +35,7 @@ export const USER_PREFS = new Set([
   'showQuickCalories','quickCaloriesDisplay',
   'foodsShowCategories','foodsShowLabels','foodsShowNotes','foodsShowThumbnails',
   'foodsShowYesterdayMeals','foodsYesterdayCollapsed','foodsSavedCollapsed','foodsSort','mealsSort','recipesSort',
+  'foodsDefaultSource',
   'barcodeBeep','cropPhotos',
   'offEnabled','offSearchLanguage','offSearchCountry','offUploadCountry','offImportPortion',
   'weightUnit','heightUnit','lengthUnit','distUnit','tempUnit',
@@ -537,6 +538,13 @@ export const foodsSavedCollapsed    = createSettingStore('foodsSavedCollapsed', 
 export const foodsSort              = createSettingStore('foodsSort',              'alpha');
 export const mealsSort              = createSettingStore('mealsSort',              'alpha');
 export const recipesSort            = createSettingStore('recipesSort',            'alpha');
+// Default source chip on the Foods page. 'local' preserves the historical
+// implicit behaviour (My Foods first — optimises for "log a food I've
+// eaten before"); users who spend more time discovering new foods can
+// switch to 'all' to fan out across OFF/USDA/Mealie every visit
+// (requested via #128). Foods.svelte reads this on mount and initialises
+// searchSource from it.
+export const foodsDefaultSource     = createSettingStore('foodsDefaultSource',     'local');
 
 export const barcodeBeep            = createSettingStore('barcodeBeep',            false);
 export const barcodeFlashlight      = createSettingStore('barcodeFlashlight',      false);

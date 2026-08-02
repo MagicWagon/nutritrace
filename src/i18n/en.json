@@ -1155,6 +1155,8 @@
     "show_category_labels_desc":"Display the category name + emoji on each food row",
     "show_notes":               "Show Notes",
     "show_notes_desc":          "Show saved food notes (e.g. \"1 serving = 150g cooked\") in the quick-add card",
+    "default_source":           "Default Search Source",
+    "default_source_desc":      "Which source chip the Foods page opens with. All fans out to every enabled database; My Foods starts in your local library.",
     "foods_sort":               "Foods Sort",
     "meals_sort":               "Meals Sort",
     "opt_recent":               "Recently Used",
