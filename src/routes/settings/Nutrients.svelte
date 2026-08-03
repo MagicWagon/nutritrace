@@ -160,7 +160,7 @@
         <select id="cn-unit" class="select" bind:value={newNutrient.unit}>
           <option value="g">g</option>
           <option value="mg">mg</option>
-          <option value="µg">µg</option>
+          <option value="mcg">mcg</option>
           <option value="IU">IU</option>
           <option value="kcal">kcal</option>
           <option value="kJ">kJ</option>

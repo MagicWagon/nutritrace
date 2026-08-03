@@ -734,7 +734,14 @@
 
 <!-- ── Goal editor sheet ── -->
 {#if editOpen && editStat}
-  {@const _editUnit = (editStat.id === 'calories_out' && $energyUnit === 'kJ') ? 'kJ' : editStat.unit}
+  {@const _rawUnit = (editStat.id === 'calories_out' && $energyUnit === 'kJ') ? 'kJ' : editStat.unit}
+  <!-- #137: normalize µg (MICRO SIGN, U+00B5) to 'mcg' for display. The
+       form-label uppercase transform case-maps µ → Μ (Greek Capital Mu),
+       which fonts render identically to Latin 'M' so 'µg' reads as 'MG'
+       and users think they need to enter milligrams. Default nutrients
+       moved to 'mcg' in nutrition.js; this catches legacy custom
+       nutrients still stored with 'µg' as their unit. -->
+  {@const _editUnit = _rawUnit === 'µg' ? 'mcg' : _rawUnit}
   <div use:portal class="sheet-backdrop" role="dialog" aria-modal="true"
     on:click={() => { if (!_gLock) editOpen = false; }} on:keydown={() => {}}>
     <div class="sheet-panel" on:click|stopPropagation on:keydown={() => {}}>
