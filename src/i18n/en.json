@@ -1115,6 +1115,7 @@
     "fat":                      "Fat",
     "serving_size":             "Serving Size",
     "num_servings":             "Number of Servings",
+    "logged_time":              "Logged Time",
     "total_amount":             "Total Amount",
     "cancel":                   "Cancel",
     "meal_name":                "Meal Name",

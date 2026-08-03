@@ -18,6 +18,7 @@
   import Dialog       from '../components/ui/Dialog.svelte';
   import ActionSheet  from '../components/ui/ActionSheet.svelte';
   import UnitPicker   from '../components/ui/UnitPicker.svelte';
+  import TimePicker   from '../components/ui/TimePicker.svelte';
   import { scaleFactor as _unitScaleFactor } from '../lib/units.js';
   import { showSuccess, showError, showInfo } from '../stores/toast.js';
   import {
@@ -100,6 +101,28 @@
   let editProtein      = '';
   let editCarbs        = '';
   let editFat          = '';
+  // #135 — editable logged time. HH:MM (24h internal, matches TimePicker).
+  // Seeded from item.addedAt on open (with legacy item.dateTime fallback
+  // for older entries). On save it's spliced back into a new ISO string
+  // preserving the item's original date so cross-day moves stay out of
+  // scope (that's a separate feature).
+  let editLoggedTime   = '';
+
+  function _isoToHm(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  }
+  function _hmMergeInto(prevIso, hm) {
+    if (!hm) return prevIso;
+    const base = prevIso ? new Date(prevIso) : new Date();
+    if (Number.isNaN(base.getTime())) return prevIso;
+    const [h, m] = hm.split(':').map(Number);
+    if (!Number.isFinite(h) || !Number.isFinite(m)) return prevIso;
+    base.setHours(h, m, 0, 0);
+    return base.toISOString();
+  }
 
   // Sheet lock helper - prevents backdrop click-through on mobile
   let _sheetLock = false;
@@ -146,6 +169,7 @@
     editPortion  = item.portion || item.amount || 100;
     editUnit     = item.unit || 'g';
     editQuantity = item.quantity || 1;
+    editLoggedTime = _isoToHm(item.addedAt || item.dateTime);
     _editChildContext = null;
     if (item?.type === 'quick_calories') {
       const storedKcal = Math.round(item.nutrition?.calories || 0);
@@ -205,6 +229,9 @@
         name: trimmed || 'Quick Calories',
         nutrition,
       };
+      const prevAt = editItem.addedAt || editItem.dateTime;
+      const newAt = _hmMergeInto(prevAt, editLoggedTime);
+      if (newAt && newAt !== prevAt) changes.addedAt = newAt;
       await updateDiaryItem(editItem._i, changes);
       showEditSheet = false;
       editItem = null;
@@ -231,8 +258,13 @@
       nutrition: newNutrition,
     };
     if (_editChildContext) {
+      // Split-recipe children inherit the parent's dateTime; skip the time
+      // edit here so a child change doesn't fork the timestamp.
       await updateSplitChild(_editChildContext.parentIdx, _editChildContext.childIdx, changes);
     } else {
+      const prevAt = editItem.addedAt || editItem.dateTime;
+      const newAt = _hmMergeInto(prevAt, editLoggedTime);
+      if (newAt && newAt !== prevAt) changes.addedAt = newAt;
       await updateDiaryItem(editItem._i, changes);
     }
     showEditSheet = false;
@@ -1839,6 +1871,12 @@
             <span class="qce-macro-label">{$_('diary_deep.fat')}</span>
           </div>
         </div>
+        {#if $diaryShowTimestamps}
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px">
+            <label class="form-label" style="font-size:11px;color:var(--text-3);margin:0">{$_('diary_deep.logged_time')}</label>
+            <div style="width:130px"><TimePicker bind:value={editLoggedTime} /></div>
+          </div>
+        {/if}
         <button class="btn btn-primary w-full" style="margin-top:16px" on:click={saveEditItem}>{$_('diary.edit_item.save')}</button>
       {:else}
       <div style="display:flex;gap:12px;margin-bottom:16px">
@@ -1851,9 +1889,17 @@
           <UnitPicker bind:value={editUnit} />
         </div>
       </div>
-      <div style="margin-bottom:16px">
-        <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:4px">{$_('diary_deep.num_servings')}</label>
-        <input class="input" type="number" min="0.1" step="0.1" bind:value={editQuantity} style="width:100%" />
+      <div style="display:flex;gap:12px;margin-bottom:16px">
+        <div style="flex:1">
+          <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:4px">{$_('diary_deep.num_servings')}</label>
+          <input class="input" type="number" min="0.1" step="0.1" bind:value={editQuantity} style="width:100%" />
+        </div>
+        {#if !_editChildContext && $diaryShowTimestamps}
+          <div style="width:130px">
+            <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:4px">{$_('diary_deep.logged_time')}</label>
+            <TimePicker bind:value={editLoggedTime} />
+          </div>
+        {/if}
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface-2);border-radius:var(--radius-md);margin-bottom:16px">
         <span style="font-size:13px;color:var(--text-3)">{$_('diary_deep.total_amount')}</span>
