@@ -4,6 +4,8 @@ import { wrap } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
 import { sharingEnabled, canRead as _canRead } from '../lib/sharing.js';
 import { localizeImage, isExternalUrl } from '../lib/image-localizer.js';
+import { sendMealShared, isEmailConfigured } from '../email.js';
+import { logger } from '../logger.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -137,11 +139,46 @@ router.patch('/:id/share', wrap((req, res) => {
     return res.status(400).json({ error: 'visibility must be private, group, or specific' });
   }
 
+  // Capture the previous grant set so we can email only the newly-added
+  // grantees below (not people who already had access).
+  const priorGrantees = new Set(
+    db.prepare('SELECT user_id FROM meal_shares WHERE meal_id = ?').all(meal.id).map(r => r.user_id)
+  );
+
   db.prepare(`UPDATE meals SET visibility = ?, updated_at = datetime('now') WHERE id = ?`).run(visibility, meal.id);
   db.prepare('DELETE FROM meal_shares WHERE meal_id = ?').run(meal.id);
+  const newGrantees = [];
   if (visibility === 'specific' && Array.isArray(user_ids)) {
     const ins = db.prepare('INSERT OR IGNORE INTO meal_shares (meal_id, user_id) VALUES (?, ?)');
-    db.transaction(() => { for (const uid_ of user_ids) ins.run(meal.id, uid_); })();
+    db.transaction(() => {
+      for (const uid_ of user_ids) {
+        const n = Number(uid_);
+        if (!Number.isFinite(n)) continue;
+        ins.run(meal.id, n);
+        if (!priorGrantees.has(n) && n !== meal.user_id) newGrantees.push(n);
+      }
+    })();
+  }
+
+  // Best-effort email each brand-new grantee. Silent no-op if SMTP is
+  // unconfigured or any individual send throws. Never blocks the response.
+  if (newGrantees.length > 0 && isEmailConfigured()) {
+    const sharer = u != null
+      ? db.prepare('SELECT full_name, username FROM users WHERE id = ?').get(u)
+      : null;
+    const sharerName = sharer?.full_name || sharer?.username || null;
+    const proto = (req.headers['x-forwarded-proto'] || req.protocol || 'http').split(',')[0].trim();
+    const host  = req.headers['x-forwarded-host']  || req.headers.host || '';
+    // Recipes and non-recipe meals share the same client route family.
+    const viewUrl = `${proto}://${host}/#/foods`;
+    const rows = db.prepare(
+      `SELECT id, email FROM users WHERE id IN (${newGrantees.map(() => '?').join(',')})`
+    ).all(...newGrantees);
+    for (const row of rows) {
+      if (!row.email) continue;
+      sendMealShared(row.email, meal.name, sharerName, viewUrl)
+        .catch(e => logger.debug?.(`[share] meal email to ${row.email} failed: ${e.message}`));
+    }
   }
 
   res.json({ ok: true, visibility });
