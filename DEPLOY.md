@@ -16,8 +16,15 @@ The app will be available at `http://localhost:3000`.
 
 ## Image tags
 
-Every release publishes a multi-arch (linux/amd64 + linux/arm64) image
-under several tags so you can pin to whatever risk level fits:
+Every release publishes a multi-arch (linux/amd64 + linux/arm64) image to
+**two registries** with an identical tag set. GHCR is primary; Docker Hub
+is a discoverability mirror. Both are first-class; pick whichever fits.
+
+- **`ghcr.io/traceapps/nutritrace`** (primary)
+- **`traceapps/nutritrace`** on [Docker Hub](https://hub.docker.com/r/traceapps/nutritrace) (mirror)
+
+Pin to whatever risk level fits (examples below use GHCR; swap the prefix
+for Docker Hub if preferred):
 
 | Tag | Updates when | Use case |
 |-----|--------------|----------|
@@ -28,7 +35,8 @@ under several tags so you can pin to whatever risk level fits:
 | `ghcr.io/traceapps/nutritrace:dev` | Every push to `dev` branch | Leading edge, not for production |
 
 Legacy `1.0.0-rc.N` tags from before the semver switch remain published
-indefinitely; anyone pinned to a specific rc release is unaffected.
+indefinitely on GHCR; anyone pinned to a specific rc release is unaffected.
+Docker Hub mirroring started post-1.0, so it only carries stable-era tags.
 
 ---
 
