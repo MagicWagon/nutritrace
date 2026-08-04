@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [1.1.0] - 2026-08-04
+
+> **⚠ Upgrade note.** The Android app identifier change (`app.nutritrace.local`, see "Changed" below) invalidates the WebView's cached auth cookie. Server-connected Android users will need to re-enter their server URL and sign back in once after upgrading; standalone Android users lose their theme / accent / display prefs but keep all food, meal, and diary data (that lives in local SQLite, unaffected). PWA / browser users are not affected.
+
 ### Added
 
 - **Editable log time on diary entries** (#135, thanks @caioqv-dev). Tap any diary item to edit and the sheet shows a Logged Time picker next to Number of Servings (or above Save on Quick Calories entries). Fixes the common "ate lunch at 2pm but only logged it at 10pm" case where the entry's timestamp was stuck at whenever you added it. The picker only appears when **Settings → Diary → Show Timestamps** is on, keeping the edit sheet clean for users who don't care about per-item times. Uses the same in-app time picker as Fasting / Notifications / Backup schedules. Moving an entry to a different day is a separate feature and stays out of scope here.
@@ -26,6 +32,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- **Redesigned Settings with per-section drill-in and search.** The single scrolling Settings page has been replaced with a per-section drill-in layout: each section (Appearance, Diary, Foods, Goals, Notifications, Backup, etc.) opens on its own sub-page with a smooth back-arrow animation. New in-Settings search jumps directly to any specific field across all sections, with deep-link support so the target row scroll-highlights on arrival. Sidebar keeps the current section highlighted while you're inside its sub-pages. Same settings, much less scroll.
 - **Bitwarden / password managers now show a real app identifier instead of "localhost" (Android).** The Android app used to serve its WebView from `https://localhost/`, so autofill entries saved through Bitwarden / 1Password / etc. showed up as "localhost" — indistinguishable from any other localhost app. NutriTrace now identifies itself as `app.nutritrace.local`, which reads clearly in autofill dialogs and in your saved-credentials list. **One-time upgrade cost:** the origin change orphans locally cached web-only state, so on first launch after upgrading you'll need to re-enter your server URL + log in again (server-connected users), and your theme / accent / display prefs will reset to defaults (standalone users). **Your food, meal, and diary data is unaffected** — that lives in a local SQLite database that's separate from the WebView.
 - **SMTP "Username" field relabeled to "Email or Username".** Most SMTP providers (Gmail, Outlook, etc.) want the full email as the username. Label change removes the guesswork.
 - **Fitbit connect card hidden for new users.** Fitbit's Web API is being
@@ -51,6 +58,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   the newer `max_completion_tokens` and `reasoning_effort` fields when
   talking to models that require them, so calls to GPT-5.6 and
   equivalents don't 400 on the older `max_tokens` field name.
+
+### Security
+
+- **fast-uri bumped to 3.1.5** (regexp DoS, moderate). Sub-dependency picked up via the standard transitive tree.
+- **brace-expansion bumped to 2.1.4 / 5.0.9** (regexp DoS, moderate). Standard `npm audit fix` update to the resolved sub-dependency versions.
 
 ---
 
