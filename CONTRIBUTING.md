@@ -16,6 +16,7 @@ Thanks for your interest in NutriTrace.
 
 ## Pull requests
 
+- **Target the `dev` branch, not `main`.** All work lands on `dev` first, gets tested there, and is bundled into `main` at release time. PRs opened against `main` will be asked to retarget.
 - Keep changes focused — one concern per PR.
 - Match the existing code style (Svelte 4, no TypeScript).
 - For server changes, ensure all SQL is parameterized and every new route has appropriate `requireAuth` / `requireAdmin` middleware.
@@ -25,9 +26,17 @@ Thanks for your interest in NutriTrace.
 
 ## Translations
 
-NutriTrace uses [svelte-i18n](https://github.com/kaisermann/svelte-i18n) with one JSON file per locale in `src/i18n/`. The English file at `src/i18n/en.json` is the source of truth. Adding a new language is straightforward and you do not need to touch any other code.
+NutriTrace uses [svelte-i18n](https://github.com/kaisermann/svelte-i18n) with one JSON file per locale in `src/i18n/`. The English file at `src/i18n/en.json` is the source of truth.
 
-### Adding a new language
+### Preferred: Weblate (no code required)
+
+The easiest way to contribute translations is via [Weblate](https://hosted.weblate.org/projects/nutritrace/) — a browser-based translation platform that syncs directly with this repo. Pick a language, translate strings inline, and commits land as PRs automatically. No git, no JSON syntax, no code. You can also request a new language from within Weblate; the maintainer will register it in `src/i18n/index.js` and add it to the Settings language picker after the first batch of strings comes in.
+
+[![Translation status](https://hosted.weblate.org/widget/nutritrace/multi-auto.svg)](https://hosted.weblate.org/engage/nutritrace/)
+
+### Alternative: adding a new language via PR
+
+If you'd rather bootstrap a language locally and open a PR directly:
 
 1. Copy `src/i18n/en.json` to `src/i18n/<code>.json` where `<code>` is the BCP-47 short code (`fr`, `de`, `nl`, `es`, `pt`, `ja`, etc.).
 2. Translate the values. Leave the keys exactly as they are. Keep `{placeholder}` tokens and any HTML tags (`<strong>`, `<code>`, `<br>`) intact and in the right grammatical position for your language.
@@ -101,7 +110,7 @@ Do not add translations for locales you don't natively speak, and do not merge m
 
 ### What's translatable today vs not
 
-About 30% of the client-side strings are extracted as of v1.0.0-rc.5 — the surface every user touches every session: navigation, page titles, settings section headers, auth flow, wizard, primary actions in Diary / Foods / Goals / Profile, common toasts, action sheets, the AI assistant FAB. The remaining strings (Wellness sync messages, deep Settings sub-section labels, Statistics chart internals) are still English and will be extracted in subsequent releases. If you start translating and notice a screen you use heavily that's not yet in `en.json`, open an issue listing the screen — those are the targets we'll extract first.
+The full client-side string surface is extracted as of v1.1.0 — navigation, all Settings sections, Diary, Foods, Wellness, Goals, Statistics, the wizard, auth flow, the AI assistant, action sheets, toasts, dialog copy. Any new user-facing string added to the app is expected to land as a key in `en.json` in the same commit (see instrumenting guidance above); hardcoded English literals get flagged in review. `npm run i18n:check` runs against every locale file to catch missing translations and orphaned keys.
 
 Server-side strings (email subject lines, push notification bodies, AI system prompts) are not currently translatable and stay English.
 

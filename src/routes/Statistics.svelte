@@ -697,18 +697,18 @@
       <div transition:slide={{ duration: 160 }}>
         <!-- Quick-select shortcuts — saves drilling into the calendar -->
         <div class="custom-range-quick">
-          <button class="quick-chip" on:click={() => { const t = localDateStr(); const d = new Date(); d.setDate(d.getDate() - 6); customStart = localDateStr(d); customEnd = t; showCalFor = null; }}>Last 7d</button>
-          <button class="quick-chip" on:click={() => { const t = localDateStr(); const d = new Date(); d.setDate(d.getDate() - 29); customStart = localDateStr(d); customEnd = t; showCalFor = null; }}>Last 30d</button>
-          <button class="quick-chip" on:click={() => { const t = localDateStr(); const d = new Date(); d.setDate(d.getDate() - 89); customStart = localDateStr(d); customEnd = t; showCalFor = null; }}>Last 90d</button>
-          <button class="quick-chip" on:click={() => { const t = new Date(); customStart = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-01`; customEnd = localDateStr(); showCalFor = null; }}>This Month</button>
-          <button class="quick-chip" on:click={() => { const t = new Date(); t.setMonth(t.getMonth() - 1); const start = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-01`; const end = new Date(t.getFullYear(), t.getMonth() + 1, 0); customStart = start; customEnd = localDateStr(end); showCalFor = null; }}>Last Month</button>
-          <button class="quick-chip" on:click={() => { const y = new Date().getFullYear(); customStart = `${y}-01-01`; customEnd = localDateStr(); showCalFor = null; }}>YTD</button>
+          <button class="quick-chip" on:click={() => { const t = localDateStr(); const d = new Date(); d.setDate(d.getDate() - 6); customStart = localDateStr(d); customEnd = t; showCalFor = null; }}>{$_('statistics_page.range.last_7d')}</button>
+          <button class="quick-chip" on:click={() => { const t = localDateStr(); const d = new Date(); d.setDate(d.getDate() - 29); customStart = localDateStr(d); customEnd = t; showCalFor = null; }}>{$_('statistics_page.range.last_30d')}</button>
+          <button class="quick-chip" on:click={() => { const t = localDateStr(); const d = new Date(); d.setDate(d.getDate() - 89); customStart = localDateStr(d); customEnd = t; showCalFor = null; }}>{$_('statistics_page.range.last_90d')}</button>
+          <button class="quick-chip" on:click={() => { const t = new Date(); customStart = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-01`; customEnd = localDateStr(); showCalFor = null; }}>{$_('statistics_page.range.this_month')}</button>
+          <button class="quick-chip" on:click={() => { const t = new Date(); t.setMonth(t.getMonth() - 1); const start = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-01`; const end = new Date(t.getFullYear(), t.getMonth() + 1, 0); customStart = start; customEnd = localDateStr(end); showCalFor = null; }}>{$_('statistics_page.range.last_month')}</button>
+          <button class="quick-chip" on:click={() => { const y = new Date().getFullYear(); customStart = `${y}-01-01`; customEnd = localDateStr(); showCalFor = null; }}>{$_('statistics_page.range.ytd')}</button>
         </div>
         <div class="custom-range-row">
           <button class="date-range-btn" class:active={showCalFor === 'start'} on:click={() => openCal('start')}>
             <span class="material-symbols-rounded drb-icon">calendar_today</span>
             <div class="drb-text">
-              <span class="drb-label">From</span>
+              <span class="drb-label">{$_('statistics_page.range.from')}</span>
               <span class="drb-val">{fmtDate(customStart)}</span>
             </div>
           </button>
@@ -716,7 +716,7 @@
           <button class="date-range-btn" class:active={showCalFor === 'end'} on:click={() => openCal('end')}>
             <span class="material-symbols-rounded drb-icon">calendar_today</span>
             <div class="drb-text">
-              <span class="drb-label">To</span>
+              <span class="drb-label">{$_('statistics_page.range.to')}</span>
               <span class="drb-val">{fmtDate(customEnd)}</span>
             </div>
           </button>
@@ -731,22 +731,22 @@
           <div class="summary-item">
             <span class="summary-val">{summary.avg.toLocaleString()}</span>
             <span class="summary-unit">{_metricUnit}</span>
-            <span class="summary-lbl">Average</span>
+            <span class="summary-lbl">{$_('statistics_page.summary.average')}</span>
           </div>
           <div class="summary-item">
             <span class="summary-val">{summary.min.toLocaleString()}</span>
             <span class="summary-unit">{_metricUnit}</span>
-            <span class="summary-lbl">Min</span>
+            <span class="summary-lbl">{$_('statistics_page.summary.min')}</span>
           </div>
           <div class="summary-item">
             <span class="summary-val">{summary.max.toLocaleString()}</span>
             <span class="summary-unit">{_metricUnit}</span>
-            <span class="summary-lbl">Max</span>
+            <span class="summary-lbl">{$_('statistics_page.summary.max')}</span>
           </div>
           <div class="summary-item">
             <span class="summary-val">{summary.daysWithData.toLocaleString()}</span>
-            <span class="summary-unit">days</span>
-            <span class="summary-lbl">Logged</span>
+            <span class="summary-unit">{$_('statistics_page.summary.days_unit')}</span>
+            <span class="summary-lbl">{$_('statistics_page.summary.logged')}</span>
           </div>
         </div>
       </div>
@@ -762,14 +762,14 @@
         <div class="chart-loading" style="background:transparent">
           <div style="text-align:center;opacity:0.45;padding:8px 24px">
             <span class="material-symbols-rounded" style="font-size:36px">show_chart</span>
-            <div class="text-2 text-sm" style="margin-top:6px;font-weight:600">No data for this period</div>
+            <div class="text-2 text-sm" style="margin-top:6px;font-weight:600">{$_('statistics_page.empty.no_data')}</div>
             <div class="text-3 text-sm" style="margin-top:4px;line-height:1.45">
               {#if metric === 'calories' || metric === 'proteins' || metric === 'carbohydrates' || metric === 'fat'}
-                Log food in your diary to see trends here
+                {$_('statistics_page.empty.hint_food_metric')}
               {:else if metric.startsWith('wl_')}
-                Connect a fitness tracker in Settings → Wellness
+                {$_('statistics_page.empty.hint_wellness')}
               {:else}
-                No entries found — try a different date range
+                {$_('statistics_page.empty.hint_other')}
               {/if}
             </div>
           </div>
@@ -783,7 +783,7 @@
     <!-- Timeline list -->
     {#if data.length > 0}
       <div class="timeline-section">
-        <div class="section-title">History</div>
+        <div class="section-title">{$_('statistics_page.history_heading')}</div>
         <div class="timeline-list card">
           {#each [...data].reverse() as row}
             {#if Number.isFinite(row.val)}

@@ -10,6 +10,7 @@
    * the same Settings section.
    */
   import BulkImportModal from '../foods/BulkImportModal.svelte';
+  import { _ } from 'svelte-i18n';
   import { showSuccess, showError } from '../../stores/toast.js';
   import { DB } from '../../lib/db.js';
   import { NtApi } from '../../lib/api.js';
@@ -85,8 +86,8 @@
       };
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       _downloadBlob(blob, `nutritrace-backup-${new Date().toISOString().slice(0,10)}.json`);
-      showSuccess('Backup exported');
-    } catch(e) { showError('Export failed: ' + e.message); }
+      showSuccess($_('settings_import_export.toast.backup_exported'));
+    } catch(e) { showError($_('settings_import_export.toast.export_failed_prefix', { values: { error: e.message } })); }
   }
 
   async function importBackup() {
@@ -142,9 +143,9 @@
           if (toAdd.length) foodCategories.set([...existing, ...toAdd]);
         }
 
-        showSuccess('Backup restored — reloading...');
+        showSuccess($_('settings_import_export.toast.backup_restored_reload'));
         setTimeout(() => location.reload(), 1500);
-      } catch(err) { showError('Import failed: ' + err.message); }
+      } catch(err) { showError($_('settings_import_export.toast.import_failed_prefix', { values: { error: err.message } })); }
     };
     input.click();
   }
@@ -193,13 +194,14 @@
           }
         }
       }
+      const isOne = foods.length === 1;
       const msg = skipped
-        ? `Imported ${foods.length} food${foods.length === 1 ? '' : 's'} (${skipped} duplicate barcode${skipped === 1 ? '' : 's'} skipped)`
-        : `Imported ${foods.length} food${foods.length === 1 ? '' : 's'}`;
+        ? $_(isOne ? 'settings_import_export.toast.imported_food_skipped' : 'settings_import_export.toast.imported_foods_skipped', { values: { n: foods.length, skipped } })
+        : $_(isOne ? 'settings_import_export.toast.imported_foods_one' : 'settings_import_export.toast.imported_foods', { values: { n: foods.length } });
       showSuccess(msg);
       bulkImportOpen = false;
     } catch (err) {
-      showError('Import failed: ' + (err.message || 'Unknown error'));
+      showError($_('settings_import_export.toast.import_failed_prefix', { values: { error: err.message || $_('settings_import_export.toast.unknown_error') } }));
     }
   }
 
@@ -216,8 +218,8 @@
       });
       const blob = new Blob([csv], { type: 'text/csv' });
       _downloadBlob(blob, `nutritrace-diary-${new Date().toISOString().slice(0,10)}.csv`);
-      showSuccess('CSV exported');
-    } catch(e) { showError('Export failed: ' + e.message); }
+      showSuccess($_('settings_import_export.toast.csv_exported'));
+    } catch(e) { showError($_('settings_import_export.toast.export_failed_prefix', { values: { error: e.message } })); }
   }
 
   // ── Activity CSV Export (#77) ───────────────────────────────────────────────
@@ -246,20 +248,20 @@
       });
       const blob = new Blob([csv], { type: 'text/csv' });
       _downloadBlob(blob, `nutritrace-activity-${new Date().toISOString().slice(0,10)}.csv`);
-      showSuccess('Activity CSV exported');
-    } catch(e) { showError('Export failed: ' + e.message); }
+      showSuccess($_('settings_import_export.toast.activity_csv_exported'));
+    } catch(e) { showError($_('settings_import_export.toast.export_failed_prefix', { values: { error: e.message } })); }
   }
 </script>
 
 <div class="section-body">
   <!-- Import card -->
-  <p class="sub-label">Import</p>
+  <p class="sub-label">{$_('settings_import_export.sections.import')}</p>
   <div class="card settings-card">
     <button class="setting-row setting-action" on:click={openBulkImport}>
       <span class="material-symbols-rounded si" style="color:var(--accent)">playlist_add</span>
       <div>
-        <span class="setting-label">Bulk Import Foods</span>
-        <div class="setting-desc">Paste JSON or upload a CSV to add multiple foods at once. Useful for foods that aren't on Open Food Facts. A template is provided so an LLM can extract label data into the right shape.</div>
+        <span class="setting-label">{$_('settings_import_export.actions.bulk_import')}</span>
+        <div class="setting-desc">{$_('settings_import_export.actions.bulk_import_desc')}</div>
       </div>
       <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
     </button>
@@ -267,21 +269,21 @@
     <button class="setting-row setting-action" on:click={importBackup}>
       <span class="material-symbols-rounded si" style="color:var(--accent)">upload</span>
       <div>
-        <span class="setting-label">Import JSON Backup</span>
-        <div class="setting-desc">Restores from a previously exported JSON file. Merges with existing data, does not erase what's already here.</div>
+        <span class="setting-label">{$_('settings_import_export.actions.import_json')}</span>
+        <div class="setting-desc">{$_('settings_import_export.actions.import_json_desc')}</div>
       </div>
       <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
     </button>
   </div>
 
   <!-- Export card -->
-  <p class="sub-label">Export</p>
+  <p class="sub-label">{$_('settings_import_export.sections.export')}</p>
   <div class="card settings-card">
     <button class="setting-row setting-action" on:click={exportBackup}>
       <span class="material-symbols-rounded si" style="color:var(--accent)">download</span>
       <div>
-        <span class="setting-label">Export JSON Backup</span>
-        <div class="setting-desc">Lighter portable format, JSON only, no images. Useful for sharing data between accounts or quick text-based exports.</div>
+        <span class="setting-label">{$_('settings_import_export.actions.export_json')}</span>
+        <div class="setting-desc">{$_('settings_import_export.actions.export_json_desc')}</div>
       </div>
       <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
     </button>
@@ -289,8 +291,8 @@
     <button class="setting-row setting-action" on:click={exportCSV}>
       <span class="material-symbols-rounded si" style="color:var(--info)">table_chart</span>
       <div>
-        <span class="setting-label">Export Diary As CSV</span>
-        <div class="setting-desc">Downloads your full diary history as a spreadsheet. Useful for analysis in Excel or Google Sheets.</div>
+        <span class="setting-label">{$_('settings_import_export.actions.export_diary_csv')}</span>
+        <div class="setting-desc">{$_('settings_import_export.actions.export_diary_csv_desc')}</div>
       </div>
       <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
     </button>
@@ -298,8 +300,8 @@
     <button class="setting-row setting-action" on:click={exportActivityCSV}>
       <span class="material-symbols-rounded si" style="color:var(--info)">directions_run</span>
       <div>
-        <span class="setting-label">Export Activity As CSV</span>
-        <div class="setting-desc">Downloads your full manual activity log (name, calories, duration, distance, MET) as a spreadsheet.</div>
+        <span class="setting-label">{$_('settings_import_export.actions.export_activity_csv')}</span>
+        <div class="setting-desc">{$_('settings_import_export.actions.export_activity_csv_desc')}</div>
       </div>
       <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
     </button>

@@ -299,6 +299,64 @@ export async function sendInvite(email, inviteUrl, inviterName) {
   });
 }
 
+// ── Food Shared With You ───────────────────────────────────────────────────
+// Fired when a user grants another user access to a food via the per-user
+// share dialog. Best-effort; the share succeeds even if the email fails.
+export async function sendFoodShared(email, foodName, sharerName, viewUrl) {
+  if (!email) return;
+  const origin = new URL(viewUrl).origin;
+  const safeFood   = String(foodName   || 'a food');
+  const safeSharer = String(sharerName || 'Someone');
+  const body = `
+    ${greeting(null)}
+    <p class="nt-heading" style="margin:0 0 10px;font-size:20px;font-weight:700;color:#FFFFFF;line-height:1.3;">
+      ${safeSharer} shared a food with you
+    </p>
+    <p class="nt-body-txt" style="margin:0 0 16px;font-size:15px;color:#8A93A8;line-height:1.7;">
+      <strong style="color:#FFFFFF;">${safeFood}</strong> just landed in your "From Others" tab
+      on <strong style="color:#FFFFFF;">NutriTrace</strong>. Open it to view the nutrition,
+      log it to your diary, or copy it into your own library.
+    </p>
+    ${ctaButton(viewUrl, 'View Food')}
+    ${fallbackUrl(viewUrl)}`;
+
+  await sendMail({
+    to: email,
+    subject: 'Someone shared a food with you',
+    html: emailWrapper(origin, body, null, `${safeSharer} shared "${safeFood}" with you on NutriTrace.`),
+    text: `${safeSharer} shared "${safeFood}" with you on NutriTrace.\n\nOpen it: ${viewUrl}`,
+  });
+}
+
+// ── Meal Shared With You ───────────────────────────────────────────────────
+// Fired when a user grants another user access to a meal via the per-user
+// share dialog. Best-effort; the share succeeds even if the email fails.
+export async function sendMealShared(email, mealName, sharerName, viewUrl) {
+  if (!email) return;
+  const origin = new URL(viewUrl).origin;
+  const safeMeal   = String(mealName   || 'a meal');
+  const safeSharer = String(sharerName || 'Someone');
+  const body = `
+    ${greeting(null)}
+    <p class="nt-heading" style="margin:0 0 10px;font-size:20px;font-weight:700;color:#FFFFFF;line-height:1.3;">
+      ${safeSharer} shared a meal with you
+    </p>
+    <p class="nt-body-txt" style="margin:0 0 16px;font-size:15px;color:#8A93A8;line-height:1.7;">
+      <strong style="color:#FFFFFF;">${safeMeal}</strong> just landed in your "From Others" tab
+      on <strong style="color:#FFFFFF;">NutriTrace</strong>. Open it to view the ingredients
+      and nutrition, log it to your diary, or copy it into your own library.
+    </p>
+    ${ctaButton(viewUrl, 'View Meal')}
+    ${fallbackUrl(viewUrl)}`;
+
+  await sendMail({
+    to: email,
+    subject: 'Someone shared a meal with you',
+    html: emailWrapper(origin, body, null, `${safeSharer} shared "${safeMeal}" with you on NutriTrace.`),
+    text: `${safeSharer} shared "${safeMeal}" with you on NutriTrace.\n\nOpen it: ${viewUrl}`,
+  });
+}
+
 // ── Weekly Summary Email ───────────────────────────────────────────────────
 
 function _statRow(label, value, unit = '') {

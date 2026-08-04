@@ -1,4 +1,5 @@
 <script>
+  import { _ } from 'svelte-i18n';
   /**
    * NutritionFactsBox — FDA-style "Nutrition Facts" label.
    *
@@ -103,13 +104,13 @@
 
 {#if rows.length > 0}
 <div class="nfacts">
-  <div class="title">Nutrition Facts</div>
+  <div class="title">{$_('nutrition_facts.title')}</div>
 
   {#if servingsPerContainer}
     <div class="serving-line">{servingsPerContainer} servings per container</div>
   {/if}
   <div class="serving-line">
-    <strong>Serving Size</strong>
+    <strong>{$_('nutrition_facts.serving_size')}</strong>
     <span class="serving-detail">
       {#if servingDescription}
         {servingDescription}
@@ -126,7 +127,7 @@
   <div class="rule thick"></div>
 
   {#if caloriesNut}
-    <div class="amount-label">Amount Per Serving</div>
+    <div class="amount-label">{$_('nutrition_facts.amount_per')}</div>
     <div class="cal-row">
       <span class="cal-name">{caloriesRowLabel}</span>
       <span class="cal-value">

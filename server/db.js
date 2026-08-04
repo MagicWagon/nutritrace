@@ -730,4 +730,63 @@ try {
   if (f + m > 0) console.log(`[db] backfilled sodium/salt on ${f} foods + ${m} meals`);
 } catch {}
 
+// ── Diary items shrink migration (issue #125) ─────────────────────────────
+// Before this fix, addDiaryItem in src/stores/diary.js spread the entire
+// source food/recipe row into each diary item, so days accumulated
+// hundreds of KB per item (recipes carried their full ingredient array,
+// alt_units metadata, category, barcode, etc.). PUT /api/diary tripped
+// the 5 MB body-parser limit for users logging recipes repeatedly. New
+// writes go through _toReferenceShape and stay minimal; this one-shot
+// pass shrinks existing rows so they don't fail on their next write.
+//
+// CRITICAL: rewrite in place without bumping updated_at. If updated_at
+// bumps, every Android client's differential /sync/pull sees every
+// diary row as changed and would clobber legitimate unpushed local
+// edits (same reasoning as _backfillSodiumSalt above, and the exact
+// class of bug the dbUpsertDiaryFromServer guard in db-native.js
+// exists to defend against).
+const _DIARY_KEEP = new Set([
+  'meal', 'addedAt', 'type',
+  'id', 'food_server_id', 'is_recipe',
+  'name', 'brand', 'portion', 'unit', 'quantity',
+  'nutrition', 'notes', 'imgUrl',
+]);
+function _shrinkDiaryItem(it) {
+  if (!it || typeof it !== 'object') return it;
+  const out = {};
+  for (const k of Object.keys(it)) {
+    if (_DIARY_KEEP.has(k)) out[k] = it[k];
+  }
+  if (Array.isArray(it._splitItems)) out._splitItems = it._splitItems.map(_shrinkDiaryItem);
+  return out;
+}
+try {
+  const done = db.prepare(`SELECT value FROM app_config WHERE key = 'diary_items_shrunk_v1'`).get();
+  if (!done) {
+    const rows = db.prepare(`SELECT id, items FROM diary WHERE items IS NOT NULL AND items != '[]' AND deleted_at IS NULL`).all();
+    const update = db.prepare(`UPDATE diary SET items = ? WHERE id = ?`);
+    let changed = 0, savedBytes = 0;
+    db.transaction(() => {
+      for (const row of rows) {
+        let parsed;
+        try { parsed = JSON.parse(row.items); } catch { continue; }
+        if (!Array.isArray(parsed) || !parsed.length) continue;
+        const shrunk = parsed.map(_shrinkDiaryItem);
+        const before = row.items.length;
+        const after = JSON.stringify(shrunk);
+        if (after.length < before) {
+          update.run(after, row.id);
+          savedBytes += (before - after.length);
+          changed++;
+        }
+      }
+      db.prepare(`INSERT OR REPLACE INTO app_config (key, value) VALUES ('diary_items_shrunk_v1', ?)`)
+        .run(new Date().toISOString());
+    })();
+    if (changed > 0) console.log(`[db] shrunk diary items on ${changed} rows, saved ${(savedBytes/1024).toFixed(1)} KB`);
+  }
+} catch (e) {
+  console.warn('[db] diary items shrink migration failed:', e.message || e);
+}
+
 export default db;

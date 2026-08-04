@@ -10,6 +10,7 @@
    * /api/app-config/test-email.
    */
   import { onMount, tick } from 'svelte';
+  import { _ } from 'svelte-i18n';
   import Toggle from './Toggle.svelte';
   import ConnectionStatus from './ConnectionStatus.svelte';
   import { showSuccess, showError } from '../../stores/toast.js';
@@ -115,7 +116,7 @@
   let testDialogInputEl;
 
   function openTestDialog() {
-    if (!smtpHost) { smtpTestStatus = 'fail'; showError('SMTP test failed: host required'); return; }
+    if (!smtpHost) { smtpTestStatus = 'fail'; showError($_('settings_email.toast.host_required')); return; }
     testRecipient = $currentUser?.email || '';
     showTestDialog = true;
     tick().then(() => testDialogInputEl?.focus());
@@ -128,7 +129,7 @@
   async function confirmTestSmtp() {
     const to = (testRecipient || '').trim();
     if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
-      showError('Enter a valid email address');
+      showError($_('settings_email.toast.invalid_email'));
       return;
     }
     showTestDialog = false;
@@ -153,16 +154,16 @@
         const data = await res.json().catch(() => ({}));
         smtpTestRecipient = data.to || to;
         smtpTestStatus = 'ok';
-        showSuccess(`SMTP test email sent to ${smtpTestRecipient}`);
+        showSuccess($_('settings_email.toast.test_sent', { values: { recipient: smtpTestRecipient } }));
       } else {
         smtpTestStatus = 'fail';
-        let detail = `HTTP ${res.status}`;
+        let detail = $_('settings_email.toast.http_prefix', { values: { status: res.status } });
         try { const j = await res.json(); if (j?.error) detail = j.error; } catch {}
-        showError(`SMTP test failed: ${detail}`);
+        showError($_('settings_email.toast.test_failed_prefix', { values: { detail } }));
       }
     } catch (e) {
       smtpTestStatus = 'fail';
-      showError(`SMTP test failed: ${e?.message || 'network error'}`);
+      showError($_('settings_email.toast.test_failed_prefix', { values: { detail: e?.message || $_('settings_email.toast.network_error') } }));
     }
   }
 
@@ -176,19 +177,19 @@
   $: smtpBannerStatus = smtpTestStatus === 'testing' || smtpTestStatus === 'fail'
     ? smtpTestStatus
     : (smtpHost && smtpFrom ? 'ok' : '');
-  $: smtpBannerLabel   = smtpTestStatus === 'ok' ? 'Last Test Sent' : 'Configured';
+  $: smtpBannerLabel   = smtpTestStatus === 'ok' ? $_('settings_email.banner.last_test_sent') : $_('settings_email.banner.configured');
   $: smtpBannerSubtext = smtpTestStatus === 'ok'
     ? (smtpTestRecipient
-        ? `Sent to ${smtpTestRecipient}. Use Send Test again any time to re-verify.`
-        : 'Use Send Test again any time to re-verify')
-    : 'No test has been sent yet';
+        ? $_('settings_email.banner.sent_to', { values: { recipient: smtpTestRecipient } })
+        : $_('settings_email.banner.sent_generic'))
+    : $_('settings_email.banner.no_test');
 </script>
 
-<p class="sub-label" style="padding-bottom:4px">Used for password resets and user invites</p>
+<p class="sub-label" style="padding-bottom:4px">{$_('settings_email.intro')}</p>
 {#if envLocks.smtp}
   <div class="env-lock-banner">
     <span class="material-symbols-rounded" style="font-size:16px">lock</span>
-    Configured via environment variables — changes are disabled.
+    {$_('settings_email.env_lock_banner')}
   </div>
 {/if}
 <div class="card settings-card">
@@ -197,81 +198,75 @@
       status={smtpBannerStatus}
       okLabel={smtpBannerLabel}
       subtext={smtpBannerSubtext}
-      error={smtpTestStatus === 'fail' ? 'Check host, credentials, and from address' : ''}
+      error={smtpTestStatus === 'fail' ? $_('settings_email.banner.error_hint') : ''}
       onRetest={testSmtp}
       retestDisabled={smtpTestStatus === 'testing' || !smtpHost}
-      retestLabel="Send Test"
+      retestLabel={$_('settings_email.banner.send_test')}
     />
   {/if}
   <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
     <div class="form-group">
-      <label class="form-label">SMTP Host</label>
-      <input class="input" type="text" placeholder="e.g. smtp.example.com"
+      <label class="form-label">{$_('settings_email.form.host')}</label>
+      <input class="input" type="text" placeholder={$_('settings_email.form.host_ph')}
         bind:value={smtpHost} disabled={envLocks.smtp} />
     </div>
     <div style="display:flex;gap:10px">
       <div class="form-group" style="flex:1">
-        <label class="form-label">Port</label>
+        <label class="form-label">{$_('settings_email.form.port')}</label>
         <input class="input" type="number" placeholder="587"
           bind:value={smtpPort} disabled={envLocks.smtp} />
       </div>
       <div class="form-group" style="display:flex;flex-direction:column;gap:6px;justify-content:flex-end;padding-bottom:2px">
-        <label class="form-label">TLS</label>
+        <label class="form-label">{$_('settings_email.form.tls')}</label>
         <Toggle checked={smtpSecure} on:change={e => smtpSecure = e.detail} disabled={envLocks.smtp} />
       </div>
     </div>
     <div class="form-group">
-      <label class="form-label">Username</label>
-      <input class="input" type="text" autocomplete="off" placeholder="SMTP username or email"
+      <label class="form-label">{$_('settings_email.form.username')}</label>
+      <input class="input" type="text" autocomplete="off" placeholder={$_('settings_email.form.username_ph')}
         bind:value={smtpUser} disabled={envLocks.smtp} />
     </div>
     <div class="form-group">
-      <label class="form-label">Password</label>
+      <label class="form-label">{$_('settings_email.form.password')}</label>
       <div style="display:flex;gap:8px;align-items:center">
-        <!-- Single input masked via CSS text-security instead of a
-             type-swap: on some Android WebView builds the swap left
-             stale password dots visible. When passIsStored is true
-             the field is read-only + the toggle is replaced with a
-             Change button, because the server redacts the real value
-             and there's nothing meaningful to "reveal". -->
         <input bind:this={smtpPassInputEl}
           class="input smtp-pass" class:masked={!smtpShowPass && !passIsStored}
           style="flex:1" type="text" autocomplete="new-password"
-          placeholder="SMTP password or app password"
+          placeholder={$_('settings_email.form.password_ph')}
           bind:value={smtpPass}
           disabled={envLocks.smtp || passIsStored} />
         {#if passIsStored}
           <button type="button" class="btn-icon change-btn"
             on:click={changeSmtpPass}
-            title="Change password"
-            aria-label="Change password">
-            Change
+            title={$_('settings_email.form.change_pass_title')}
+            aria-label={$_('settings_email.form.change_pass_title')}>
+            {$_('settings_email.form.change')}
           </button>
         {:else}
           <button type="button" class="btn-icon"
             on:click={() => smtpShowPass = !smtpShowPass}
-            title={smtpShowPass ? 'Hide' : 'Show'}
-            aria-label={smtpShowPass ? 'Hide password' : 'Show password'}>
+            title={smtpShowPass ? $_('settings_email.form.hide') : $_('settings_email.form.show')}
+            aria-label={smtpShowPass ? $_('settings_email.form.hide_pass_aria') : $_('settings_email.form.show_pass_aria')}>
             <span class="material-symbols-rounded">{smtpShowPass ? 'visibility_off' : 'visibility'}</span>
           </button>
         {/if}
       </div>
       {#if passIsStored}
-        <p class="pass-hint">Password saved. Tap Change to replace it.</p>
+        <p class="pass-hint">{$_('settings_email.form.pass_saved_hint')}</p>
       {/if}
     </div>
     <div class="form-group">
-      <label class="form-label">From Address</label>
-      <input class="input" type="email" placeholder='NutriTrace <noreply@example.com>'
+      <label class="form-label">{$_('settings_email.form.from')}</label>
+      <input class="input" type="email" placeholder={$_('settings_email.form.from_ph')}
         bind:value={smtpFrom} disabled={envLocks.smtp} />
     </div>
     <div style="display:flex;align-items:center;gap:10px">
       <button class="btn btn-primary" style="height:36px;font-size:13px"
         on:click={saveSmtp} disabled={smtpSaving || envLocks.smtp}>
         {#if smtpSaved}
-          <span class="material-symbols-rounded" style="font-size:16px">check</span> Saved
+          <span class="material-symbols-rounded" style="font-size:16px">check</span> {$_('settings_email.form.saved')}
         {:else}
-          {smtpSaving ? 'Saving…' : 'Save'}
+          {smtpSaving ? $_('settings_email.form.saving') : $_('settings_email.form.save')}
         {/if}
       </button>
     </div>
@@ -283,15 +278,15 @@
     on:keydown={(e) => e.key === 'Escape' && closeTestDialog()}>
     <div class="test-dialog" role="dialog" aria-labelledby="test-dialog-title"
       on:click|stopPropagation>
-      <h3 id="test-dialog-title">Send Test Email</h3>
-      <p>Where should we send the test?</p>
+      <h3 id="test-dialog-title">{$_('settings_email.test_dialog.title')}</h3>
+      <p>{$_('settings_email.test_dialog.question')}</p>
       <input bind:this={testDialogInputEl} class="input" type="email"
-        placeholder="you@example.com" bind:value={testRecipient}
+        placeholder={$_('settings_email.test_dialog.recipient_ph')} bind:value={testRecipient}
         on:keydown={(e) => e.key === 'Enter' && confirmTestSmtp()} />
       <div class="test-dialog-actions">
-        <button class="btn btn-ghost" on:click={closeTestDialog}>Cancel</button>
+        <button class="btn btn-ghost" on:click={closeTestDialog}>{$_('settings_email.test_dialog.cancel')}</button>
         <button class="btn btn-primary" on:click={confirmTestSmtp}
-          disabled={!testRecipient.trim()}>Send</button>
+          disabled={!testRecipient.trim()}>{$_('settings_email.test_dialog.send')}</button>
       </div>
     </div>
   </div>

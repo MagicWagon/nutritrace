@@ -76,12 +76,56 @@ function _stripCachedPaths(items) {
   });
 }
 
+// Fields that stay snapshotted on the diary item forever (history
+// protection: editing the source food/recipe later must not
+// retroactively rewrite what the user logged) plus the render-time
+// essentials the diary UI actually reads. Everything else on the source
+// object — recipe ingredients (items[]), OFF metadata, category,
+// barcode, favorite/usage counters, timestamps, alt_units, etc. — is
+// dead cargo that ballooned the day's items JSON past the 5 MB PUT
+// body limit for users logging recipes repeatedly (issue #125). Drop
+// it here on write; the server + native reads use hydrateItems() to
+// re-attach the safe-to-refresh fields (imgUrl already lived under
+// this pattern via freshenItemImages).
+const _KEEP_FIELDS = [
+  'meal', 'addedAt', 'type',                        // routing + display + branch
+  'id', 'food_server_id', 'is_recipe',              // hydration keys
+  'name', 'brand', 'portion', 'unit', 'quantity',   // history-protected snapshot
+  'nutrition', 'notes',                             // history-protected snapshot
+  'imgUrl',                                         // scrubbed by _stripCachedPaths, hydrated on read
+];
+function _toReferenceShape(items) {
+  if (!Array.isArray(items)) return items;
+  return items.map(it => {
+    if (!it || typeof it !== 'object') return it;
+    const out = {};
+    for (const k of _KEEP_FIELDS) if (k in it) out[k] = it[k];
+    // _splitItems is a transient recipe-split; each child follows the same
+    // shape rules recursively.
+    if (Array.isArray(it._splitItems)) out._splitItems = _toReferenceShape(it._splitItems);
+    return out;
+  });
+}
+
 function _toApi(entry) {
   return {
-    items:      _stripCachedPaths(entry.items || []),
+    items:      _toReferenceShape(_stripCachedPaths(entry.items || [])),
     body_stats: entry.bodyStats  || entry.body_stats || {},
     water:      entry.water      || [],
     notes:      entry.notes      || '',
+  };
+}
+
+/** Shared PUT-payload builder for raw callers (Diary.svelte's multi-delete,
+ *  water log write, and replace flow) that bypass _save(). Applies the same
+ *  reference-shape trim + cached-path scrub, so no future raw NtApi.saveDiaryDate
+ *  call can silently reintroduce the recipe-inlining bloat that #125 traced to. */
+export function buildDiaryWritePayload({ items, body_stats, bodyStats, water, notes } = {}) {
+  return {
+    items:      _toReferenceShape(_stripCachedPaths(items || [])),
+    body_stats: bodyStats || body_stats || {},
+    water:      water || [],
+    notes:      typeof notes === 'string' ? notes : '',
   };
 }
 

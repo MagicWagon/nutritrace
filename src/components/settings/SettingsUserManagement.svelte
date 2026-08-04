@@ -10,6 +10,7 @@
   import { push } from 'svelte-spa-router';
   import { validatePassword } from '../../lib/validation.js';
   import { confirmDialog } from '../../stores/confirmDialog.js';
+  import { envLocks } from '../../stores/settings.js';
   import Dialog from '../ui/Dialog.svelte';
 
   // ── User Management state ────────────────────────────────────────────────────
@@ -31,6 +32,7 @@
   let enableShowPass = false;
   let enableAdminConf = '';
   let enableAdminName = '';
+  let enableAdminEmail = '';
   let enableUmError   = '';
   let enableUmLoading = false;
 
@@ -69,16 +71,16 @@
   }
   async function revokeInvite(token) {
     if (!await confirmDialog({
-      title: 'Revoke invite?',
-      message: 'The link will stop working immediately. The recipient won\'t be able to use it after this.',
-      confirmText: 'Revoke',
+      title: $_('settings.users.revoke_invite_title'),
+      message: $_('settings.users.revoke_invite_message'),
+      confirmText: $_('settings.users.revoke_confirm'),
       dangerous: true,
     })) return;
     try {
       await NtApi.del(`/api/auth/invites/${token}`);
       await loadPendingInvites();
-      showSuccess('Invite revoked');
-    } catch (e) { showError(e.message || 'Could not revoke invite'); }
+      showSuccess($_('settings.users.invite_revoked'));
+    } catch (e) { showError(e.message || $_('settings.users.err_could_not_revoke')); }
   }
 
   export async function loadData() {
@@ -129,9 +131,9 @@
         // config key'). Roll back the optimistic UI flip and surface
         // the reason so the failure isn't silent.
         const data = await res.json().catch(() => ({}));
-        const msg = data.error || `Save failed (${res.status})`;
+        const msg = data.error || $_('settings.users.save_failed_status', { values: { status: res.status } });
         console.warn('[password-policy] save rejected:', msg);
-        showError(`Could not save password policy: ${msg}. Server may need to redeploy.`);
+        showError($_('settings.users.err_password_policy_prefix', { values: { msg } }));
         passwordPolicy = prev;
         return;
       }
@@ -143,7 +145,7 @@
       setTimeout(() => passwordPolicySaved = false, 2000);
     } catch (e) {
       console.warn('[password-policy] save threw:', e);
-      showError(`Could not save password policy: ${e?.message || 'network error'}`);
+      showError($_('settings.users.err_password_policy', { values: { msg: e?.message || $_('settings.users.network_error') } }));
       passwordPolicy = prev;
     }
   }
@@ -181,6 +183,10 @@
           username:  enableAdminUser.trim(),
           password:  enableAdminPass,
           full_name: enableAdminName.trim() || undefined,
+          // Only sent when SMTP is env-configured (field only rendered
+          // in that case). Server stores it on the user row so password
+          // reset / admin invites can email them later.
+          email:     enableAdminEmail.trim().toLowerCase() || undefined,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -211,7 +217,7 @@
       }
       await loadAuthState();
       showEnableUm = false;
-      enableAdminUser = ''; enableAdminPass = ''; enableAdminConf = ''; enableAdminName = '';
+      enableAdminUser = ''; enableAdminPass = ''; enableAdminConf = ''; enableAdminName = ''; enableAdminEmail = '';
       await loadUsers();
       showSuccess($_('settings.users.toast_um_enabled'));
     } catch(e) { enableUmError = $_('settings.users.err_could_not_reach_server'); }
@@ -402,7 +408,7 @@
 
   async function createInvite() {
     if (!_inviteEmailValid) {
-      showError('Enter a valid email or leave blank to generate a shareable link');
+      showError($_('settings.users.err_invite_email'));
       return;
     }
     inviteLoading = true;
@@ -414,16 +420,14 @@
         body: JSON.stringify({ email: _inviteEmailTrimmed || undefined, role: inviteRole }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { showError(data.error || 'Failed to create invite'); return; }
+      if (!res.ok) { showError(data.error || $_('settings.users.err_failed_create_invite')); return; }
       inviteResult = data;
       // Server reports sent: true only after nodemailer's SMTP handoff resolves
-      // — that's the strongest delivery confirmation any app can make without
-      // webhooks from the upstream provider. Same wording GitHub / Slack use.
-      if (data.sent) showSuccess(`Invite emailed to ${_inviteEmailTrimmed}`);
+      if (data.sent) showSuccess($_('settings.users.invite_sent_to', { values: { email: _inviteEmailTrimmed } }));
       inviteEmail  = '';
       await loadPendingInvites();
     } catch {
-      showError('Could not create invite');
+      showError($_('settings.users.err_could_not_create_invite'));
     } finally {
       // Always release the loading state — was leaking on early-returns
       // (validation fails / non-OK response) so the button stayed stuck on
@@ -495,7 +499,7 @@
             class:invalid={_inviteEmailTrimmed && !_inviteEmailValid}
             bind:value={inviteEmail} placeholder={$_('settings.users.email_optional')} />
           {#if _inviteEmailTrimmed && !_inviteEmailValid}
-            <p class="invite-hint">Enter a valid email address, or clear the field to generate a shareable link.</p>
+            <p class="invite-hint">{$_('settings.users.invite_email_hint')}</p>
           {/if}
           <div class="um-role-pair">
             <label class="um-role-label" for="invite-role-sel">{$_('settings.users.role')}</label>
@@ -512,18 +516,18 @@
           </button>
           {#if pendingInvites.length > 0}
             <div class="pending-invites" transition:slide={{ duration: 160 }}>
-              <div class="pending-invites-label">Pending Invites</div>
+              <div class="pending-invites-label">{$_('settings.users.pending_invites')}</div>
               {#each pendingInvites as inv (inv.token)}
                 <div class="pending-invite-row">
                   <div class="pending-invite-info">
-                    <span class="pending-invite-email">{inv.email || 'Link-only (no email)'}</span>
+                    <span class="pending-invite-email">{inv.email || $_('settings.users.link_only')}</span>
                     <span class="pending-invite-meta">
-                      {inv.role === 'admin' ? 'Admin' : 'User'} ·
-                      expires {new Date(inv.expires_at).toLocaleDateString()}
+                      {inv.role === 'admin' ? $_('settings.users.role_admin_display') : $_('settings.users.role_user_display')} ·
+                      {$_('settings.users.expires_short', { values: { date: new Date(inv.expires_at).toLocaleDateString() } })}
                     </span>
                   </div>
                   <button class="btn-icon pending-invite-revoke" on:click={() => revokeInvite(inv.token)}
-                    aria-label="Revoke invite" title="Revoke invite">
+                    aria-label={$_('settings.users.revoke_invite_aria')} title={$_('settings.users.revoke_invite_aria')}>
                     <span class="material-symbols-rounded">close</span>
                   </button>
                 </div>
@@ -593,30 +597,30 @@
         <div class="setting-divider"></div>
         <div class="setting-row">
           <div>
-            <span class="setting-label">Require Strong Passwords</span>
-            <div class="setting-desc">Reject weak passwords (zxcvbn score below 3) on top of the standard 8-char + mixed-case + number + symbol rules. Affects new sign-ups, invites, and password changes. Existing passwords aren't re-checked.</div>
+            <span class="setting-label">{$_('settings.users.strong_passwords')}</span>
+            <div class="setting-desc">{$_('settings.users.strong_passwords_desc')}</div>
           </div>
           <Toggle checked={passwordPolicy === 'strong'} on:change={e => savePasswordPolicy(e.detail ? 'strong' : 'standard')} />
         </div>
         {#if passwordPolicySaved}
-          <p class="setting-desc" style="padding:0 16px 8px;color:var(--accent)">Saved.</p>
+          <p class="setting-desc" style="padding:0 16px 8px;color:var(--accent)">{$_('settings.users.saved_short')}</p>
         {/if}
 
         <div class="setting-divider"></div>
         <div class="setting-row">
           <div>
-            <span class="setting-label">Session Duration</span>
-            <div class="setting-desc">How long users stay signed in. Applies to new logins.</div>
+            <span class="setting-label">{$_('settings.users.session_duration')}</span>
+            <div class="setting-desc">{$_('settings.users.session_desc')}</div>
           </div>
           <div class="select-wrap" style="width:130px">
             <select class="select sel-sm" bind:value={sessionHours} on:change={saveSessionHours}>
-              <option value="0">Never expires</option>
-              <option value="8">8 hours</option>
-              <option value="24">1 day</option>
-              <option value="168">7 days</option>
-              <option value="720">30 days</option>
-              <option value="2160">90 days</option>
-              <option value="8760">1 year</option>
+              <option value="0">{$_('settings.users.session_never')}</option>
+              <option value="8">{$_('settings.users.session_8h')}</option>
+              <option value="24">{$_('settings.users.session_1d')}</option>
+              <option value="168">{$_('settings.users.session_7d')}</option>
+              <option value="720">{$_('settings.users.session_30d')}</option>
+              <option value="2160">{$_('settings.users.session_90d')}</option>
+              <option value="8760">{$_('settings.users.session_1y')}</option>
             </select>
           </div>
         </div>
@@ -625,8 +629,8 @@
         <button class="setting-row setting-action danger" on:click={disableUserManagement}>
           <span class="material-symbols-rounded si" style="color:var(--danger)">no_accounts</span>
           <div>
-            <span class="setting-label" style="color:var(--danger)">Disable User Management</span>
-            <div class="setting-desc">Removes all user accounts and returns to single-user mode</div>
+            <span class="setting-label" style="color:var(--danger)">{$_('settings.users.disable_um')}</span>
+            <div class="setting-desc">{$_('settings.users.disable_um_subtitle')}</div>
           </div>
         </button>
       {/if}
@@ -635,43 +639,68 @@
       <button class="setting-row setting-action" on:click={() => { showEnableUm = !showEnableUm; enableUmError = ''; }}>
         <span class="material-symbols-rounded si" style="color:var(--accent)">group_add</span>
         <div>
-          <span class="setting-label">Enable User Management</span>
-          <div class="setting-desc">Add multiple user accounts with separate data &amp; settings</div>
+          <span class="setting-label">{$_('settings.users.enable_um')}</span>
+          <div class="setting-desc">{$_('settings.users.enable_um_subtitle')}</div>
         </div>
         <span class="material-symbols-rounded text-3" style="font-size:18px">{showEnableUm ? 'expand_less' : 'expand_more'}</span>
       </button>
 
       {#if showEnableUm}
         <div class="section-body" style="padding:0 16px 16px" transition:slide={{ duration: 160 }}>
-          <p class="um-section-label" style="margin-bottom:8px">Create admin account</p>
+          <p class="um-section-label" style="margin-bottom:8px">{$_('settings.users.create_admin_account')}</p>
           <p class="text-3 text-sm" style="margin:0 0 12px;line-height:1.5">
-            The first account is always admin. All existing food, meal, and diary data on this server will be assigned to it.
+            {$_('settings.users.create_admin_explainer')}
           </p>
           <div class="um-add-form">
             <div class="um-form-row">
-              <input class="input" type="text" bind:value={enableAdminUser} placeholder={$_('settings.users.username_required')} autocomplete="username" />
-              <input class="input" type="text" bind:value={enableAdminName} placeholder={$_('settings.users.full_name')} />
+              <input class="input" style="flex:1;min-width:0" type="text" bind:value={enableAdminUser} placeholder={$_('settings.users.username_required')} autocomplete="username" />
+              <input class="input" style="flex:1;min-width:0" type="text" bind:value={enableAdminName} placeholder={$_('settings.users.full_name')} />
             </div>
+            <!-- Optional admin email — only shown when SMTP is env-locked
+                 (docker-compose configured), so we know at boot the server
+                 can actually send from it. In the default "SMTP configured
+                 via Settings UI post-install" path, SMTP isn't up yet at
+                 this point so the field would be dead weight. Stored on
+                 the user row for later password-reset / invite emails. -->
+            {#if $envLocks?.smtp}
+              <div class="um-form-row">
+                <input class="input" style="flex:1;min-width:0" type="email"
+                  bind:value={enableAdminEmail}
+                  placeholder={$_('settings.users.email_optional')}
+                  autocomplete="email" />
+              </div>
+            {/if}
+            <!-- Symmetric password + confirm row: each field wrapped in its own
+                 flex:1 group with an eye toggle at its right edge. Both eyes
+                 flip the same shared `enableShowPass` state so clicking either
+                 shows/hides both fields together. Without the min-width:0 the
+                 .input's inherited width:100% would fight flex distribution
+                 and crush one side to a sliver (#122). -->
             <div class="um-form-row">
-              <div style="display:flex;gap:4px;align-items:center;flex:1">
+              <div style="display:flex;gap:4px;align-items:center;flex:1;min-width:0">
                 {#if enableShowPass}
-                  <input class="input" style="flex:1" type="text" bind:value={enableAdminPass} placeholder={$_('settings.users.password_required')} autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
+                  <input class="input" style="flex:1;min-width:0" type="text" bind:value={enableAdminPass} placeholder={$_('settings.users.password_required')} autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
                 {:else}
-                  <input class="input" style="flex:1" type="password" bind:value={enableAdminPass} placeholder={$_('settings.users.password_required')} autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
+                  <input class="input" style="flex:1;min-width:0" type="password" bind:value={enableAdminPass} placeholder={$_('settings.users.password_required')} autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
                 {/if}
-                <button class="btn-icon" on:click={() => enableShowPass = !enableShowPass} style="flex-shrink:0">
+                <button class="btn-icon" on:click={() => enableShowPass = !enableShowPass} style="flex-shrink:0" aria-label={enableShowPass ? $_('common.hide') : 'Show password'}>
                   <span class="material-symbols-rounded" style="font-size:18px">{enableShowPass ? 'visibility_off' : 'visibility'}</span>
                 </button>
               </div>
-              {#if enableShowPass}
-                <input class="input" type="text" bind:value={enableAdminConf} placeholder={$_('settings.users.confirm_required')} autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
-              {:else}
-                <input class="input" type="password" bind:value={enableAdminConf} placeholder={$_('settings.users.confirm_required')} autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
-              {/if}
+              <div style="display:flex;gap:4px;align-items:center;flex:1;min-width:0">
+                {#if enableShowPass}
+                  <input class="input" style="flex:1;min-width:0" type="text" bind:value={enableAdminConf} placeholder={$_('settings.users.confirm_required')} autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
+                {:else}
+                  <input class="input" style="flex:1;min-width:0" type="password" bind:value={enableAdminConf} placeholder={$_('settings.users.confirm_required')} autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
+                {/if}
+                <button class="btn-icon" on:click={() => enableShowPass = !enableShowPass} style="flex-shrink:0" aria-label={enableShowPass ? $_('common.hide') : 'Show password'}>
+                  <span class="material-symbols-rounded" style="font-size:18px">{enableShowPass ? 'visibility_off' : 'visibility'}</span>
+                </button>
+              </div>
             </div>
             {#if enableUmError}<p class="um-error">{enableUmError}</p>{/if}
             <button class="btn btn-primary" style="width:100%" on:click={enableUserManagement} disabled={enableUmLoading}>
-              {enableUmLoading ? 'Enabling...' : 'Enable & Create Admin'}
+              {enableUmLoading ? $_('settings.users.enabling') : $_('settings.users.enable_create')}
             </button>
           </div>
         </div>

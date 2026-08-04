@@ -1,4 +1,5 @@
 <script>
+  import { _ } from 'svelte-i18n';
   import { showError, showSuccess } from '../../stores/toast.js';
   import { apiUrl, resolveAssetUrl, isNative, getServerUrl, getAuthToken } from '../../lib/platform.js';
   import { loadEntry, currentDate } from '../../stores/diary.js';
@@ -29,29 +30,29 @@
   let busy = false;
   let onDuplicate = 'skip';
 
-  const SOURCE_OPTIONS = [
+  $: SOURCE_OPTIONS = [
     {
       id: 'spreadsheet',
-      label: 'Generic Spreadsheet',
-      hint: 'Any CSV with at least Date, Name, and Calories columns. Use our template for the easiest path.',
+      label: $_('settings_nutrition_import.sources.spreadsheet_label'),
+      hint:  $_('settings_nutrition_import.sources.spreadsheet_hint'),
       accept: '.csv,text/csv',
     },
     {
       id: 'cronometer',
-      label: 'Cronometer',
-      hint: 'Profile → Account → Export Data → Servings (CSV). Free tier supported.',
+      label: $_('settings_nutrition_import.sources.cronometer_label'),
+      hint:  $_('settings_nutrition_import.sources.cronometer_hint'),
       accept: '.csv,text/csv',
     },
     {
       id: 'loseit',
-      label: 'Lose It!',
-      hint: 'loseit.com → Insights → Weekly → Export to Spreadsheet. One CSV per week — concatenate first if importing multiple weeks.',
+      label: $_('settings_nutrition_import.sources.loseit_label'),
+      hint:  $_('settings_nutrition_import.sources.loseit_hint'),
       accept: '.csv,text/csv',
     },
     {
       id: 'mfp',
-      label: 'MyFitnessPal',
-      hint: 'Go to myfitnesspal.com/reports/export, pick a date range, click Export, and wait for the email. Free and Premium both work. The export is aggregated per meal per day — one diary entry is created per meal with brand "MyFitnessPal", preserving the macro totals. Individual foods aren\'t in the export so they aren\'t reconstructed.',
+      label: $_('settings_nutrition_import.sources.mfp_label'),
+      hint:  $_('settings_nutrition_import.sources.mfp_hint'),
       accept: '.csv,.zip,text/csv,application/zip',
     },
   ];
@@ -80,10 +81,10 @@
         method: 'POST', credentials: 'include', headers: _authHeaders(), body: fd,
       });
       const data = await res.json();
-      if (!res.ok) { showError(data?.error || 'Preview failed'); return; }
+      if (!res.ok) { showError(data?.error || $_('settings_nutrition_import.preview_failed')); return; }
       preview = data;
     } catch (e) {
-      showError('Could not reach server');
+      showError($_('common.errors.cant_reach_server'));
     } finally { busy = false; }
   }
 
@@ -99,15 +100,20 @@
         method: 'POST', credentials: 'include', headers: _authHeaders(), body: fd,
       });
       const data = await res.json();
-      if (!res.ok) { showError(data?.error || 'Import failed'); return; }
-      const verb = onDuplicate === 'merge' ? 'merged' : (onDuplicate === 'replace' ? 'replaced' : 'imported');
-      showSuccess(`Imported ${data.imported + data.merged + data.replaced} day(s) — ${data.totalItems} items ${verb}`);
-      // Refresh today's diary view in case the import touched today
+      if (!res.ok) { showError(data?.error || $_('settings_nutrition_import.import_failed')); return; }
+      const verb = $_(onDuplicate === 'merge' ? 'settings_nutrition_import.verb_merged'
+                    : onDuplicate === 'replace' ? 'settings_nutrition_import.verb_replaced'
+                    : 'settings_nutrition_import.verb_imported');
+      showSuccess($_('settings_nutrition_import.imported_summary', { values: {
+        days: data.imported + data.merged + data.replaced,
+        items: data.totalItems,
+        verb,
+      } }));
       const today = get(currentDate);
       if (today) loadEntry(today);
       reset();
     } catch (e) {
-      showError('Could not reach server');
+      showError($_('common.errors.cant_reach_server'));
     } finally { busy = false; }
   }
 </script>
@@ -115,9 +121,9 @@
 <div class="section-body">
   <div class="card settings-card">
     <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:6px">
-      <span class="setting-label" style="font-weight:600">Import Nutrition History</span>
+      <span class="setting-label" style="font-weight:600">{$_('settings_nutrition_import.title')}</span>
       <p class="setting-desc" style="margin:0">
-        Bring in past days from another tracker. Your existing diary is left alone unless you pick "replace" below.
+        {$_('settings_nutrition_import.desc')}
       </p>
     </div>
 
@@ -125,7 +131,7 @@
 
     <!-- Source picker -->
     <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px">
-      <span class="setting-label">Source App</span>
+      <span class="setting-label">{$_('settings_nutrition_import.source_app')}</span>
       <div class="select-wrap" style="width:100%">
         <select class="select" bind:value={source} on:change={reset}>
           {#each SOURCE_OPTIONS as o (o.id)}
@@ -137,7 +143,7 @@
       {#if source === 'spreadsheet'}
         <a class="text-link" href={resolveAssetUrl('/templates/nutrition-import-template.csv')} download>
           <span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">download</span>
-          Download template CSV
+          {$_('settings_nutrition_import.download_template')}
         </a>
       {/if}
     </div>
@@ -146,7 +152,7 @@
 
     <!-- File picker -->
     <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px">
-      <span class="setting-label">File</span>
+      <span class="setting-label">{$_('settings_nutrition_import.file')}</span>
       <input
         type="file"
         accept={currentSource.accept}
@@ -157,18 +163,18 @@
       <div style="display:flex;gap:8px;align-items:center;width:100%">
         <button class="btn btn-secondary" on:click={pickFile} disabled={busy}>
           <span class="material-symbols-rounded" style="font-size:16px;vertical-align:middle">upload_file</span>
-          {file ? 'Choose Different File' : 'Choose File'}
+          {file ? $_('settings_nutrition_import.choose_different_file') : $_('settings_nutrition_import.choose_file')}
         </button>
         {#if file}
           <span class="text-3 text-sm" style="overflow-wrap:anywhere;min-width:0;flex:1">{file.name}</span>
-          <button class="btn-icon" title="Clear" on:click={reset}>
+          <button class="btn-icon" title={$_('settings_nutrition_import.clear')} on:click={reset}>
             <span class="material-symbols-rounded">close</span>
           </button>
         {/if}
       </div>
       {#if file && !preview}
         <button class="btn btn-primary" style="width:100%" on:click={runPreview} disabled={busy}>
-          {busy ? 'Reading…' : 'Preview'}
+          {busy ? $_('settings_nutrition_import.reading') : $_('settings_nutrition_import.preview')}
         </button>
       {/if}
     </div>
@@ -176,34 +182,34 @@
     {#if preview}
       <div class="setting-divider"></div>
       <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:10px">
-        <span class="setting-label" style="font-weight:600">Preview</span>
+        <span class="setting-label" style="font-weight:600">{$_('settings_nutrition_import.preview')}</span>
         <div class="preview-stats">
-          <div class="preview-stat"><strong>{preview.items}</strong><span>items</span></div>
-          <div class="preview-stat"><strong>{preview.days}</strong><span>days</span></div>
-          <div class="preview-stat" title="Days that already have a diary entry"><strong>{preview.duplicateDates.length}</strong><span>existing</span></div>
+          <div class="preview-stat"><strong>{preview.items}</strong><span>{$_('settings_nutrition_import.stats_items')}</span></div>
+          <div class="preview-stat"><strong>{preview.days}</strong><span>{$_('settings_nutrition_import.stats_days')}</span></div>
+          <div class="preview-stat" title={$_('settings_nutrition_import.existing_hint')}><strong>{preview.duplicateDates.length}</strong><span>{$_('settings_nutrition_import.stats_existing')}</span></div>
         </div>
         <p class="text-3 text-sm" style="margin:0">
-          Range: {preview.dateRange.from} → {preview.dateRange.to}
+          {$_('settings_nutrition_import.range', { values: { from: preview.dateRange.from, to: preview.dateRange.to } })}
         </p>
 
         {#if preview.unmappedMealLabels.length}
           <div class="warn-box">
-            <strong>Unmapped meal labels</strong>
+            <strong>{$_('settings_nutrition_import.unmapped_title')}</strong>
             <p class="text-3 text-sm" style="margin:4px 0">
-              These labels didn't match any of your meal names ({preview.mealNames.join(' / ')}). They'll be imported into your last meal slot ({preview.mealNames[preview.mealNames.length - 1]}). Add custom meal names in Settings if you want them grouped separately.
+              {$_('settings_nutrition_import.unmapped_desc', { values: { meals: preview.mealNames.join(' / '), lastMeal: preview.mealNames[preview.mealNames.length - 1] } })}
             </p>
             <ul class="unmapped-list">
               {#each preview.unmappedMealLabels.slice(0, 6) as u}
                 <li><code>{u.label}</code> · {u.count}</li>
               {/each}
-              {#if preview.unmappedMealLabels.length > 6}<li class="text-3 text-sm">…and {preview.unmappedMealLabels.length - 6} more</li>{/if}
+              {#if preview.unmappedMealLabels.length > 6}<li class="text-3 text-sm">{$_('settings_nutrition_import.and_more', { values: { n: preview.unmappedMealLabels.length - 6 } })}</li>{/if}
             </ul>
           </div>
         {/if}
 
         {#if preview.sample.length}
           <div class="sample-list">
-            <div class="text-3 text-sm" style="margin-bottom:4px">First {preview.sample.length} items:</div>
+            <div class="text-3 text-sm" style="margin-bottom:4px">{$_('settings_nutrition_import.first_items', { values: { n: preview.sample.length } })}</div>
             {#each preview.sample as s}
               {@const _e = Nutrition.displayEnergy(s.calories, $energyUnit)}
               <div class="sample-row">
@@ -218,28 +224,28 @@
 
         {#if preview.duplicateDates.length}
           <div class="setting-row" style="padding:0;align-items:flex-start;flex-direction:column;gap:6px">
-            <span class="setting-label">{preview.duplicateDates.length} day(s) already have entries</span>
+            <span class="setting-label">{$_('settings_nutrition_import.dupes_days', { values: { n: preview.duplicateDates.length } })}</span>
             <div class="dupe-options">
               <label class="dupe-option">
                 <input type="radio" bind:group={onDuplicate} value="skip" />
-                <span><strong>Skip</strong> — leave existing days alone (safe)</span>
+                <span><strong>{$_('settings_nutrition_import.dup_skip')}</strong>{$_('settings_nutrition_import.dup_skip_desc')}</span>
               </label>
               <label class="dupe-option">
                 <input type="radio" bind:group={onDuplicate} value="merge" />
-                <span><strong>Merge</strong> — append imported items to existing days</span>
+                <span><strong>{$_('settings_nutrition_import.dup_merge')}</strong>{$_('settings_nutrition_import.dup_merge_desc')}</span>
               </label>
               <label class="dupe-option">
                 <input type="radio" bind:group={onDuplicate} value="replace" />
-                <span><strong>Replace</strong> — overwrite existing days (destructive)</span>
+                <span><strong>{$_('settings_nutrition_import.dup_replace')}</strong>{$_('settings_nutrition_import.dup_replace_desc')}</span>
               </label>
             </div>
           </div>
         {/if}
 
         <div class="action-row">
-          <button class="btn btn-ghost action-btn-cancel" on:click={reset} disabled={busy}>Cancel</button>
+          <button class="btn btn-ghost action-btn-cancel" on:click={reset} disabled={busy}>{$_('settings_nutrition_import.cancel')}</button>
           <button class="btn btn-primary action-btn-import" on:click={runCommit} disabled={busy}>
-            {busy ? 'Importing…' : `Import ${preview.items} item${preview.items === 1 ? '' : 's'}`}
+            {busy ? $_('settings_nutrition_import.importing') : $_(preview.items === 1 ? 'settings_nutrition_import.import_one' : 'settings_nutrition_import.import_n', { values: { n: preview.items } })}
           </button>
         </div>
       </div>

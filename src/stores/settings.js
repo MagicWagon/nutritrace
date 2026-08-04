@@ -35,6 +35,7 @@ export const USER_PREFS = new Set([
   'showQuickCalories','quickCaloriesDisplay',
   'foodsShowCategories','foodsShowLabels','foodsShowNotes','foodsShowThumbnails',
   'foodsShowYesterdayMeals','foodsYesterdayCollapsed','foodsSavedCollapsed','foodsSort','mealsSort','recipesSort',
+  'foodsDefaultSource',
   'barcodeBeep','cropPhotos',
   'offEnabled','offSearchLanguage','offSearchCountry','offUploadCountry','offImportPortion',
   'weightUnit','heightUnit','lengthUnit','distUnit','tempUnit',
@@ -132,6 +133,15 @@ export function _applySetting(key, value) {
 }
 function _isLoggedIn() { return !!localStorage.getItem('wl:userId'); }
 function _shouldSyncToServer() { return _isLoggedIn() && !(isNative && !getServerUrl()); }
+async function _serverRequestDeferred() {
+  if (!isNative) return false;
+  try {
+    const { checkOnline } = await import('../lib/sync.js');
+    return !(await checkOnline());
+  } catch {
+    return false;
+  }
+}
 export function scheduleSave(key, value) {
   if (!SERVER_SETTINGS.has(key)) return;
   if (_suppressSync) return;
@@ -139,6 +149,10 @@ export function scheduleSave(key, value) {
   _saveQueue[key] = setTimeout(async () => {
     // Try direct push to server (fast path when online)
     if (!_shouldSyncToServer()) return;
+    if (await _serverRequestDeferred()) {
+      _dlog(`[settings] deferring ${key} push — server is currently unreachable`);
+      return;
+    }
 
     // Snapshot the row's updated_at BEFORE the network push so the
     // mark-synced step afterward can detect if the user re-edited the same
@@ -235,6 +249,10 @@ export async function bulkSet(settingsObj) {
 
   // Step 3: single bulk API call (only if we should sync to server)
   if (!_shouldSyncToServer() || userPrefEntries.length === 0) return;
+  if (await _serverRequestDeferred()) {
+    _dlog(`[settings] deferring bulk push — server is currently unreachable`);
+    return;
+  }
   try {
     const url = _settingsUrl() + '/bulk';
     const bulkObj = Object.fromEntries(userPrefEntries);
@@ -275,6 +293,7 @@ export async function bulkSet(settingsObj) {
  */
 export async function loadServerSettings() {
   if (!_shouldSyncToServer()) return;
+  if (await _serverRequestDeferred()) return;
   try {
     const res = await fetch(_settingsUrl(), { credentials: 'include', headers: _authHeaders(), signal: AbortSignal.timeout(8000) });
     if (!res.ok) return;
@@ -519,6 +538,13 @@ export const foodsSavedCollapsed    = createSettingStore('foodsSavedCollapsed', 
 export const foodsSort              = createSettingStore('foodsSort',              'alpha');
 export const mealsSort              = createSettingStore('mealsSort',              'alpha');
 export const recipesSort            = createSettingStore('recipesSort',            'alpha');
+// Default source chip on the Foods page. 'local' preserves the historical
+// implicit behaviour (My Foods first — optimises for "log a food I've
+// eaten before"); users who spend more time discovering new foods can
+// switch to 'all' to fan out across OFF/USDA/Mealie every visit
+// (requested via #128). Foods.svelte reads this on mount and initialises
+// searchSource from it.
+export const foodsDefaultSource     = createSettingStore('foodsDefaultSource',     'local');
 
 export const barcodeBeep            = createSettingStore('barcodeBeep',            false);
 export const barcodeFlashlight      = createSettingStore('barcodeFlashlight',      false);
@@ -567,7 +593,36 @@ export function applyAccentColor(value) {
   } else {
     document.documentElement.setAttribute('data-accent', value);
   }
+  // Tint the browser-chrome tab bar to match the accent. Chromium
+  // reads <meta name="theme-color"> and paints the address-bar strip
+  // (and the top of the focused tab on Android) with it, so multi-
+  // instance self-hosters can spot which install a tab belongs to at
+  // a glance. Favicon stays the branded NT logo (issue #108 pushback).
+  _applyThemeColor(value);
   accentColor.set(value);
+}
+
+/** Resolve any accent value (named, hex, or fallback) to a hex string.
+ *  Kept simple so we don't have to import the full picker metadata. */
+function _accentToHex(value) {
+  if (typeof value !== 'string') return null;
+  if (/^#[0-9a-fA-F]{6}$/.test(value)) return value;
+  // Names match ACCENT_COLORS in Settings.svelte's picker; both files
+  // must stay in sync when accents are added.
+  const NAMED = {
+    mint:   '#4FFFB0', blue:  '#4FC3F7', red:    '#FF7070',
+    purple: '#CE93D8', orange:'#FFB547', teal:   '#4DD0E1',
+    pink:   '#F48FB1', yellow:'#FFF176', indigo: '#9FA8DA',
+    lime:   '#C5E1A5', rose:  '#FF80AB', cyan:   '#80DEEA',
+  };
+  return NAMED[value] || null;
+}
+
+function _applyThemeColor(accentValue) {
+  const hex = _accentToHex(accentValue);
+  if (!hex) return; // Unrecognised — leave whatever applyAppearance set.
+  const meta = document.getElementById('theme-color-meta');
+  if (meta) meta.content = hex;
 }
 
 /** Apply an appearance change and update the DOM + theme-color meta */
@@ -581,8 +636,13 @@ export function applyAppearance(value) {
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   const dark = value === 'dark' || (value === 'system' && prefersDark);
   document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  // Re-apply the accent-tinted browser-chrome color; falling back to
+  // the bg-based colour only when no accent is loaded yet (very early
+  // boot). Without this, changing appearance would stomp the accent
+  // tint until the user touched the accent picker again.
+  const accentHex = _accentToHex(_lastAppliedAccent);
   const meta = document.getElementById('theme-color-meta');
-  if (meta) meta.content = dark ? '#0A0B0F' : '#F5F7FA';
+  if (meta) meta.content = accentHex || (dark ? '#0A0B0F' : '#F5F7FA');
   appearance.set(value);
 }
 

@@ -9,6 +9,190 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.1.0] - 2026-08-04
+
+> **⚠ Upgrade note.** The Android app identifier change (`app.nutritrace.local`, see "Changed" below) invalidates the WebView's cached auth cookie. Server-connected Android users will need to re-enter their server URL and sign back in once after upgrading; standalone Android users lose their theme / accent / display prefs but keep all food, meal, and diary data (that lives in local SQLite, unaffected). PWA / browser users are not affected.
+
+### Added
+
+- **Editable log time on diary entries** (#135, thanks @caioqv-dev). Tap any diary item to edit and the sheet shows a Logged Time picker next to Number of Servings (or above Save on Quick Calories entries). Fixes the common "ate lunch at 2pm but only logged it at 10pm" case where the entry's timestamp was stuck at whenever you added it. The picker only appears when **Settings → Diary → Show Timestamps** is on, keeping the edit sheet clean for users who don't care about per-item times. Uses the same in-app time picker as Fasting / Notifications / Backup schedules. Moving an entry to a different day is a separate feature and stays out of scope here.
+- **Foods page: configurable default search source** (#128, thanks @sunjam). New setting under **Settings → Foods → Default Search Source** picks which chip the Foods page opens with — All, My Foods, OFF, USDA, or Mealie. Existing users keep the current default (My Foods); power users who add new foods often can switch to All to fan out to OFF/USDA/Mealie on every visit.
+- **Optional email on the "Create Admin Account" form.** Shows up only when SMTP is configured via environment variables (`SMTP_HOST`/`SMTP_USER`/etc. in docker-compose), so we know the server can actually reach that address at that point. Stored on the admin's user record for password-reset and invite emails later. Missing this field was called out in #122 — thanks @sunjam.
+- **Accent-tinted browser chrome.** The browser's tab bar / address strip now picks up your current accent color via `<meta name="theme-color">`. Running multiple instances side by side (personal + family, or NT + CT + LT together) — pick a distinct accent per install and the tabs are visually different at a glance. Favicon and icons stay the branded NutriTrace mark.
+- **Pull-to-refresh sync + smarter connection banner (Android).** In native server mode, swipe down from the top of any page to trigger a manual sync. When sync fails, the on-screen banner now analyzes what went wrong (no network vs cellular-only vs server unreachable vs HTTP error) with actionable copy and a Retry button, instead of a generic "sync error". Contributed by @librarian (#124).
+
+- **In-app updates.** New Settings → Updates panel checks GitHub Releases
+  for a newer version and, on Android, downloads the signed APK with a
+  progress bar and hands off to the system installer via FileProvider.
+  Admins on the PWA see a server-update banner comparing the running
+  server version against the latest release, with a copy-paste
+  `docker-compose` upgrade command. Opt-in stable or dev-build channels.
+  Same shared signing key means Android upgrades in place with no
+  reinstall.
+
+### Changed
+
+- **Redesigned Settings with per-section drill-in and search.** The single scrolling Settings page has been replaced with a per-section drill-in layout: each section (Appearance, Diary, Foods, Goals, Notifications, Backup, etc.) opens on its own sub-page with a smooth back-arrow animation. New in-Settings search jumps directly to any specific field across all sections, with deep-link support so the target row scroll-highlights on arrival. Sidebar keeps the current section highlighted while you're inside its sub-pages. Same settings, much less scroll.
+- **Bitwarden / password managers now show a real app identifier instead of "localhost" (Android).** The Android app used to serve its WebView from `https://localhost/`, so autofill entries saved through Bitwarden / 1Password / etc. showed up as "localhost" — indistinguishable from any other localhost app. NutriTrace now identifies itself as `app.nutritrace.local`, which reads clearly in autofill dialogs and in your saved-credentials list. **One-time upgrade cost:** the origin change orphans locally cached web-only state, so on first launch after upgrading you'll need to re-enter your server URL + log in again (server-connected users), and your theme / accent / display prefs will reset to defaults (standalone users). **Your food, meal, and diary data is unaffected** — that lives in a local SQLite database that's separate from the WebView.
+- **SMTP "Username" field relabeled to "Email or Username".** Most SMTP providers (Gmail, Outlook, etc.) want the full email as the username. Label change removes the guesswork.
+- **Fitbit connect card hidden for new users.** Fitbit's Web API is being
+  wound down; Google Health is the recommended path forward. Users who
+  already have Fitbit connected continue to see the card and their data
+  keeps syncing until the September 2026 cutoff. Nothing changes for
+  existing connections.
+
+### Fixed
+
+- **Micronutrient goal units read "mcg" instead of the confusing "MG"** (#137, thanks @dominicbui). The Goals editor for Vitamin K / Vitamin A / Vitamin D / Folate (B9) / Vitamin B12 used the micro sign (`µg`) in the label, which the app's uppercase form-label style case-mapped to Greek Capital Mu (`Μ`) — visually identical to Latin `M` in most fonts. So `µg` rendered as `MG` and looked like milligrams. Switched to the unambiguous `mcg` spelling everywhere (matching notification and USDA API conventions already in use). Custom-nutrient dropdown also updated. Legacy custom nutrients still stored with `µg` are display-normalized to `mcg` in the Goals editor so no data migration is needed.
+- **Open Food Facts country filtering now works for country-specific searches** (#130, thanks @JacosVerksted for #131). OFF name search moved to the v2 API with the correct `countries_tags=en:<country>` filter — the legacy `countries_tags_en=<country>` shape stopped returning country-filtered results. Previously-saved country prefs auto-backfill the `en:` prefix so existing users keep their setting. Country dropdown also expanded from 15 to 30 entries and alphabetized: added Argentina, Austria, Belgium, Chile, Denmark, Finland, Ireland, Netherlands, New Zealand, Norway, Poland, Portugal, Singapore, South Africa, South Korea, Sweden, Switzerland.
+- **App icon no longer shows a white halo.** The bundled icon PNGs had ~15px of solid white padding baked into their corners. On tinted browser chrome the halo was visible around the tab favicon; in-app the icon looked framed. Corners now clear cleanly through to the tab background. Icon URLs also cache-busted with the app version so shipped icon fixes actually take effect without users needing to clear their browser cache.
+- **Create Admin form password field no longer crushed** (#122). The password input on the Enable User Management form was rendering as a colored sliver because of a flex-layout bug. Password + Confirm now sit symmetrically side-by-side, each with its own eye toggle sharing show/hide state.
+- **Bundled assets load offline again.** In native server mode, `/icons/`, `/fonts/`, `/templates/`, and `/vendor/` paths were being rewritten to the configured server URL even though those assets ship inside the Android APK. When the server was unreachable, icons and fonts silently disappeared. Now short-circuits to the WebView's local origin. Contributed by @librarian (#123).
+
+- **OpenAI-compatible endpoints accept vision requests again** (#114).
+  Image content blocks are normalised on the AI proxy before
+  forwarding, so a request with an image attached goes through whether
+  the block is a string URL or an object with `image_url.url`.
+
+- **GPT-5.6-era chat parameters supported.** The AI proxy translates
+  the newer `max_completion_tokens` and `reasoning_effort` fields when
+  talking to models that require them, so calls to GPT-5.6 and
+  equivalents don't 400 on the older `max_tokens` field name.
+
+### Security
+
+- **fast-uri bumped to 3.1.5** (regexp DoS, moderate). Sub-dependency picked up via the standard transitive tree.
+- **brace-expansion bumped to 2.1.4 / 5.0.9** (regexp DoS, moderate). Standard `npm audit fix` update to the resolved sub-dependency versions.
+
+---
+
+## [1.0.3] - 2026-07-25
+
+### Added
+
+- **Origin-country flag on OFF search results.** Each Open Food Facts
+  result now shows a small flag emoji next to the food name when OFF has
+  origin data for it (from `origins_tags`, falling back to
+  `manufacturing_places_tags`). Lets you see at a glance whether that
+  "yogurt" is French, American, or Australian without opening the entry.
+  Countries OFF doesn't have origin data for show no flag rather than a
+  misleading placeholder.
+- **Data-completeness indicator on OFF search results.** Small colored
+  dot next to the kcal on each OFF row: green when the entry has most
+  nutriment fields filled in, yellow for partial, grey for sparse.
+  Long-press or hover shows the exact percentage. Helps pick the more
+  trustworthy of two similar entries.
+- **USDA data-type badge on USDA search results.** Small color-coded
+  letter next to the kcal on each USDA row: F (Foundation, curated
+  laboratory-analyzed staples), L (SR Legacy, established reference
+  data), S (Survey/FNDDS, dietary composite), B (Branded,
+  manufacturer-submitted). Letter + color tells you which tier the
+  entry came from so you can favor curated Foundation entries over
+  manufacturer-submitted branded ones for common searches.
+- **"Custom…" option on the Model dropdown for Claude, OpenAI, and
+  Gemini.** Lets you enter any model ID the vendor supports without
+  waiting for the preset list to catch up. Same behavior the OpenAI
+  Compatible provider has always had.
+- **Retirement remap for retired Gemini models.** Saved selections of
+  `gemini-1.5-*` or `gemini-2.0-*` (both retired by Google) are quietly
+  upgraded to the current default at request time, avoiding 404 errors
+  after the vendor pulled the model.
+- **`LICENSES.md`** at the repo root formally lists the four food data
+  sources (Open Food Facts, USDA, Mealie, Local Foods) and their licenses,
+  plus the operator obligations that apply if the `OFF_LOCAL_DB` local
+  mirror is enabled on a multi-user instance.
+- **In-app ODbL disclosure banner** for admin users when the local Open
+  Food Facts mirror is active, so operators serving other users don't
+  miss the share-alike consideration.
+- **SSO-only mode via environment variable.** Set
+  `OIDC_ENABLE_EMAIL_PASSWORD_LOGIN=0` (or `false` / `no`) at boot to
+  disable password login server-wide, so users must sign in via an OIDC
+  provider. Locks the corresponding admin UI toggle with an env-lock
+  note. Mirrors the pattern of other env-locked settings. Applies to
+  NutriTrace, LiftTrace, and CookTrace since all three share the same
+  shape (asked for on LT #16).
+- **Per-source tier filter dropdowns on the Foods search bar.** A caret
+  next to the OFF and USDA source chips opens a checkbox panel to
+  narrow results by tier — OFF completeness bucket (High / Medium /
+  Low / Unknown) or USDA data type (Foundation / SR Legacy /
+  Survey / Branded / Experimental). Defaults to all tiers active; a
+  small dot on the source chip signals when a subset is applied.
+  Filter is client-side (no extra API calls) and also applies in
+  All-mode and multi-source mode.
+- **Long-press to combine sources on the Foods search bar.** Long-press
+  any source chip to pin it alongside the currently-active source —
+  results become a merged, multi-source view with per-row source
+  badges (same fan-out as All-mode, but limited to your pinned set).
+  Long-press an already-pinned chip to remove it. Regular tap on any
+  chip exits multi mode back to single-source. OFF completeness dot,
+  origin-country flag, and USDA data-type badge all render in the
+  merged results too, so quality signals stay visible.
+
+### Changed
+
+- **OFF search results now sorted by data quality within each fetched
+  page.** Entries with images and more complete nutrition data surface
+  higher than sparse ones. OFF's server-side relevance still picks the
+  initial batch; the re-rank runs within the batch to reduce the
+  "many near-identical variants" search noise.
+- **USDA search results now sorted by data-type tier within each
+  fetched page.** Foundation entries and SR Legacy come first, then
+  Survey/FNDDS, then Branded. Same pattern as OFF: USDA's server-side
+  relevance still picks the initial batch; the re-rank surfaces the
+  curated tiers above the ~1M brand-submitted entries that would
+  otherwise dominate common searches like "chicken" or "milk".
+- **Claude model presets refreshed.** Sonnet bumped to Sonnet 5, Opus
+  4.8 added as a "smartest" tier option, older Sonnet 4.6 removed.
+
+### Fixed
+
+- **OIDC sign-in now works on Android first-install for OIDC-only
+  servers** (#110, reported by @ImmanuelMc). NativeSetup previously
+  required a username + password to submit, so users on Authentik /
+  Keycloak / Authelia-backed servers with password login disabled had
+  no way to complete initial setup — the OIDC button never appeared
+  because it lived on the post-setup Login screen, but Login never
+  loaded because the server URL was never persisted. The setup form is
+  now a two-step flow: enter server URL → app fetches
+  `/api/auth/status` → renders whichever auth methods the server
+  actually supports (password fields only when enabled, OIDC provider
+  buttons with logos when configured, both when both). After OIDC
+  callback completes the setup gate re-evaluates so the app lands on
+  the main screen instead of staying visually stuck.
+- **OIDC callbacks no longer fail on the first attempt** with a
+  spurious `callback_failed` error. openid-client v5's default outgoing
+  HTTP timeout was 3500ms, tight enough that cold token-exchange or
+  userinfo requests to Authentik / Keycloak / etc. would sometimes
+  time out. Bumped to 10 seconds, matching most other OAuth client
+  library defaults.
+- **Info icon on meal rows no longer escapes the card on narrow
+  viewports** (#106, reported by @javydekoning). Flex sizing on the
+  food-item button had `width: 100%` while being a flex child, pushing
+  the info icon past the parent boundary on Firefox and iOS Safari when
+  the food name was long. Now uses `flex: 1; min-width: 0`.
+- **`offSearchCountry` setting now actually filters OFF searches.** The
+  Settings → Connected Services → Open Food Facts → Search Country
+  dropdown was previously stored but never applied to the search URL.
+  Now correctly narrows OFF search results to the selected country.
+- **`offSearchLanguage` setting now actually localizes OFF results.** Same
+  bug pattern as country: the Settings → Connected Services → Open Food
+  Facts → Search Language dropdown was previously stored but never sent
+  to OFF. Now passed as `lc=<code>` to both the search and barcode-lookup
+  endpoints, so product names, ingredients, categories, and labels come
+  back in the user's chosen language when OFF has translations.
+
+### Security
+
+- **fast-uri bumped to 3.1.4** (GHSA-4c8g-83qw-93j6, high). ReDoS in
+  URI parsing.
+- **brace-expansion bumped to 5.0.8** (GHSA-mh99-v99m-4gvg, high). DoS
+  via unbounded expansion length causing out-of-memory. Follow-up to
+  the 5.0.7 bump in v1.0.2, which fixed a different CVE.
+- **body-parser bumped to 2.3.0** (GHSA-v422-hmwv-36x6, low). DoS when
+  an invalid `limit` value silently disables size enforcement.
+
+---
+
 ## [1.0.5] - 2026-07-29
 
 ### Fixed

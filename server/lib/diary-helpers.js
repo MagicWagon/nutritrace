@@ -56,6 +56,69 @@ const _norm = s => String(s || '').trim().toLowerCase();
  * Wrapped in try/catch so a query error never breaks the calling
  * endpoint — falls through to returning items unchanged.
  */
+/**
+ * Re-attach the source food's safe-to-refresh render-time fields to each
+ * diary item, using `food_server_id ?? id` as the key. Runs alongside
+ * freshenItemImages — same read-time-only pattern, same fail-open safety.
+ *
+ * Why this exists (issue #125): stored diary items USED to snapshot every
+ * field of the source food (recipe ingredients, alt_units, category,
+ * barcode, etc.) on every log. Days accumulated hundreds of KB per item;
+ * PUT /api/diary tripped the 5 MB body-parser limit for users logging
+ * recipes repeatedly. Fix: store only the history-protected minimum
+ * (name, brand, nutrition, portion, unit, quantity, notes) plus the id
+ * keys, and live-resolve everything else on read.
+ *
+ * What gets re-attached (foods): nutrition_basis, alt_units, density_g_ml,
+ * category, barcode — the fields the edit sheet + unit scaler read.
+ * NAME/BRAND/NUTRITION/PORTION/UNIT/QUANTITY/NOTES stay from the snapshot
+ * (history protection). imgUrl stays owned by freshenItemImages.
+ *
+ * For recipe items (`is_recipe` truthy): meals table has none of these
+ * fields, so the meal lookup is a no-op — splitRecipeItem falls back to
+ * NtApi.getMeal(recipeId) on demand for ingredient data.
+ */
+const HYDRATE_FIELDS = ['nutrition_basis', 'alt_units', 'density_g_ml', 'category', 'barcode'];
+export function hydrateItems(items) {
+  if (!Array.isArray(items) || !items.length) return items;
+  try {
+    // Collect ids we need to look up. Recipe items skip the foods query.
+    const foodIds = new Set();
+    for (const it of items) {
+      if (it && !it.is_recipe) {
+        const id = it.food_server_id ?? it.id;
+        if (typeof id === 'number') foodIds.add(id);
+      }
+    }
+    if (!foodIds.size) return items;
+    const placeholders = Array.from(foodIds).map(() => '?').join(',');
+    const rows = db.prepare(
+      `SELECT id, nutrition_basis, alt_units, density_g_ml, category, barcode
+       FROM foods WHERE id IN (${placeholders}) AND deleted_at IS NULL`
+    ).all(...Array.from(foodIds));
+    const byId = new Map(rows.map(r => [r.id, r]));
+    return items.map(it => {
+      if (!it || it.is_recipe) return _hydrateSplitChildren(it);
+      const id = it.food_server_id ?? it.id;
+      const src = typeof id === 'number' ? byId.get(id) : null;
+      if (!src) return _hydrateSplitChildren(it);
+      const out = { ...it };
+      for (const k of HYDRATE_FIELDS) {
+        if (src[k] != null && it[k] == null) out[k] = src[k];
+      }
+      return _hydrateSplitChildren(out);
+    });
+  } catch {
+    return items;
+  }
+}
+
+// Recipe-split children are diary-item shaped too; hydrate them the same way.
+function _hydrateSplitChildren(item) {
+  if (!item || !Array.isArray(item._splitItems) || !item._splitItems.length) return item;
+  return { ...item, _splitItems: hydrateItems(item._splitItems) };
+}
+
 export function freshenItemImages(items) {
   if (!Array.isArray(items) || !items.length) return items;
   try {

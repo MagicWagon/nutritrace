@@ -1,5 +1,6 @@
 <script>
-  import { setNativeMode, setServerUrl, setAuthToken, resolveAssetUrl, explainConnectError } from '../lib/platform.js';
+  import { _ } from 'svelte-i18n';
+  import { setNativeMode, setServerUrl, setAuthToken, resolveAssetUrl, iconUrl, explainConnectError } from '../lib/platform.js';
   import { showError, showSuccess } from '../stores/toast.js';
   import { DB } from '../lib/db.js';
 
@@ -38,7 +39,7 @@
   // Step 1 → step 2: validate server reachability + discover which auth
   // methods the server supports. Uses CapacitorHttp to bypass WebView CORS.
   async function validateAndNext() {
-    if (!serverUrl.trim()) { showError('Enter your server URL'); return; }
+    if (!serverUrl.trim()) { showError($_('native_setup.errors.server_url_required')); return; }
     const url = serverUrl.trim().replace(/\/$/, '');
     connecting = true;
     try {
@@ -77,7 +78,7 @@
   // in behaviour from the pre-fix single-form flow — only reached when the
   // server actually has password login enabled.
   async function loginWithPassword() {
-    if (!username.trim() || !password.trim()) { showError('Enter your credentials'); return; }
+    if (!username.trim() || !password.trim()) { showError($_('native_setup.errors.credentials_required')); return; }
     connecting = true;
     try {
       const { CapacitorHttp } = await import('@capacitor/core');
@@ -87,13 +88,13 @@
         data: { username: username.trim(), password },
       });
       const loginData = typeof loginRes.data === 'string' ? JSON.parse(loginRes.data) : loginRes.data;
-      if (loginRes.status < 200 || loginRes.status >= 300) throw new Error(loginData.error || 'Login failed');
+      if (loginRes.status < 200 || loginRes.status >= 300) throw new Error(loginData.error || $_('native_setup.errors.login_failed'));
 
       setServerUrl(validatedUrl);
       setAuthToken(loginData.token);
       setNativeMode('server');
       DB.setSetting('setupComplete', true);
-      showSuccess('Connected to server');
+      showSuccess($_('native_setup.errors.connected'));
       window.location.reload();
     } catch (e) {
       showError(explainConnectError(e, validatedUrl));
@@ -125,7 +126,7 @@
       // App.svelte's appUrlOpen listener — it sets the token, calls
       // loadAuthState, redirects to '#/', and the main app renders.
     } catch (e) {
-      showError('Could not open sign-in browser');
+      showError($_('native_setup.errors.browser_open_failed'));
     }
   }
 
@@ -153,56 +154,47 @@
   <div class="setup-inner">
     <!-- Logo / branding -->
     <div class="setup-brand">
-      <img src={resolveAssetUrl('/icons/icon-192.png')} alt="NutriTrace" class="setup-logo" />
+      <img src={iconUrl('/icons/icon-192.png')} alt="NutriTrace" class="setup-logo" />
       <h1 class="setup-title">NutriTrace</h1>
-      <p class="setup-subtitle">Trace Every Bite</p>
+      <p class="setup-subtitle">{$_('native_setup.subtitle')}</p>
     </div>
 
     {#if step === 'choose'}
       <div class="setup-cards">
         <button class="setup-card" on:click={chooseLocal}>
           <span class="material-symbols-rounded setup-card-icon">smartphone</span>
-          <div class="setup-card-title">Use Locally</div>
-          <p class="setup-card-desc">
-            All data stays on this device. Works offline, no server needed.
-            You can connect to a server later in Settings.
-          </p>
+          <div class="setup-card-title">{$_('native_setup.use_locally')}</div>
+          <p class="setup-card-desc">{$_('native_setup.use_locally_desc')}</p>
         </button>
 
         <button class="setup-card" on:click={chooseServer}>
           <span class="material-symbols-rounded setup-card-icon">cloud_sync</span>
-          <div class="setup-card-title">Connect to Server</div>
-          <p class="setup-card-desc">
-            Sync with your NutriTrace server. Your data is available on all
-            devices and the web app.
-          </p>
+          <div class="setup-card-title">{$_('native_setup.connect_to_server')}</div>
+          <p class="setup-card-desc">{$_('native_setup.connect_to_server_desc')}</p>
         </button>
       </div>
 
     {:else if step === 'server-url'}
       <div class="setup-form">
         <div class="form-group">
-          <label class="form-label">Server URL</label>
+          <label class="form-label">{$_('native_setup.server_url')}</label>
           <input
             class="input"
             type="url"
-            placeholder="https://nutritrace.example.com"
+            placeholder={$_('native_setup.server_url_placeholder')}
             bind:value={serverUrl}
             autocapitalize="off"
             autocorrect="off"
           />
-          <p class="form-hint">
-            After you enter your server, sign-in options (password or SSO)
-            will be shown based on what your server supports.
-          </p>
+          <p class="form-hint">{$_('native_setup.server_url_hint')}</p>
         </div>
 
         <div class="setup-form-actions">
           <button class="btn btn-ghost" on:click={backToChoose} disabled={connecting}>
-            Back
+            {$_('native_setup.back')}
           </button>
           <button class="btn btn-primary" on:click={validateAndNext} disabled={connecting}>
-            {connecting ? 'Checking…' : 'Next'}
+            {connecting ? $_('native_setup.checking') : $_('native_setup.next')}
           </button>
         </div>
       </div>
@@ -232,7 +224,7 @@
                 {:else}
                   <span class="material-symbols-rounded" style="font-size:20px">login</span>
                 {/if}
-                Sign in with {p.display_name || p.name || p.id}
+                {$_('native_setup.oidc_sign_in_with', { values: { name: p.display_name || p.name || p.id } })}
               </button>
             {/each}
           </div>
@@ -241,27 +233,27 @@
         <!-- Password form only when the server has it enabled. Divider only
              shown when both auth methods are available. -->
         {#if passwordLoginEnabled && providers.length}
-          <div class="auth-divider"><span>or</span></div>
+          <div class="auth-divider"><span>{$_('native_setup.or')}</span></div>
         {/if}
         {#if passwordLoginEnabled}
           <div class="form-group">
-            <label class="form-label">Username</label>
+            <label class="form-label">{$_('native_setup.username')}</label>
             <input
               class="input"
               type="text"
-              placeholder="Your username"
+              placeholder={$_('native_setup.username_placeholder')}
               bind:value={username}
               autocapitalize="off"
               autocorrect="off"
             />
           </div>
           <div class="form-group">
-            <label class="form-label">Password</label>
+            <label class="form-label">{$_('native_setup.password')}</label>
             <div style="position:relative">
               {#if showPw}
-                <input class="input" type="text" placeholder="Your password" bind:value={password} style="padding-right:40px" />
+                <input class="input" type="text" placeholder={$_('native_setup.password_placeholder')} bind:value={password} style="padding-right:40px" />
               {:else}
-                <input class="input" type="password" placeholder="Your password" bind:value={password} style="padding-right:40px" />
+                <input class="input" type="password" placeholder={$_('native_setup.password_placeholder')} bind:value={password} style="padding-right:40px" />
               {/if}
               <button type="button" class="pw-toggle" on:click={() => showPw = !showPw}>
                 <span class="material-symbols-rounded" style="font-size:20px">{showPw ? 'visibility_off' : 'visibility'}</span>
@@ -276,20 +268,17 @@
         {#if !providers.length && !passwordLoginEnabled}
           <div class="no-auth-warning">
             <span class="material-symbols-rounded">warning</span>
-            <div>
-              This server has no sign-in methods configured. Ask your admin
-              to enable password login or configure an OIDC provider.
-            </div>
+            <div>{$_('native_setup.no_auth_warning')}</div>
           </div>
         {/if}
 
         <div class="setup-form-actions">
           <button class="btn btn-ghost" on:click={backToServerUrl} disabled={connecting}>
-            Back
+            {$_('native_setup.back')}
           </button>
           {#if passwordLoginEnabled}
             <button class="btn btn-primary" on:click={loginWithPassword} disabled={connecting}>
-              {connecting ? 'Signing in…' : 'Sign In'}
+              {connecting ? $_('native_setup.signing_in') : $_('native_setup.sign_in')}
             </button>
           {/if}
         </div>

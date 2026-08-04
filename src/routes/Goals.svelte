@@ -414,30 +414,29 @@
         <div class="adaptive-header">
           <span class="material-symbols-rounded adaptive-icon">trending_up</span>
           <div style="flex:1;min-width:0">
-            <div class="adaptive-title">Adaptive TDEE</div>
+            <div class="adaptive-title">{$_('goals_page.adaptive.title')}</div>
             {#if _adaptive?.ready}
               {@const _tdeeE = Nutrition.displayEnergy(_adaptive.tdee, $energyUnit)}
               <div class="adaptive-sub">
-                Learned <strong>{_tdeeE.value.toLocaleString()} {_tdeeE.unit}/day</strong> · weight trend
-                {_adaptive.trendKgPerWeek > 0 ? '+' : ''}{_adaptive.trendKgPerWeek} kg/week
+                {@html $_('goals_page.adaptive.learned', { values: { value: _tdeeE.value.toLocaleString(), unit: _tdeeE.unit, trend: (_adaptive.trendKgPerWeek > 0 ? '+' : '') + _adaptive.trendKgPerWeek } })}
               </div>
             {:else}
               <div class="adaptive-sub">
-                Building up data: <strong>{_adaptive?.daysAvailable ?? 0} / {_adaptive?.daysRequired ?? 21}</strong> days with both weight + diary
+                {@html $_('goals_page.adaptive.building', { values: { available: _adaptive?.daysAvailable ?? 0, required: _adaptive?.daysRequired ?? 21 } })}
               </div>
             {/if}
           </div>
           <button class="btn-icon" on:click={() => _showAdaptiveHelp = !_showAdaptiveHelp}
-            aria-label="How it works" title="How it works">
+            aria-label={$_('goals_page.adaptive.help_button')} title={$_('goals_page.adaptive.help_button')}>
             <span class="material-symbols-rounded">{_showAdaptiveHelp ? 'expand_less' : 'help_outline'}</span>
           </button>
         </div>
         {#if _adaptive?.ready}
           {@const _todayE = Nutrition.displayEnergy(_effectiveCalGoal, $energyUnit)}
           <div class="adaptive-stats">
-            <div><span class="text-3 text-sm">Today's goal</span><br><strong>{_todayE.value.toLocaleString()} {_todayE.unit}</strong></div>
-            <div><span class="text-3 text-sm">Confidence</span><br><strong>{Math.round((_adaptive.confidence || 0) * 100)}%</strong></div>
-            <div><span class="text-3 text-sm">Weight source</span><br><strong style="text-transform:capitalize">{_adaptive.weightSource}</strong></div>
+            <div><span class="text-3 text-sm">{$_('goals_page.adaptive.today_goal')}</span><br><strong>{_todayE.value.toLocaleString()} {_todayE.unit}</strong></div>
+            <div><span class="text-3 text-sm">{$_('goals_page.adaptive.confidence')}</span><br><strong>{Math.round((_adaptive.confidence || 0) * 100)}%</strong></div>
+            <div><span class="text-3 text-sm">{$_('goals_page.adaptive.weight_source')}</span><br><strong style="text-transform:capitalize">{_adaptive.weightSource}</strong></div>
           </div>
         {:else}
           <div class="adaptive-progress-track">
@@ -446,25 +445,25 @@
           </div>
           {@const _fixedE = Nutrition.displayEnergy(_fixedGoal, $energyUnit)}
           <p class="text-3 text-sm" style="margin:8px 0 0">
-            Until ready, your fixed goal of {_fixedE.value.toLocaleString()} {_fixedE.unit} applies.
+            {$_('goals_page.adaptive.until_ready', { values: { value: _fixedE.value.toLocaleString(), unit: _fixedE.unit } })}
           </p>
         {/if}
         {#if _showAdaptiveHelp}
           <div class="adaptive-help" transition:slide={{ duration: 180 }}>
-            <p><strong>How it works.</strong> Adaptive TDEE learns your true daily energy expenditure from your weight trend over the last 35 days, paired with how much you actually ate. The math:</p>
+            <p><strong>{$_('goals_page.adaptive.help_headline')}</strong> {$_('goals_page.adaptive.help_intro')}</p>
             <ol>
-              <li>Smooth your weight series (linear regression over 35 days).</li>
-              <li>Convert the trend into daily energy balance (1 kg of body mass ≈ 7,700 kcal).</li>
-              <li>TDEE = average daily intake − that daily balance.</li>
+              <li>{$_('goals_page.adaptive.help_step_1')}</li>
+              <li>{$_('goals_page.adaptive.help_step_2')}</li>
+              <li>{$_('goals_page.adaptive.help_step_3')}</li>
             </ol>
-            <p><strong>For best results:</strong></p>
+            <p><strong>{$_('goals_page.adaptive.help_best_intro')}</strong></p>
             <ul>
-              <li><strong>Weigh yourself frequently</strong> — daily is best, every other day is fine. Sparse weights are interpolated, but more measurements = tighter signal. A connected scale (Withings, Fitbit, Garmin, Health Connect) is automatic; manual body-stats entries also work.</li>
-              <li><strong>Log your food consistently.</strong> Missing days are dropped from the calculation. The estimate gets noisy if you log half your days.</li>
-              <li><strong>Don't switch goals mid-window.</strong> The 35-day rolling average converges over time. If you bounce between cuts and bulks weekly, the learned TDEE will lag.</li>
-              <li><strong>Re-weigh in similar conditions</strong> — first thing in the morning, after using the bathroom, before food/drink. Day-to-day fluctuations are mostly water; the trend is what matters.</li>
+              <li>{@html $_('goals_page.adaptive.help_best_weigh')}</li>
+              <li>{@html $_('goals_page.adaptive.help_best_log')}</li>
+              <li>{@html $_('goals_page.adaptive.help_best_switch')}</li>
+              <li>{@html $_('goals_page.adaptive.help_best_reweigh')}</li>
             </ul>
-            <p><strong>Caveats.</strong> Big changes in activity (started running, broke a leg) take ~2 weeks to fully reflect. Travel weeks with under-logged food can pull the estimate up. The learned TDEE is multiplied by your goal factor (Lose -20% / Maintain / Gain +20%) to get your actual daily target.</p>
+            <p>{@html $_('goals_page.adaptive.help_caveats')}</p>
           </div>
         {/if}
       </div>
@@ -475,12 +474,12 @@
       {#if !hasAnyGoal}
         <div class="empty-state">
           <span class="material-symbols-rounded" style="font-size:48px;opacity:0.2">flag</span>
-          <p>No goals set yet.</p>
-          <p class="text-3 text-sm">Go to <strong>All Fields</strong> tab to add goals.</p>
+          <p>{$_('goals_page.empty.no_goals')}</p>
+          <p class="text-3 text-sm">{@html $_('goals_page.empty.add_hint')}</p>
         </div>
       {:else}
         {#if configuredBodyStats.length > 0}
-          <p class="section-title">Body Stats</p>
+          <p class="section-title">{$_('goals_page.sections.body_stats')}</p>
           <div class="card">
             {#each configuredBodyStats as stat, i}
               {#if i > 0}<div class="divider"></div>{/if}
@@ -499,11 +498,11 @@
                     </div>
                     <span class="text-3 text-sm">
                       {cur != null ? (Math.round(cur*10)/10).toLocaleString() : '—'} / {tgt.toLocaleString()} {stat.unit || ''}
-                      {#if isMin}<span style="opacity:0.6">(min)</span>{/if}
-                      {#if stale}<span class="goal-stale" title="Most recent reading within the last 30 days, used until you log a new value">· {stale}</span>{/if}
+                      {#if isMin}<span style="opacity:0.6">{$_('goals_page.row.min')}</span>{/if}
+                      {#if stale}<span class="goal-stale" title={$_('goals_page.row.stale_tip')}>· {stale}</span>{/if}
                     </span>
                   {:else}
-                    <span class="text-3 text-sm">Not set</span>
+                    <span class="text-3 text-sm">{$_('goals_page.row.not_set')}</span>
                   {/if}
                 </div>
                 <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
@@ -513,7 +512,7 @@
         {/if}
 
         {#if configuredNutrients.length > 0}
-          <p class="section-title">Nutrients</p>
+          <p class="section-title">{$_('goals_page.sections.nutrients')}</p>
           <div class="card">
             {#each configuredNutrients as stat, i}
               {#if i > 0}<div class="divider"></div>{/if}
@@ -531,10 +530,10 @@
                     </div>
                     <span class="text-3 text-sm">
                       {cur != null ? (Math.round(cur*10)/10).toLocaleString() : '—'} / {tgt.toLocaleString()} {stat.unit || ''}
-                      {#if isMin}<span style="opacity:0.6">(min)</span>{/if}
+                      {#if isMin}<span style="opacity:0.6">{$_('goals_page.row.min')}</span>{/if}
                     </span>
                   {:else}
-                    <span class="text-3 text-sm">Not set</span>
+                    <span class="text-3 text-sm">{$_('goals_page.row.not_set')}</span>
                   {/if}
                 </div>
                 <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
@@ -546,11 +545,11 @@
       {/if}
 
       <!-- Water Goal — alphabetically before Wellness -->
-      <p class="section-title">Water</p>
+      <p class="section-title">{$_('goals_page.sections.water')}</p>
       <div class="card">
         <button class="goal-row" on:click={openEditWater}>
           <div class="goal-info">
-            <span class="font-medium">Daily Water Goal</span>
+            <span class="font-medium">{$_('goals_page.row.daily_water_goal')}</span>
             <div class="goal-progress-bar">
               <div class="goal-progress-fill" style="width:{waterPct}%"></div>
             </div>
@@ -561,7 +560,7 @@
       </div>
 
       {#if configuredWellness.length > 0}
-        <p class="section-title">Wellness</p>
+        <p class="section-title">{$_('goals_page.sections.wellness')}</p>
         <div class="card">
           {#each configuredWellness as stat, i}
             {#if i > 0}<div class="divider"></div>{/if}
@@ -577,7 +576,7 @@
                   </div>
                   <span class="text-3 text-sm">{cur != null ? (Math.round(cur*10)/10).toLocaleString() : '—'} / {tgt.toLocaleString()} {stat.unit}</span>
                 {:else}
-                  <span class="text-3 text-sm">Not set</span>
+                  <span class="text-3 text-sm">{$_('goals_page.row.not_set')}</span>
                 {/if}
               </div>
               <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
@@ -588,10 +587,10 @@
 
     <!-- ── All Fields tab ── -->
     {:else if activeTab === 'all'}
-      <p class="text-3 text-sm" style="padding:0 var(--page-px) 8px">Tap any field to set or edit its goal.</p>
+      <p class="text-3 text-sm" style="padding:0 var(--page-px) 8px">{$_('goals_page.all_fields.intro')}</p>
 
       <!-- Body Stats -->
-      <p class="section-title">Body Stats</p>
+      <p class="section-title">{$_('goals_page.sections.body_stats')}</p>
       <div class="card">
         {#each bodyStatsWithUnit as stat, i}
           {#if i > 0}<div class="divider"></div>{/if}
@@ -608,10 +607,10 @@
                 </div>
                 <span class="text-3 text-sm">
                   {cur != null ? (Math.round(cur*10)/10).toLocaleString() : '—'} / {tgt.toLocaleString()} {stat.unit}
-                  {#if stale}<span class="goal-stale" title="Most recent reading within the last 30 days, used until you log a new value">· {stale}</span>{/if}
+                  {#if stale}<span class="goal-stale" title={$_('goals_page.row.stale_tip')}>· {stale}</span>{/if}
                 </span>
               {:else}
-                <span class="text-3 text-sm" style="opacity:0.4">No goal</span>
+                <span class="text-3 text-sm" style="opacity:0.4">{$_('goals_page.row.no_goal')}</span>
               {/if}
             </div>
             <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
@@ -620,7 +619,7 @@
       </div>
 
       <!-- Nutrients -->
-      <p class="section-title">Nutrients</p>
+      <p class="section-title">{$_('goals_page.sections.nutrients')}</p>
       <div class="card">
         {#each allNutrients as stat, i}
           {#if i > 0}<div class="divider"></div>{/if}
@@ -636,7 +635,7 @@
                 </div>
                 <span class="text-3 text-sm">{cur != null ? (Math.round(cur*10)/10).toLocaleString() : '—'} / {tgt.toLocaleString()} {stat.unit}</span>
               {:else}
-                <span class="text-3 text-sm" style="opacity:0.4">No goal</span>
+                <span class="text-3 text-sm" style="opacity:0.4">{$_('goals_page.row.no_goal')}</span>
               {/if}
             </div>
             <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
@@ -645,11 +644,11 @@
       </div>
 
       <!-- Water -->
-      <p class="section-title">Water</p>
+      <p class="section-title">{$_('goals_page.sections.water')}</p>
       <div class="card">
         <button class="goal-row" on:click={openEditWater}>
           <div class="goal-info">
-            <span class="font-medium">Daily Water Goal</span>
+            <span class="font-medium">{$_('goals_page.row.daily_water_goal')}</span>
             <div class="goal-progress-bar">
               <div class="goal-progress-fill" style="width:{waterPct}%"></div>
             </div>
@@ -661,7 +660,7 @@
 
       <!-- Wellness (when enabled) -->
       {#if $wellnessEnabled}
-        <p class="section-title">Wellness</p>
+        <p class="section-title">{$_('goals_page.sections.wellness')}</p>
         <div class="card">
           {#each WELLNESS_GOALS as stat, i}
             {@const _kjMode = stat.id === 'calories_out' && $energyUnit === 'kJ'}
@@ -681,7 +680,7 @@
                   </div>
                   <span class="text-3 text-sm">{cur != null ? (Math.round(cur*10)/10).toLocaleString() : '—'} / {tgt.toLocaleString()} {_statUnit}</span>
                 {:else}
-                  <span class="text-3 text-sm" style="opacity:0.4">No goal</span>
+                  <span class="text-3 text-sm" style="opacity:0.4">{$_('goals_page.row.no_goal')}</span>
                 {/if}
               </div>
               <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
@@ -693,18 +692,18 @@
     <!-- ── Templates tab ── -->
     {:else if activeTab === 'templates'}
       <div class="tpl-header">
-        <p class="text-3 text-sm">Save your current goals as a named template to reuse later.</p>
+        <p class="text-3 text-sm">{$_('goals_page.templates.intro')}</p>
         <button class="btn btn-primary tpl-save-btn" on:click={openSaveSheet}>
           <span class="material-symbols-rounded" style="font-size:18px">save</span>
-          Save Current Goals
+          {$_('goals_page.templates.save_button')}
         </button>
       </div>
 
       {#if $goalTemplates.length === 0}
         <div class="empty-state">
           <span class="material-symbols-rounded" style="font-size:48px;opacity:0.2">bookmarks</span>
-          <p>No templates yet.</p>
-          <p class="text-3 text-sm">Save your current goals to create your first template.</p>
+          <p>{$_('goals_page.empty.no_templates')}</p>
+          <p class="text-3 text-sm">{$_('goals_page.empty.no_templates_hint')}</p>
         </div>
       {:else}
         <div class="card">
@@ -713,13 +712,13 @@
             <div class="tpl-row">
               <div class="tpl-info">
                 <span class="font-medium">{tpl.name}</span>
-                <span class="text-3 text-sm">{formatDate(tpl.createdAt)} · {tpl.goalCount || Object.keys(tpl.goals).filter(k => tpl.goals[k]?.min != null || tpl.goals[k]?.max != null).length + (tpl.waterGoalMl > 0 ? 1 : 0)} goals</span>
+                <span class="text-3 text-sm">{formatDate(tpl.createdAt)} · {$_('goals_page.templates.goals_count', { values: { count: tpl.goalCount || Object.keys(tpl.goals).filter(k => tpl.goals[k]?.min != null || tpl.goals[k]?.max != null).length + (tpl.waterGoalMl > 0 ? 1 : 0) } })}</span>
               </div>
               <div class="tpl-actions">
                 <button class="btn btn-ghost tpl-btn" on:click={() => showApplyConfirm = tpl}>
-                  Apply
+                  {$_('goals_page.templates.apply')}
                 </button>
-                <button class="btn-icon" style="color:var(--text-3)" on:click={() => deleteTemplate(tpl.id)} title="Delete template">
+                <button class="btn-icon" style="color:var(--text-3)" on:click={() => deleteTemplate(tpl.id)} title={$_('goals_page.templates.delete_template')}>
                   <span class="material-symbols-rounded" style="font-size:20px">delete</span>
                 </button>
               </div>
@@ -735,7 +734,14 @@
 
 <!-- ── Goal editor sheet ── -->
 {#if editOpen && editStat}
-  {@const _editUnit = (editStat.id === 'calories_out' && $energyUnit === 'kJ') ? 'kJ' : editStat.unit}
+  {@const _rawUnit = (editStat.id === 'calories_out' && $energyUnit === 'kJ') ? 'kJ' : editStat.unit}
+  <!-- #137: normalize µg (MICRO SIGN, U+00B5) to 'mcg' for display. The
+       form-label uppercase transform case-maps µ → Μ (Greek Capital Mu),
+       which fonts render identically to Latin 'M' so 'µg' reads as 'MG'
+       and users think they need to enter milligrams. Default nutrients
+       moved to 'mcg' in nutrition.js; this catches legacy custom
+       nutrients still stored with 'µg' as their unit. -->
+  {@const _editUnit = _rawUnit === 'µg' ? 'mcg' : _rawUnit}
   <div use:portal class="sheet-backdrop" role="dialog" aria-modal="true"
     on:click={() => { if (!_gLock) editOpen = false; }} on:keydown={() => {}}>
     <div class="sheet-panel" on:click|stopPropagation on:keydown={() => {}}>
@@ -747,16 +753,16 @@
 
         <!-- Display options -->
         {#if !editStat?.isWellness}
-          <p class="goal-section-label">Display</p>
+          <p class="goal-section-label">{$_('goals_page.editor.display')}</p>
           <div class="toggle-row">
-            <label class="toggle-label">Show in Diary</label>
+            <label class="toggle-label">{$_('goals_page.editor.show_in_diary')}</label>
             <label class="toggle-switch">
               <input type="checkbox" bind:checked={editShowDiary} />
               <span class="toggle-track"></span>
             </label>
           </div>
           <div class="toggle-row">
-            <label class="toggle-label">Show in Statistics</label>
+            <label class="toggle-label">{$_('goals_page.editor.show_in_statistics')}</label>
             <label class="toggle-switch">
               <input type="checkbox" bind:checked={editShowStats} />
               <span class="toggle-track"></span>
@@ -765,11 +771,11 @@
         {/if}
 
         <!-- Goal behavior -->
-        <p class="goal-section-label">Goal Behavior</p>
+        <p class="goal-section-label">{$_('goals_page.editor.goal_behavior')}</p>
         <div class="toggle-row">
           <div class="toggle-label-wrap">
-            <label class="toggle-label">Same goal every day</label>
-            <span class="toggle-hint">{editShared ? 'One target for every day' : 'Different target per weekday'}</span>
+            <label class="toggle-label">{$_('goals_page.editor.same_every_day')}</label>
+            <span class="toggle-hint">{editShared ? $_('goals_page.editor.one_target') : $_('goals_page.editor.per_weekday')}</span>
           </div>
           <label class="toggle-switch">
             <input type="checkbox" bind:checked={editShared} />
@@ -778,8 +784,8 @@
         </div>
         <div class="toggle-row">
           <div class="toggle-label-wrap">
-            <label class="toggle-label">Minimum Goal</label>
-            <span class="toggle-hint">{editIsMin ? 'Must reach at least this value' : 'Must not exceed this value'}</span>
+            <label class="toggle-label">{$_('goals_page.editor.minimum_goal')}</label>
+            <span class="toggle-hint">{editIsMin ? $_('goals_page.editor.min_hint_true') : $_('goals_page.editor.min_hint_false')}</span>
           </div>
           <label class="toggle-switch">
             <input type="checkbox" bind:checked={editIsMin} />
@@ -789,8 +795,8 @@
         {#if isPercentEligible(editStat)}
           <div class="toggle-row">
             <div class="toggle-label-wrap">
-              <label class="toggle-label">Goal as % of calories</label>
-              <span class="toggle-hint">Target scales with your calorie goal</span>
+              <label class="toggle-label">{$_('goals_page.editor.as_percent_calories')}</label>
+              <span class="toggle-hint">{$_('goals_page.editor.as_percent_hint')}</span>
             </div>
             <label class="toggle-switch">
               <input type="checkbox" bind:checked={editIsPercent} />
@@ -800,8 +806,8 @@
         {/if}
         <div class="toggle-row">
           <div class="toggle-label-wrap">
-            <label class="toggle-label">Auto-adjust to activity</label>
-            <span class="toggle-hint">Adjusts based on calories burned from wearables</span>
+            <label class="toggle-label">{$_('goals_page.editor.auto_adjust')}</label>
+            <span class="toggle-hint">{$_('goals_page.editor.auto_adjust_hint')}</span>
           </div>
           <label class="toggle-switch">
             <input type="checkbox" bind:checked={editAutoAdjust} />
@@ -812,14 +818,14 @@
         <div class="divider" style="margin:12px 0 8px"></div>
 
         <!-- Goal value(s) -->
-        <p class="goal-section-label">Target{editShared ? '' : 's per day'}</p>
+        <p class="goal-section-label">{editShared ? $_('goals_page.editor.target') : $_('goals_page.editor.targets_per_day')}</p>
         {#if editShared}
-          <label class="form-label">Value ({editIsPercent ? '% of calories' : (_editUnit || '')})</label>
+          <label class="form-label">{$_('goals_page.editor.value_label', { values: { unit: editIsPercent ? $_('goals_page.editor.value_percent_of_cal') : (_editUnit || '') } })}</label>
           <input class="input" type="number" min="0" step="any"
             placeholder="0" bind:value={editVal0} />
         {:else}
           {#each DAYS as day, i}
-            <label class="form-label">{day} ({editIsPercent ? '% of calories' : (_editUnit || '')})</label>
+            <label class="form-label">{$_('goals_page.editor.value_label_day', { values: { day, unit: editIsPercent ? $_('goals_page.editor.value_percent_of_cal') : (_editUnit || '') } })}</label>
             <input class="input" type="number" min="0" step="any"
               placeholder="0" bind:value={editDayVals[i]} style="margin-bottom:8px" />
           {/each}
@@ -828,7 +834,7 @@
       <div class="sheet-footer">
         {#if $goals[editStat?.id]}
           <button class="btn btn-danger w-full" style="margin-bottom:8px" on:click={deleteGoal}>
-            Remove Goal
+            {$_('goals_page.editor.remove_goal')}
           </button>
         {/if}
         <button class="btn btn-primary w-full" on:click={saveGoal}>{$_('goals.save_goal')}</button>
@@ -843,9 +849,9 @@
     on:click={() => editWaterOpen = false} on:keydown={() => {}}>
     <div class="sheet-panel" on:click|stopPropagation on:keydown={() => {}}>
       <div class="sheet-handle"></div>
-      <div class="sheet-header"><h3 class="sheet-title">Daily Water Goal</h3></div>
+      <div class="sheet-header"><h3 class="sheet-title">{$_('goals_page.row.daily_water_goal')}</h3></div>
       <div class="sheet-body">
-        <label class="form-label">Goal ({$waterUnit})</label>
+        <label class="form-label">{$_('goals_page.editor.water_sheet_label', { values: { unit: $waterUnit } })}</label>
         <input class="input" type="number" min="0" step="0.1" bind:value={editWaterVal}
           on:keydown={e => e.key === 'Enter' && saveWaterGoal()} />
         <button class="btn btn-primary w-full" style="margin-top:16px" on:click={saveWaterGoal}>{$_('common.save')}</button>
@@ -860,18 +866,18 @@
     on:click={() => showSaveSheet = false} on:keydown={() => {}}>
     <div class="sheet-panel" on:click|stopPropagation on:keydown={() => {}}>
       <div class="sheet-handle"></div>
-      <div class="sheet-header"><h3 class="sheet-title">Save as Template</h3></div>
+      <div class="sheet-header"><h3 class="sheet-title">{$_('goals_page.templates.save_title')}</h3></div>
       <div class="sheet-body">
-        <label class="form-label">Template Name</label>
-        <input class="input" placeholder="e.g. Cut — Summer 2025" bind:value={templateName}
+        <label class="form-label">{$_('goals_page.templates.template_name')}</label>
+        <input class="input" placeholder={$_('goals_page.templates.template_placeholder')} bind:value={templateName}
           on:keydown={e => e.key === 'Enter' && saveTemplate()} />
         <p class="text-3 text-sm" style="margin-top:4px">
-          Saves a snapshot of all {Object.keys($goals).filter(k => $goals[k]?.min != null || $goals[k]?.max != null).length + ($waterGoalMl > 0 ? 1 : 0)} current goals.
+          {$_('goals_page.templates.snapshot_hint', { values: { count: Object.keys($goals).filter(k => $goals[k]?.min != null || $goals[k]?.max != null).length + ($waterGoalMl > 0 ? 1 : 0) } })}
         </p>
       </div>
       <div class="sheet-footer">
         <button class="btn btn-primary w-full" on:click={saveTemplate}
-          disabled={!templateName.trim()}>Save Template</button>
+          disabled={!templateName.trim()}>{$_('goals_page.templates.save_template')}</button>
       </div>
     </div>
   </div>
@@ -883,14 +889,14 @@
     on:click={() => showApplyConfirm = null} on:keydown={() => {}}>
     <div class="sheet-panel" on:click|stopPropagation on:keydown={() => {}}>
       <div class="sheet-handle"></div>
-      <div class="sheet-header"><h3 class="sheet-title">Apply Template</h3></div>
+      <div class="sheet-header"><h3 class="sheet-title">{$_('goals_page.templates.apply_title')}</h3></div>
       <div class="sheet-body">
-        <p>Apply <strong>{showApplyConfirm.name}</strong>?</p>
-        <p class="text-3 text-sm">This will replace your current goals with the {showApplyConfirm.goalCount || Object.keys(showApplyConfirm.goals).filter(k => showApplyConfirm.goals[k]?.min != null || showApplyConfirm.goals[k]?.max != null).length + (showApplyConfirm.waterGoalMl > 0 ? 1 : 0)} goals saved in this template.</p>
+        <p>{@html $_('goals_page.templates.apply_confirm', { values: { name: showApplyConfirm.name } })}</p>
+        <p class="text-3 text-sm">{$_('goals_page.templates.apply_desc', { values: { count: showApplyConfirm.goalCount || Object.keys(showApplyConfirm.goals).filter(k => showApplyConfirm.goals[k]?.min != null || showApplyConfirm.goals[k]?.max != null).length + (showApplyConfirm.waterGoalMl > 0 ? 1 : 0) } })}</p>
       </div>
       <div class="sheet-footer" style="display:flex;flex-direction:column;gap:8px">
-        <button class="btn btn-primary w-full" on:click={() => applyTemplate(showApplyConfirm)}>Apply</button>
-        <button class="btn btn-ghost w-full" on:click={() => showApplyConfirm = null}>Cancel</button>
+        <button class="btn btn-primary w-full" on:click={() => applyTemplate(showApplyConfirm)}>{$_('goals_page.templates.apply')}</button>
+        <button class="btn btn-ghost w-full" on:click={() => showApplyConfirm = null}>{$_('goals_page.templates.cancel')}</button>
       </div>
     </div>
   </div>

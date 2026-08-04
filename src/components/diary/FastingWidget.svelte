@@ -16,6 +16,7 @@
 <script>
   import { onMount } from 'svelte';
   import { slide } from 'svelte/transition';
+  import { _ } from 'svelte-i18n';
   import { activeFast, fastHistory, elapsedMs, loadFasting, startFast, endFast, checkScheduleAndStart } from '../../stores/fasting.js';
   import { onDestroy } from 'svelte';
   import { fastingDefaultHours, fastingNotifyOnGoal, fastingCustomPresets, dateFormat } from '../../stores/settings.js';
@@ -216,7 +217,7 @@
     <div class="fast-idle">
       <span class="material-symbols-rounded fast-icon">restaurant</span>
       <div class="fast-idle-main">
-        <div class="fast-idle-title">Start Fasting</div>
+        <div class="fast-idle-title">{$_('fasting.start_fasting')}</div>
         {#if _lastFast}
           <div class="fast-last-hint">
             Last fast: <strong>{_lastFastDuration.toFixed(1)}h</strong> · ended {_lastFastAgo}
@@ -250,11 +251,11 @@
         {#if _showCustom}
           <div class="fast-custom" transition:slide={{ duration: 140 }}>
             <input class="input" type="number" min="1" max="168" step="0.5" bind:value={_customHours}
-              placeholder="Hours" />
+              placeholder={$_('fasting.hours_ph')} />
             <span class="fast-custom-suffix">hours</span>
             {#if ($fastingCustomPresets || []).length < 3}
               <input class="input fast-custom-name" type="text" maxlength="20"
-                placeholder="Name (optional)" bind:value={_customName} />
+                placeholder={$_('fasting.name_ph')} bind:value={_customName} />
               <button class="btn-icon fast-custom-save" on:click={_saveCustomPreset}
                 title="Save as preset" aria-label="Save as preset">
                 <span class="material-symbols-rounded">bookmark_add</span>
@@ -263,7 +264,7 @@
           </div>
         {/if}
       </div>
-      <button class="btn btn-primary fast-start-btn" on:click={_onStart}>Start</button>
+      <button class="btn btn-primary fast-start-btn" on:click={_onStart}>{$_('fasting.start')}</button>
     </div>
   {:else}
     <!-- Active / Reached state -->
@@ -283,7 +284,7 @@
             · Goal: {_active.goal_hours}h · Target: {_fmtDateTime(_targetEnd)}
           </div>
         </div>
-        <button class="btn btn-secondary fast-end-btn" on:click={_onEnd}>End Fast</button>
+        <button class="btn btn-secondary fast-end-btn" on:click={_onEnd}>{$_('fasting.end_fast')}</button>
       </div>
       <div class="fast-progress-track">
         <div class="fast-progress-fill" style="width:{(_progress * 100).toFixed(2)}%"></div>
@@ -295,7 +296,7 @@
             <TimePicker bind:value={_editStartTime} />
           </div>
           <div class="fast-edit-actions">
-            <button class="btn btn-secondary" on:click={() => _editingStart = false}>Cancel</button>
+            <button class="btn btn-secondary" on:click={() => _editingStart = false}>{$_('fasting.cancel')}</button>
             <button class="btn btn-primary" on:click={_saveEditStart}>Save</button>
           </div>
         </div>

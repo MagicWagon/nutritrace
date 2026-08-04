@@ -14,7 +14,8 @@ No accounts, no telemetry, no cloud sync unless you opt in.</p>
   <a href="https://github.com/traceapps/nutritrace/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/traceapps/nutritrace?label=release&color=blue"></a>
   <a href="https://github.com/traceapps/nutritrace/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/traceapps/nutritrace/total?label=downloads&color=blue"></a>
   <a href="https://traceapps.github.io/docs/nutritrace/"><img alt="Documentation" src="https://img.shields.io/badge/docs-traceapps.github.io-4A90E2?logo=readthedocs&logoColor=white"></a>
-  <a href="https://github.com/traceapps/nutritrace/pkgs/container/nutritrace"><img alt="Docker image" src="https://img.shields.io/badge/docker-ghcr.io%2Ftraceapps%2Fnutritrace-2496ED?logo=docker&logoColor=white"></a>
+  <a href="https://github.com/traceapps/nutritrace/pkgs/container/nutritrace"><img alt="GHCR" src="https://img.shields.io/badge/ghcr.io-traceapps%2Fnutritrace-2496ED?logo=docker&logoColor=white"></a>
+  <a href="https://hub.docker.com/r/traceapps/nutritrace"><img alt="Docker Hub pulls" src="https://img.shields.io/docker/pulls/traceapps/nutritrace?logo=docker&logoColor=white&label=docker%20pulls"></a>
   <a href="https://github.com/traceapps/nutritrace/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/traceapps/nutritrace?style=flat"></a>
 </p>
 
@@ -58,6 +59,8 @@ NutriTrace runs as a single Docker container on your own hardware, with a PWA fo
 
 ## Install
 
+Published to two registries with identical tag sets: `ghcr.io/traceapps/nutritrace` (primary) and `traceapps/nutritrace` on [Docker Hub](https://hub.docker.com/r/traceapps/nutritrace) (mirror). The snippet below uses GHCR; swap in `traceapps/nutritrace:latest` if that suits your setup.
+
 Minimum viable `docker-compose.yml`:
 
 ```yaml
@@ -66,7 +69,7 @@ services:
     image: ghcr.io/traceapps/nutritrace:latest
     container_name: nutritrace
     ports:
-      - "3000:3001"
+      - "3001:3001"
     volumes:
       - ./data/db:/data/db
       - ./data/uploads:/data/uploads
@@ -90,11 +93,11 @@ Start it:
 docker compose up -d
 ```
 
-Open `http://localhost:3000` and the first-run wizard will walk you through user management and creating your admin account. Skipping user management runs the app in single-user mode.
+Open `http://localhost:3001` and the first-run wizard will walk you through user management and creating your admin account. Skipping user management runs the app in single-user mode.
 
 Full compose recipes with SMTP, Docker secrets (`*_FILE`), reverse-proxy examples, and multi-provider OIDC at [docs/getting-started/compose/](https://traceapps.github.io/docs/getting-started/compose/). Tag policy (`:latest`, `:1`, `:1.0`, `:1.0.0`, `:dev`, legacy `:1.0.0-rc.N`) in [DEPLOY.md](DEPLOY.md).
 
-Pre-release testers can grab the rolling `dev-latest` APK; occasional milestone builds also get numbered `-dev.N` pre-releases. See [DEPLOY.md](DEPLOY.md) for details.
+Pre-release testers can grab the rolling `dev-latest` APK; occasional milestone builds also get numbered `-devNN` pre-releases. See [DEPLOY.md](DEPLOY.md) for details.
 
 ## Env vars
 
@@ -150,11 +153,19 @@ The database schema migrates automatically on startup.
 
 Part of the **TraceApps** family. Sister apps: [CookTrace](https://github.com/traceapps/cooktrace) for recipes and pantry, [LiftTrace](https://github.com/traceapps/lifttrace) for weightlifting. Full docs for all three at [traceapps.github.io/docs](https://traceapps.github.io/docs/).
 
+## Translations
+
+NutriTrace is translated with [Weblate](https://weblate.org/), a free web platform for libre translation projects. No coding required — pick your language, translate the strings, submit. Missing keys fall back to English at runtime, so partial translations are safe to release.
+
+[![Translation status](https://hosted.weblate.org/widget/nutritrace/svg-badge.svg)](https://hosted.weblate.org/engage/nutritrace/)
+
+Start translating at [hosted.weblate.org/projects/nutritrace/](https://hosted.weblate.org/projects/nutritrace/). See [CONTRIBUTING.md](CONTRIBUTING.md#translations) for domain-specific guidance (regulatory nutrition terms, proper nouns, tone).
+
 ## Roadmap, changelog, contributing, license
 
 - See [ROADMAP.md](ROADMAP.md) for what's next.
 - [CHANGELOG.md](CHANGELOG.md) tracks per-release changes.
-- Contributions welcome; see [CONTRIBUTING.md](CONTRIBUTING.md) for translations (single JSON file per locale), coding conventions, and the volunteer thread.
+- Contributions welcome; see [CONTRIBUTING.md](CONTRIBUTING.md) for coding conventions, translation workflow, and the volunteer thread.
 - Licensed under [AGPL-3.0](LICENSE), entire codebase including the Android app source.
 
 ## Support

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import db from '../db.js';
 import { wrap } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
-import { freshenItemImages } from '../lib/diary-helpers.js';
+import { freshenItemImages, hydrateItems } from '../lib/diary-helpers.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -169,7 +169,7 @@ function parse(row) {
   const items = JSON.parse(row.items || '[]');
   return {
     ...row,
-    items:      freshenItemImages(fixCachedPaths(items)),
+    items:      freshenItemImages(hydrateItems(fixCachedPaths(items))),
     body_stats: JSON.parse(row.body_stats || '{}'),
     water:      JSON.parse(row.water      || '[]'),
     notes:      row.notes || '',

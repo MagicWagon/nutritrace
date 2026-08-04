@@ -153,6 +153,16 @@ export function explainConnectError(rawError, serverUrl) {
  */
 let _imageMap = {};
 
+// Files under these public/ directories are copied into the Capacitor bundle.
+// They must stay on the WebView's local origin in native server mode; otherwise
+// resolveAssetUrl() rewrites them to the configured server and they disappear
+// whenever that server is unreachable.
+const BUNDLED_ASSET_PREFIXES = ['/icons/', '/fonts/', '/templates/', '/vendor/'];
+
+function _isBundledAssetPath(path) {
+  return BUNDLED_ASSET_PREFIXES.some(prefix => path.startsWith(prefix));
+}
+
 /** Load the image map from local DB into memory (call once on sync init).
  *  Honors image_cache_version (#61): if the stored version differs from
  *  the current code, the cached map is treated as empty because old keys
@@ -166,7 +176,7 @@ export async function loadImageMap() {
     // Must stay in sync with CACHE_VERSION in image-cache.js. Treated as a
     // small magic number on purpose to avoid creating a cross-file import
     // just for this one constant; only image-cache.js writes it.
-    const IMAGE_CACHE_VERSION = 2;
+    const IMAGE_CACHE_VERSION = 3;
     const vr = await db.query(`SELECT value FROM sync_meta WHERE key = 'image_cache_version'`, []);
     const storedVersion = parseInt(vr?.values?.[0]?.value || '1', 10);
     if (storedVersion !== IMAGE_CACHE_VERSION) { _imageMap = {}; return; }
@@ -186,10 +196,40 @@ export function setImageMap(map) {
  * when in native server mode. Checks local image cache first for offline support.
  * On web, returns the path unchanged.
  */
+/**
+ * Version-busted URL for one of the app's icon PNGs (favicon, logo,
+ * launcher). Browsers cache these hard by URL and won't refetch when
+ * the file changes underneath them; appending ?v=<version> makes
+ * each dev bump a new URL so a shipped icon fix is actually visible
+ * without asking users to clear their cache. Kept separate from
+ * resolveAssetUrl so we only cache-bust things we know will change
+ * between builds (icons), not every image the app serves.
+ */
+export function iconUrl(path) {
+  const resolved = resolveAssetUrl(path);
+  if (!resolved) return resolved;
+  if (resolved.startsWith('data:') || resolved.includes('?')) return resolved;
+  // Lazy import to avoid a circular dep — version.js doesn't touch platform.js.
+  const v = (typeof __APP_VERSION__ !== 'undefined')
+    ? __APP_VERSION__
+    : (typeof window !== 'undefined' && window.__NT_VERSION__) || 'dev';
+  return `${resolved}?v=${encodeURIComponent(v)}`;
+}
+
+// WebView's own origin — historically https://localhost, now
+// https://app.nutritrace.local after the hostname flip for password-
+// manager identity. Resolved once at load time; any absolute URL that
+// begins with this origin is already a bundled asset served from the
+// APK and doesn't need further path resolution.
+const _webviewOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+
 export function resolveAssetUrl(path) {
   if (!path) return path;
-  if (path.startsWith('data:') || path.startsWith('file:') || path.startsWith('https://localhost')) return path;
+  if (path.startsWith('data:') || path.startsWith('file:')) return path;
+  if (_webviewOrigin && path.startsWith(_webviewOrigin)) return path;
   if (isNative) {
+    // Vite copies public/ to the root of the local Capacitor web bundle.
+    if (_isBundledAssetPath(path)) return path;
     // Always check local image cache first (fastest, works offline + disconnected)
     if (_imageMap[path]) return _imageMap[path];
     const url = getServerUrl() || localStorage.getItem('nt:lastServerUrl') || '';
@@ -210,7 +250,7 @@ export function resolveAssetUrl(path) {
   }
   // PWA: prefix server-relative paths with base path so they resolve under
   // the configured subpath instead of the document root.
-  if (_basePath && (path.startsWith('/uploads/') || path.startsWith('/api/') || path.startsWith('/icons/') || path.startsWith('/fonts/'))) {
+  if (_basePath && (path.startsWith('/uploads/') || path.startsWith('/api/') || _isBundledAssetPath(path))) {
     return _basePath + path;
   }
   return path;

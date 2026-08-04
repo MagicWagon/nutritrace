@@ -23,7 +23,7 @@
   import { Mealie } from '../lib/mealieApi.js';
   import { resolveAssetUrl } from '../lib/platform.js';
   import { offCountryTagToFlag, offCountryTagToName } from '../lib/off-country-flag.js';
-  import { foodsShowThumbnails, foodsShowCategories, foodsShowLabels, foodsShowNotes, foodsSort, mealsSort, recipesSort, foodCategories, foodsShowYesterdayMeals, foodsYesterdayCollapsed, foodsSavedCollapsed, mealNames, usdaEnabled, usdaApiKey, offEnabled, offSearchCountry, offSearchLanguage, catName as _catName, catDisplay as _catDisplay, pageBanners, bannerStyle, energyUnit } from '../stores/settings.js';
+  import { foodsShowThumbnails, foodsShowCategories, foodsShowLabels, foodsShowNotes, foodsSort, mealsSort, recipesSort, foodCategories, foodsShowYesterdayMeals, foodsYesterdayCollapsed, foodsSavedCollapsed, mealNames, usdaEnabled, usdaApiKey, offEnabled, offSearchCountry, offSearchLanguage, foodsDefaultSource, catName as _catName, catDisplay as _catDisplay, pageBanners, bannerStyle, energyUnit } from '../stores/settings.js';
   import { mealIcon } from '../lib/mealIcon.js';
 
   // Query string params
@@ -80,7 +80,12 @@
   $: _hideSavedMealsList = _savedMealsHeaderVisible && $foodsSavedCollapsed;
 
   let search = '';
-  let searchSource = 'local';
+  // Initial source chip. Reads the user's saved default (Settings → Foods →
+  // Default search source). Requested via #128 — power users who add new
+  // foods frequently prefer 'all' so it fans out to OFF/USDA/Mealie on
+  // every visit rather than starting on My Foods. Existing users default
+  // to 'local' (unchanged behaviour).
+  let searchSource = foodsDefaultSource.get() || 'local';
   const _mealieEnabled = DB.getSetting('mealieEnabled',  false);
   // OFF / USDA / Mealie are food databases — only meaningful on the Foods tab.
   // Meals + Recipes tabs only get Local + From Others (when shared content exists).
@@ -1495,7 +1500,7 @@
   {#if activeTab === 0 && searchSource === 'local' && $foodsShowCategories && $foodCategories && $foodCategories.length > 0}
     <div class="cat-filter-row">
       <button class="cat-chip" class:active={!activeCategoryFilter}
-        on:click={() => activeCategoryFilter = ''}>All</button>
+        on:click={() => activeCategoryFilter = ''}>{$_('foods.category_all')}</button>
       {#each $foodCategories as cat}
         <button class="cat-chip" class:active={activeCategoryFilter === _catName(cat)}
           on:click={() => activeCategoryFilter = activeCategoryFilter === _catName(cat) ? '' : _catName(cat)}>{$foodsShowLabels ? _catDisplay(cat) : _catName(cat)}</button>
@@ -1545,7 +1550,7 @@
       <button class="meal-section-header" type="button"
         on:click={() => foodsSavedCollapsed.set(!$foodsSavedCollapsed)}
         aria-expanded={!$foodsSavedCollapsed}>
-        <span class="meal-section-label">Saved Meals</span>
+        <span class="meal-section-label">{$_('foods.saved_meals')}</span>
         <span class="material-symbols-rounded meal-section-chevron"
           class:meal-section-chevron-collapsed={$foodsSavedCollapsed}>expand_more</span>
       </button>
@@ -1555,7 +1560,7 @@
   {#if loadError}
     <div class="server-error-banner">
       <span class="material-symbols-rounded">cloud_off</span>
-      <span>Could not reach server — <button class="server-error-retry" on:click={load}>Retry</button></span>
+      <span>{$_('foods_deep.cant_reach_retry_msg')}<button class="server-error-retry" on:click={load}>{$_('foods_deep.retry')}</button></span>
     </div>
   {/if}
 
@@ -1722,7 +1727,7 @@
           <span class="material-symbols-rounded empty-icon">search_off</span>
           <p>No matches for "{search}"</p>
           {#if activeTab === 0}
-            <p class="empty-state-hint">Try searching Open Food Facts or USDA above</p>
+            <p class="empty-state-hint">{$_('foods.search_empty_hint')}</p>
           {/if}
         </div>
       {:else if !_hideSavedMealsList}
@@ -1957,7 +1962,7 @@
 </div>
 
 <!-- Multi-item portion sheet -->
-<Sheet bind:open={showMultiPortionSheet} title="Set Portions ({multiPortionItems.length} items)">
+<Sheet bind:open={showMultiPortionSheet} title={$_('foods.multi_portion_sheet', { values: { count: multiPortionItems.length } })}>
   <div style="display:flex;flex-direction:column;gap:0;padding-top:4px">
     {#each multiPortionItems as item, i}
       {#if i > 0}<div style="height:1px;background:var(--border);margin:12px 0"></div>{/if}
@@ -1971,7 +1976,7 @@
         {/if}
         <div style="display:flex;gap:10px">
           <div style="flex:1">
-            <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:5px">Serving Size</label>
+            <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:5px">{$_('foods_deep.serving_size')}</label>
             <input class="input" type="number" min="0.1" step="0.1" bind:value={item.portion} style="font-size:16px;width:100%" />
           </div>
           <div style="width:100px">
@@ -1979,7 +1984,7 @@
             <UnitPicker bind:value={item.unit} />
           </div>
           <div style="width:72px">
-            <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:5px">Servings</label>
+            <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:5px">{$_('foods_deep.servings')}</label>
             <input class="input" type="number" min="0.1" step="0.1" bind:value={item.servings} style="font-size:16px;width:100%" />
           </div>
         </div>
@@ -2044,7 +2049,7 @@
     {/if}
     <div style="display:flex;gap:12px">
       <div style="flex:1">
-        <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:6px">Serving Size</label>
+        <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:6px">{$_('foods_deep.serving_size')}</label>
         <input class="input" type="number" min="0.1" step="0.1" bind:value={promptPortion}
           style="font-size:16px;width:100%" />
       </div>
@@ -2068,12 +2073,12 @@
       </div>
     {/if}
     <div>
-      <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:6px">Number of Servings</label>
+      <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:6px">{$_('foods_deep.num_servings')}</label>
       <input class="input" type="number" min="0.1" step="0.1" bind:value={promptServings}
         style="font-size:16px;width:100%" />
     </div>
     <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface-2);border-radius:var(--radius-md)">
-      <span style="font-size:13px;color:var(--text-3)">Total Amount</span>
+      <span style="font-size:13px;color:var(--text-3)">{$_('foods_deep.total_amount')}</span>
       <span style="font-size:14px;font-weight:500">{Math.round((parseFloat(promptPortion) || 100) * (parseFloat(promptServings) || 1) * 10) / 10}{promptUnit || 'g'}</span>
     </div>
     <!-- Live nutrition preview (#30) — recomputes with portion/unit/servings changes.
@@ -2097,7 +2102,7 @@
         <span class="qty-macro-label">fat</span>
       </div>
     </div>
-    <button class="btn btn-primary w-full" on:click={confirmQtyPrompt}>Add to Diary</button>
+    <button class="btn btn-primary w-full" on:click={confirmQtyPrompt}>{$_('foods.add_to_diary')}</button>
   </div>
 </Sheet>
 
@@ -2134,7 +2139,7 @@
         </div>
       {/each}
       <div style="display:flex;justify-content:space-between;padding:12px;font-weight:600">
-        <span>Total</span>
+        <span>{$_('foods_deep.total')}</span>
         <span>{_yTotEnergy.value.toLocaleString()} {_yTotEnergy.unit}</span>
       </div>
       <button class="btn btn-primary w-full" style="margin-top:8px"
@@ -2178,7 +2183,7 @@
         </div>
       {/each}
       <div style="display:flex;justify-content:space-between;padding:12px;font-weight:600">
-        <span>Total</span>
+        <span>{$_('foods_deep.total')}</span>
         <span>{_mTotEnergy.value.toLocaleString()} {_mTotEnergy.unit}</span>
       </div>
       {#if pickMode}
@@ -2261,30 +2266,30 @@
       on:click|stopPropagation
       in:slide={{ duration: 140 }}>
       <div class="tier-dropdown-header">
-        <span>OFF data quality</span>
+        <span>{$_('foods.tier.off_data_quality')}</span>
         {#if offTiersFiltered}
-          <button class="tier-reset" on:click={resetOffTiers}>Reset</button>
+          <button class="tier-reset" on:click={resetOffTiers}>{$_('foods.tier.reset')}</button>
         {/if}
       </div>
       <label class="tier-option">
         <input type="checkbox" checked={offTiersActive.has('hi')} on:change={() => toggleOffTier('hi')} />
         <span class="tier-swatch tier-swatch-hi"></span>
-        <span class="tier-label">High <span class="tier-hint">(≥70%)</span></span>
+        <span class="tier-label">{$_('foods.tier.off_high')} <span class="tier-hint">{$_('foods.tier.off_high_hint')}</span></span>
       </label>
       <label class="tier-option">
         <input type="checkbox" checked={offTiersActive.has('mid')} on:change={() => toggleOffTier('mid')} />
         <span class="tier-swatch tier-swatch-mid"></span>
-        <span class="tier-label">Medium <span class="tier-hint">(40-69%)</span></span>
+        <span class="tier-label">{$_('foods.tier.off_medium')} <span class="tier-hint">{$_('foods.tier.off_medium_hint')}</span></span>
       </label>
       <label class="tier-option">
         <input type="checkbox" checked={offTiersActive.has('lo')} on:change={() => toggleOffTier('lo')} />
         <span class="tier-swatch tier-swatch-lo"></span>
-        <span class="tier-label">Low <span class="tier-hint">(&lt;40%)</span></span>
+        <span class="tier-label">{$_('foods.tier.off_low')} <span class="tier-hint">{$_('foods.tier.off_low_hint')}</span></span>
       </label>
       <label class="tier-option">
         <input type="checkbox" checked={offTiersActive.has('unknown')} on:change={() => toggleOffTier('unknown')} />
         <span class="tier-swatch"></span>
-        <span class="tier-label">Unknown <span class="tier-hint">(no data)</span></span>
+        <span class="tier-label">{$_('foods.tier.off_unknown')} <span class="tier-hint">{$_('foods.tier.off_unknown_hint')}</span></span>
       </label>
     </div>
   </div>
@@ -2301,35 +2306,35 @@
       on:click|stopPropagation
       in:slide={{ duration: 140 }}>
       <div class="tier-dropdown-header">
-        <span>USDA data type</span>
+        <span>{$_('foods.tier.usda_data_type')}</span>
         {#if usdaTiersFiltered}
-          <button class="tier-reset" on:click={resetUsdaTiers}>Reset</button>
+          <button class="tier-reset" on:click={resetUsdaTiers}>{$_('foods.tier.reset')}</button>
         {/if}
       </div>
       <label class="tier-option">
         <input type="checkbox" checked={usdaTiersActive.has('Foundation')} on:change={() => toggleUsdaTier('Foundation')} />
         <span class="tier-swatch tier-swatch-hi"></span>
-        <span class="tier-label">Foundation <span class="tier-hint">(curated)</span></span>
+        <span class="tier-label">{$_('foods.tier.usda_foundation')} <span class="tier-hint">{$_('foods.tier.usda_foundation_hint')}</span></span>
       </label>
       <label class="tier-option">
         <input type="checkbox" checked={usdaTiersActive.has('SR Legacy')} on:change={() => toggleUsdaTier('SR Legacy')} />
         <span class="tier-swatch tier-swatch-hi"></span>
-        <span class="tier-label">SR Legacy <span class="tier-hint">(reference)</span></span>
+        <span class="tier-label">{$_('foods.tier.usda_sr_legacy')} <span class="tier-hint">{$_('foods.tier.usda_sr_legacy_hint')}</span></span>
       </label>
       <label class="tier-option">
         <input type="checkbox" checked={usdaTiersActive.has('Survey (FNDDS)')} on:change={() => toggleUsdaTier('Survey (FNDDS)')} />
         <span class="tier-swatch tier-swatch-mid"></span>
-        <span class="tier-label">Survey (FNDDS) <span class="tier-hint">(composite)</span></span>
+        <span class="tier-label">{$_('foods.tier.usda_survey')} <span class="tier-hint">{$_('foods.tier.usda_survey_hint')}</span></span>
       </label>
       <label class="tier-option">
         <input type="checkbox" checked={usdaTiersActive.has('Branded')} on:change={() => toggleUsdaTier('Branded')} />
         <span class="tier-swatch tier-swatch-lo"></span>
-        <span class="tier-label">Branded <span class="tier-hint">(brand-submitted)</span></span>
+        <span class="tier-label">{$_('foods.tier.usda_branded')} <span class="tier-hint">{$_('foods.tier.usda_branded_hint')}</span></span>
       </label>
       <label class="tier-option">
         <input type="checkbox" checked={usdaTiersActive.has('Experimental')} on:change={() => toggleUsdaTier('Experimental')} />
         <span class="tier-swatch tier-swatch-lo"></span>
-        <span class="tier-label">Experimental <span class="tier-hint">(research)</span></span>
+        <span class="tier-label">{$_('foods.tier.usda_experimental')} <span class="tier-hint">{$_('foods.tier.usda_experimental_hint')}</span></span>
       </label>
     </div>
   </div>

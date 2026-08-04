@@ -79,7 +79,7 @@
       if (cameraVideo) { cameraVideo.srcObject = cameraStream; cameraVideo.play(); }
     } catch(err) {
       showCamera = false;
-      showError('Camera access denied or unavailable.');
+      showError($_('food_editor.toast.camera_denied'));
     }
   }
 
@@ -234,7 +234,7 @@
       // Re-use the existing smart-fill that only writes empty fields.
       await downloadFromOFF();
     } else {
-      showSuccess('Barcode set');
+      showSuccess($_('food_editor.toast.barcode_set'));
     }
   }
 
@@ -297,7 +297,7 @@
       await _doUploadToOFF(API);
       offProductExists = true; // we just contributed it, mark as present
     } catch(e) {
-      showError('Could not upload to Open Food Facts: ' + e.message);
+      showError($_('food_editor.toast.off_upload_failed', { values: { error: e.message } }));
       contributing = false;
     }
   }
@@ -405,7 +405,7 @@
     try {
       const { API } = await import('../lib/api.js');
       const result = await API.lookupBarcode(food.barcode);
-      if (!result) { showError('Not found in Open Food Facts'); return; }
+      if (!result) { showError($_('food_editor.toast.off_not_found')); return; }
       // Only fill empty fields (smart mode)
       if (!food.name && result.name)   food.name  = result.name;
       if (!food.brand && result.brand) food.brand = result.brand;
@@ -419,9 +419,9 @@
       food = { ...food };
       downloadSuccess = true;
       setTimeout(() => downloadSuccess = false, 2500);
-      showSuccess('Data refreshed from Open Food Facts');
+      showSuccess($_('food_editor.toast.off_refreshed'));
     } catch(e) {
-      showError('Refresh failed: ' + e.message);
+      showError($_('food_editor.toast.refresh_failed', { values: { error: e.message } }));
     } finally { downloading = false; }
   }
 
@@ -536,7 +536,7 @@
           });
       const parsed = _parseJsonFromReply(reply);
       if (!parsed || typeof parsed !== 'object') {
-        showError('Could not read the label. Try a clearer photo.');
+        showError($_('food_editor.toast.label_read_failed'));
         return;
       }
       // Overwrite (NOT smart-fill) — the label is the source of truth this moment.
@@ -551,9 +551,9 @@
         if (v != null && !isNaN(parseFloat(v))) food[n.id] = parseFloat(v);
       }
       food = { ...food };
-      showSuccess('Nutrition extracted from label');
+      showSuccess($_('food_editor.toast.nutrition_extracted'));
     } catch (e) {
-      showError('Scan failed: ' + (e?.message || 'unknown error'));
+      showError($_('food_editor.toast.scan_failed', { values: { error: e?.message || $_('food_editor.toast.unknown_error') } }));
     } finally {
       scanningLabel = false;
     }
@@ -626,10 +626,10 @@
       const created = sourceId
         ? await NtApi.copyFood(sourceId)
         : await NtApi.createFood(copy);
-      showSuccess('Saved a copy to your catalog');
+      showSuccess($_('food_editor.toast.saved_copy'));
       clearFoodEditorState();
       pop();
-    } catch (e) { showError('Could not save copy: ' + e.message); }
+    } catch (e) { showError($_('food_editor.toast.save_copy_failed', { values: { error: e.message } })); }
     saving = false;
   }
 
@@ -681,7 +681,7 @@
         pop();
       }
     } catch(e) {
-      showError('Save failed: ' + (e.message || e));
+      showError($_('food_editor.toast.save_failed', { values: { error: e.message || e } }));
     } finally {
       saving = false;
     }
@@ -755,7 +755,7 @@
       <span class="material-symbols-rounded">lock</span>
       <div>
         <div class="readonly-title">Shared by {food._shared_by} — read only</div>
-        <div class="readonly-sub">Tap <strong>Save to My Catalog</strong> to bring this into your catalog and edit it.</div>
+        <div class="readonly-sub">{$_('food_editor.readonly_sub')}</div>
       </div>
     </div>
   {/if}
@@ -763,11 +763,11 @@
   <div class="page-content editor-content" class:readonly-content={_readOnly} inert={_readOnly || null}>
     <!-- Photo -->
     <div class="card editor-card photo-card">
-      <div class="editor-card-title">Photo</div>
+      <div class="editor-card-title">{$_('food_editor.card_photo')}</div>
       <div class="photo-preview-wrap">
         {#if food.imgUrl}
           <img class="photo-preview-img" src={food.imgUrl} alt="Food" />
-          <button class="photo-remove-btn btn-icon" on:click={removePhoto} aria-label="Remove photo" title="Remove photo">
+          <button class="photo-remove-btn btn-icon" on:click={removePhoto} aria-label={$_('food_editor.photo_remove')} title={$_('food_editor.photo_remove')}>
             <span class="material-symbols-rounded" style="font-size:18px">close</span>
           </button>
         {:else}
@@ -805,8 +805,8 @@
       <div class="cam-overlay" role="dialog" aria-modal="true" use:portal>
         <div class="cam-popup">
           <div class="cam-header">
-            <span class="cam-title">Take Photo</span>
-            <button class="btn-icon" on:click={stopCamera} aria-label="Cancel" title="Close camera">
+            <span class="cam-title">{$_('food_editor.take_photo')}</span>
+            <button class="btn-icon" on:click={stopCamera} aria-label={$_('food_editor.cancel')} title={$_('food_editor.close_camera')}>
               <span class="material-symbols-rounded">close</span>
             </button>
           </div>
@@ -827,12 +827,12 @@
       <div class="cam-overlay" role="dialog" aria-modal="true" use:portal>
         <div class="cam-popup">
           <div class="cam-header">
-            <span class="cam-title">Crop Photo</span>
-            <button class="btn-icon" on:click={() => { showCrop = false; cropSrc = ''; }} aria-label="Cancel" title="Cancel">
+            <span class="cam-title">{$_('food_editor.crop_photo')}</span>
+            <button class="btn-icon" on:click={() => { showCrop = false; cropSrc = ''; }} aria-label={$_('food_editor.cancel')} title={$_('food_editor.cancel')}>
               <span class="material-symbols-rounded">close</span>
             </button>
           </div>
-          <p class="crop-hint">Drag the box to reposition</p>
+          <p class="crop-hint">{$_('food_editor.crop_hint')}</p>
           <div class="crop-container"
             on:mousemove={cropMoveDrag}
             on:touchmove={cropMoveDrag}
@@ -854,23 +854,23 @@
 
     <!-- Basic info -->
     <div class="card editor-card">
-      <div class="editor-card-title">Basic Info</div>
+      <div class="editor-card-title">{$_('food_editor.card_basic')}</div>
       <div class="form-group">
         <label class="form-label">Name *</label>
         <input class="input" placeholder={$_('food_editor.name_placeholder')} bind:value={food.name} />
       </div>
       <div class="form-group">
-        <label class="form-label">Brand</label>
+        <label class="form-label">{$_('food_editor.field_brand')}</label>
         <input class="input" placeholder={$_('food_editor.brand_placeholder')} bind:value={food.brand} />
       </div>
       <div class="form-row" style="align-items:flex-end">
         <div class="form-group" style="flex:1">
-          <label class="form-label">Serving Size</label>
+          <label class="form-label">{$_('food_editor.field_serving_size')}</label>
           <input class="input" type="number" min="0" bind:value={food.portion}
             on:input={onPortionInput} />
         </div>
         <div class="form-group" style="width:100px">
-          <label class="form-label">Unit</label>
+          <label class="form-label">{$_('food_editor.field_unit')}</label>
           <UnitPicker bind:value={food.unit} />
         </div>
         <button class="btn-icon link-btn" class:linked title={linked ? 'All fields scale proportionally' : 'Fields are independent'}
@@ -887,7 +887,7 @@
            always flows in, just the editor is hidden by default. -->
       {#if _showUnitMetadataUI}
       <div class="form-group">
-        <label class="form-label">Nutrition Basis</label>
+        <label class="form-label">{$_('food_editor.field_nutrition_basis')}</label>
         <div class="basis-toggle">
           <button type="button" class="basis-opt" class:active={food.nutrition_basis === 'g'}
             on:click={() => food.nutrition_basis = food.nutrition_basis === 'g' ? null : 'g'}>
@@ -907,7 +907,7 @@
            the first row from serving_size + serving_quantity; users can
            edit, add, or remove rows. Issues #69 + #70. -->
       <div class="form-group">
-        <label class="form-label">Serving Units</label>
+        <label class="form-label">{$_('food_editor.field_serving_units')}</label>
         <div class="alt-units">
           {#each (food.alt_units || []) as row, i}
             <div class="alt-unit-row">
@@ -918,7 +918,7 @@
                 placeholder="grams" bind:value={row.grams} />
               <span class="alt-unit-suffix">g</span>
               <button type="button" class="btn-icon alt-unit-del"
-                title="Remove" aria-label="Remove serving unit"
+                title={$_('food_editor.remove_serving_unit')} aria-label={$_('food_editor.remove_serving_unit')}
                 on:click={() => food.alt_units = food.alt_units.filter((_, j) => j !== i)}>
                 <span class="material-symbols-rounded">close</span>
               </button>
@@ -943,7 +943,7 @@
         <label class="form-label">Density (g/ml)</label>
         <div style="display:flex;align-items:center;gap:6px">
           <input class="input" type="number" min="0" step="0.01"
-            placeholder="Optional"
+            placeholder={$_('food_editor.placeholder_optional')}
             value={food.density_g_ml ?? ''}
             on:input={e => food.density_g_ml = e.target.value === '' ? null : Number(e.target.value)} />
           <span style="color:var(--text-3);font-size:13px">g/ml</span>
@@ -954,10 +954,10 @@
       </div>
       {/if}
       <div class="form-group">
-        <label class="form-label">Barcode</label>
+        <label class="form-label">{$_('food_editor.field_barcode')}</label>
         <div class="barcode-input-wrap">
-          <input class="input barcode-input" type="text" inputmode="numeric" placeholder="Optional" bind:value={food.barcode} />
-          <button type="button" class="btn-scan-inline" title="Scan barcode" aria-label="Scan barcode"
+          <input class="input barcode-input" type="text" inputmode="numeric" placeholder={$_('food_editor.placeholder_optional')} bind:value={food.barcode} />
+          <button type="button" class="btn-scan-inline" title={$_('food_editor.scan_barcode')} aria-label={$_('food_editor.scan_barcode')}
             on:click={() => editorScannerOpen = true}>
             <span class="material-symbols-rounded">barcode_scanner</span>
           </button>
@@ -1019,7 +1019,7 @@
     <!-- Categories -->
     {#if $foodsShowCategories && ($foodCategories || []).length > 0}
       <div class="card editor-card">
-        <div class="editor-card-title">Categories</div>
+        <div class="editor-card-title">{$_('food_editor.card_categories')}</div>
         <div class="cat-chips">
           {#each $foodCategories as cat}
             <button class="chip" class:accent={(food.categories||[]).includes(_catName(cat))}
@@ -1037,18 +1037,18 @@
     <!-- Notes -->
     {#if $foodsShowNotes}
       <div class="card editor-card">
-        <div class="editor-card-title">Notes</div>
-        <textarea class="input textarea" placeholder="Optional notes" bind:value={food.notes}></textarea>
+        <div class="editor-card-title">{$_('food_editor.card_notes')}</div>
+        <textarea class="input textarea" placeholder={$_('food_editor.notes_placeholder')} bind:value={food.notes}></textarea>
       </div>
     {/if}
 
     <!-- Nutrition -->
     <div class="card editor-card">
       <div class="editor-card-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-        <span>Nutrition</span>
+        <span>{$_('food_editor.card_nutrition')}</span>
         {#if $aiEffectivelyEnabled}
           <button class="scan-label-btn" on:click={scanLabel} disabled={scanningLabel}
-            title="Take a photo of the nutrition label to fill these fields"
+            title={$_('food_editor.scan_label_title')}
             aria-label="Scan nutrition label">
             <span class="material-symbols-rounded scan-icon" class:spin={scanningLabel}>
               {scanningLabel ? 'progress_activity' : 'document_scanner'}

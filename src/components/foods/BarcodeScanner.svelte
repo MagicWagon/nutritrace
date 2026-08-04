@@ -1,6 +1,7 @@
 <script>
   import { onMount, onDestroy, createEventDispatcher } from 'svelte';
   import { fly } from 'svelte/transition';
+  import { _ } from 'svelte-i18n';
   import { isNative } from '../../lib/platform.js';
 
   // Portal to document.body — prevents position:fixed being trapped by
@@ -372,7 +373,7 @@
       const perms = await BarcodeScanner.requestPermissions();
       if (perms.camera !== 'granted') {
         const { showError } = await import('../../stores/toast.js');
-        showError('Camera permission denied');
+        showError($_('barcode_scanner.toast.cam_denied'));
         open = false; scanning = false;
         return;
       }
@@ -415,7 +416,7 @@
     } catch (e) {
       console.error('[BarcodeScanner] Native scan failed:', e);
       const { showError } = await import('../../stores/toast.js');
-      showError('Barcode scan failed: ' + (e?.message || 'Unknown error'));
+      showError($_('barcode_scanner.toast.scan_failed', { values: { error: e?.message || $_('barcode_scanner.toast.unknown_error') } }));
       await stopNativeScanner();
       open = false;
     }
@@ -491,11 +492,11 @@
        body child except this overlay) doesn't sweep us up with #app. -->
   <div class="native-scanner-overlay" use:modalPortal>
     <div class="ns-top">
-      <button class="btn-icon ns-close" on:click={closeNative} aria-label="Close scanner" title="Close scanner">
+      <button class="btn-icon ns-close" on:click={closeNative} aria-label={$_('barcode_scanner.close')} title={$_('barcode_scanner.close')}>
         <span class="material-symbols-rounded">close</span>
       </button>
       <div class="ns-status">{nativeStatus}</div>
-      <button class="btn-icon ns-torch" class:active={nativeTorchOn} on:click={toggleNativeTorch} aria-label="Toggle flashlight" title="Toggle flashlight">
+      <button class="btn-icon ns-torch" class:active={nativeTorchOn} on:click={toggleNativeTorch} aria-label={$_('barcode_scanner.torch')} title={$_('barcode_scanner.torch')}>
         <span class="material-symbols-rounded">{nativeTorchOn ? 'flash_on' : 'flash_off'}</span>
       </button>
     </div>
@@ -517,11 +518,11 @@
         <input
           class="input"
           type="text"
-          placeholder="Or type barcode manually…"
+          placeholder={$_('barcode_scanner.manual_ph')}
           bind:value={manualCode}
           on:keydown={e => e.key === 'Enter' && doManualNative()}
         />
-        <button class="btn btn-primary" on:click={doManualNative}>Look Up</button>
+        <button class="btn btn-primary" on:click={doManualNative}>{$_('barcode_scanner.lookup')}</button>
       </div>
     </div>
   </div>
@@ -532,8 +533,8 @@
     <div class="scanner-panel" on:click|stopPropagation>
       <!-- Header -->
       <div class="scanner-header">
-        <span class="scanner-title">Scan Barcode</span>
-        <button class="btn-icon" on:click={close} aria-label="Close" title="Close scanner">
+        <span class="scanner-title">{$_('barcode_scanner.title')}</span>
+        <button class="btn-icon" on:click={close} aria-label={$_('barcode_scanner.close_short')} title={$_('barcode_scanner.close')}>
           <span class="material-symbols-rounded">close</span>
         </button>
       </div>
@@ -541,7 +542,7 @@
       <!-- Engine + Camera selects -->
       <div class="scanner-controls">
         <div class="sc-field">
-          <label class="sc-label">Library</label>
+          <label class="sc-label">{$_('barcode_scanner.library')}</label>
           <select class="sc-select" bind:value={selectedEngine} on:change={onEngineChange}>
             <option value="zxing">@zxing/library</option>
             <option value="html5qr">html5-qrcode</option>
@@ -549,7 +550,7 @@
           </select>
         </div>
         <div class="sc-field">
-          <label class="sc-label">Camera</label>
+          <label class="sc-label">{$_('barcode_scanner.camera')}</label>
           <select class="sc-select" bind:value={selectedCamId} on:change={onCamChange}>
             {#if cameras.length === 0}
               <option>Loading…</option>
@@ -600,11 +601,11 @@
         <input
           class="input"
           type="text"
-          placeholder="Or type barcode manually…"
+          placeholder={$_('barcode_scanner.manual_ph')}
           bind:value={manualCode}
           on:keydown={e => e.key === 'Enter' && doManual()}
         />
-        <button class="btn btn-primary" on:click={doManual}>Look Up</button>
+        <button class="btn btn-primary" on:click={doManual}>{$_('barcode_scanner.lookup')}</button>
       </div>
     </div>
   </div>

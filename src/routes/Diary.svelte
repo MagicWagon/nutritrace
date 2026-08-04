@@ -18,6 +18,7 @@
   import Dialog       from '../components/ui/Dialog.svelte';
   import ActionSheet  from '../components/ui/ActionSheet.svelte';
   import UnitPicker   from '../components/ui/UnitPicker.svelte';
+  import TimePicker   from '../components/ui/TimePicker.svelte';
   import { scaleFactor as _unitScaleFactor } from '../lib/units.js';
   import { showSuccess, showError, showInfo } from '../stores/toast.js';
   import {
@@ -25,7 +26,8 @@
     prevDay, nextDay, loadEntry, removeDiaryItem, updateDiaryItem, saveBodyStats,
     copyMealItems, moveMealItems, clearMealItems, copyMealToDate, saveDiaryNote,
     splitRecipeItem, removeSplitChild, updateSplitChild,
-    diaryShowNutritionSummary, diaryShowBodyStats, diaryLoadError
+    diaryShowNutritionSummary, diaryShowBodyStats, diaryLoadError,
+    buildDiaryWritePayload
   } from '../stores/diary.js';
   import { mealNames, goals, energyUnit, weightUnit, lengthUnit, navStyle,
            diaryShowBrands, diaryShowThumbnails,
@@ -99,6 +101,28 @@
   let editProtein      = '';
   let editCarbs        = '';
   let editFat          = '';
+  // #135 — editable logged time. HH:MM (24h internal, matches TimePicker).
+  // Seeded from item.addedAt on open (with legacy item.dateTime fallback
+  // for older entries). On save it's spliced back into a new ISO string
+  // preserving the item's original date so cross-day moves stay out of
+  // scope (that's a separate feature).
+  let editLoggedTime   = '';
+
+  function _isoToHm(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  }
+  function _hmMergeInto(prevIso, hm) {
+    if (!hm) return prevIso;
+    const base = prevIso ? new Date(prevIso) : new Date();
+    if (Number.isNaN(base.getTime())) return prevIso;
+    const [h, m] = hm.split(':').map(Number);
+    if (!Number.isFinite(h) || !Number.isFinite(m)) return prevIso;
+    base.setHours(h, m, 0, 0);
+    return base.toISOString();
+  }
 
   // Sheet lock helper - prevents backdrop click-through on mobile
   let _sheetLock = false;
@@ -145,6 +169,7 @@
     editPortion  = item.portion || item.amount || 100;
     editUnit     = item.unit || 'g';
     editQuantity = item.quantity || 1;
+    editLoggedTime = _isoToHm(item.addedAt || item.dateTime);
     _editChildContext = null;
     if (item?.type === 'quick_calories') {
       const storedKcal = Math.round(item.nutrition?.calories || 0);
@@ -204,6 +229,9 @@
         name: trimmed || 'Quick Calories',
         nutrition,
       };
+      const prevAt = editItem.addedAt || editItem.dateTime;
+      const newAt = _hmMergeInto(prevAt, editLoggedTime);
+      if (newAt && newAt !== prevAt) changes.addedAt = newAt;
       await updateDiaryItem(editItem._i, changes);
       showEditSheet = false;
       editItem = null;
@@ -230,8 +258,13 @@
       nutrition: newNutrition,
     };
     if (_editChildContext) {
+      // Split-recipe children inherit the parent's dateTime; skip the time
+      // edit here so a child change doesn't fork the timestamp.
       await updateSplitChild(_editChildContext.parentIdx, _editChildContext.childIdx, changes);
     } else {
+      const prevAt = editItem.addedAt || editItem.dateTime;
+      const newAt = _hmMergeInto(prevAt, editLoggedTime);
+      if (newAt && newAt !== prevAt) changes.addedAt = newAt;
       await updateDiaryItem(editItem._i, changes);
     }
     showEditSheet = false;
@@ -736,11 +769,7 @@
     currentEntry.subscribe(v => ent = v)();
     if (!ent) return;
     const updated = { ...ent, items: ent.items.filter((_, i) => !toDelete.has(i)) };
-    await NtApi.saveDiaryDate($currentDate, {
-      items:       updated.items,
-      body_stats:  updated.bodyStats || {},
-      water:       updated.water,
-    });
+    await NtApi.saveDiaryDate($currentDate, buildDiaryWritePayload(updated));
     await loadEntry($currentDate);
     showSuccess(`${count} item${count !== 1 ? 's' : ''} removed`);
     exitSelectMode();
@@ -981,11 +1010,7 @@
     const _use24 = $timeFormat === '24h';
     const log = { amount: ml, time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: !_use24 }) };
     const updated = { ...ent, water: [...(ent?.water || []), log] };
-    await NtApi.saveDiaryDate($currentDate, {
-      items: updated.items || [],
-      body_stats: updated.bodyStats || {},
-      water: updated.water,
-    });
+    await NtApi.saveDiaryDate($currentDate, buildDiaryWritePayload(updated));
     await loadEntry($currentDate);
     _waterCustomAmt  = '';
     _waterShowCustom = false;
@@ -1012,11 +1037,7 @@
     currentEntry.subscribe(v => ent = v)();
     if (!ent) return;
     const water = (ent.water || []).filter((_, i) => i !== index);
-    await NtApi.saveDiaryDate($currentDate, {
-      items: ent.items || [],
-      body_stats: ent.bodyStats || {},
-      water,
-    });
+    await NtApi.saveDiaryDate($currentDate, buildDiaryWritePayload({ ...ent, water }));
     await loadEntry($currentDate);
   }
 
@@ -1043,11 +1064,7 @@
     currentEntry.subscribe(v => ent = v)();
     if (!ent) return;
     const water = (ent.water || []).map((l, idx) => idx === i ? { ...l, amount: ml } : l);
-    await NtApi.saveDiaryDate($currentDate, {
-      items: ent.items || [],
-      body_stats: ent.bodyStats || {},
-      water,
-    });
+    await NtApi.saveDiaryDate($currentDate, buildDiaryWritePayload({ ...ent, water }));
     _waterEditIndex = -1;
     await loadEntry($currentDate);
   }
@@ -1095,11 +1112,7 @@
         const entry = $currentEntry;
         if (entry && entry.items && index < entry.items.length) {
           const updated = { ...entry, items: entry.items.filter((_, i) => i !== index) };
-          await NtApi.saveDiaryDate($currentDate, {
-            items: updated.items,
-            body_stats: updated.bodyStats || updated.body_stats || {},
-            water: updated.water || [],
-          });
+          await NtApi.saveDiaryDate($currentDate, buildDiaryWritePayload(updated));
           await loadEntry($currentDate);
           showSuccess('Item replaced');
         }
@@ -1203,7 +1216,7 @@
 {#if $diaryLoadError}
       <div class="server-error-banner">
         <span class="material-symbols-rounded">cloud_off</span>
-        <span>Could not reach server — <button class="server-error-retry" on:click={() => loadEntry($currentDate)}>Retry</button></span>
+        <span>{$_('diary.server_error.unreachable')} <button class="server-error-retry" on:click={() => loadEntry($currentDate)}>{$_('diary.server_error.retry')}</button></span>
       </div>
     {/if}
     <!-- Intermittent fasting widget — opt-in via Settings → Diary -->
@@ -1240,7 +1253,7 @@
         {#if items.length === 0}
           <button type="button" class="meal-empty" on:click={() => openAddFood(mealIdx)} aria-label="Add food to {meal}">
             <span class="material-symbols-rounded meal-empty-icon" style="color:{mealColor(mealIdx)}">add_circle</span>
-            <span class="meal-empty-text">Tap to add food</span>
+            <span class="meal-empty-text">{$_('diary.empty.tap_to_add_food')}</span>
           </button>
         {:else}
           {@const _foodItems  = items.filter(it => it.type !== 'quick_calories')}
@@ -1304,7 +1317,7 @@
                         </span>
                       </button>
                       <button type="button" class="btn-icon split-child-del" on:click|stopPropagation={() => onRemoveSplitChild(item._i, ci)}
-                        aria-label="Remove ingredient" title="Remove ingredient">
+                        aria-label={$_('diary.edit_item.remove_ingredient')} title={$_('diary.edit_item.remove_ingredient')}>
                         <span class="material-symbols-rounded" style="font-size:16px">close</span>
                       </button>
                     </div>
@@ -1398,7 +1411,7 @@
                           </span>
                         </button>
                         <button type="button" class="btn-icon split-child-del" on:click|stopPropagation={() => removeDiaryItem(qItem._i)}
-                          aria-label="Remove Quick Calories entry" title="Remove entry">
+                          aria-label={$_('diary.edit_item.remove_qc_aria')} title={$_('diary.edit_item.remove_qc_entry')}>
                           <span class="material-symbols-rounded" style="font-size:16px">close</span>
                         </button>
                       </div>
@@ -1504,7 +1517,7 @@
         <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
         <div class="diary-notes-header" on:click={toggleNotes}>
           <span class="material-symbols-rounded diary-notes-icon">edit_note</span>
-          <span class="diary-notes-label">Day Notes</span>
+          <span class="diary-notes-label">{$_('diary_deep.day_notes')}</span>
           {#if _notesText && !notesExpanded}
             <span class="diary-notes-preview text-3 text-sm truncate">{_notesText}</span>
           {/if}
@@ -1569,8 +1582,8 @@
       <div class="dbb-toggle-row">
         <button class="dbb-toggle-pill" on:click|stopPropagation={toggleTotalsMode}
           aria-label="Toggle consumed/remaining">
-          <span class="dbb-tp-opt" class:dbb-tp-active={_totalsMode === 'consumed'}>Consumed</span>
-          <span class="dbb-tp-opt" class:dbb-tp-active={_totalsMode === 'remaining'}>Remaining</span>
+          <span class="dbb-tp-opt" class:dbb-tp-active={_totalsMode === 'consumed'}>{$_('diary_deep.consumed')}</span>
+          <span class="dbb-tp-opt" class:dbb-tp-active={_totalsMode === 'remaining'}>{$_('diary_deep.remaining')}</span>
         </button>
       </div>
       <!-- Mode-aware calorie + macro row -->
@@ -1661,7 +1674,7 @@
          when the user scrolls through the day's water log. -->
     <div class="wc-banner-strip">
       <WaterBanner />
-      <h2 class="wc-banner-title">Water</h2>
+      <h2 class="wc-banner-title">{$_('diary_deep.water')}</h2>
     </div>
 
     <div class="wc-inner">
@@ -1718,7 +1731,7 @@
     </div>
 
     <!-- Quick-add grid -->
-    <p class="section-title" style="padding:4px 0 8px;text-align:center">Quick Add</p>
+    <p class="section-title" style="padding:4px 0 8px;text-align:center">{$_('diary_deep.quick_add')}</p>
     <div class="wc-grid">
       {#if _waterContainers.length > 0}
         {#each _waterContainers as cont (cont.id)}
@@ -1738,7 +1751,7 @@
       {/if}
       <button class="wc-btn wc-btn-custom" on:click={_toggleWaterCustom}>
         <span class="material-symbols-rounded">edit</span>
-        <span class="wc-btn-name">Custom</span>
+        <span class="wc-btn-name">{$_('diary.water.custom')}</span>
       </button>
     </div>
 
@@ -1748,7 +1761,7 @@
           placeholder={`Amount (${_waterUnit === 'oz' ? 'fl oz' : _waterUnit})`}
           bind:value={_waterCustomAmt} bind:this={_waterCustomInput}
           on:keydown={e => e.key === 'Enter' && _addWaterCustom()} />
-        <button class="btn btn-primary" on:click={_addWaterCustom}>Add</button>
+        <button class="btn btn-primary" on:click={_addWaterCustom}>{$_('diary.water.add')}</button>
       </div>
     {/if}
 
@@ -1786,7 +1799,7 @@
                 <span class="font-medium">{_waterDisplay(log.amount)}</span>
                 {#if log.time}<span class="text-3 text-sm">{log.time}</span>{/if}
               </div>
-              <button class="btn-icon" on:click|stopPropagation={() => _removeWaterLog(i)} title="Remove">
+              <button class="btn-icon" on:click|stopPropagation={() => _removeWaterLog(i)} title={$_('diary.water.remove')}>
                 <span class="material-symbols-rounded" style="font-size:18px;color:var(--text-3)">delete</span>
               </button>
             </div>
@@ -1796,7 +1809,7 @@
     {:else}
       <div class="wc-empty-log">
         <span class="material-symbols-rounded wc-empty-icon">water_drop</span>
-        <p class="text-3 text-sm">No water logged yet today</p>
+        <p class="text-3 text-sm">{$_('diary_deep.no_water_today')}</p>
       </div>
     {/if}
 
@@ -1816,7 +1829,7 @@
         {@const _qcUnit = $energyUnit === 'kJ' ? 'kJ' : 'kcal'}
         <label class="form-label" for="qce-name">Name (optional)</label>
         <input id="qce-name" class="input" type="text" maxlength="60"
-               placeholder="Office snack, hotel breakfast..."
+               placeholder={$_('diary_deep.qce_name_ph')}
                bind:value={editName} />
         <div class="qce-kcal-pill" style="background:var(--macro-calories-dim);margin-top:12px">
           <input class="qce-kcal-input" type="number" inputmode="numeric"
@@ -1825,7 +1838,7 @@
                  bind:value={editKcalDisplay} />
           <span class="qce-kcal-unit" style="color:var(--macro-calories)">{_qcUnit.toUpperCase()}</span>
         </div>
-        <p class="qce-section-label">Optional Macros</p>
+        <p class="qce-section-label">{$_('diary_deep.optional_macros')}</p>
         <div class="qce-macros">
           <div class="qce-macro-pill" style="background:var(--macro-protein-dim)">
             <div class="qce-macro-val-row">
@@ -1835,7 +1848,7 @@
                      bind:value={editProtein} />
               <span class="qce-macro-unit" style="color:var(--macro-protein)">g</span>
             </div>
-            <span class="qce-macro-label">Protein</span>
+            <span class="qce-macro-label">{$_('diary_deep.protein')}</span>
           </div>
           <div class="qce-macro-pill" style="background:var(--macro-carbs-dim)">
             <div class="qce-macro-val-row">
@@ -1845,7 +1858,7 @@
                      bind:value={editCarbs} />
               <span class="qce-macro-unit" style="color:var(--macro-carbs)">g</span>
             </div>
-            <span class="qce-macro-label">Carbs</span>
+            <span class="qce-macro-label">{$_('diary_deep.carbs')}</span>
           </div>
           <div class="qce-macro-pill" style="background:var(--macro-fat-dim)">
             <div class="qce-macro-val-row">
@@ -1855,14 +1868,20 @@
                      bind:value={editFat} />
               <span class="qce-macro-unit" style="color:var(--macro-fat)">g</span>
             </div>
-            <span class="qce-macro-label">Fat</span>
+            <span class="qce-macro-label">{$_('diary_deep.fat')}</span>
           </div>
         </div>
-        <button class="btn btn-primary w-full" style="margin-top:16px" on:click={saveEditItem}>Save</button>
+        {#if $diaryShowTimestamps}
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px">
+            <label class="form-label" style="font-size:11px;color:var(--text-3);margin:0">{$_('diary_deep.logged_time')}</label>
+            <div style="width:130px"><TimePicker bind:value={editLoggedTime} /></div>
+          </div>
+        {/if}
+        <button class="btn btn-primary w-full" style="margin-top:16px" on:click={saveEditItem}>{$_('diary.edit_item.save')}</button>
       {:else}
       <div style="display:flex;gap:12px;margin-bottom:16px">
         <div style="flex:1">
-          <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:4px">Serving Size</label>
+          <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:4px">{$_('diary_deep.serving_size')}</label>
           <input class="input" type="number" min="0.1" step="0.1" bind:value={editPortion} style="width:100%" />
         </div>
         <div style="width:100px">
@@ -1870,12 +1889,20 @@
           <UnitPicker bind:value={editUnit} />
         </div>
       </div>
-      <div style="margin-bottom:16px">
-        <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:4px">Number of Servings</label>
-        <input class="input" type="number" min="0.1" step="0.1" bind:value={editQuantity} style="width:100%" />
+      <div style="display:flex;gap:12px;margin-bottom:16px">
+        <div style="flex:1">
+          <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:4px">{$_('diary_deep.num_servings')}</label>
+          <input class="input" type="number" min="0.1" step="0.1" bind:value={editQuantity} style="width:100%" />
+        </div>
+        {#if !_editChildContext && $diaryShowTimestamps}
+          <div style="width:130px">
+            <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:4px">{$_('diary_deep.logged_time')}</label>
+            <TimePicker bind:value={editLoggedTime} />
+          </div>
+        {/if}
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface-2);border-radius:var(--radius-md);margin-bottom:16px">
-        <span style="font-size:13px;color:var(--text-3)">Total Amount</span>
+        <span style="font-size:13px;color:var(--text-3)">{$_('diary_deep.total_amount')}</span>
         <span style="font-size:14px;font-weight:500">{Math.round((parseFloat(editPortion) || 100) * (parseFloat(editQuantity) || 1) * 10) / 10}{editUnit}</span>
       </div>
       <div class="edit-macros">
@@ -1896,7 +1923,7 @@
           <span class="edit-macro-label">fat</span>
         </div>
       </div>
-      <button class="btn btn-primary w-full" style="margin-top:16px" on:click={saveEditItem}>Save</button>
+      <button class="btn btn-primary w-full" style="margin-top:16px" on:click={saveEditItem}>{$_('diary.edit_item.save')}</button>
       {/if}
     </div>
   {/if}
@@ -1908,7 +1935,7 @@
 <!-- Delete confirm dialog -->
 <Dialog
   bind:open={showDeleteDialog}
-  title="Remove {actionItem?.name || 'item'}?"
+  title={$_('diary.confirm.remove_item', { values: { name: actionItem?.name || $_('diary.confirm.remove_fallback') } })}
   message="This will remove it from your diary."
   confirmText="Remove"
   dangerous
@@ -2009,7 +2036,7 @@
         </select>
       </label>
       <div class="copy-date-actions">
-        <button class="btn btn-ghost" on:click={() => showCopySheet = false} disabled={copyBusy}>Cancel</button>
+        <button class="btn btn-ghost" on:click={() => showCopySheet = false} disabled={copyBusy}>{$_('diary_deep.cancel')}</button>
         <button class="btn btn-primary" on:click={onConfirmCopy} disabled={!copyDate || copyBusy}>
           {copyBusy ? 'Copying…' : 'Copy'}
         </button>
@@ -2021,7 +2048,7 @@
 <!-- Clear meal confirm -->
 <Dialog
   bind:open={showClearMealDialog}
-  title="Clear all items from {actionMealIdx != null ? meals[actionMealIdx] : 'meal'}?"
+  title={$_('diary.confirm.clear_all_meal', { values: { meal: actionMealIdx != null ? meals[actionMealIdx] : $_('diary.confirm.clear_all_fallback') } })}
   message="This will remove every item in this meal from your diary for {$currentDate}. This can't be undone."
   confirmText="Clear"
   dangerous
@@ -2036,7 +2063,7 @@
       <div class="sheet-handle"></div>
       <p class="sheet-title">Save {actionMealIdx != null ? meals[actionMealIdx] : 'meal'} to library</p>
       <label class="copy-date-label">
-        <span>Meal name</span>
+        <span>{$_('diary_deep.meal_name')}</span>
         <input type="text" bind:value={saveAsMealName} bind:this={saveAsMealNameInput}
           class="copy-date-input" placeholder="e.g. Usual breakfast" />
       </label>
@@ -2045,7 +2072,7 @@
       </p>
       <div class="copy-date-actions">
         <button class="btn btn-ghost" disabled={saveAsMealSaving}
-          on:click={() => showSaveAsMeal = false}>Cancel</button>
+          on:click={() => showSaveAsMeal = false}>{$_('diary_deep.cancel')}</button>
         <button class="btn btn-primary" disabled={saveAsMealSaving || !saveAsMealName.trim()}
           on:click={doSaveAsMeal}>{saveAsMealSaving ? 'Saving…' : 'Save'}</button>
       </div>
@@ -2071,7 +2098,7 @@
     <div class="bs-sheet" on:click|stopPropagation on:keydown={() => {}}>
       <div class="sheet-handle"></div>
       <div class="sheet-header-row">
-        <h3 class="sheet-title">Body Stats</h3>
+        <h3 class="sheet-title">{$_('diary_deep.body_stats')}</h3>
         <button class="btn-icon sheet-close-btn" on:click={() => diaryShowBodyStats.set(false)} aria-label="Close" title="Close">
           <span class="material-symbols-rounded">close</span>
         </button>
@@ -2122,7 +2149,7 @@
         </div>
       </div>
       <div class="bs-sheet-footer">
-        <button class="btn btn-primary w-full" type="submit">Save</button>
+        <button class="btn btn-primary w-full" type="submit">{$_('common.save')}</button>
       </div>
       </form>
     </div>
@@ -2137,7 +2164,7 @@
     <div class="ns-sheet" on:click|stopPropagation on:keydown={() => {}}>
       <div class="sheet-handle"></div>
       <div class="sheet-header-row">
-        <h3 class="sheet-title">Nutrition Summary</h3>
+        <h3 class="sheet-title">{$_('diary_deep.nutrition_summary')}</h3>
         <div style="display:flex;align-items:center;gap:8px">
           <span class="text-3 text-sm">{formatDateSub($currentDate, $dateFormat)}</span>
           <button class="btn-icon sheet-close-btn" on:click={() => diaryShowNutritionSummary.set(false)} aria-label="Close" title="Close">
@@ -2182,15 +2209,15 @@
         <div class="ns-macros">
           <div class="ns-macro-pill" style="background:var(--macro-protein-dim)">
             <span class="ns-macro-val" style="color:var(--macro-protein)">{Math.round(totals.proteins || 0)}{#if $macroLegendMode === 'grams' && protGoal}/{protGoal}{/if}g</span>
-            <span class="ns-macro-lbl">Protein</span>
+            <span class="ns-macro-lbl">{$_('diary_deep.protein')}</span>
           </div>
           <div class="ns-macro-pill" style="background:var(--macro-carbs-dim)">
             <span class="ns-macro-val" style="color:var(--macro-carbs)">{Math.round(totals.carbohydrates || 0)}{#if $macroLegendMode === 'grams' && carbGoal}/{carbGoal}{/if}g</span>
-            <span class="ns-macro-lbl">Carbs</span>
+            <span class="ns-macro-lbl">{$_('diary_deep.carbs')}</span>
           </div>
           <div class="ns-macro-pill" style="background:var(--macro-fat-dim)">
             <span class="ns-macro-val" style="color:var(--macro-fat)">{Math.round(totals.fat || 0)}{#if $macroLegendMode === 'grams' && fatGoal}/{fatGoal}{/if}g</span>
-            <span class="ns-macro-lbl">Fat</span>
+            <span class="ns-macro-lbl">{$_('diary_deep.fat')}</span>
           </div>
         </div>
         <!-- All nutrients — tap a row to drill into top contributors -->
@@ -2255,15 +2282,15 @@
     <div class="ns-macros">
       <div class="ns-macro-pill" style="background:var(--macro-protein-dim)">
         <span class="ns-macro-val" style="color:var(--macro-protein)">{Math.round(_mealTotals.proteins || 0)}g</span>
-        <span class="ns-macro-lbl">Protein</span>
+        <span class="ns-macro-lbl">{$_('diary_deep.protein')}</span>
       </div>
       <div class="ns-macro-pill" style="background:var(--macro-carbs-dim)">
         <span class="ns-macro-val" style="color:var(--macro-carbs)">{Math.round(_mealTotals.carbohydrates || 0)}g</span>
-        <span class="ns-macro-lbl">Carbs</span>
+        <span class="ns-macro-lbl">{$_('diary_deep.carbs')}</span>
       </div>
       <div class="ns-macro-pill" style="background:var(--macro-fat-dim)">
         <span class="ns-macro-val" style="color:var(--macro-fat)">{Math.round(_mealTotals.fat || 0)}g</span>
-        <span class="ns-macro-lbl">Fat</span>
+        <span class="ns-macro-lbl">{$_('diary_deep.fat')}</span>
       </div>
       <div class="ns-macro-pill" style="background:var(--macro-calories-dim)">
         <span class="ns-macro-val" style="color:var(--macro-calories)">{_nsMealEnergy.value.toLocaleString()}</span>
