@@ -69,7 +69,7 @@ services:
     image: ghcr.io/traceapps/nutritrace:latest
     container_name: nutritrace
     ports:
-      - "3000:3001"
+      - "3001:3001"
     volumes:
       - ./data/db:/data/db
       - ./data/uploads:/data/uploads
@@ -93,7 +93,7 @@ Start it:
 docker compose up -d
 ```
 
-Open `http://localhost:3000` and the first-run wizard will walk you through user management and creating your admin account. Skipping user management runs the app in single-user mode.
+Open `http://localhost:3001` and the first-run wizard will walk you through user management and creating your admin account. Skipping user management runs the app in single-user mode.
 
 Full compose recipes with SMTP, Docker secrets (`*_FILE`), reverse-proxy examples, and multi-provider OIDC at [docs/getting-started/compose/](https://traceapps.github.io/docs/getting-started/compose/). Tag policy (`:latest`, `:1`, `:1.0`, `:1.0.0`, `:dev`, legacy `:1.0.0-rc.N`) in [DEPLOY.md](DEPLOY.md).
 

@@ -10,7 +10,7 @@ cp .env.example .env          # edit as needed
 docker compose up -d
 ```
 
-The app will be available at `http://localhost:3000`.
+The app will be available at `http://localhost:3001`.
 
 ---
 
@@ -69,7 +69,7 @@ services:
   nutritrace:
     image: ghcr.io/traceapps/nutritrace:latest
     ports:
-      - "3000:3001"
+      - "3001:3001"
     volumes:
       - ./data/db:/data/db
       - ./data/uploads:/data/uploads
@@ -87,7 +87,7 @@ services:
   nutritrace:
     image: ghcr.io/traceapps/nutritrace:latest
     ports:
-      - "3000:3001"
+      - "3001:3001"
     volumes:
       - ./data/db:/data/db
       - ./data/uploads:/data/uploads
@@ -283,7 +283,7 @@ With `BASE_URL` set, the app's assets, API routes, service worker, and image URL
 ```caddyfile
 example.com {
   handle /nutritrace/* {
-    reverse_proxy localhost:3000
+    reverse_proxy localhost:3001
   }
 }
 ```
@@ -294,7 +294,7 @@ example.com {
 
 ```nginx
 location /nutritrace/ {
-  proxy_pass http://localhost:3000/nutritrace/;  # trailing slash on both sides
+  proxy_pass http://localhost:3001/nutritrace/;  # trailing slash on both sides
   proxy_set_header Host $host;
   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
   proxy_set_header X-Forwarded-Proto $scheme;
