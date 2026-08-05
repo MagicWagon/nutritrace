@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **"Save as template" on Add Activity now actually surfaces the saved templates.** Two contradictory gates on the suggestion dropdown were keeping saved-template rows from ever rendering: the outer dropdown required a typed query to show, and the templates section required an empty query to show. Templates therefore saved to the database correctly but never appeared in the picker. Dropdown now opens on focus when any templates exist, and typed text fuzzy-filters templates alongside the compendium + past-name suggestions. Thanks to @tellis82 for reporting in [Discussion #121](https://github.com/TraceApps/nutritrace/discussions/121).
+
 ---
 
 ## [1.1.0] - 2026-08-04

@@ -149,8 +149,23 @@
   $: pastMatches = q
     ? pastNames.filter(n => n.toLowerCase().includes(q.toLowerCase())).slice(0, 4)
     : [];
-  $: hasSuggestions = showSuggestions && q.length > 0 &&
-    (compendiumMatches.length > 0 || pastMatches.length > 0 || templates.length > 0);
+  // Show the dropdown on focus even with an empty query as long as at least
+  // one templates row exists (that's the whole point of "Save as template"
+  // — pinned entries surface immediately on focus). Compendium / past-name
+  // matches still require a query since those lists are too large to render
+  // wholesale. Fixes the empty-state gap on Discussion #121 where templates
+  // were saved but never rendered because the outer q.length > 0 gate hid
+  // the entire dropdown before the inner templates section could show.
+  $: hasSuggestions = showSuggestions && (
+    (q.length > 0 && (compendiumMatches.length > 0 || pastMatches.length > 0 || filteredTemplates.length > 0)) ||
+    (q.length === 0 && templates.length > 0)
+  );
+  // Templates get fuzzy-filtered by the current query when the user is
+  // typing, so a saved "Bike ride" template still shows when they've typed
+  // "bik". When empty, all templates render (see hasSuggestions above).
+  $: filteredTemplates = q.length > 0
+    ? templates.filter(t => (t.name || '').toLowerCase().includes(q.toLowerCase()))
+    : templates;
 
   function pickCompendium(a) {
     name = a.name;
@@ -241,7 +256,7 @@
       <div class="name-row">
         <input class="input" type="text" bind:value={name} bind:this={nameInput}
           on:input={onNameInput}
-          on:focus={() => { if (q) showSuggestions = true; }}
+          on:focus={() => { if (q || templates.length > 0) showSuggestions = true; }}
           on:blur={() => setTimeout(() => showSuggestions = false, 150)}
           placeholder={$_('diary.activity.field_name_placeholder')} maxlength="80"
           autocomplete="off" />
@@ -255,9 +270,9 @@
       {/if}
       {#if hasSuggestions}
         <div class="suggest">
-          {#if templates.length > 0 && !q}
+          {#if filteredTemplates.length > 0}
             <div class="suggest-section-label">{$_('diary.activity.suggest.templates')}</div>
-            {#each templates as t (t.id)}
+            {#each filteredTemplates as t (t.id)}
               <button type="button" class="suggest-item" on:mousedown|preventDefault={() => pickTemplate(t)}>
                 <span class="suggest-name">{t.name}</span>
                 {#if t.met != null}<span class="suggest-met">MET {Number(t.met).toFixed(1)}</span>{/if}
