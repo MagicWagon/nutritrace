@@ -123,6 +123,29 @@ export function unitSystem(unit) {
   return null;
 }
 
+// Short SI / labeling abbreviations that consumers read tightly against
+// the number ("500g", "250ml", "100kcal"). Everything else — named
+// serving units ("Nugget(s)", "slice", "cup", "tbsp"), custom user
+// units — gets a space so it doesn't visually smash together
+// ("8Nugget(s)" vs "8 Nugget(s)"). Matches FDA nutrition-label +
+// MyFitnessPal / MacroFactor / Lose It consumer convention. Cronometer
+// is the outlier that spaces everything; every other tracker in the
+// space uses this mixed style.
+const _NO_SPACE_UNITS = new Set([
+  'g','mg','kg','ml','l','oz','lb','mcg','µg','kcal','kj','iu','%',
+]);
+
+/**
+ * Format an amount + unit for display. Uses no separator for short SI
+ * abbreviations (500g, 250ml, 100kcal) and a single space for word /
+ * named units (8 Nugget(s), 1 cup, 3 slices). Bug #143 (@javydekoning).
+ */
+export function amountAndUnit(amount, unit) {
+  const u = (unit || 'g').toString();
+  const sep = _NO_SPACE_UNITS.has(u.toLowerCase()) ? '' : ' ';
+  return `${amount}${sep}${u}`;
+}
+
 /** Lookup factor; returns null for unknown / non-convertible units. */
 export function unitToGrams(unit) {
   if (!unit) return null;

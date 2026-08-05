@@ -12,7 +12,7 @@
   import FoodDetailSheet from '../components/ui/FoodDetailSheet.svelte';
   import UnitPicker  from '../components/ui/UnitPicker.svelte';
   import { portal } from '../lib/portal.js';
-  import { scaleFactor as _unitScaleFactor, unitSystem as _unitSystem } from '../lib/units.js';
+  import { scaleFactor as _unitScaleFactor, unitSystem as _unitSystem, amountAndUnit } from '../lib/units.js';
   import { diaryPromptQuantity, warnUnitMismatch, showUnitMetadata } from '../stores/settings.js';
   import { showSuccess, showError } from '../stores/toast.js';
   import { editorState, clearFoodEditorState } from '../stores/editorState.js';
@@ -1772,7 +1772,7 @@
                   </span>
                   {#if activeTab === 0}
                     {#if food.brand}<span class="food-brand text-3 text-sm">{food.brand}</span>{/if}
-                    <span class="food-kcal text-sm">{food.portion || 100} {food.unit || 'g'}{#if food.nutrition_basis && ($showUnitMetadata || $warnUnitMismatch)} · <span class="food-basis text-3">per 100 {food.nutrition_basis}</span>{/if}{#if food._shared_by} · <span style="color:var(--accent)">by {food._shared_by}</span>{/if}</span>
+                    <span class="food-kcal text-sm">{amountAndUnit(food.portion || 100, food.unit)}{#if food.nutrition_basis && ($showUnitMetadata || $warnUnitMismatch)} · <span class="food-basis text-3">per 100 {food.nutrition_basis}</span>{/if}{#if food._shared_by} · <span style="color:var(--accent)">by {food._shared_by}</span>{/if}</span>
                   {:else}
                     {@const _kcal = Math.round(Nutrition.sum((food.items||[]).map(i => Nutrition.calculate(i))).calories || food.nutrition?.calories || 0)}
                     {@const _mealEnergy = Nutrition.displayEnergy(_kcal, $energyUnit)}
@@ -2130,7 +2130,7 @@
             <span style="font-weight:500;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{it.name || 'Unnamed'}</span>
             {#if it.brand}<span class="text-3 text-sm">{it.brand}</span>{/if}
             <span class="text-3 text-sm">
-              {it.quantity ? `${it.quantity} × ` : ''}{it.portion || 100} {it.unit || 'g'}
+              {it.quantity ? `${it.quantity} × ` : ''}{amountAndUnit(it.portion || 100, it.unit)}
             </span>
           </div>
           <span class="text-2 text-sm" style="font-variant-numeric:tabular-nums;margin-left:8px;flex-shrink:0">
@@ -2174,7 +2174,7 @@
             <span style="font-weight:500;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{it.name || 'Unnamed'}</span>
             {#if it.brand}<span class="text-3 text-sm">{it.brand}</span>{/if}
             <span class="text-3 text-sm">
-              {it.quantity ? `${it.quantity} × ` : ''}{it.portion || 100} {it.unit || 'g'}
+              {it.quantity ? `${it.quantity} × ` : ''}{amountAndUnit(it.portion || 100, it.unit)}
             </span>
           </div>
           <span class="text-2 text-sm" style="font-variant-numeric:tabular-nums;margin-left:8px;flex-shrink:0">
