@@ -509,7 +509,9 @@
 
   function _pickBySource(source, item) {
     if (source === 'mealie') return pickMealieRecipe(item);
-    return pickFood(item);  // local + shared + off + usda all go through pickFood
+    // Pass source through so pickFood can trigger the OFF v3 hydration
+    // step (search-a-licious hits lack serving_size + _serving nutriments).
+    return pickFood(item, source);  // local + shared + off + usda all go through pickFood
   }
 
   // Fetch the next page of the currently-active external source and append
@@ -861,7 +863,23 @@
     push(item ? '/meal-editor/' + item.id : '/meal-editor');
   }
 
-  async function pickFood(food) {
+  async function pickFood(food, sourceHint) {
+    // Search-a-licious hits deliberately omit serving_size, serving_quantity,
+    // nutrition_data_per, and _serving nutriment variants (index space
+    // savings). These matter for the Import Portion As setting, alt-units
+    // convenience picker, and the cross-system nutrition-basis warning.
+    // Hydrate on tap via a v3 product lookup so the add / detail sheet
+    // sees full-fidelity data. NtApi.fetchProductByCode caches per-code
+    // in-session, so a second tap on the same food is instant. Only fires
+    // for freshly-picked OFF search hits (sourceHint === 'off'); locally
+    // stored foods, barcode-scanned foods, and shared / USDA / Mealie
+    // items all have their own data paths and don't need OFF hydration.
+    if (sourceHint === 'off' && food && food.barcode) {
+      try {
+        const hydrated = await NtApi.fetchProductByCode(food.barcode);
+        if (hydrated) food = { ...food, ...hydrated };
+      } catch { /* fall through with the un-hydrated hit */ }
+    }
     if (!pickMode) {
       // Meals/Recipes open the meal editor; Foods open the read-only
       // detail sheet (Phase 2 of the NutritionFactsBox rollout). The sheet
