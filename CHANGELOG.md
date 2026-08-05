@@ -7,8 +7,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [1.1.1] - 2026-08-05
+
+Patch release. Restores OFF food-name search for the majority of self-hosters (broken in v1.1.0 by a response-shape parser mismatch), plus a handful of UI polish fixes.
+
 ### Fixed
 
+- **Open Food Facts name search returns results again for non-mirror users** ([#133](https://github.com/TraceApps/nutritrace/issues/133), thanks @JacosVerksted for spotting). v1.1.0 changed the OFF search URL to the v2 API but left the response parser reading `data.hits` (the search-a-licious envelope key) instead of `data.products` (v2's key). Self-hosters running the local OFF mirror weren't affected because the mirror always returns `hits`, but anyone without the mirror got zero results for every text query. Parser now reads whichever envelope is present so both paths work. Full search-a-licious migration is queued for a following release for typo tolerance + code parity with CookTrace.
 - **Missing space between amount and unit for named serving units** (#143, thanks @javydekoning). Rows like `8Nugget(s)` now render as `8 Nugget(s)`. Uses the FDA-nutrition-label + MyFitnessPal / MacroFactor consumer convention: short SI abbreviations stay tight (`500g`, `250ml`, `100kcal`), named / word units get a space (`8 Nugget(s)`, `3 slices`, `1 cup`). New shared helper `amountAndUnit()` in `lib/units.js` centralizes the rule; applied across the Diary main rows, split-recipe children, action-sheet subtitles, Foods list, Foods bulk-import modal, Meal Editor per-serving line + food-picker, and Smart Log preview.
 - **"Save as template" on Add Activity now actually surfaces the saved templates.** Two contradictory gates on the suggestion dropdown were keeping saved-template rows from ever rendering: the outer dropdown required a typed query to show, and the templates section required an empty query to show. Templates therefore saved to the database correctly but never appeared in the picker. Dropdown now opens on focus when any templates exist, and typed text fuzzy-filters templates alongside the compendium + past-name suggestions. Thanks to @tellis82 for reporting in [Discussion #121](https://github.com/TraceApps/nutritrace/discussions/121).
 
