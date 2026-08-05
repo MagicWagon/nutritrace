@@ -23,6 +23,7 @@
     return navigator.language || 'en-US';
   }
   import { Nutrition } from '../../lib/nutrition.js';
+  import { amountAndUnit } from '../../lib/units.js';
   import { showError, showSuccess } from '../../stores/toast.js';
   import { parseInput, matchItems, saveItems, resolveMealSlot } from '../../lib/quick-log.js';
   import { isNative } from '../../lib/platform.js';
@@ -378,7 +379,7 @@
                 {@const _kcal = (m.food.nutrition?.calories || 0) * (m.quantity / (m.food.portion || 100))}
                 {@const _e2 = Nutrition.displayEnergy(_kcal, $energyUnit)}
                 <div class="ql-row-meta">
-                  {_e2.value.toLocaleString()} {_e2.unit} · {m.quantity}{m.food.unit || 'g'}
+                  {_e2.value.toLocaleString()} {_e2.unit} · {amountAndUnit(m.quantity, m.food.unit)}
                 </div>
               {:else}
                 <div class="ql-row-meta">No nutrition data — remove or add manually</div>

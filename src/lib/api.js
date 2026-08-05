@@ -153,7 +153,12 @@ const API = {
       const res = await _extFetch(offUrl);
       if (!res.ok) return [];
       const data = await res.json();
-      const items = (data.hits || []).map(p => this._mapOFFProduct(p)).filter(Boolean);
+      // Read whichever envelope is present. The proxy at server/routes/proxy.js
+      // may respond with `hits` (local OFF mirror) or `products` (remote v2
+      // API fall-through when the mirror is off or misses). v1.1.0 shipped
+      // reading `hits` only, which silently returned empty for the majority
+      // of self-hosters who don't run the mirror. #133 (@JacosVerksted).
+      const items = (data.hits || data.products || []).map(p => this._mapOFFProduct(p)).filter(Boolean);
       return _rankOFFResults(items);
     } catch(e) {
       console.error('Search failed:', e);
@@ -173,7 +178,12 @@ const API = {
       const res = await _extFetch(offUrl);
       if (!res.ok) return { items: [], totalHits: 0, page, hasMore: false };
       const data = await res.json();
-      const items = (data.hits || []).map(p => this._mapOFFProduct(p)).filter(Boolean);
+      // Read whichever envelope is present. The proxy at server/routes/proxy.js
+      // may respond with `hits` (local OFF mirror) or `products` (remote v2
+      // API fall-through when the mirror is off or misses). v1.1.0 shipped
+      // reading `hits` only, which silently returned empty for the majority
+      // of self-hosters who don't run the mirror. #133 (@JacosVerksted).
+      const items = (data.hits || data.products || []).map(p => this._mapOFFProduct(p)).filter(Boolean);
       const totalHits = typeof data.count === 'number' ? data.count : items.length;
       const hasMore = page * pageSize < totalHits;
       return { items: _rankOFFResults(items), totalHits, page, hasMore };

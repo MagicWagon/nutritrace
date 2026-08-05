@@ -6,6 +6,7 @@
   import { buildJsonTemplate, buildCsvTemplate } from '../../lib/food-import-template.js';
   import { parseJson, parseCsv } from '../../lib/food-import-parse.js';
   import { Nutrition } from '../../lib/nutrition.js';
+  import { amountAndUnit } from '../../lib/units.js';
   import { energyUnit } from '../../stores/settings.js';
 
   export let open = false;
@@ -152,7 +153,7 @@
               <li>
                 <span class="food-name">{f.name}</span>
                 {#if f.brand}<span class="food-brand">{f.brand}</span>{/if}
-                <span class="food-meta">{_e.value} {_e.unit} · {f.portion}{f.unit}</span>
+                <span class="food-meta">{_e.value} {_e.unit} · {amountAndUnit(f.portion, f.unit)}</span>
               </li>
             {/each}
           </ul>

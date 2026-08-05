@@ -19,7 +19,7 @@
   import ActionSheet  from '../components/ui/ActionSheet.svelte';
   import UnitPicker   from '../components/ui/UnitPicker.svelte';
   import TimePicker   from '../components/ui/TimePicker.svelte';
-  import { scaleFactor as _unitScaleFactor } from '../lib/units.js';
+  import { scaleFactor as _unitScaleFactor, amountAndUnit } from '../lib/units.js';
   import { showSuccess, showError, showInfo } from '../stores/toast.js';
   import {
     currentDate, currentEntry, diaryTotals, macroPercents,
@@ -317,7 +317,7 @@
       if (value <= 0) return null;
       const isQuick = it.type === 'quick_calories';
       const portion = isQuick ? null
-        : `${Math.round((it.portion || it.amount || 100) * (it.quantity || 1) * 10) / 10}${it.unit || 'g'}`;
+        : amountAndUnit(Math.round((it.portion || it.amount || 100) * (it.quantity || 1) * 10) / 10, it.unit);
       return { name: it.name || 'Item', value, isQuick, portion };
     }).filter(Boolean).sort((a, b) => b.value - a.value);
     const visible    = _nsShowAll ? rows : rows.slice(0, 5);
@@ -1287,7 +1287,7 @@
                   <div class="item-info">
                     <span class="item-name truncate">{item.name}</span>
                     <span class="item-meta text-3 text-sm">
-                      {Math.round((item.portion || item.amount || 100) * (item.quantity || 1) * 10) / 10}{item.unit || 'g'}{#if $diaryShowPortionSize && Math.abs((item.quantity || 1) - 1) > 0.001} ({item.quantity || 1} × {item.portion || item.amount || 100}{item.unit || 'g'}){/if}
+                      {amountAndUnit(Math.round((item.portion || item.amount || 100) * (item.quantity || 1) * 10) / 10, item.unit)}{#if $diaryShowPortionSize && Math.abs((item.quantity || 1) - 1) > 0.001} ({item.quantity || 1} × {amountAndUnit(item.portion || item.amount || 100, item.unit)}){/if}
                       {#if $diaryShowBrands && item.brand} · {item.brand}{/if}
                       · {_itemEnergy.value.toLocaleString()} {_itemEnergy.unit}
                       {#if $diaryShowTimestamps && item.addedAt}
@@ -1313,7 +1313,7 @@
                         aria-label="Edit {child.name}" title="Edit serving size">
                         <span class="split-child-name truncate">{child.name}</span>
                         <span class="split-child-meta text-3 text-sm">
-                          {Math.round((child.portion || 100) * (child.quantity || 1) * 10) / 10}{child.unit || 'g'} · {_ce.value.toLocaleString()} {_ce.unit}
+                          {amountAndUnit(Math.round((child.portion || 100) * (child.quantity || 1) * 10) / 10, child.unit)} · {_ce.value.toLocaleString()} {_ce.unit}
                         </span>
                       </button>
                       <button type="button" class="btn-icon split-child-del" on:click|stopPropagation={() => onRemoveSplitChild(item._i, ci)}
