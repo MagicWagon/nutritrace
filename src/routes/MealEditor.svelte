@@ -809,7 +809,7 @@
           {@const _g = Math.round((parseFloat(recipeAmount) / _y) * 10) / 10}
           {@const _perServE = Nutrition.displayEnergy((totals?.calories || 0) / _y, $energyUnit)}
           <div style="border-top:1px solid var(--border);margin-top:10px;padding-top:8px">
-            <p style="margin:0;font-size:13px"><span class="text-3">{$_('meal_editor.servings.per_serving_label')}</span> <strong>{_g}{recipeUnit} · {_perServE.value} {_perServE.unit}</strong></p>
+            <p style="margin:0;font-size:13px"><span class="text-3">{$_('meal_editor.servings.per_serving_label')}</span> <strong>{_g} {recipeUnit} · {_perServE.value} {_perServE.unit}</strong></p>
           </div>
         {/if}
       </div>
@@ -1023,7 +1023,7 @@
                 <span class="picker-name">{food.name}</span>
                 {#if food.brand}<span class="text-3" style="font-size:12px">{food.brand}</span>{/if}
                 {#if pickerTab === 0}
-                  <span class="text-3" style="font-size:12px">{food.portion||100}{food.unit||'g'} · {_pickEnergy.value.toLocaleString()} {_pickEnergy.unit}</span>
+                  <span class="text-3" style="font-size:12px">{food.portion||100} {food.unit||'g'} · {_pickEnergy.value.toLocaleString()} {_pickEnergy.unit}</span>
                 {:else}
                   <span class="text-3" style="font-size:12px">{_pickEnergy.value.toLocaleString()} {_pickEnergy.unit}</span>
                 {/if}

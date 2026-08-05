@@ -378,7 +378,7 @@
                 {@const _kcal = (m.food.nutrition?.calories || 0) * (m.quantity / (m.food.portion || 100))}
                 {@const _e2 = Nutrition.displayEnergy(_kcal, $energyUnit)}
                 <div class="ql-row-meta">
-                  {_e2.value.toLocaleString()} {_e2.unit} · {m.quantity}{m.food.unit || 'g'}
+                  {_e2.value.toLocaleString()} {_e2.unit} · {m.quantity} {m.food.unit || 'g'}
                 </div>
               {:else}
                 <div class="ql-row-meta">No nutrition data — remove or add manually</div>

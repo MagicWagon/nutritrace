@@ -9,6 +9,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **Missing space between amount and unit in the diary and elsewhere** (#143, thanks @javydekoning). Rows like `8Nugget(s)` now render as `8 Nugget(s)`. The bug hid on weight units like `g` and `ml` where the space was cosmetic (`500g` reads fine), but custom serving units like `Nugget(s)`, `slices`, `pieces`, `cups` made it obvious. Fixed across the Diary main rows, split-recipe children, action-sheet subtitles, Foods list, Foods bulk-import modal, Meal Editor per-serving line, and Smart Log preview.
 - **"Save as template" on Add Activity now actually surfaces the saved templates.** Two contradictory gates on the suggestion dropdown were keeping saved-template rows from ever rendering: the outer dropdown required a typed query to show, and the templates section required an empty query to show. Templates therefore saved to the database correctly but never appeared in the picker. Dropdown now opens on focus when any templates exist, and typed text fuzzy-filters templates alongside the compendium + past-name suggestions. Thanks to @tellis82 for reporting in [Discussion #121](https://github.com/TraceApps/nutritrace/discussions/121).
 
 ---
