@@ -29,6 +29,11 @@
         <button class="seg-opt" class:seg-active={$calorieGoalMode === 'adaptive'}
           on:click={() => calorieGoalMode.set('adaptive')}>{$_('settings_goals.mode_adaptive')}</button>
       </div>
+      {#if !_hasWearable}
+        <p class="setting-desc" style="padding:4px 0 0;font-size:12px;line-height:1.4">
+          Dynamic mode needs a wearable that reports calorie burn (Fitbit, Garmin, or Google Health). <a href="#/settings/wellness" class="about-link">Set one up in Wellness</a>.
+        </p>
+      {/if}
     </div>
     {#if $calorieGoalMode === 'fixed'}
       <div class="setting-divider"></div>
