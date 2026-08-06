@@ -160,6 +160,34 @@
   $: if (($fitbitFamilyEnabled || $garminEnabled) && !_wellnessLoaded) loadWellnessToday();
 
   onMount(async () => {
+    // #146 migration: users on kJ mode used to be able to set a Kilojoules
+    // goal that stored under $goals.kilojoules independently from
+    // $goals.calories. If the two got out of sync, Goals page and Diary
+    // showed different targets. Fix collapsed storage into $goals.calories
+    // (kcal) and now derives kJ display at the boundary. Clean up any
+    // legacy $goals.kilojoules value here: transfer to $goals.calories
+    // only if calories isn't already set (calories wins on conflict —
+    // that's the canonical value moving forward), then delete the stale
+    // kilojoules key so it can't drift again.
+    goals.update(g => {
+      if (!g || !g.kilojoules) return g;
+      const next = { ...g };
+      if (!next.calories && next.kilojoules) {
+        const kjVal = next.kilojoules.max ?? next.kilojoules.min;
+        if (kjVal != null && Number.isFinite(kjVal) && kjVal > 0) {
+          next.calories = {
+            ...next.kilojoules,
+            max: next.kilojoules.max != null ? kjVal / 4.184 : undefined,
+            min: next.kilojoules.min != null ? next.kilojoules.min / 4.184 : undefined,
+            days: (next.kilojoules.days || []).map(v => v != null ? v / 4.184 : null),
+          };
+          Object.keys(next.calories).forEach(k => next.calories[k] === undefined && delete next.calories[k]);
+        }
+      }
+      delete next.kilojoules;
+      return next;
+    });
+
     // Load diary data first — don't block on server calls
     const entry = await NtApi.getDiaryDate(today).catch(() => null);
     if (entry) {
@@ -249,10 +277,20 @@
 
   let _gLock = false;
   let _gLockTimer;
+  // Kilojoules is a display-mode alias for calories, not a separately-
+  // editable goal. Underlying storage is always $goals.calories in kcal;
+  // the Kilojoules row reads/writes through that same key with a kJ
+  // display conversion. Prevents the two goals from drifting after mode
+  // switches or independent edits. #146.
+  function _goalStorageId(statId) {
+    return statId === 'kilojoules' ? 'calories' : statId;
+  }
   function openEdit(stat) {
     editStat = stat;
-    const g = $goals[stat.id];
-    const kj = stat.id === 'calories_out' && $energyUnit === 'kJ';
+    const storageId = _goalStorageId(stat.id);
+    const g = $goals[storageId];
+    const kj = (stat.id === 'kilojoules') ||
+               (stat.id === 'calories_out' && $energyUnit === 'kJ');
     const toDisp = (v) => kj && v != null && v !== '' ? Math.round(Nutrition.kcalToKj(parseFloat(v))) : v;
     if (g) {
       editShared  = g.sharedGoal !== false;
@@ -281,7 +319,8 @@
 
   function saveGoal() {
     if (!editStat) return;
-    const kj = editStat.id === 'calories_out' && $energyUnit === 'kJ';
+    const kj = (editStat.id === 'kilojoules') ||
+               (editStat.id === 'calories_out' && $energyUnit === 'kJ');
     const toStore = (n) => kj && n != null ? n / 4.184 : n;
     const val = toStore(parseFloat(editVal0) || null);
     const dayArr = editShared
@@ -303,7 +342,14 @@
     if (editIsMin) entry.min = editShared ? val : peakVal;
     else           entry.max = editShared ? val : peakVal;
 
-    goals.update(g => ({ ...g, [editStat.id]: entry }));
+    const storageId = _goalStorageId(editStat.id);
+    goals.update(g => {
+      const next = { ...g, [storageId]: entry };
+      // Clear any legacy $goals.kilojoules on any kilojoules-labeled save;
+      // storage now lives only under `calories`. #146 cleanup.
+      if (editStat.id === 'kilojoules') delete next.kilojoules;
+      return next;
+    });
     editOpen = false;
     showSuccess($_('goals.toast.goal_saved'));
   }
@@ -311,7 +357,13 @@
   function deleteGoal() {
     if (!editStat) return;
     if (!confirm(`Remove goal for ${editStat.label || editStat.id}?`)) return;
-    goals.update(g => { const n = {...g}; delete n[editStat.id]; return n; });
+    const storageId = _goalStorageId(editStat.id);
+    goals.update(g => {
+      const n = { ...g };
+      delete n[storageId];
+      if (editStat.id === 'kilojoules') delete n.kilojoules;
+      return n;
+    });
     editOpen = false;
   }
 
@@ -364,7 +416,8 @@
   }
 
   function getTarget(stat) {
-    const g = $goals[stat.id];
+    const storageId = _goalStorageId(stat.id);
+    const g = $goals[storageId];
     if (!g) return null;
     let raw;
     if (g.sharedGoal !== false) {
@@ -372,6 +425,11 @@
     } else {
       const d = new Date().getDay();
       raw = (g.days && g.days[d] != null) ? g.days[d] : (g.max ?? g.min ?? null);
+    }
+    // Kilojoules row displays the calories goal converted to kJ. Underlying
+    // storage is kcal; display is unit-transformed at the boundary. #146.
+    if (stat.id === 'kilojoules' && raw != null) {
+      return Math.round(Nutrition.kcalToKj(raw) * 100) / 100;
     }
     if (raw == null || !g.isPercent) return raw;
     const density = MACRO_DENSITY[stat.id];

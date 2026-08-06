@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Kilojoules goal and Calories goal no longer drift out of sync** (#146, thanks @dominicbui). Kilojoules was defined as a separately-editable nutrient goal, so it stored under `$goals.kilojoules` independently from `$goals.calories`. Switching between fixed and adaptive calorie modes, or setting one goal via the Goals page and another via mode-switching, could leave the two out of sync (Goals page showed one target, the diary math used the other). Kilojoules is now a display-mode alias for Calories: the underlying storage is always `$goals.calories` in kcal, and the Kilojoules row reads/writes through the same key with a kJ display conversion. One-time migration on next Goals page open: if you had a Kilojoules goal but no Calories goal, it's transferred to Calories cleanly; if you had both set to different values, Calories wins (that's the canonical storage moving forward, and it matches what the diary was already using).
+
 ### Changed
 
 - **Barcode scan of an OFF-known product now shows the nutrition-facts sheet first instead of jumping into the editor.** Matches the flow when you tap an OFF search result: view nutrition, then Add to Diary or Edit. Only barcodes that OFF doesn't know go straight into the editor (nothing to view, must enter manually). Same-app-consistent UX regardless of whether you got to the food via search or scan.
