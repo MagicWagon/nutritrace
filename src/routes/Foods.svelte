@@ -1236,7 +1236,15 @@
       const { API } = await import('../lib/api.js');
       const result = await API.lookupBarcode(code);
       if (result) {
-        openEditor(result, 'foodList');
+        // OFF returned data for this barcode — show the nutrition-facts
+        // detail sheet first (with Edit + Add to Diary options) instead
+        // of jumping straight into the editor. Matches the OFF-search-tap
+        // flow so barcode scan and text-search of an OFF-known product
+        // land on the same view. Users who want to correct OFF data before
+        // saving tap Edit from the detail sheet. Only unknown-to-OFF
+        // barcodes go straight to the editor (that path unchanged).
+        detailSheetFood = result;
+        detailSheetOpen = true;
       } else {
         const { showInfo: si } = await import('../stores/toast.js');
         si('Not in Open Food Facts — enter the food and contribute it back if you want');
