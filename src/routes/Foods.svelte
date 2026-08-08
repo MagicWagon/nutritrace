@@ -874,13 +874,18 @@
     // for freshly-picked OFF search hits (sourceHint === 'off'); locally
     // stored foods, barcode-scanned foods, and shared / USDA / Mealie
     // items all have their own data paths and don't need OFF hydration.
-    if (sourceHint === 'off' && food && food.barcode) {
+    if (sourceHint === 'off' && food && food.barcode && !food._offHydrated) {
       try {
         // fetchProductByCode lives on API, not NtApi. NtApi is a Proxy
         // that routes to the HTTP / native / cached transport layers and
         // has no such method — calling it there returns undefined and
         // throws TypeError, which the surrounding catch swallowed. Would
         // silently no-op every hydration otherwise.
+        //
+        // Callers that already fetched the product via lookupBarcode (v3
+        // barcode scan path) pass _offHydrated: true so we skip the round-
+        // trip. Cache is scoped to the tap-hydration call site, not to the
+        // barcode scan, so a fresh scan wouldn't hit the cache anyway.
         const hydrated = await API.fetchProductByCode(food.barcode);
         if (hydrated) food = { ...food, ...hydrated };
       } catch { /* fall through with the un-hydrated hit */ }
@@ -1253,7 +1258,11 @@
         // so its own pickDate / pickMeal context is preserved rather than
         // silently defaulting to today + first meal via detailSheet.
         if (pickMode) {
-          await pickFood(result, 'off');
+          // Mark as already-hydrated so pickFood skips its own v3 fetch —
+          // lookupBarcode already hit /api/v3/product/<code> and returned
+          // full serving-size / _serving nutriments. Would otherwise double
+          // the request per scan and re-run _mapOFFProduct.
+          await pickFood({ ...result, _offHydrated: true }, 'off');
         } else {
           detailSheetFood = result;
           detailSheetOpen = true;

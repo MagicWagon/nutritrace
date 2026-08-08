@@ -100,8 +100,37 @@
     showSuccess($_('goals.toast.template_saved'));
   }
 
+  // #146 storage migration. Called from both onMount (for legacy $goals on
+  // page load) and applyTemplate (for legacy templates saved under the old
+  // schema). Converts $goals.kilojoules to $goals.calories at the kcal
+  // boundary and deletes the legacy key. If the legacy entry only carried
+  // per-day values (no shared max/min), the days array is still migrated
+  // instead of being silently discarded.
+  function _migrateKilojoulesGoal(g) {
+    if (!g || !g.kilojoules) return g;
+    const next = { ...g };
+    if (!next.calories && next.kilojoules) {
+      const kj = next.kilojoules;
+      const daysArr = Array.isArray(kj.days) ? kj.days : null;
+      const hasDays = daysArr && daysArr.some(v => v != null && Number.isFinite(v) && v > 0);
+      const shared = kj.max ?? kj.min;
+      const hasShared = shared != null && Number.isFinite(shared) && shared > 0;
+      if (hasShared || hasDays) {
+        next.calories = {
+          ...kj,
+          max: kj.max != null ? kj.max / 4.184 : undefined,
+          min: kj.min != null ? kj.min / 4.184 : undefined,
+          days: daysArr ? daysArr.map(v => v != null ? v / 4.184 : null) : undefined,
+        };
+        Object.keys(next.calories).forEach(k => next.calories[k] === undefined && delete next.calories[k]);
+      }
+    }
+    delete next.kilojoules;
+    return next;
+  }
+
   function applyTemplate(tpl) {
-    goals.set({ ...tpl.goals });
+    goals.set(_migrateKilojoulesGoal({ ...tpl.goals }));
     if (tpl.waterGoalMl != null) waterGoalMl.set(tpl.waterGoalMl);
     showApplyConfirm = null;
     activeTab = 'yours';
@@ -163,33 +192,8 @@
   $: if (($fitbitFamilyEnabled || $garminEnabled) && !_wellnessLoaded) loadWellnessToday();
 
   onMount(async () => {
-    // #146 migration: users on kJ mode used to be able to set a Kilojoules
-    // goal that stored under $goals.kilojoules independently from
-    // $goals.calories. If the two got out of sync, Goals page and Diary
-    // showed different targets. Fix collapsed storage into $goals.calories
-    // (kcal) and now derives kJ display at the boundary. Clean up any
-    // legacy $goals.kilojoules value here: transfer to $goals.calories
-    // only if calories isn't already set (calories wins on conflict —
-    // that's the canonical value moving forward), then delete the stale
-    // kilojoules key so it can't drift again.
-    goals.update(g => {
-      if (!g || !g.kilojoules) return g;
-      const next = { ...g };
-      if (!next.calories && next.kilojoules) {
-        const kjVal = next.kilojoules.max ?? next.kilojoules.min;
-        if (kjVal != null && Number.isFinite(kjVal) && kjVal > 0) {
-          next.calories = {
-            ...next.kilojoules,
-            max: next.kilojoules.max != null ? kjVal / 4.184 : undefined,
-            min: next.kilojoules.min != null ? next.kilojoules.min / 4.184 : undefined,
-            days: (next.kilojoules.days || []).map(v => v != null ? v / 4.184 : null),
-          };
-          Object.keys(next.calories).forEach(k => next.calories[k] === undefined && delete next.calories[k]);
-        }
-      }
-      delete next.kilojoules;
-      return next;
-    });
+    // #146 migration on page load. See _migrateKilojoulesGoal above.
+    goals.update(_migrateKilojoulesGoal);
 
     // Load diary data first — don't block on server calls
     const entry = await NtApi.getDiaryDate(today).catch(() => null);
@@ -431,8 +435,11 @@
     }
     // Kilojoules row displays the calories goal converted to kJ. Underlying
     // storage is kcal; display is unit-transformed at the boundary. #146.
+    // Integer rounding matches openEdit's toDisp so open-then-save without
+    // editing is a no-op instead of drifting the stored kcal value each
+    // pass (round(kj)→saved kcal→round back to same kj stabilizes).
     if (stat.id === 'kilojoules' && raw != null) {
-      return Math.round(Nutrition.kcalToKj(raw) * 100) / 100;
+      return Math.round(Nutrition.kcalToKj(raw));
     }
     if (raw == null || !g.isPercent) return raw;
     const density = MACRO_DENSITY[stat.id];
