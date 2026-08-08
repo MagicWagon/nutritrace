@@ -1900,7 +1900,7 @@
                   </button>
                 {/if}
                 <button class="food-item-btn"
-                  on:click={() => pickFood(food)}
+                  on:click={() => pickFood(food, searchSource)}
                   on:contextmenu|preventDefault={() => longPress(food)}
                   on:touchstart|passive={() => _startLongPress(() => longPress(food))}
                   on:touchmove|passive={_cancelLongPress}

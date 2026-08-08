@@ -203,10 +203,21 @@ const API = {
   // search itself fast and restores full fidelity at add-time. Cached
   // in-session by barcode so a second tap on the same food doesn't
   // refetch. Returns null on error; caller falls back to the search hit.
+  // LRU-capped hydrate cache. Bound prevents unbounded growth over a long
+  // browsing session where a user searches OFF many times and taps many
+  // unique results. Map iteration order is insertion order in JS, so
+  // deleting the first key evicts the least-recently-inserted entry; each
+  // hit is re-inserted so recently-used entries move to the tail.
   _offHydrateCache: new Map(),
+  _OFF_HYDRATE_MAX: 200,
   async fetchProductByCode(code) {
     if (!code) return null;
-    if (this._offHydrateCache.has(code)) return this._offHydrateCache.get(code);
+    if (this._offHydrateCache.has(code)) {
+      const cached = this._offHydrateCache.get(code);
+      this._offHydrateCache.delete(code);
+      this._offHydrateCache.set(code, cached);
+      return cached;
+    }
     try {
       const lc = _getOffSearchLanguage();
       const url = `${this.OFF_BASE}/api/v3/product/${code}?lc=${encodeURIComponent(lc)}`;
@@ -215,7 +226,13 @@ const API = {
       const data = await res.json();
       if (!_isOffSuccess(data)) return null;
       const mapped = this._mapOFFProduct(data.product);
-      if (mapped) this._offHydrateCache.set(code, mapped);
+      if (mapped) {
+        if (this._offHydrateCache.size >= this._OFF_HYDRATE_MAX) {
+          const oldest = this._offHydrateCache.keys().next().value;
+          if (oldest !== undefined) this._offHydrateCache.delete(oldest);
+        }
+        this._offHydrateCache.set(code, mapped);
+      }
       return mapped;
     } catch(e) {
       console.warn('OFF hydrate failed:', e);

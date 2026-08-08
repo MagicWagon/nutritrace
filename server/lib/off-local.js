@@ -255,7 +255,27 @@ export async function lookupByBarcode(code) {
 export async function searchByName(query, { page = 1, pageSize = 20 } = {}) {
   const conn = await _init();
   if (!conn) return null;
-  const q = String(query || '').trim();
+  // The frontend now builds Lucene-syntax queries for search-a-licious
+  // ('foo bar +countries_tags:"en:norway"' + backslash-escapes on reserved
+  // chars like `+ - ! ( ) { } [ ] ^ " ~ * ? : \ / && ||`). The local mirror
+  // does SQL LIKE matching, so Lucene syntax would never match. Strip:
+  //   1. Trailing filter clauses of the form `+field:"value"` or `-field:value`
+  //   2. Backslash-escapes on reserved chars so 'Ben \\& Jerry\\'s' becomes
+  //      'Ben & Jerry\\'s' for the LIKE match.
+  //   3. Leftover Lucene operators (`&&`, `||`, standalone `+`/`-` prefixes
+  //      on unrelated tokens) that would still be baked into the pattern.
+  // Country filter is lost (mirror can't apply it without a countries_tags
+  // column on the DuckDB extract), which is acceptable since the mirror
+  // is already a coarse text-search fallback and the caller can still see
+  // the flag via the origins_tags field on each product.
+  const raw = String(query || '').trim();
+  const q = raw
+    .replace(/[+\-]\w+:"[^"]*"/g, '')   // +field:"value" and -field:"value"
+    .replace(/[+\-]\w+:\S+/g, '')       // +field:value / -field:value (unquoted)
+    .replace(/\\(.)/g, '$1')            // unescape \x → x
+    .replace(/\s+&&\s+|\s+\|\|\s+/g, ' ') // strip boolean operators
+    .replace(/\s+/g, ' ')
+    .trim();
   if (!q) return { hits: [], count: 0, page, page_size: pageSize };
   const pattern = `%${q.toLowerCase().replace(/[%_]/g, c => '\\' + c)}%`;
   const startPattern = `${q.toLowerCase().replace(/[%_]/g, c => '\\' + c)}%`;
