@@ -4,21 +4,27 @@
  *
  * Usage:
  *   node scripts/mcp-smoke.mjs <BASE_URL> <MCP_TOKEN>
+ *   node scripts/mcp-smoke.mjs <BASE_URL> <MCP_TOKEN> --writes
  *
- * Example:
- *   node scripts/mcp-smoke.mjs https://nt-dev.example nt_abc123...
+ * Reads-only mode: the token must hold `mcp:read`. Default.
+ * Writes mode:     add `--writes`; the token must ALSO hold `mcp:write`
+ *                  and the server must have MCP_WRITE_ENABLED=1. The
+ *                  writes tested are additive (log_water 250 ml, log a
+ *                  body_stat weight snapshot) and are safe to run
+ *                  against a real account — they land in the diary and
+ *                  are undoable through the normal UI.
  *
- * The token must hold the `mcp:read` scope. Mint one via
- * POST /api/admin/api-tokens (or the Settings UI once wired).
- *
- * Prints one line per check with PASS / FAIL / SKIP. Exits non-zero
- * if any REQUIRED check failed. Negative-path checks (401 / 403) are
- * required — if they pass, auth or origin gating is broken.
+ * Prints one line per check with PASS / FAIL. Exits non-zero if any
+ * check failed. Negative-path checks (401 / 403) are required — if they
+ * pass, auth or origin gating is broken.
  */
 
-const [, , BASE, TOKEN] = process.argv;
+const argv = process.argv.slice(2);
+const WRITE_MODE = argv.includes('--writes');
+const positional = argv.filter(a => !a.startsWith('--'));
+const [BASE, TOKEN] = positional;
 if (!BASE || !TOKEN) {
-  console.error('usage: node scripts/mcp-smoke.mjs <BASE_URL> <MCP_TOKEN>');
+  console.error('usage: node scripts/mcp-smoke.mjs <BASE_URL> <MCP_TOKEN> [--writes]');
   process.exit(2);
 }
 
@@ -82,22 +88,33 @@ console.log(`\n\x1b[1mMCP smoke test\x1b[0m  ${URL_}\n`);
 }
 
 // --- tools/list ---
-const EXPECTED_TOOLS = new Set([
+const READ_TOOLS = [
   'get_goals',
   'list_diary_entries',
   'get_daily_totals',
   'search_foods',
   'get_recent_foods',
-]);
+];
+const WRITE_TOOLS = [
+  'log_food',
+  'log_water',
+  'log_meal',
+  'log_body_stat',
+];
+const EXPECTED_TOOLS = new Set(WRITE_MODE ? [...READ_TOOLS, ...WRITE_TOOLS] : READ_TOOLS);
 {
   const r = await mcp('tools/list');
   const tools = r.json?.result?.tools || [];
   const names = new Set(tools.map(t => t.name));
   const missing = [...EXPECTED_TOOLS].filter(n => !names.has(n));
-  if (r.status === 200 && missing.length === 0) {
+  const unexpected = WRITE_MODE ? [] : WRITE_TOOLS.filter(n => names.has(n));
+  if (r.status === 200 && missing.length === 0 && unexpected.length === 0) {
     line('PASS', `tools/list`, `${tools.length} tools`);
   } else {
-    line('FAIL', `tools/list`, `status=${r.status} missing=[${missing.join(',')}]`);
+    const notes = [];
+    if (missing.length)    notes.push(`missing=[${missing.join(',')}]`);
+    if (unexpected.length) notes.push(`write tools leaked without --writes: [${unexpected.join(',')}]`);
+    line('FAIL', `tools/list`, `status=${r.status} ${notes.join(' ')}`);
   }
 }
 
@@ -120,6 +137,28 @@ await checkTool('get_daily_totals',    {},                       'totals',    '(
 await checkTool('list_diary_entries',  {},                       'items',     '(today)');
 await checkTool('search_foods',        { query: 'a', limit: 3 }, 'items',     '(q=a)');
 await checkTool('get_recent_foods',    { limit: 3 },             'items');
+
+// --- Write tools (opt-in with --writes) ---
+if (WRITE_MODE) {
+  // log_water: safe, additive, verifiable.
+  await checkTool('log_water', { amount_ml: 250 }, 'total_ml_on_day', '(+250 ml)');
+  // log_body_stat: additive, merges — logs a weight snapshot.
+  await checkTool('log_body_stat', { stats: { weight: 75.0 } }, 'current_stats', '(weight=75)');
+  // log_food / log_meal require real ids from the user's catalog, so
+  // just check that the tools exist and reject a bogus id cleanly.
+  {
+    const r = await callTool('log_food', { food_id: 999999999 });
+    const err = r.json?.result?.isError;
+    if (err) line('PASS', 'log_food (bogus id → clean tool error)');
+    else     line('FAIL', 'log_food (bogus id)', `did not return isError`);
+  }
+  {
+    const r = await callTool('log_meal', { meal_id: 999999999 });
+    const err = r.json?.result?.isError;
+    if (err) line('PASS', 'log_meal (bogus id → clean tool error)');
+    else     line('FAIL', 'log_meal (bogus id)', `did not return isError`);
+  }
+}
 
 // --- Negative: no bearer → 401 ---
 {

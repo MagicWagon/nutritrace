@@ -2,8 +2,11 @@
  * server/routes/mcp.js — Model Context Protocol endpoint (#103).
  *
  * Mounted at /api/mcp when MCP_ENABLED=1 in the server env. Off by
- * default, so no existing user sees any change. A future write-scope
- * addition will require MCP_WRITE_ENABLED=1 separately (Phase 2).
+ * default, so no existing user sees any change. Write tools (Phase 2:
+ * log_food, log_water, log_meal, log_body_stat) additionally require
+ * MCP_WRITE_ENABLED=1 on the server AND the calling token holding the
+ * `mcp:write` scope; either missing and the write tools don't appear
+ * in tools/list.
  *
  * Wire protocol: MCP Streamable HTTP, stateless mode. Single POST
  * endpoint. GET / DELETE explicitly return 405 (we don't run stateful
@@ -23,7 +26,8 @@ import { logger } from '../logger.js';
 
 const router = Router();
 
-const ENABLED = _envFlag(process.env.MCP_ENABLED);
+const ENABLED       = _envFlag(process.env.MCP_ENABLED);
+const WRITE_ENABLED = _envFlag(process.env.MCP_WRITE_ENABLED);
 
 // Parse ALLOWED_ORIGINS (comma-separated, same convention as the rest
 // of the server). Server-to-server MCP clients (Claude Desktop's HTTP
@@ -76,6 +80,9 @@ router.use((req, res, next) => {
 });
 
 router.post('/', bearerAuth, requireScope('mcp:read'), async (req, res) => {
+  // Stamp write eligibility onto the request for the tool registrar
+  // downstream. Both the server flag AND the token scope must be true.
+  req.mcpWrites = WRITE_ENABLED && !!req.apiToken?.scopes?.includes('mcp:write');
   try {
     await handleMcpRequest(req, res);
   } catch (e) {

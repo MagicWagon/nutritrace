@@ -37,6 +37,21 @@ test('mcp:read scope is registered in KNOWN_SCOPES so tokens can hold it', () =>
   assert.match(apiTokens, /'mcp:read'/);
 });
 
+test('mcp:write scope is registered (Phase 2)', () => {
+  assert.match(apiTokens, /'mcp:write'/);
+});
+
+test('MCP route computes write eligibility from MCP_WRITE_ENABLED + mcp:write scope', () => {
+  assert.match(mcpRoute, /MCP_WRITE_ENABLED/);
+  assert.match(mcpRoute, /mcp:write/);
+  assert.match(mcpRoute, /req\.mcpWrites/);
+});
+
+test('MCP server registers write tools only when req.mcpWrites is true', () => {
+  assert.match(mcpServer, /registerWriteTools/);
+  assert.match(mcpServer, /req\.mcpWrites/);
+});
+
 test('MCP transport is stateless (no session id generator)', () => {
   // Stateless mode is what current MCP clients (Claude Desktop / Cursor
   // / Codex) expect for a read-only server; switching to stateful would
@@ -58,6 +73,18 @@ test('All Phase 1 read tools are registered', () => {
   }
 });
 
+test('All Phase 2 write tools are registered in registerWriteTools', () => {
+  const expected = [
+    'registerLogFood',
+    'registerLogWater',
+    'registerLogMeal',
+    'registerLogBodyStat',
+  ];
+  for (const fn of expected) {
+    assert.match(mcpTools, new RegExp(`\\b${fn}\\s*\\(`), `expected ${fn}() call in tools/index.js`);
+  }
+});
+
 test('@modelcontextprotocol/sdk is declared as a runtime dependency', () => {
   const deps = pkgJson.dependencies || {};
   assert.ok(deps['@modelcontextprotocol/sdk'], 'missing @modelcontextprotocol/sdk in dependencies');
@@ -73,6 +100,10 @@ test('MCP tool DB queries scope on user_id — no cross-user access', () => {
     'daily-totals.js',
     'search-foods.js',
     'recent-foods.js',
+    'log-food.js',
+    'log-water.js',
+    'log-meal.js',
+    'log-body-stat.js',
   ];
   for (const f of toolFiles) {
     const src = readFileSync(

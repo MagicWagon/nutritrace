@@ -39,6 +39,12 @@ export const KNOWN_SCOPES = new Set([
   // Desktop / Cursor / Codex / etc.) inspect their diary, goals, and
   // food catalog through the MCP standard interface.
   'mcp:read',
+  // mcp:write unlocks Model Context Protocol WRITE tools (Phase 2:
+  // log_food, log_water, log_meal, log_body_stat). Independent of
+  // mcp:read but tokens typically hold both — the write tools rely on
+  // read primitives (food lookup, meal lookup) at execution time.
+  // Requires MCP_WRITE_ENABLED=1 on the server for any effect.
+  'mcp:write',
 ]);
 
 function _hash(raw) {

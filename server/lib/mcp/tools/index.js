@@ -4,12 +4,22 @@
  * ctx.userId — the token that hit the MCP endpoint owns the scope
  * of every query. No cross-user access is possible from an MCP
  * handler; every DB query in each tool prepends `WHERE user_id = ?`.
+ *
+ * Write tools are registered ONLY when the request context reports
+ * `writes: true` — that requires BOTH the server-side MCP_WRITE_ENABLED
+ * flag AND the caller's token holding the `mcp:write` scope. If either
+ * is absent the write tools don't appear in tools/list at all, so an
+ * agent has no way to attempt them.
  */
 import { registerGetGoals } from './goals.js';
 import { registerListDiary } from './list-diary.js';
 import { registerDailyTotals } from './daily-totals.js';
 import { registerSearchFoods } from './search-foods.js';
 import { registerRecentFoods } from './recent-foods.js';
+import { registerLogFood } from './log-food.js';
+import { registerLogWater } from './log-water.js';
+import { registerLogMeal } from './log-meal.js';
+import { registerLogBodyStat } from './log-body-stat.js';
 
 export function registerReadTools(server, ctx) {
   registerGetGoals(server, ctx);
@@ -17,4 +27,11 @@ export function registerReadTools(server, ctx) {
   registerDailyTotals(server, ctx);
   registerSearchFoods(server, ctx);
   registerRecentFoods(server, ctx);
+}
+
+export function registerWriteTools(server, ctx) {
+  registerLogFood(server, ctx);
+  registerLogWater(server, ctx);
+  registerLogMeal(server, ctx);
+  registerLogBodyStat(server, ctx);
 }

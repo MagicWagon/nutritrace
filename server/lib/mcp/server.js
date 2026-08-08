@@ -16,7 +16,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { APP_VERSION } from '../../routes/version-source.js';
-import { registerReadTools } from './tools/index.js';
+import { registerReadTools, registerWriteTools } from './tools/index.js';
 
 export async function handleMcpRequest(req, res) {
   const transport = new StreamableHTTPServerTransport({
@@ -33,7 +33,9 @@ export async function handleMcpRequest(req, res) {
       capabilities: { tools: {} },
     }
   );
-  registerReadTools(server, { userId: req.apiUser.id });
+  const ctx = { userId: req.apiUser.id };
+  registerReadTools(server, ctx);
+  if (req.mcpWrites) registerWriteTools(server, ctx);
 
   await server.connect(transport);
   try {
