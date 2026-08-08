@@ -6,7 +6,8 @@
  * side (1 fl oz = 29.5735 ml) before calling.
  */
 import { z } from 'zod';
-import { DATE_RE, todayLocal, toolResult, toolError } from '../_util.js';
+import db from '../../../db.js';
+import { DATE_RE, safeJson, todayLocal, toolResult, toolError } from '../_util.js';
 import { mutateDiaryDay, DiaryTombstonedError } from '../_diary-write.js';
 
 const MAX_ML_PER_ENTRY = 5000;   // 5 L in one log = obvious agent bug or typo
@@ -34,12 +35,21 @@ export function registerLogWater(server, { userId }) {
       // Default time to now ONLY when the log is for today; backdated
       // entries default to noon to avoid a stamp that reads as "logged
       // 9 AM on that day" when it was actually filed later.
+      //
+      // hour12 is pinned to the user's timeFormat setting so a mixed
+      // en_GB/en_US server locale doesn't leave the same diary with
+      // '9:00 AM' entries from the UI and '09:00' entries from MCP.
       const isToday = day === todayLocal();
+      const tfRow = db.prepare(
+        `SELECT value FROM user_settings
+          WHERE user_id = ? AND key = 'timeFormat' AND deleted_at IS NULL`
+      ).get(userId);
+      const use24 = safeJson(tfRow?.value, '12h') === '24h';
       const log = {
         amount: Math.round(amount_ml),
         time: time || (isToday
-          ? new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-          : '12:00 PM'),
+          ? new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: !use24 })
+          : (use24 ? '12:00' : '12:00 PM')),
       };
 
       let next;

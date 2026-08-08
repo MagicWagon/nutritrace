@@ -49,13 +49,17 @@ export function registerLogFood(server, { userId }) {
       ).get(userId, food_id);
       if (!food) return toolError(`food_id ${food_id} not found in your catalog.`);
 
-      // Unit-conversion is intentionally not attempted server-side —
-      // the callers know their own inputs and OFF/USDA style unit
-      // conversions are lossy without density data. Reject cross-unit
-      // requests so the agent knows to convert first.
+      // Unit-conversion is intentionally not attempted server-side.
+      // Callers know their own inputs; OFF/USDA style unit conversions
+      // are lossy without density data. Reject cross-unit requests so
+      // the agent knows to convert first. Comparison is case-insensitive
+      // ('G' vs 'g' should match) but otherwise strict.
       const foodPortion = Number.isFinite(Number(food.portion)) ? Number(food.portion) : null;
       const foodUnit    = food.unit || null;
-      if (unit && foodUnit && unit !== foodUnit) {
+      const unitMatches = !unit
+        || !foodUnit
+        || String(unit).trim().toLowerCase() === String(foodUnit).trim().toLowerCase();
+      if (!unitMatches) {
         return toolError(
           `Cross-unit portions are not supported: food '${food.name}' is measured in '${foodUnit}', ` +
           `caller supplied '${unit}'. Convert to '${foodUnit}' first or omit the unit override.`
@@ -63,11 +67,22 @@ export function registerLogFood(server, { userId }) {
       }
 
       // Scale nutrition proportionally when the caller overrides portion.
-      // Nutrition.calculate() multiplies by quantity only — portion + unit
-      // are display-only on the diary item — so any portion delta must be
+      // Nutrition.calculate() multiplies by quantity only (portion + unit
+      // are display-only on the diary item) so any portion delta must be
       // baked into the stored `nutrition` object before write.
+      //
+      // If the caller supplied a portion but the food row has no baseline
+      // portion, we cannot compute a scale factor — refuse rather than
+      // silently record the base nutrition against the caller's number.
       const rawNutrition   = safeJson(food.nutrition, {});
       const effectivePortion = Number.isFinite(portion) ? portion : foodPortion;
+      if (Number.isFinite(portion) && !foodPortion) {
+        return toolError(
+          `Food '${food.name}' has no baseline portion stored, so a portion override ` +
+          "can't be scaled correctly. Log without the portion argument (uses 1× the food's " +
+          "nutrition per quantity) or edit the food in the app to add a base portion first."
+        );
+      }
       const factor = (foodPortion && effectivePortion) ? (effectivePortion / foodPortion) : 1;
       const scaledNutrition = (factor === 1)
         ? rawNutrition

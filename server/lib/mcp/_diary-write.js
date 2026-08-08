@@ -7,12 +7,15 @@
  *  - runs inside a single transaction (safe against concurrent writes),
  *  - respects the (user_id, date) unique-key upsert pattern the rest of
  *    the server uses (nutrition-import, data.js, full-backup),
- *  - clears the `deleted_at` tombstone if the row was soft-deleted,
+ *  - REFUSES to overwrite a tombstoned row (throws DiaryTombstonedError
+ *    so the calling tool returns a clean isError instead of silently
+ *    resurrecting an erased day and wiping its prior contents),
  *  - stamps `updated_at` so differential sync picks up the change.
  *
  * The mutator callback receives the parsed { items, water, bodyStats,
  * notes } shape and returns the same (mutated in-place or replaced).
- * Return `null` from the mutator to bail without writing.
+ * The mutator must always return a value; returning null is not
+ * supported.
  */
 import db from '../../db.js';
 import { safeJson } from './_util.js';

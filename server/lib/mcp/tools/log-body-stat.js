@@ -13,26 +13,28 @@ import { z } from 'zod';
 import { DATE_RE, todayLocal, toolResult, toolError } from '../_util.js';
 import { mutateDiaryDay, DiaryTombstonedError } from '../_diary-write.js';
 
-// Allowed body-stat keys with { min, max } sanity ranges. Values
-// outside the range are rejected so a wrong-sign or typo (e.g. -70,
-// or 700 kg) doesn't land in the diary and skew charts. Ranges are
-// generous — clinically implausible but physically plausible — because
-// the MCP tool is a data pipe, not a validator; the app UI catches
+// Allowed body-stat keys with { min, max } sanity ranges. Keys match
+// EXACTLY what the frontend BodyStats editor writes (see LENGTH_KEYS in
+// src/lib/body-stats-unit.js): plural forms hips/thighs/calves/biceps,
+// not singular. Anything outside this set is rejected — otherwise a
+// write to 'hip' would silently orphan (row saved but never displayed
+// because the UI only reads 'hips'). muscle_mass / water_pct / bone_mass
+// / visceral_fat aren't in body_stats at all — those live in wellness_data
+// from Withings/Garmin, which this tool doesn't touch.
+//
+// Ranges are generous — clinically implausible but physically plausible —
+// because the MCP tool is a data pipe, not a validator; the app UI catches
 // finer input mistakes.
 const STAT_RANGES = {
-  weight:       { min: 0.5,  max: 500,  unit: 'kg' },
-  body_fat:     { min: 0,    max: 80,   unit: '%'  },
-  muscle_mass:  { min: 1,    max: 200,  unit: 'kg' },
-  water_pct:    { min: 0,    max: 100,  unit: '%'  },
-  bone_mass:    { min: 0.5,  max: 20,   unit: 'kg' },
-  visceral_fat: { min: 1,    max: 59,   unit: 'AU' },
-  waist:        { min: 30,   max: 250,  unit: 'cm' },
-  hip:          { min: 30,   max: 250,  unit: 'cm' },
-  neck:         { min: 15,   max: 100,  unit: 'cm' },
-  chest:        { min: 40,   max: 250,  unit: 'cm' },
-  arm:          { min: 10,   max: 100,  unit: 'cm' },
-  thigh:        { min: 20,   max: 150,  unit: 'cm' },
-  calf:         { min: 15,   max: 100,  unit: 'cm' },
+  weight:   { min: 0.5, max: 500, kind: 'weight' },   // kg
+  body_fat: { min: 0,   max: 80,  kind: 'percent' }, // %
+  waist:    { min: 30,  max: 250, kind: 'length' },  // cm
+  hips:     { min: 30,  max: 250, kind: 'length' },
+  neck:     { min: 15,  max: 100, kind: 'length' },
+  chest:    { min: 40,  max: 250, kind: 'length' },
+  biceps:   { min: 10,  max: 100, kind: 'length' },
+  thighs:   { min: 20,  max: 150, kind: 'length' },
+  calves:   { min: 15,  max: 100, kind: 'length' },
 };
 const ALLOWED_STATS = new Set(Object.keys(STAT_RANGES));
 
@@ -43,9 +45,12 @@ export function registerLogBodyStat(server, { userId }) {
       title: 'Log Body Stat',
       description:
         "Set one or more body-stat values on a diary day. Units are canonical: " +
-        'weight/muscle_mass/bone_mass in kg, waist/hip/neck/chest/arm/thigh/calf ' +
-        'in cm, body_fat/water_pct as percent (0-100). Merges into existing ' +
-        'stats (setting weight does not clear body_fat). Date defaults to today.',
+        'weight in kg, waist / hips / neck / chest / biceps / thighs / calves ' +
+        'in cm, body_fat as percent (0-100). Merges into existing stats (setting ' +
+        'weight does not clear body_fat). Keys must match the app exactly (plural ' +
+        'forms for length metrics: hips not hip, thighs not thigh, calves not ' +
+        'calf, biceps not arm). Values are stored with unit tags (weight_unit=kg, ' +
+        'lengths_unit=cm) so display in a lb/in user profile converts correctly.',
       inputSchema: {
         stats: z.record(z.string(), z.number()).refine(
           o => Object.keys(o || {}).length > 0,
@@ -60,19 +65,28 @@ export function registerLogBodyStat(server, { userId }) {
 
       const clean = {};
       const rejected = [];
+      let hasWeightWrite = false;
+      let hasLengthWrite = false;
       for (const [k, v] of Object.entries(stats || {})) {
-        if (!ALLOWED_STATS.has(k)) { rejected.push(`${k} (unknown key)`); continue; }
+        if (!ALLOWED_STATS.has(k)) { rejected.push(`${k} (unknown key; allowed: ${[...ALLOWED_STATS].join(', ')})`); continue; }
         if (!Number.isFinite(v))   { rejected.push(`${k} (not a number)`); continue; }
-        const { min, max, unit } = STAT_RANGES[k];
-        if (v < min || v > max)    { rejected.push(`${k} (${v} outside ${min}-${max} ${unit})`); continue; }
+        const { min, max, kind } = STAT_RANGES[k];
+        if (v < min || v > max)    { rejected.push(`${k} (${v} outside ${min}-${max})`); continue; }
         clean[k] = Math.round(v * 100) / 100;   // 2-decimal cap
+        if (kind === 'weight') hasWeightWrite = true;
+        if (kind === 'length') hasLengthWrite = true;
       }
       if (Object.keys(clean).length === 0) {
         return toolError(
           `No valid stats. Allowed keys: ${[...ALLOWED_STATS].join(', ')}. ` +
-          `Rejected: ${rejected.join(', ') || '(none)'}`
+          `Rejected: ${rejected.join('; ')}`
         );
       }
+      // Tag with canonical units so readBodyStat() converts to the
+      // user's display unit correctly (otherwise untagged rows are
+      // reinterpreted AS the display unit and off by 2.2× / 2.54×).
+      if (hasWeightWrite) clean.weight_unit  = 'kg';
+      if (hasLengthWrite) clean.lengths_unit = 'cm';
 
       let next;
       try {
