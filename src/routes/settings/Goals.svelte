@@ -31,7 +31,7 @@
       </div>
       {#if !_hasWearable}
         <p class="setting-desc" style="padding:4px 0 0;font-size:12px;line-height:1.4">
-          Dynamic mode needs a wearable that reports calorie burn (Fitbit, Garmin, or Google Health). <a href="#/settings/wellness" class="about-link">Set one up in Wellness</a>.
+          {$_('settings_goals.dynamic_needs_wearable')} <a href="#/settings/wellness" class="about-link">{$_('settings_goals.dynamic_needs_wearable_setup')}</a>.
         </p>
       {/if}
     </div>

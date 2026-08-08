@@ -63,7 +63,10 @@
   $: allFields = [...bodyStatsWithUnit, ...allNutrients, ...wellnessFields];
   // Your Goals: categorized
   $: configuredBodyStats = bodyStatsWithUnit.filter(s => $goals[s.id]);
-  $: configuredNutrients = allNutrients.filter(s => $goals[s.id]);
+  // Alias-aware lookup: after #146 the Kilojoules stat is a display alias
+  // for Calories in kJ mode, so its storage key is 'calories'. Reading
+  // $goals[s.id] raw for a kilojoules stat always misses the migrated goal.
+  $: configuredNutrients = allNutrients.filter(s => $goals[_goalStorageId(s.id)]);
   $: configuredWellness  = wellnessFields.filter(s => $goals[s.id]);
   $: hasAnyGoal = configuredBodyStats.length > 0 || configuredNutrients.length > 0 || configuredWellness.length > 0;
 
@@ -548,7 +551,7 @@
                     {@const pct = getPct(stat, todayTotals, todayBodyStats, todayWellness, recentBodyStats)}
                     {@const tgt = getTarget(stat)}
                     {@const cur = getTodayValue(stat, todayTotals, todayBodyStats, todayWellness, recentBodyStats)}
-                    {@const isMin = $goals[stat.id]?.isMin}
+                    {@const isMin = $goals[_goalStorageId(stat.id)]?.isMin}
                     {@const bad = cur != null && tgt != null && (isMin ? cur < tgt : cur > tgt)}
                     {@const stale = getBodyStatStaleness(stat, recentBodyStats)}
                     <div class="goal-progress-bar">
@@ -581,7 +584,7 @@
                     {@const tgt = stat.id === 'calories' && ($calorieGoalMode === 'dynamic' || ($calorieGoalMode === 'adaptive' && _adaptive?.ready)) ? _effectiveCalGoal : getTarget(stat)}
                     {@const cur = getTodayValue(stat, todayTotals, todayBodyStats, todayWellness, recentBodyStats)}
                     {@const pct = tgt > 0 ? Math.min(100, Math.round((cur ?? 0) / tgt * 100)) : 0}
-                    {@const isMin = $goals[stat.id]?.isMin}
+                    {@const isMin = $goals[_goalStorageId(stat.id)]?.isMin}
                     {@const bad = cur != null && tgt != null && (isMin ? cur < tgt : cur > tgt)}
                     <div class="goal-progress-bar">
                       <div class="goal-progress-fill" class:over={bad} style="width:{pct}%"></div>
@@ -655,7 +658,7 @@
           <button class="goal-row" on:click={() => openEdit(stat)}>
             <div class="goal-info">
               <span class="font-medium">{stat.label}</span>
-              {#if $goals[stat.id]}
+              {#if $goals[_goalStorageId(stat.id)]}
                 {@const pct = getPct(stat, todayTotals, todayBodyStats, todayWellness, recentBodyStats)}
                 {@const tgt = getTarget(stat)}
                 {@const cur = getTodayValue(stat, todayTotals, todayBodyStats, todayWellness, recentBodyStats)}
@@ -684,7 +687,7 @@
           <button class="goal-row" on:click={() => openEdit(stat)}>
             <div class="goal-info">
               <span class="font-medium">{stat.label}</span>
-              {#if $goals[stat.id]}
+              {#if $goals[_goalStorageId(stat.id)]}
                 {@const pct = getPct(stat, todayTotals, todayBodyStats, todayWellness, recentBodyStats)}
                 {@const tgt = getTarget(stat)}
                 {@const cur = getTodayValue(stat, todayTotals, todayBodyStats, todayWellness, recentBodyStats)}
@@ -727,7 +730,7 @@
             <button class="goal-row" on:click={() => openEdit(stat)}>
               <div class="goal-info">
                 <span class="font-medium">{stat.label}</span>
-                {#if $goals[stat.id]}
+                {#if $goals[_goalStorageId(stat.id)]}
                   {@const pct = getPct(stat, todayTotals, todayBodyStats, todayWellness, recentBodyStats)}
                   {@const _tgtRaw = getTarget(stat)}
                   {@const _curRaw = getTodayValue(stat, todayTotals, todayBodyStats, todayWellness, recentBodyStats)}

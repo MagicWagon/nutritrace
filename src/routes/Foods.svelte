@@ -876,7 +876,12 @@
     // items all have their own data paths and don't need OFF hydration.
     if (sourceHint === 'off' && food && food.barcode) {
       try {
-        const hydrated = await NtApi.fetchProductByCode(food.barcode);
+        // fetchProductByCode lives on API, not NtApi. NtApi is a Proxy
+        // that routes to the HTTP / native / cached transport layers and
+        // has no such method — calling it there returns undefined and
+        // throws TypeError, which the surrounding catch swallowed. Would
+        // silently no-op every hydration otherwise.
+        const hydrated = await API.fetchProductByCode(food.barcode);
         if (hydrated) food = { ...food, ...hydrated };
       } catch { /* fall through with the un-hydrated hit */ }
     }
@@ -1240,11 +1245,19 @@
         // detail sheet first (with Edit + Add to Diary options) instead
         // of jumping straight into the editor. Matches the OFF-search-tap
         // flow so barcode scan and text-search of an OFF-known product
-        // land on the same view. Users who want to correct OFF data before
-        // saving tap Edit from the detail sheet. Only unknown-to-OFF
-        // barcodes go straight to the editor (that path unchanged).
-        detailSheetFood = result;
-        detailSheetOpen = true;
+        // land on the same view. Only unknown-to-OFF barcodes go straight
+        // to the editor (that path unchanged).
+        //
+        // In pickMode (caller landed here to add-to-diary via meal-editor
+        // or the Foods+pickDate+pickMeal URL flow), route through pickFood
+        // so its own pickDate / pickMeal context is preserved rather than
+        // silently defaulting to today + first meal via detailSheet.
+        if (pickMode) {
+          await pickFood(result, 'off');
+        } else {
+          detailSheetFood = result;
+          detailSheetOpen = true;
+        }
       } else {
         const { showInfo: si } = await import('../stores/toast.js');
         si('Not in Open Food Facts — enter the food and contribute it back if you want');

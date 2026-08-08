@@ -933,7 +933,9 @@
     "goal_factor":            "Goal Factor",
     "factor_maintain":        "Maintain",
     "adaptive_note":          "Learns your true TDEE from 35 days of weight + diary and adjusts daily. Falls back to your fixed goal until enough data is logged. See the readiness card on the Goals page for current status.",
-    "how_it_works":           "How it works →"
+    "how_it_works":           "How it works →",
+    "dynamic_needs_wearable": "Dynamic mode needs a wearable that reports calorie burn (Fitbit, Garmin, or Google Health).",
+    "dynamic_needs_wearable_setup": "Set one up in Wellness"
   },
   "settings_stats": {
     "default_chart":          "Default Chart Type",

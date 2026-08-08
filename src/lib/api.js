@@ -150,6 +150,24 @@ function _rankOFFResults(items) {
   });
 }
 
+// Accept every "product was found" flavor OFF returns across API generations
+// and mirror paths:
+//   v3 live: { status: "success" }
+//   v3 live with data warnings: { status: "success_with_warnings" }
+//   v3 live with recoverable errors on some fields: { status: "success_with_errors" }
+//   v2 live + local OFF mirror: { status: 1 }
+// Falling back to a truthy `product` object handles any future envelope
+// wording change without a false-negative on real hits. Only outright
+// "no product" replies (status: "failure" / status: 0, or missing product
+// object) drop through as null.
+function _isOffSuccess(data) {
+  if (!data) return false;
+  const s = data.status;
+  if (s === 1) return true;
+  if (typeof s === 'string' && s.startsWith('success')) return true;
+  return !!data.product;
+}
+
 const API = {
   OFF_BASE: 'https://world.openfoodfacts.org',
 
@@ -167,7 +185,7 @@ const API = {
       const res = await _extFetch(url);
       if (!res.ok) return null;
       const data = await res.json();
-      if (data.status !== 1 && data.status !== 'success') return null;
+      if (!_isOffSuccess(data)) return null;
       return this._mapOFFProduct(data.product);
     } catch(e) {
       console.error('Barcode lookup failed:', e);
@@ -195,7 +213,7 @@ const API = {
       const res = await _extFetch(url);
       if (!res.ok) return null;
       const data = await res.json();
-      if (data.status !== 1 && data.status !== 'success') return null;
+      if (!_isOffSuccess(data)) return null;
       const mapped = this._mapOFFProduct(data.product);
       if (mapped) this._offHydrateCache.set(code, mapped);
       return mapped;
