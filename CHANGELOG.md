@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [1.1.2] - 2026-08-08
+
+Patch release. Full OFF integration migration to the two current-canonical endpoints (search-a-licious for text search, v3 for barcode / product detail), a Kilojoules-vs-Calories goal storage cleanup, and smaller UI polish. Six code-review passes on the accumulated dev diff turned up 18 issues across the cycle; the resulting release has been through more static-analysis scrutiny than most NT releases to date.
+
 ### Fixed
 
 - **Disabled Calorie Goal Mode buttons now look and explain themselves** (#147, thanks @dominicbui). Dynamic mode requires a connected wearable that reports calorie burn (Fitbit, Garmin, or Google Health). It was correctly gated on the code side, but the disabled visual style was barely distinguishable from an inactive button and the reason ("Connect a wearable first") only appeared as a hover tooltip so on mobile you got no feedback at all. Disabled seg-control buttons now render clearly grayed out, and a visible helper line under the mode selector explains what Dynamic needs and where to set it up.
