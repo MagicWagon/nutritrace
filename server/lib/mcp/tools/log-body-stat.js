@@ -10,8 +10,19 @@
  * mirrors the client-side saveBodyStats() contract.
  */
 import { z } from 'zod';
-import { DATE_RE, todayLocal, toolResult, toolError } from '../_util.js';
+import db from '../../../db.js';
+import { DATE_RE, safeJson, todayLocal, toolResult, toolError } from '../_util.js';
 import { mutateDiaryDay, DiaryTombstonedError } from '../_diary-write.js';
+
+const LENGTH_KEYS = ['waist', 'hips', 'neck', 'chest', 'thighs', 'biceps', 'calves'];
+
+function _userUnitPref(userId, key, fallback) {
+  const row = db.prepare(
+    `SELECT value FROM user_settings
+      WHERE user_id = ? AND key = ? AND deleted_at IS NULL`
+  ).get(userId, key);
+  return safeJson(row?.value, fallback);
+}
 
 // Allowed body-stat keys with { min, max } sanity ranges. Keys match
 // EXACTLY what the frontend BodyStats editor writes (see LENGTH_KEYS in
@@ -82,41 +93,57 @@ export function registerLogBodyStat(server, { userId }) {
           `Rejected: ${rejected.join('; ')}`
         );
       }
-      // Length unit tag is SHARED across all 7 length metrics on the
-      // row (waist/hips/neck/chest/thighs/biceps/calves). If the day
-      // already has other length values stored under 'in', naively
-      // writing our new kg/cm values under 'cm' would reinterpret the
-      // pre-existing 'in' values as 'cm'. Convert our canonical values
-      // into the row's existing unit instead of forcing the tag change.
+      // Unit tag handling is subtle because the tag is SHARED across
+      // all fields of its kind (7 length metrics share lengths_unit;
+      // weight is the only weight-unit user, so simpler there):
+      //
+      //  a) Row already tagged (weight_unit / lengths_unit set): convert
+      //     our canonical kg/cm into the row's stored unit and preserve
+      //     the tag. Naively stamping 'kg'/'cm' would reinterpret the
+      //     pre-existing values.
+      //  b) Row has values of that kind but is UNTAGGED (legacy row):
+      //     honor the user's display setting for that unit, because the
+      //     pre-existing values were saved AS the display unit. Convert
+      //     our canonical value to match, and add the corresponding tag.
+      //  c) Row has no values of that kind yet: safe to stamp 'kg'/'cm'
+      //     and store our canonical value directly.
       let next;
       try {
         next = mutateDiaryDay(userId, day, cur => {
           const merged = { ...cur.bodyStats, ...clean };
+          const bs = cur.bodyStats || {};
 
           if (hasWeightWrite) {
-            const existingWeightUnit = cur.bodyStats?.weight_unit;
-            if (existingWeightUnit === 'lb') {
-              // Convert kg → lb to preserve the row's tag.
-              merged.weight       = Math.round(clean.weight * 2.20462 * 10) / 10;
-              merged.weight_unit  = 'lb';
+            let effectiveUnit;
+            if (bs.weight_unit) {
+              effectiveUnit = bs.weight_unit;                    // (a)
+            } else if (bs.weight != null) {
+              effectiveUnit = _userUnitPref(userId, 'weightUnit', 'kg');  // (b)
             } else {
-              merged.weight_unit  = 'kg';
+              effectiveUnit = 'kg';                              // (c)
             }
+            if (effectiveUnit === 'lb') {
+              merged.weight = Math.round(clean.weight * 2.20462 * 10) / 10;
+            }
+            merged.weight_unit = effectiveUnit;
           }
 
           if (hasLengthWrite) {
-            const existingLengthUnit = cur.bodyStats?.lengths_unit;
-            if (existingLengthUnit === 'in') {
-              // Convert every length key we're writing cm → in.
-              for (const [k, { kind }] of Object.entries(STAT_RANGES)) {
-                if (kind === 'length' && k in clean) {
-                  merged[k] = Math.round((clean[k] / 2.54) * 10) / 10;
-                }
-              }
-              merged.lengths_unit = 'in';
+            const anyExistingLength = LENGTH_KEYS.some(k => bs[k] != null);
+            let effectiveUnit;
+            if (bs.lengths_unit) {
+              effectiveUnit = bs.lengths_unit;                   // (a)
+            } else if (anyExistingLength) {
+              effectiveUnit = _userUnitPref(userId, 'lengthUnit', 'cm');  // (b)
             } else {
-              merged.lengths_unit = 'cm';
+              effectiveUnit = 'cm';                              // (c)
             }
+            if (effectiveUnit === 'in') {
+              for (const k of LENGTH_KEYS) {
+                if (k in clean) merged[k] = Math.round((clean[k] / 2.54) * 10) / 10;
+              }
+            }
+            merged.lengths_unit = effectiveUnit;
           }
 
           return { ...cur, bodyStats: merged };

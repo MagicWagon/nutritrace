@@ -37,12 +37,22 @@ const WRITE_ENABLED = _envFlag(process.env.MCP_WRITE_ENABLED);
 // exactly the pattern DNS rebinding attacks exploit (an attacker can
 // point evil.example at 127.0.0.1 and the browser will send matching
 // Origin + Host headers). See MCP spec on the DNS-rebinding defense.
+function _normalizeOrigin(s) {
+  // Lowercase scheme+host, strip trailing slash. Browsers strip the
+  // path from Origin already (`https://foo.example/bar` -> `https://foo.example`)
+  // but admins routinely paste a full URL from the address bar. Normalize
+  // both sides of the comparison so a trailing / or SHOUTED CASE doesn't
+  // 403 a legitimate allowlist entry.
+  if (!s) return '';
+  return String(s).trim().replace(/\/+$/, '').toLowerCase();
+}
+
 const _originAllow = (process.env.ALLOWED_ORIGINS || '')
   .split(',')
-  .map(s => s.trim())
+  .map(_normalizeOrigin)
   .filter(Boolean)
   .filter(s => {
-    // Refuse '*' — accepting it would open the exact DNS-rebinding hole
+    // Refuse '*'. Accepting it would open the exact DNS-rebinding hole
     // this whole check exists to close, and admins carry-over the CORS
     // convention where '*' means "any" without realising the difference.
     // To intentionally allow any browser origin, remove the check and
@@ -56,7 +66,7 @@ const _originAllow = (process.env.ALLOWED_ORIGINS || '')
 
 function _isOriginAllowed(origin) {
   if (!origin) return true;                    // Server-to-server = ok
-  return _originAllow.includes(origin);
+  return _originAllow.includes(_normalizeOrigin(origin));
 }
 
 // Router-level gates: BOTH the ENABLED flag AND the origin check run

@@ -62,7 +62,11 @@ export function registerLogMeal(server, { userId }) {
         meal: override ?? (Number.isInteger(it.meal) ? it.meal : 0),
         // Stagger addedAt by 1ms per item so diary sort keeps composition order.
         addedAt: new Date(Date.parse(now) + i).toISOString(),
-        source: 'mcp:meal',
+        // Preserve the item's original `source` (e.g. 'mfp_import',
+        // 'off') so the diary provenance UI stays accurate. Only stamp
+        // source_meal_id (the saved-meal ancestry, which is genuinely
+        // new information for this diary entry).
+        source: it.source || 'mcp:meal',
         source_meal_id: savedMeal.id,
       }));
 

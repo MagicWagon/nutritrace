@@ -43,11 +43,29 @@ export function registerLogFood(server, { userId }) {
       if (!DATE_RE.test(day)) return toolError(`Invalid date '${day}'; expected YYYY-MM-DD.`);
 
       const food = db.prepare(
-        `SELECT id, name, brand, portion, unit, nutrition, category
+        `SELECT id, name, brand, portion, unit, nutrition, category, alt_units
            FROM foods
           WHERE user_id = ? AND id = ? AND deleted_at IS NULL`
       ).get(userId, food_id);
       if (!food) return toolError(`food_id ${food_id} not found in your catalog.`);
+
+      // Foods with alt_units defined (issue #69/#70) rely on non-linear
+      // per-unit conversions (e.g. 1 cup = 40 g of oats) that the client
+      // computes via _unitScaleFactor. This tool doesn't consult those,
+      // so a portion override would silently disagree with what the app
+      // UI produces for the same numeric portion. Refuse the override —
+      // the caller can log without a portion (uses 1× base nutrition per
+      // quantity) instead.
+      const hasAltUnits = food.alt_units && food.alt_units !== 'null' && food.alt_units !== '[]';
+      if (Number.isFinite(portion) && hasAltUnits) {
+        return toolError(
+          `Food '${food.name}' has alt-units defined (custom per-unit conversions). ` +
+          "Portion override isn't supported for these foods because the numeric scale " +
+          "wouldn't match what the app UI produces. Omit the portion argument (uses 1× " +
+          "the food's stored nutrition per quantity) or edit the food in the app to log " +
+          'a specific alt-unit portion.'
+        );
+      }
 
       // Unit-conversion is intentionally not attempted server-side.
       // Callers know their own inputs; OFF/USDA style unit conversions
