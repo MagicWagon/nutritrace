@@ -32,6 +32,13 @@ export const KNOWN_SCOPES = new Set([
   // integrations pushing smart-scale readings straight to the server
   // (BLE → HA → NT), skipping the phone/Health-Connect roundtrip.
   'write:body-measurements',
+  // mcp:read unlocks the Model Context Protocol read tools (issue #103)
+  // exposed under /api/mcp when MCP_ENABLED=1. Read-only in Phase 1;
+  // future mcp:write scope will be added alongside the write tools.
+  // Tokens created with this scope let a user's own agent (Claude
+  // Desktop / Cursor / Codex / etc.) inspect their diary, goals, and
+  // food catalog through the MCP standard interface.
+  'mcp:read',
 ]);
 
 function _hash(raw) {

@@ -28,6 +28,7 @@ import oidcRoutes       from './routes/oidc.js';
 import oidcAdminRoutes  from './routes/oidc-admin.js';
 import apiTokensRoutes  from './routes/api-tokens.js';
 import apiV1Routes      from './routes/api/v1/index.js';
+import mcpRoutes        from './routes/mcp.js';
 import nutritionImportRoutes from './routes/nutrition-import.js';
 import offLocalRoutes from './routes/off-local.js';
 import updatesRoutes  from './routes/updates.js';
@@ -175,6 +176,11 @@ router.use('/api/admin/api-tokens', apiTokensRoutes);
 // /api/v1 so the version is part of the contract URL. See
 // docs/federation.md for the wire format.
 router.use('/api/v1', apiV1Routes);
+// Model Context Protocol endpoint — Bearer-token auth, scope 'mcp:read'.
+// Feature-flagged: the route itself is always mounted but returns 404
+// unless MCP_ENABLED=1 in the server env. See server/routes/mcp.js and
+// server/lib/mcp/ for the tool implementations. Issue #103.
+router.use('/api/mcp', mcpRoutes);
 // proxy already registered before auth (line 64)
 router.use('/api/data',   dataRoutes);
 router.use('/api/foods',  foodsRoutes);

@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **Model Context Protocol (MCP) server** ([#103](https://github.com/TraceApps/nutritrace/issues/103)). Your NutriTrace server can now expose your food catalog, diary, and goals to AI agents (Claude Desktop, Cursor, Codex, VS Code, or any MCP-compatible client) via the standard MCP Streamable HTTP transport. Off by default; opt in with `MCP_ENABLED=1` in your server env. Phase 1 ships read-only tools: `list_diary_entries`, `get_daily_totals`, `get_goals`, `search_foods`, `get_recent_foods`. Auth reuses the existing API token system with a new `mcp:read` scope — generate a token in Settings → API Tokens, paste it into your MCP client's config. Rate-limited per token. Write tools (log food, quick calories) will land in a follow-up dev release behind their own opt-in gate. Thanks to @javydekoning for the feature request.
+
 ---
 
 ## [1.1.2] - 2026-08-08
