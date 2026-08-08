@@ -55,7 +55,7 @@ export function registerSearchFoods(server, { userId }) {
         name: r.name,
         brand: r.brand || null,
         barcode: r.barcode || null,
-        portion: Number(r.portion) || null,
+        portion: Number.isFinite(Number(r.portion)) ? Number(r.portion) : null,
         unit: r.unit || null,
         category: r.category || null,
         nutrition: safeJson(r.nutrition, {}),

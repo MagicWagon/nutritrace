@@ -11,7 +11,7 @@
 import { z } from 'zod';
 import db from '../../../db.js';
 import { DATE_RE, safeJson, todayLocal, toolResult, toolError } from '../_util.js';
-import { mutateDiaryDay } from '../_diary-write.js';
+import { mutateDiaryDay, DiaryTombstonedError } from '../_diary-write.js';
 
 export function registerLogMeal(server, { userId }) {
   server.registerTool(
@@ -52,20 +52,30 @@ export function registerLogMeal(server, { userId }) {
       }
 
       const now = new Date().toISOString();
-      const slot = meal ?? 0;
+      // When caller supplies a `meal` slot, ALL items land in that slot
+      // (explicit override). When omitted, preserve each item's own meal
+      // assignment from the saved meal so a multi-meal prep pack stays
+      // segmented in the diary. Fall back to 0 for items with no slot.
+      const override = Number.isInteger(meal) ? meal : null;
       const cloned = sourceItems.map((it, i) => ({
         ...it,
-        meal: slot,
+        meal: override ?? (Number.isInteger(it.meal) ? it.meal : 0),
         // Stagger addedAt by 1ms per item so diary sort keeps composition order.
         addedAt: new Date(Date.parse(now) + i).toISOString(),
         source: 'mcp:meal',
         source_meal_id: savedMeal.id,
       }));
 
-      const next = mutateDiaryDay(userId, day, cur => ({
-        ...cur,
-        items: [...cur.items, ...cloned],
-      }));
+      let next;
+      try {
+        next = mutateDiaryDay(userId, day, cur => ({
+          ...cur,
+          items: [...cur.items, ...cloned],
+        }));
+      } catch (e) {
+        if (e instanceof DiaryTombstonedError) return toolError(e.message);
+        throw e;
+      }
 
       return toolResult({
         ok: true,
@@ -73,7 +83,7 @@ export function registerLogMeal(server, { userId }) {
         logged: {
           meal_id: savedMeal.id,
           name: savedMeal.name,
-          slot,
+          slot_override: override,
           item_count: cloned.length,
         },
         total_items_on_day: next.items.length,

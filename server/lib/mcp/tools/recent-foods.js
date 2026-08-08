@@ -60,24 +60,29 @@ export function registerRecentFoods(server, { userId }) {
         }
         if (lastSeen.size >= cap * 3) break;
       }
-      const ids = Array.from(lastSeen.keys()).slice(0, cap);
-      if (!ids.length) return toolResult({ count: 0, items: [] });
-      const placeholders = ids.map(() => '?').join(',');
+      // Fetch food rows for the FULL id superset (cap*3 headroom),
+      // then filter deleted, THEN slice — otherwise a user who has
+      // pruned their catalog could see fewer than `cap` results just
+      // because the pre-slice included deleted rows.
+      const allIds = Array.from(lastSeen.keys());
+      if (!allIds.length) return toolResult({ count: 0, items: [] });
+      const placeholders = allIds.map(() => '?').join(',');
       const foods = db.prepare(
         `SELECT id, name, brand, barcode, portion, unit, nutrition, category
            FROM foods
           WHERE user_id = ? AND deleted_at IS NULL AND id IN (${placeholders})`
-      ).all(userId, ...ids);
+      ).all(userId, ...allIds);
       const byId = new Map(foods.map(f => [f.id, f]));
-      const items = ids
+      const items = allIds
         .map(id => byId.get(id))
         .filter(Boolean)
+        .slice(0, cap)
         .map(f => ({
           id: f.id,
           name: f.name,
           brand: f.brand || null,
           barcode: f.barcode || null,
-          portion: Number(f.portion) || null,
+          portion: Number.isFinite(Number(f.portion)) ? Number(f.portion) : null,
           unit: f.unit || null,
           category: f.category || null,
           nutrition: safeJson(f.nutrition, {}),

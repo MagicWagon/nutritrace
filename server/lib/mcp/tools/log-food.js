@@ -14,7 +14,7 @@
 import { z } from 'zod';
 import db from '../../../db.js';
 import { DATE_RE, safeJson, todayLocal, toolResult, toolError } from '../_util.js';
-import { mutateDiaryDay } from '../_diary-write.js';
+import { mutateDiaryDay, DiaryTombstonedError } from '../_diary-write.js';
 
 export function registerLogFood(server, { userId }) {
   server.registerTool(
@@ -49,24 +49,58 @@ export function registerLogFood(server, { userId }) {
       ).get(userId, food_id);
       if (!food) return toolError(`food_id ${food_id} not found in your catalog.`);
 
+      // Unit-conversion is intentionally not attempted server-side —
+      // the callers know their own inputs and OFF/USDA style unit
+      // conversions are lossy without density data. Reject cross-unit
+      // requests so the agent knows to convert first.
+      const foodPortion = Number.isFinite(Number(food.portion)) ? Number(food.portion) : null;
+      const foodUnit    = food.unit || null;
+      if (unit && foodUnit && unit !== foodUnit) {
+        return toolError(
+          `Cross-unit portions are not supported: food '${food.name}' is measured in '${foodUnit}', ` +
+          `caller supplied '${unit}'. Convert to '${foodUnit}' first or omit the unit override.`
+        );
+      }
+
+      // Scale nutrition proportionally when the caller overrides portion.
+      // Nutrition.calculate() multiplies by quantity only — portion + unit
+      // are display-only on the diary item — so any portion delta must be
+      // baked into the stored `nutrition` object before write.
+      const rawNutrition   = safeJson(food.nutrition, {});
+      const effectivePortion = Number.isFinite(portion) ? portion : foodPortion;
+      const factor = (foodPortion && effectivePortion) ? (effectivePortion / foodPortion) : 1;
+      const scaledNutrition = (factor === 1)
+        ? rawNutrition
+        : Object.fromEntries(
+            Object.entries(rawNutrition).map(([k, v]) =>
+              [k, typeof v === 'number' ? Math.round(v * factor * 100) / 100 : v]
+            )
+          );
+
       const item = {
         name:      food.name,
         brand:     food.brand || undefined,
         meal:      meal ?? 0,
         quantity:  quantity ?? 1,
-        portion:   portion ?? Number(food.portion) || undefined,
-        unit:      unit || food.unit || undefined,
-        nutrition: safeJson(food.nutrition, {}),
+        portion:   effectivePortion ?? undefined,
+        unit:      unit || foodUnit || undefined,
+        nutrition: scaledNutrition,
         notes:     notes || undefined,
         food_server_id: food.id,
         addedAt:   new Date().toISOString(),
         source:    'mcp',
       };
 
-      const next = mutateDiaryDay(userId, day, cur => ({
-        ...cur,
-        items: [...cur.items, item],
-      }));
+      let next;
+      try {
+        next = mutateDiaryDay(userId, day, cur => ({
+          ...cur,
+          items: [...cur.items, item],
+        }));
+      } catch (e) {
+        if (e instanceof DiaryTombstonedError) return toolError(e.message);
+        throw e;
+      }
 
       return toolResult({
         ok: true,
@@ -78,6 +112,7 @@ export function registerLogFood(server, { userId }) {
           portion: item.portion,
           unit: item.unit,
           quantity: item.quantity,
+          scaled_by: factor === 1 ? undefined : factor,
         },
         total_items_on_day: next.items.length,
       });
