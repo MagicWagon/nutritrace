@@ -117,7 +117,7 @@ async function checkTool(name, args, resultKey, note) {
 
 await checkTool('get_goals',           {},                       'goals');
 await checkTool('get_daily_totals',    {},                       'totals',    '(today)');
-await checkTool('list_diary_entries',  {},                       'entries',   '(today)');
+await checkTool('list_diary_entries',  {},                       'items',     '(today)');
 await checkTool('search_foods',        { query: 'a', limit: 3 }, 'items',     '(q=a)');
 await checkTool('get_recent_foods',    { limit: 3 },             'items');
 
