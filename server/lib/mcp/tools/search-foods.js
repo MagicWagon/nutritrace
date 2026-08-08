@@ -47,7 +47,7 @@ export function registerSearchFoods(server, { userId }) {
           WHERE user_id = ?
             AND deleted_at IS NULL
             AND (name LIKE ? ESCAPE '\\' OR brand LIKE ? ESCAPE '\\')
-          ORDER BY name ASC
+          ORDER BY name COLLATE NOCASE ASC
           LIMIT ?`
       ).all(userId, like, like, cap);
       const items = rows.map(r => ({

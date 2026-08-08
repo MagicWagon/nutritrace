@@ -8,9 +8,18 @@
 
 /**
  * Safely parse a JSON string; return `fallback` on any error.
+ *
+ * Also returns `fallback` when the parsed value is JSON `null` — a
+ * literal `'null'` in a DB column is functionally "no value" for our
+ * callers (items/water_logs/goals maps), and returning bare null would
+ * turn every downstream .map / .reduce / .keys call into a TypeError.
+ * Explicit `false`, `0`, `''` all pass through unchanged.
  */
 export function safeJson(s, fallback) {
-  try { return JSON.parse(s); } catch { return fallback; }
+  try {
+    const v = JSON.parse(s);
+    return v == null ? fallback : v;
+  } catch { return fallback; }
 }
 
 /**

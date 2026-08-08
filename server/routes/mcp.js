@@ -36,11 +36,23 @@ const ENABLED = _envFlag(process.env.MCP_ENABLED);
 const _originAllow = (process.env.ALLOWED_ORIGINS || '')
   .split(',')
   .map(s => s.trim())
-  .filter(Boolean);
+  .filter(Boolean)
+  .filter(s => {
+    // Refuse '*' — accepting it would open the exact DNS-rebinding hole
+    // this whole check exists to close, and admins carry-over the CORS
+    // convention where '*' means "any" without realising the difference.
+    // To intentionally allow any browser origin, remove the check and
+    // recompile; there is no env-var opt-in on purpose.
+    if (s === '*') {
+      logger.warn('[mcp] Ignoring "*" entry in ALLOWED_ORIGINS: wildcard is refused by design (DNS-rebinding defense). List each allowed origin explicitly.');
+      return false;
+    }
+    return true;
+  });
 
 function _isOriginAllowed(origin) {
   if (!origin) return true;                    // Server-to-server = ok
-  return _originAllow.some(o => o === '*' || o === origin);
+  return _originAllow.includes(origin);
 }
 
 // Router-level gates: BOTH the ENABLED flag AND the origin check run

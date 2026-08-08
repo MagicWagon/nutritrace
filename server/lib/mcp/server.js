@@ -40,9 +40,10 @@ export async function handleMcpRequest(req, res) {
     await transport.handleRequest(req, res, req.body);
   } finally {
     // Tear down the per-request transport once the SDK is done, whether
-    // the response ended cleanly or the client aborted. Gated on
-    // writableEnded so a mid-flight close doesn't reject the pending
-    // handleRequest write and produce a false-positive error log.
+    // the response ended cleanly or the client aborted. Called inside
+    // `finally` (not on `res.on('close')`) so it never races the SDK's
+    // own writes; wrapped in try because double-close is harmless but
+    // the SDK doesn't currently guarantee it's a no-op.
     try { transport.close?.(); } catch { /* ignore */ }
   }
 }

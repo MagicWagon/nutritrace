@@ -16,7 +16,7 @@ const mcpRoute     = readFileSync(new URL('../server/routes/mcp.js', import.meta
 const mcpServer    = readFileSync(new URL('../server/lib/mcp/server.js', import.meta.url), 'utf8');
 const mcpTools     = readFileSync(new URL('../server/lib/mcp/tools/index.js', import.meta.url), 'utf8');
 const apiTokens    = readFileSync(new URL('../server/lib/api-tokens.js', import.meta.url), 'utf8');
-const pkgJson      = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+const pkgJson      = JSON.parse(readFileSync(new URL('../server/package.json', import.meta.url), 'utf8'));
 
 test('MCP route is mounted at /api/mcp on the main router', () => {
   assert.match(indexJs, /import mcpRoutes[\s\S]*from '\.\/routes\/mcp\.js'/);

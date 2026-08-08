@@ -50,10 +50,12 @@ export function registerRecentFoods(server, { userId }) {
           if (!it || it.is_recipe) continue;
           // Android clients store the local autoincrement id in `id`
           // and the real foods.id in `food_server_id`. Server-side
-          // hydration uses `food_server_id ?? id` (see diary-helpers).
-          // Same order here so Android-logged items resolve correctly.
-          const id = it.food_server_id ?? it.id;
-          if (typeof id !== 'number') continue;
+          // hydration prefers the server id when present. Use a positive-
+          // number check (not `??`) so a legacy row with food_server_id=0
+          // doesn't collide with foods.id=0 or waste a dedup slot.
+          const srv = it.food_server_id;
+          const id  = (typeof srv === 'number' && srv > 0) ? srv : it.id;
+          if (typeof id !== 'number' || id <= 0) continue;
           if (!lastSeen.has(id)) lastSeen.set(id, r.date);
         }
         if (lastSeen.size >= cap * 3) break;
