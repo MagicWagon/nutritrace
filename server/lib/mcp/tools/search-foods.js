@@ -35,13 +35,18 @@ export function registerSearchFoods(server, { userId }) {
       const q = String(query || '').trim();
       if (!q) return toolError('query is required and cannot be empty.');
       const cap = Math.min(MAX_LIMIT, Math.max(1, Number(limit) || DEFAULT_LIMIT));
-      const like = `%${q}%`;
+      // Escape LIKE wildcards (%, _, \) in user input so a food named
+      // "100% Whole Wheat" is searchable by "100%" without matching every
+      // row. Uses backslash escaping under an explicit ESCAPE clause so
+      // we don't collide with the SQLite default.
+      const escaped = q.replace(/[\\%_]/g, c => '\\' + c);
+      const like = `%${escaped}%`;
       const rows = db.prepare(
         `SELECT id, name, brand, barcode, portion, unit, nutrition, category
            FROM foods
           WHERE user_id = ?
             AND deleted_at IS NULL
-            AND (name LIKE ? OR brand LIKE ?)
+            AND (name LIKE ? ESCAPE '\\' OR brand LIKE ? ESCAPE '\\')
           ORDER BY name ASC
           LIMIT ?`
       ).all(userId, like, like, cap);

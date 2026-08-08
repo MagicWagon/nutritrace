@@ -32,7 +32,11 @@ export function registerGetGoals(server, { userId }) {
           WHERE user_id = ? AND key = 'waterGoalMl' AND deleted_at IS NULL`
       ).get(userId);
       const goals = row?.value ? safeJson(row.value, {}) : {};
-      const waterGoalMl = water?.value ? Number(safeJson(water.value, 0)) || null : null;
+      // Preserve legitimate 0 (user explicitly cleared their water goal) —
+      // don't treat it as falsy. Only truly-missing or non-numeric values
+      // become null.
+      const waterRaw = water?.value != null ? Number(safeJson(water.value, null)) : null;
+      const waterGoalMl = Number.isFinite(waterRaw) ? waterRaw : null;
       return toolResult({ goals, water_goal_ml: waterGoalMl });
     }
   );
