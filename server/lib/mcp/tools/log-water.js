@@ -12,6 +12,13 @@ import { mutateDiaryDay, DiaryTombstonedError } from '../_diary-write.js';
 
 const MAX_ML_PER_ENTRY = 5000;   // 5 L in one log = obvious agent bug or typo
 
+function _formatTime(date, use24) {
+  const hh = date.getHours();
+  const mm = String(date.getMinutes()).padStart(2, '0');
+  if (use24) return `${String(hh).padStart(2, '0')}:${mm}`;
+  return `${(hh % 12) || 12}:${mm} ${hh >= 12 ? 'PM' : 'AM'}`;
+}
+
 export function registerLogWater(server, { userId }) {
   server.registerTool(
     'log_water',
@@ -36,9 +43,11 @@ export function registerLogWater(server, { userId }) {
       // entries default to noon to avoid a stamp that reads as "logged
       // 9 AM on that day" when it was actually filed later.
       //
-      // hour12 is pinned to the user's timeFormat setting so a mixed
-      // en_GB/en_US server locale doesn't leave the same diary with
-      // '9:00 AM' entries from the UI and '09:00' entries from MCP.
+      // Format manually — toLocaleTimeString respects the server locale
+      // (LC_ALL), so a French-locale server would return '14:15' or a
+      // narrow-no-break-space AM/PM even for a 12h user. Formatting
+      // manually keeps every MCP-logged entry consistent with the
+      // client-produced strings ('9:15 AM' / '21:15').
       const isToday = day === todayLocal();
       const tfRow = db.prepare(
         `SELECT value FROM user_settings
@@ -47,9 +56,7 @@ export function registerLogWater(server, { userId }) {
       const use24 = safeJson(tfRow?.value, '12h') === '24h';
       const log = {
         amount: Math.round(amount_ml),
-        time: time || (isToday
-          ? new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: !use24 })
-          : (use24 ? '12:00' : '12:00 PM')),
+        time: time || (isToday ? _formatTime(new Date(), use24) : (use24 ? '12:00' : '12:00 PM')),
       };
 
       let next;

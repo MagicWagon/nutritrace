@@ -82,18 +82,45 @@ export function registerLogBodyStat(server, { userId }) {
           `Rejected: ${rejected.join('; ')}`
         );
       }
-      // Tag with canonical units so readBodyStat() converts to the
-      // user's display unit correctly (otherwise untagged rows are
-      // reinterpreted AS the display unit and off by 2.2× / 2.54×).
-      if (hasWeightWrite) clean.weight_unit  = 'kg';
-      if (hasLengthWrite) clean.lengths_unit = 'cm';
-
+      // Length unit tag is SHARED across all 7 length metrics on the
+      // row (waist/hips/neck/chest/thighs/biceps/calves). If the day
+      // already has other length values stored under 'in', naively
+      // writing our new kg/cm values under 'cm' would reinterpret the
+      // pre-existing 'in' values as 'cm'. Convert our canonical values
+      // into the row's existing unit instead of forcing the tag change.
       let next;
       try {
-        next = mutateDiaryDay(userId, day, cur => ({
-          ...cur,
-          bodyStats: { ...cur.bodyStats, ...clean },
-        }));
+        next = mutateDiaryDay(userId, day, cur => {
+          const merged = { ...cur.bodyStats, ...clean };
+
+          if (hasWeightWrite) {
+            const existingWeightUnit = cur.bodyStats?.weight_unit;
+            if (existingWeightUnit === 'lb') {
+              // Convert kg → lb to preserve the row's tag.
+              merged.weight       = Math.round(clean.weight * 2.20462 * 10) / 10;
+              merged.weight_unit  = 'lb';
+            } else {
+              merged.weight_unit  = 'kg';
+            }
+          }
+
+          if (hasLengthWrite) {
+            const existingLengthUnit = cur.bodyStats?.lengths_unit;
+            if (existingLengthUnit === 'in') {
+              // Convert every length key we're writing cm → in.
+              for (const [k, { kind }] of Object.entries(STAT_RANGES)) {
+                if (kind === 'length' && k in clean) {
+                  merged[k] = Math.round((clean[k] / 2.54) * 10) / 10;
+                }
+              }
+              merged.lengths_unit = 'in';
+            } else {
+              merged.lengths_unit = 'cm';
+            }
+          }
+
+          return { ...cur, bodyStats: merged };
+        });
       } catch (e) {
         if (e instanceof DiaryTombstonedError) return toolError(e.message);
         throw e;

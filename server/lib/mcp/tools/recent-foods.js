@@ -44,9 +44,7 @@ export function registerRecentFoods(server, { userId }) {
       for (const r of rows) {
         const items = safeJson(r.items, []);
         for (const it of items) {
-          // Recipes live in the `meals` table, not `foods` — including
-          // them would just waste the cap*3 early-exit budget and
-          // return empty rows below. Skip.
+          // Recipes live in the `meals` table, not `foods` — skip.
           if (!it || it.is_recipe) continue;
           // Android clients store the local autoincrement id in `id`
           // and the real foods.id in `food_server_id`. Server-side
@@ -58,7 +56,13 @@ export function registerRecentFoods(server, { userId }) {
           if (typeof id !== 'number' || id <= 0) continue;
           if (!lastSeen.has(id)) lastSeen.set(id, r.date);
         }
-        if (lastSeen.size >= cap * 3) break;
+        // No early exit on collected-id count. A user who prunes their
+        // catalog aggressively could have most of their recent ids
+        // pointing to deleted foods; without scanning further, the
+        // returned list would be shorter than `cap` even when older
+        // rows in the same window would yield valid results. 14 days
+        // of diary items is a few thousand rows at most, cheap enough
+        // to walk in full.
       }
       // Fetch food rows for the FULL id superset (cap*3 headroom),
       // then filter deleted, THEN slice — otherwise a user who has
