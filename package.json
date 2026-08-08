@@ -36,7 +36,6 @@
     "@capacitor/splash-screen": "^8.0.1",
     "@capacitor/status-bar": "^8.0.2",
     "@devmaxime/capacitor-health-connect": "^1.1.0",
-    "@modelcontextprotocol/sdk": "^1.30.0",
     "@zxcvbn-ts/core": "^3.0.4",
     "@zxcvbn-ts/language-common": "^3.0.4",
     "@zxcvbn-ts/language-en": "^3.0.2",
@@ -45,8 +44,7 @@
     "jszip": "^3.10.1",
     "nodemailer": "^9.0.3",
     "svelte-i18n": "^4.0.1",
-    "svelte-spa-router": "^4.0.1",
-    "zod": "^4.4.3"
+    "svelte-spa-router": "^4.0.1"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.3.0",
