@@ -14,7 +14,7 @@
  */
 import { z } from 'zod';
 import db from '../../../db.js';
-import { safeJson, toolResult } from '../_util.js';
+import { daysAgoLocal, safeJson, toolResult } from '../_util.js';
 
 const MAX_LIMIT = 30;
 const DEFAULT_LIMIT = 10;
@@ -34,7 +34,7 @@ export function registerRecentFoods(server, { userId }) {
     },
     async ({ limit }) => {
       const cap = Math.min(MAX_LIMIT, Math.max(1, Number(limit) || DEFAULT_LIMIT));
-      const since = _daysAgoLocal(LOOKBACK_DAYS);
+      const since = daysAgoLocal(LOOKBACK_DAYS);
       const rows = db.prepare(
         `SELECT items, date FROM diary
           WHERE user_id = ? AND date >= ? AND deleted_at IS NULL
@@ -86,8 +86,3 @@ export function registerRecentFoods(server, { userId }) {
   );
 }
 
-function _daysAgoLocal(days) {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  return d.toLocaleDateString('sv-SE');
-}

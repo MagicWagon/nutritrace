@@ -26,45 +26,44 @@ const router = Router();
 const ENABLED = _envFlag(process.env.MCP_ENABLED);
 
 // Parse ALLOWED_ORIGINS (comma-separated, same convention as the rest
-// of the server). If absent, origin-bearing requests fall back to a
-// same-Host check so a browser-based MCP inspector hitting the app's
-// own URL still works out of the box. Header-less server-to-server
-// clients (Claude Desktop, stdio bridges) always pass.
+// of the server). Server-to-server MCP clients (Claude Desktop's HTTP
+// bridge, stdio wrappers) send no Origin header and always pass. A
+// browser-based client MUST be listed in ALLOWED_ORIGINS explicitly —
+// there is no same-Host fallback, because trusting the Host header is
+// exactly the pattern DNS rebinding attacks exploit (an attacker can
+// point evil.example at 127.0.0.1 and the browser will send matching
+// Origin + Host headers). See MCP spec on the DNS-rebinding defense.
 const _originAllow = (process.env.ALLOWED_ORIGINS || '')
   .split(',')
   .map(s => s.trim())
   .filter(Boolean);
 
-function _isOriginAllowed(origin, host) {
+function _isOriginAllowed(origin) {
   if (!origin) return true;                    // Server-to-server = ok
-  if (_originAllow.some(o => o === '*' || o === origin)) return true;
-  if (host) {
-    try {
-      const u = new URL(origin);
-      if (u.host === host) return true;         // Same-origin browser client
-    } catch { /* invalid Origin header → treat as reject */ }
-  }
-  return false;
+  return _originAllow.some(o => o === '*' || o === origin);
 }
 
-// Router-level gate: if MCP is disabled, respond 404 to every verb on
-// /api/mcp BEFORE running bearer auth. Prevents an attacker (or a
-// misconfigured agent) from burning a valid token's rate-limit budget
-// against a feature that isn't actually turned on.
+// Router-level gates: BOTH the ENABLED flag AND the origin check run
+// BEFORE bearer auth, so probes against a disabled endpoint or a
+// disallowed origin can't burn a valid token's rate-limit budget.
 router.use((req, res, next) => {
   if (!ENABLED) return res.status(404).json({ error: 'MCP not enabled on this server' });
   next();
 });
-
-router.post('/', bearerAuth, requireScope('mcp:read'), async (req, res) => {
+router.use((req, res, next) => {
   const origin = req.get('origin');
-  const host = req.get('host');
-  if (!_isOriginAllowed(origin, host)) {
+  if (!_isOriginAllowed(origin)) {
     return res.status(403).json({
-      error: 'Origin not allowed',
+      error:
+        'Origin not allowed. Server-to-server clients (Claude Desktop etc.) work by ' +
+        'default; browser-based MCP inspectors must be listed in ALLOWED_ORIGINS.',
       code: 'origin_rejected',
     });
   }
+  next();
+});
+
+router.post('/', bearerAuth, requireScope('mcp:read'), async (req, res) => {
   try {
     await handleMcpRequest(req, res);
   } catch (e) {

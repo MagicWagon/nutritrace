@@ -35,12 +35,14 @@ export async function handleMcpRequest(req, res) {
   );
   registerReadTools(server, { userId: req.apiUser.id });
 
-  // If the client hangs up mid-response, tear down transport cleanly
-  // so we don't leak the underlying reader/writer.
-  res.on('close', () => {
-    try { transport.close?.(); } catch { /* ignore */ }
-  });
-
   await server.connect(transport);
-  await transport.handleRequest(req, res, req.body);
+  try {
+    await transport.handleRequest(req, res, req.body);
+  } finally {
+    // Tear down the per-request transport once the SDK is done, whether
+    // the response ended cleanly or the client aborted. Gated on
+    // writableEnded so a mid-flight close doesn't reject the pending
+    // handleRequest write and produce a false-positive error log.
+    try { transport.close?.(); } catch { /* ignore */ }
+  }
 }

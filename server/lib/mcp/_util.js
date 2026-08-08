@@ -25,6 +25,16 @@ export function todayLocal() {
 }
 
 /**
+ * YYYY-MM-DD `days` days before today in server-local time. Same TZ
+ * caveat as `todayLocal`.
+ */
+export function daysAgoLocal(days) {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return d.toLocaleDateString('sv-SE');
+}
+
+/**
  * Standard MCP error result. `isError: true` means "the tool ran but
  * couldn't do what was asked" — protocol-level errors (unknown tool,
  * malformed JSON-RPC) are returned as JSON-RPC error objects by the

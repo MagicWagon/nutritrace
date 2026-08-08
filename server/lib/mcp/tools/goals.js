@@ -33,10 +33,14 @@ export function registerGetGoals(server, { userId }) {
       ).get(userId);
       const goals = row?.value ? safeJson(row.value, {}) : {};
       // Preserve legitimate 0 (user explicitly cleared their water goal) —
-      // don't treat it as falsy. Only truly-missing or non-numeric values
-      // become null.
-      const waterRaw = water?.value != null ? Number(safeJson(water.value, null)) : null;
-      const waterGoalMl = Number.isFinite(waterRaw) ? waterRaw : null;
+      // don't treat it as falsy. But also don't collapse a JSON `null`
+      // value into 0 via `Number(null)` — parse first, then keep the
+      // result only if it's actually a finite number.
+      let waterGoalMl = null;
+      if (water?.value != null) {
+        const parsed = safeJson(water.value, null);
+        if (typeof parsed === 'number' && Number.isFinite(parsed)) waterGoalMl = parsed;
+      }
       return toolResult({ goals, water_goal_ml: waterGoalMl });
     }
   );
