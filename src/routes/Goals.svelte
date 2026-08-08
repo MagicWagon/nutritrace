@@ -586,9 +586,13 @@
               {#if i > 0}<div class="divider"></div>{/if}
               <button class="goal-row" on:click={() => openEdit(stat)}>
                 <div class="goal-info">
-                  <span class="font-medium">{stat.label}{#if stat.id === 'calories' && $calorieGoalMode === 'dynamic' && _dynamicCaloriesOut != null} ⚡{:else if stat.id === 'calories' && $calorieGoalMode === 'adaptive' && _adaptive?.ready} 📈{/if}</span>
+                  <span class="font-medium">{stat.label}{#if (stat.id === 'calories' || stat.id === 'kilojoules') && $calorieGoalMode === 'dynamic' && _dynamicCaloriesOut != null} ⚡{:else if (stat.id === 'calories' || stat.id === 'kilojoules') && $calorieGoalMode === 'adaptive' && _adaptive?.ready} 📈{/if}</span>
                   {#if getTarget(stat) != null}
-                    {@const tgt = stat.id === 'calories' && ($calorieGoalMode === 'dynamic' || ($calorieGoalMode === 'adaptive' && _adaptive?.ready)) ? _effectiveCalGoal : getTarget(stat)}
+                    {@const _isEnergy = stat.id === 'calories' || stat.id === 'kilojoules'}
+                    {@const _dynAdapt = _isEnergy && ($calorieGoalMode === 'dynamic' || ($calorieGoalMode === 'adaptive' && _adaptive?.ready))}
+                    {@const tgt = _dynAdapt
+                      ? (stat.id === 'kilojoules' ? Math.round(Nutrition.kcalToKj(_effectiveCalGoal)) : _effectiveCalGoal)
+                      : getTarget(stat)}
                     {@const cur = getTodayValue(stat, todayTotals, todayBodyStats, todayWellness, recentBodyStats)}
                     {@const pct = tgt > 0 ? Math.min(100, Math.round((cur ?? 0) / tgt * 100)) : 0}
                     {@const isMin = $goals[_goalStorageId(stat.id)]?.isMin}
