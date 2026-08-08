@@ -1257,6 +1257,14 @@
         // or the Foods+pickDate+pickMeal URL flow), route through pickFood
         // so its own pickDate / pickMeal context is preserved rather than
         // silently defaulting to today + first meal via detailSheet.
+        //
+        // Close the scanner explicitly before opening the sheet or calling
+        // pickFood. The pre-migration flow relied on openEditor navigating
+        // away (which unmounted the scanner as a side effect); replacing
+        // that with detail-sheet or pickFood means the scanner would keep
+        // its camera running behind the sheet and could re-fire handleScan
+        // on the next decoded frame.
+        scannerOpen = false;
         if (pickMode) {
           // Mark as already-hydrated so pickFood skips its own v3 fetch —
           // lookupBarcode already hit /api/v3/product/<code> and returned

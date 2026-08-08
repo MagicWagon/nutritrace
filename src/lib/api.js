@@ -73,9 +73,9 @@ function _getOffSearchCountry() {
 // `+ - && || ! ( ) { } [ ] ^ " ~ * ? : \ /` and interpreting them as
 // query operators on raw user input can 500 the request (e.g. a user
 // typing "Ben & Jerry's" or "M&M's" would trip the parser). Backslash-
-// prefixing each reserved char keeps user intent intact and stops the
-// server from rejecting the query. Also strips double quotes so they
-// don't break out of the country-filter quoted-term below.
+// prefixing each reserved char (including `"`) keeps user intent intact
+// and prevents an unbalanced quote inside user text from closing the
+// country-filter quoted-term appended later in the query builder.
 function _luceneEscape(s) {
   return String(s || '')
     .replace(/[+\-!(){}\[\]^"~*?:\\\/]/g, '\\$&')
