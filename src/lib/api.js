@@ -69,17 +69,39 @@ function _getOffSearchCountry() {
   } catch { return null; }
 }
 
+// Escape user-typed query text for search-a-licious. Lucene reserves
+// `+ - && || ! ( ) { } [ ] ^ " ~ * ? : \ /` and interpreting them as
+// query operators on raw user input can 500 the request (e.g. a user
+// typing "Ben & Jerry's" or "M&M's" would trip the parser). Backslash-
+// prefixing each reserved char (including `"`) keeps user intent intact
+// and prevents an unbalanced quote inside user text from closing the
+// country-filter quoted-term appended later in the query builder.
+function _luceneEscape(s) {
+  return String(s || '')
+    .replace(/[+\-!(){}\[\]^"~*?:\\\/]/g, '\\$&')
+    .replace(/&&/g, '\\&\\&')
+    .replace(/\|\|/g, '\\|\\|');
+}
+
+// Build the search-a-licious URL. OFF's canonical text-search endpoint,
+// backed by ElasticSearch. Supports typo tolerance, fuzzy matching, and
+// multilingual analysis vs the deprecated v2 API's substring MongoDB
+// query. Country filter goes inline into `q` as Lucene syntax rather
+// than a separate query param (v2's `countries_tags=` is a no-op here).
+// Language filter uses `langs=` (v2 used `lc=`, ignored by search-a-licious).
 function _offSearchUrl(query, page, pageSize) {
+  const country = _getOffSearchCountry();
+  const escaped  = _luceneEscape(query);
+  const qWithFilter = country
+    ? `${escaped} +countries_tags:"${country}"`
+    : escaped;
   const params = new URLSearchParams({
-    search_terms: query,
-    json: '1',
+    q: qWithFilter,
     page_size: String(pageSize),
     page: String(page),
-    lc: _getOffSearchLanguage(),
+    langs: _getOffSearchLanguage(),
   });
-  const country = _getOffSearchCountry();
-  if (country) params.set('countries_tags', country);
-  return `https://world.openfoodfacts.org/api/v2/search?${params.toString()}`;
+  return `https://search.openfoodfacts.org/search?${params.toString()}`;
 }
 
 // Read the user's saved OFF language preference (short ISO 639-1 code
@@ -128,20 +150,92 @@ function _rankOFFResults(items) {
   });
 }
 
+// Accept every "product was found" flavor OFF returns across API generations
+// and mirror paths:
+//   v3 live: { status: "success" }
+//   v3 live with data warnings: { status: "success_with_warnings" }
+//   v3 live with recoverable errors on some fields: { status: "success_with_errors" }
+//   v2 live + local OFF mirror: { status: 1 }
+// Falling back to a truthy `product` object handles any future envelope
+// wording change without a false-negative on real hits. Only outright
+// "no product" replies (status: "failure" / status: 0, or missing product
+// object) drop through as null.
+function _isOffSuccess(data) {
+  if (!data) return false;
+  const s = data.status;
+  if (s === 1) return true;
+  if (typeof s === 'string' && s.startsWith('success')) return true;
+  return !!data.product;
+}
+
 const API = {
   OFF_BASE: 'https://world.openfoodfacts.org',
 
   async lookupBarcode(barcode) {
     try {
       const lc = _getOffSearchLanguage();
-      const url = `${this.OFF_BASE}/api/v0/product/${barcode}.json?lc=${encodeURIComponent(lc)}`;
+      // v3 is the current canonical product endpoint. v0/v2 still work
+      // (OFF marks v2 deprecated but supported for back-compat) and the
+      // local mirror at server/routes/proxy.js intercepts any /api/vN/
+      // path, so on-disk mirrors keep working unchanged. Status shape
+      // differs: v3 returns { status: "success" }, v2/mirror returns
+      // { status: 1 } — accept both so a mirror hit and a live v3 hit
+      // are treated the same.
+      const url = `${this.OFF_BASE}/api/v3/product/${barcode}?lc=${encodeURIComponent(lc)}`;
       const res = await _extFetch(url);
       if (!res.ok) return null;
       const data = await res.json();
-      if (data.status !== 1) return null;
+      if (!_isOffSuccess(data)) return null;
       return this._mapOFFProduct(data.product);
     } catch(e) {
       console.error('Barcode lookup failed:', e);
+      return null;
+    }
+  },
+
+  // Fetch full product detail for a specific barcode from v3, used to
+  // hydrate a search-a-licious hit before the user opens the add sheet.
+  // search-a-licious's index deliberately omits serving_size,
+  // serving_quantity, nutrition_data_per, and the _serving nutriment
+  // variants (see #133 migration). Those fields matter for the Import
+  // Portion As setting, alt-units convenience picker, and the cross-
+  // system nutrition-basis warning. Fetching them on tap keeps the
+  // search itself fast and restores full fidelity at add-time. Cached
+  // in-session by barcode so a second tap on the same food doesn't
+  // refetch. Returns null on error; caller falls back to the search hit.
+  // LRU-capped hydrate cache. Bound prevents unbounded growth over a long
+  // browsing session where a user searches OFF many times and taps many
+  // unique results. Map iteration order is insertion order in JS, so
+  // deleting the first key evicts the least-recently-inserted entry; each
+  // hit is re-inserted so recently-used entries move to the tail.
+  _offHydrateCache: new Map(),
+  _OFF_HYDRATE_MAX: 200,
+  async fetchProductByCode(code) {
+    if (!code) return null;
+    if (this._offHydrateCache.has(code)) {
+      const cached = this._offHydrateCache.get(code);
+      this._offHydrateCache.delete(code);
+      this._offHydrateCache.set(code, cached);
+      return cached;
+    }
+    try {
+      const lc = _getOffSearchLanguage();
+      const url = `${this.OFF_BASE}/api/v3/product/${code}?lc=${encodeURIComponent(lc)}`;
+      const res = await _extFetch(url);
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (!_isOffSuccess(data)) return null;
+      const mapped = this._mapOFFProduct(data.product);
+      if (mapped) {
+        if (this._offHydrateCache.size >= this._OFF_HYDRATE_MAX) {
+          const oldest = this._offHydrateCache.keys().next().value;
+          if (oldest !== undefined) this._offHydrateCache.delete(oldest);
+        }
+        this._offHydrateCache.set(code, mapped);
+      }
+      return mapped;
+    } catch(e) {
+      console.warn('OFF hydrate failed:', e);
       return null;
     }
   },

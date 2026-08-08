@@ -509,7 +509,9 @@
 
   function _pickBySource(source, item) {
     if (source === 'mealie') return pickMealieRecipe(item);
-    return pickFood(item);  // local + shared + off + usda all go through pickFood
+    // Pass source through so pickFood can trigger the OFF v3 hydration
+    // step (search-a-licious hits lack serving_size + _serving nutriments).
+    return pickFood(item, source);  // local + shared + off + usda all go through pickFood
   }
 
   // Fetch the next page of the currently-active external source and append
@@ -861,7 +863,33 @@
     push(item ? '/meal-editor/' + item.id : '/meal-editor');
   }
 
-  async function pickFood(food) {
+  async function pickFood(food, sourceHint) {
+    // Search-a-licious hits deliberately omit serving_size, serving_quantity,
+    // nutrition_data_per, and _serving nutriment variants (index space
+    // savings). These matter for the Import Portion As setting, alt-units
+    // convenience picker, and the cross-system nutrition-basis warning.
+    // Hydrate on tap via a v3 product lookup so the add / detail sheet
+    // sees full-fidelity data. NtApi.fetchProductByCode caches per-code
+    // in-session, so a second tap on the same food is instant. Only fires
+    // for freshly-picked OFF search hits (sourceHint === 'off'); locally
+    // stored foods, barcode-scanned foods, and shared / USDA / Mealie
+    // items all have their own data paths and don't need OFF hydration.
+    if (sourceHint === 'off' && food && food.barcode && !food._offHydrated) {
+      try {
+        // fetchProductByCode lives on API, not NtApi. NtApi is a Proxy
+        // that routes to the HTTP / native / cached transport layers and
+        // has no such method — calling it there returns undefined and
+        // throws TypeError, which the surrounding catch swallowed. Would
+        // silently no-op every hydration otherwise.
+        //
+        // Callers that already fetched the product via lookupBarcode (v3
+        // barcode scan path) pass _offHydrated: true so we skip the round-
+        // trip. Cache is scoped to the tap-hydration call site, not to the
+        // barcode scan, so a fresh scan wouldn't hit the cache anyway.
+        const hydrated = await API.fetchProductByCode(food.barcode);
+        if (hydrated) food = { ...food, ...hydrated };
+      } catch { /* fall through with the un-hydrated hit */ }
+    }
     if (!pickMode) {
       // Meals/Recipes open the meal editor; Foods open the read-only
       // detail sheet (Phase 2 of the NutritionFactsBox rollout). The sheet
@@ -1218,7 +1246,35 @@
       const { API } = await import('../lib/api.js');
       const result = await API.lookupBarcode(code);
       if (result) {
-        openEditor(result, 'foodList');
+        // OFF returned data for this barcode — show the nutrition-facts
+        // detail sheet first (with Edit + Add to Diary options) instead
+        // of jumping straight into the editor. Matches the OFF-search-tap
+        // flow so barcode scan and text-search of an OFF-known product
+        // land on the same view. Only unknown-to-OFF barcodes go straight
+        // to the editor (that path unchanged).
+        //
+        // In pickMode (caller landed here to add-to-diary via meal-editor
+        // or the Foods+pickDate+pickMeal URL flow), route through pickFood
+        // so its own pickDate / pickMeal context is preserved rather than
+        // silently defaulting to today + first meal via detailSheet.
+        //
+        // Close the scanner explicitly before opening the sheet or calling
+        // pickFood. The pre-migration flow relied on openEditor navigating
+        // away (which unmounted the scanner as a side effect); replacing
+        // that with detail-sheet or pickFood means the scanner would keep
+        // its camera running behind the sheet and could re-fire handleScan
+        // on the next decoded frame.
+        scannerOpen = false;
+        if (pickMode) {
+          // Mark as already-hydrated so pickFood skips its own v3 fetch —
+          // lookupBarcode already hit /api/v3/product/<code> and returned
+          // full serving-size / _serving nutriments. Would otherwise double
+          // the request per scan and re-run _mapOFFProduct.
+          await pickFood({ ...result, _offHydrated: true }, 'off');
+        } else {
+          detailSheetFood = result;
+          detailSheetOpen = true;
+        }
       } else {
         const { showInfo: si } = await import('../stores/toast.js');
         si('Not in Open Food Facts — enter the food and contribute it back if you want');
@@ -1844,7 +1900,7 @@
                   </button>
                 {/if}
                 <button class="food-item-btn"
-                  on:click={() => pickFood(food)}
+                  on:click={() => pickFood(food, searchSource)}
                   on:contextmenu|preventDefault={() => longPress(food)}
                   on:touchstart|passive={() => _startLongPress(() => longPress(food))}
                   on:touchmove|passive={_cancelLongPress}

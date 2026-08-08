@@ -9,6 +9,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.1.2] - 2026-08-08
+
+Patch release. Full OFF integration migration to the two current-canonical endpoints (search-a-licious for text search, v3 for barcode / product detail), a Kilojoules-vs-Calories goal storage cleanup, and smaller UI polish. Six code-review passes on the accumulated dev diff turned up 18 issues across the cycle; the resulting release has been through more static-analysis scrutiny than most NT releases to date.
+
+### Fixed
+
+- **Disabled Calorie Goal Mode buttons now look and explain themselves** (#147, thanks @dominicbui). Dynamic mode requires a connected wearable that reports calorie burn (Fitbit, Garmin, or Google Health). It was correctly gated on the code side, but the disabled visual style was barely distinguishable from an inactive button and the reason ("Connect a wearable first") only appeared as a hover tooltip so on mobile you got no feedback at all. Disabled seg-control buttons now render clearly grayed out, and a visible helper line under the mode selector explains what Dynamic needs and where to set it up.
+- **Kilojoules goal and Calories goal no longer drift out of sync** (#146, thanks @dominicbui). Kilojoules was defined as a separately-editable nutrient goal, so it stored under `$goals.kilojoules` independently from `$goals.calories`. Switching between fixed and adaptive calorie modes, or setting one goal via the Goals page and another via mode-switching, could leave the two out of sync (Goals page showed one target, the diary math used the other). Kilojoules is now a display-mode alias for Calories: the underlying storage is always `$goals.calories` in kcal, and the Kilojoules row reads/writes through the same key with a kJ display conversion. One-time migration on next Goals page open: if you had a Kilojoules goal but no Calories goal, it's transferred to Calories cleanly; if you had both set to different values, Calories wins (that's the canonical storage moving forward, and it matches what the diary was already using).
+
+### Changed
+
+- **Barcode scan of an OFF-known product now shows the nutrition-facts sheet first instead of jumping into the editor.** Matches the flow when you tap an OFF search result: view nutrition, then Add to Diary or Edit. Only barcodes that OFF doesn't know go straight into the editor (nothing to view, must enter manually). Same-app-consistent UX regardless of whether you got to the food via search or scan.
+- **Open Food Facts search moved to search-a-licious for better relevance and future-proofing** (#133). NutriTrace now hits OFF's dedicated ElasticSearch-backed search service (`search.openfoodfacts.org/search`) for text queries instead of the deprecated v2 API. Multi-word queries rank more sensibly, French / German / Spanish queries respect the language preference correctly via `langs=`, and barcode lookups moved from `/api/v0/` to the current `/api/v3/` product endpoint (v2 was officially deprecated by OFF). Local OFF mirror (`OFF_LOCAL_DB`) unaffected. The proxy still intercepts both URL shapes and the frontend accepts both response envelopes so mirror + live paths keep working identically. NutriTrace is now on the two endpoints OFF actively recommends and matches CookTrace's OFF codepath so future fixes port cleanly between the two apps.
+- **Add-time hydration for OFF foods.** Because search-a-licious deliberately drops `serving_size`, `serving_quantity`, `nutrition_data_per`, and the `_serving` variants of nutriments (index space savings), NutriTrace now fetches full product detail via v3 the moment a user taps an OFF search result. Restores the Import Portion As setting, alt-units convenience picker ("1 slice (35g)"), and the cross-system nutrition-basis warning. Cached in-session per barcode so second taps are instant. Adds an invisible ~200-500ms once per unique food.
+- **User queries with special characters no longer break OFF search.** `Ben & Jerry's`, `M&M's`, `Häagen-Dazs` etc. are now Lucene-escaped before being sent, so reserved operators (`+`, `"`, `&&`, `||`, brackets, etc.) don't trip the search parser.
+
+---
+
 ## [1.1.1] - 2026-08-05
 
 Patch release. Restores OFF food-name search for the majority of self-hosters (broken in v1.1.0 by a response-shape parser mismatch), plus a handful of UI polish fixes.

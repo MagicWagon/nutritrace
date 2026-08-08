@@ -1025,6 +1025,14 @@
   :global(.seg-opt.seg-active) {
     color: var(--text-1);
   }
+  /* #147: differentiate disabled from just-inactive. Without this, a
+     button gated by a feature (e.g. Calorie Goal Mode > Dynamic when no
+     wearable is connected) looks identical to a not-currently-selected
+     option, so users tap it expecting it to work. */
+  :global(.seg-opt:disabled) {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
 
   /* Spin — used by any child component that renders a rotating icon
      (sync buttons, in-flight test buttons, etc.). */

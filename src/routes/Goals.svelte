@@ -63,7 +63,10 @@
   $: allFields = [...bodyStatsWithUnit, ...allNutrients, ...wellnessFields];
   // Your Goals: categorized
   $: configuredBodyStats = bodyStatsWithUnit.filter(s => $goals[s.id]);
-  $: configuredNutrients = allNutrients.filter(s => $goals[s.id]);
+  // Alias-aware lookup: after #146 the Kilojoules stat is a display alias
+  // for Calories in kJ mode, so its storage key is 'calories'. Reading
+  // $goals[s.id] raw for a kilojoules stat always misses the migrated goal.
+  $: configuredNutrients = allNutrients.filter(s => $goals[_goalStorageId(s.id)]);
   $: configuredWellness  = wellnessFields.filter(s => $goals[s.id]);
   $: hasAnyGoal = configuredBodyStats.length > 0 || configuredNutrients.length > 0 || configuredWellness.length > 0;
 
@@ -97,8 +100,37 @@
     showSuccess($_('goals.toast.template_saved'));
   }
 
+  // #146 storage migration. Called from both onMount (for legacy $goals on
+  // page load) and applyTemplate (for legacy templates saved under the old
+  // schema). Converts $goals.kilojoules to $goals.calories at the kcal
+  // boundary and deletes the legacy key. If the legacy entry only carried
+  // per-day values (no shared max/min), the days array is still migrated
+  // instead of being silently discarded.
+  function _migrateKilojoulesGoal(g) {
+    if (!g || !g.kilojoules) return g;
+    const next = { ...g };
+    if (!next.calories && next.kilojoules) {
+      const kj = next.kilojoules;
+      const daysArr = Array.isArray(kj.days) ? kj.days : null;
+      const hasDays = daysArr && daysArr.some(v => v != null && Number.isFinite(v) && v > 0);
+      const shared = kj.max ?? kj.min;
+      const hasShared = shared != null && Number.isFinite(shared) && shared > 0;
+      if (hasShared || hasDays) {
+        next.calories = {
+          ...kj,
+          max: kj.max != null ? kj.max / 4.184 : undefined,
+          min: kj.min != null ? kj.min / 4.184 : undefined,
+          days: daysArr ? daysArr.map(v => v != null ? v / 4.184 : null) : undefined,
+        };
+        Object.keys(next.calories).forEach(k => next.calories[k] === undefined && delete next.calories[k]);
+      }
+    }
+    delete next.kilojoules;
+    return next;
+  }
+
   function applyTemplate(tpl) {
-    goals.set({ ...tpl.goals });
+    goals.set(_migrateKilojoulesGoal({ ...tpl.goals }));
     if (tpl.waterGoalMl != null) waterGoalMl.set(tpl.waterGoalMl);
     showApplyConfirm = null;
     activeTab = 'yours';
@@ -160,6 +192,9 @@
   $: if (($fitbitFamilyEnabled || $garminEnabled) && !_wellnessLoaded) loadWellnessToday();
 
   onMount(async () => {
+    // #146 migration on page load. See _migrateKilojoulesGoal above.
+    goals.update(_migrateKilojoulesGoal);
+
     // Load diary data first — don't block on server calls
     const entry = await NtApi.getDiaryDate(today).catch(() => null);
     if (entry) {
@@ -249,10 +284,20 @@
 
   let _gLock = false;
   let _gLockTimer;
+  // Kilojoules is a display-mode alias for calories, not a separately-
+  // editable goal. Underlying storage is always $goals.calories in kcal;
+  // the Kilojoules row reads/writes through that same key with a kJ
+  // display conversion. Prevents the two goals from drifting after mode
+  // switches or independent edits. #146.
+  function _goalStorageId(statId) {
+    return statId === 'kilojoules' ? 'calories' : statId;
+  }
   function openEdit(stat) {
     editStat = stat;
-    const g = $goals[stat.id];
-    const kj = stat.id === 'calories_out' && $energyUnit === 'kJ';
+    const storageId = _goalStorageId(stat.id);
+    const g = $goals[storageId];
+    const kj = (stat.id === 'kilojoules') ||
+               (stat.id === 'calories_out' && $energyUnit === 'kJ');
     const toDisp = (v) => kj && v != null && v !== '' ? Math.round(Nutrition.kcalToKj(parseFloat(v))) : v;
     if (g) {
       editShared  = g.sharedGoal !== false;
@@ -281,7 +326,8 @@
 
   function saveGoal() {
     if (!editStat) return;
-    const kj = editStat.id === 'calories_out' && $energyUnit === 'kJ';
+    const kj = (editStat.id === 'kilojoules') ||
+               (editStat.id === 'calories_out' && $energyUnit === 'kJ');
     const toStore = (n) => kj && n != null ? n / 4.184 : n;
     const val = toStore(parseFloat(editVal0) || null);
     const dayArr = editShared
@@ -303,7 +349,14 @@
     if (editIsMin) entry.min = editShared ? val : peakVal;
     else           entry.max = editShared ? val : peakVal;
 
-    goals.update(g => ({ ...g, [editStat.id]: entry }));
+    const storageId = _goalStorageId(editStat.id);
+    goals.update(g => {
+      const next = { ...g, [storageId]: entry };
+      // Clear any legacy $goals.kilojoules on any kilojoules-labeled save;
+      // storage now lives only under `calories`. #146 cleanup.
+      if (editStat.id === 'kilojoules') delete next.kilojoules;
+      return next;
+    });
     editOpen = false;
     showSuccess($_('goals.toast.goal_saved'));
   }
@@ -311,7 +364,13 @@
   function deleteGoal() {
     if (!editStat) return;
     if (!confirm(`Remove goal for ${editStat.label || editStat.id}?`)) return;
-    goals.update(g => { const n = {...g}; delete n[editStat.id]; return n; });
+    const storageId = _goalStorageId(editStat.id);
+    goals.update(g => {
+      const n = { ...g };
+      delete n[storageId];
+      if (editStat.id === 'kilojoules') delete n.kilojoules;
+      return n;
+    });
     editOpen = false;
   }
 
@@ -364,7 +423,8 @@
   }
 
   function getTarget(stat) {
-    const g = $goals[stat.id];
+    const storageId = _goalStorageId(stat.id);
+    const g = $goals[storageId];
     if (!g) return null;
     let raw;
     if (g.sharedGoal !== false) {
@@ -372,6 +432,14 @@
     } else {
       const d = new Date().getDay();
       raw = (g.days && g.days[d] != null) ? g.days[d] : (g.max ?? g.min ?? null);
+    }
+    // Kilojoules row displays the calories goal converted to kJ. Underlying
+    // storage is kcal; display is unit-transformed at the boundary. #146.
+    // Integer rounding matches openEdit's toDisp so open-then-save without
+    // editing is a no-op instead of drifting the stored kcal value each
+    // pass (round(kj)→saved kcal→round back to same kj stabilizes).
+    if (stat.id === 'kilojoules' && raw != null) {
+      return Math.round(Nutrition.kcalToKj(raw));
     }
     if (raw == null || !g.isPercent) return raw;
     const density = MACRO_DENSITY[stat.id];
@@ -490,7 +558,7 @@
                     {@const pct = getPct(stat, todayTotals, todayBodyStats, todayWellness, recentBodyStats)}
                     {@const tgt = getTarget(stat)}
                     {@const cur = getTodayValue(stat, todayTotals, todayBodyStats, todayWellness, recentBodyStats)}
-                    {@const isMin = $goals[stat.id]?.isMin}
+                    {@const isMin = $goals[_goalStorageId(stat.id)]?.isMin}
                     {@const bad = cur != null && tgt != null && (isMin ? cur < tgt : cur > tgt)}
                     {@const stale = getBodyStatStaleness(stat, recentBodyStats)}
                     <div class="goal-progress-bar">
@@ -518,12 +586,16 @@
               {#if i > 0}<div class="divider"></div>{/if}
               <button class="goal-row" on:click={() => openEdit(stat)}>
                 <div class="goal-info">
-                  <span class="font-medium">{stat.label}{#if stat.id === 'calories' && $calorieGoalMode === 'dynamic' && _dynamicCaloriesOut != null} ⚡{:else if stat.id === 'calories' && $calorieGoalMode === 'adaptive' && _adaptive?.ready} 📈{/if}</span>
+                  <span class="font-medium">{stat.label}{#if (stat.id === 'calories' || stat.id === 'kilojoules') && $calorieGoalMode === 'dynamic' && _dynamicCaloriesOut != null} ⚡{:else if (stat.id === 'calories' || stat.id === 'kilojoules') && $calorieGoalMode === 'adaptive' && _adaptive?.ready} 📈{/if}</span>
                   {#if getTarget(stat) != null}
-                    {@const tgt = stat.id === 'calories' && ($calorieGoalMode === 'dynamic' || ($calorieGoalMode === 'adaptive' && _adaptive?.ready)) ? _effectiveCalGoal : getTarget(stat)}
+                    {@const _isEnergy = stat.id === 'calories' || stat.id === 'kilojoules'}
+                    {@const _dynAdapt = _isEnergy && ($calorieGoalMode === 'dynamic' || ($calorieGoalMode === 'adaptive' && _adaptive?.ready))}
+                    {@const tgt = _dynAdapt
+                      ? (stat.id === 'kilojoules' ? Math.round(Nutrition.kcalToKj(_effectiveCalGoal)) : _effectiveCalGoal)
+                      : getTarget(stat)}
                     {@const cur = getTodayValue(stat, todayTotals, todayBodyStats, todayWellness, recentBodyStats)}
                     {@const pct = tgt > 0 ? Math.min(100, Math.round((cur ?? 0) / tgt * 100)) : 0}
-                    {@const isMin = $goals[stat.id]?.isMin}
+                    {@const isMin = $goals[_goalStorageId(stat.id)]?.isMin}
                     {@const bad = cur != null && tgt != null && (isMin ? cur < tgt : cur > tgt)}
                     <div class="goal-progress-bar">
                       <div class="goal-progress-fill" class:over={bad} style="width:{pct}%"></div>
@@ -597,7 +669,7 @@
           <button class="goal-row" on:click={() => openEdit(stat)}>
             <div class="goal-info">
               <span class="font-medium">{stat.label}</span>
-              {#if $goals[stat.id]}
+              {#if $goals[_goalStorageId(stat.id)]}
                 {@const pct = getPct(stat, todayTotals, todayBodyStats, todayWellness, recentBodyStats)}
                 {@const tgt = getTarget(stat)}
                 {@const cur = getTodayValue(stat, todayTotals, todayBodyStats, todayWellness, recentBodyStats)}
@@ -626,7 +698,7 @@
           <button class="goal-row" on:click={() => openEdit(stat)}>
             <div class="goal-info">
               <span class="font-medium">{stat.label}</span>
-              {#if $goals[stat.id]}
+              {#if $goals[_goalStorageId(stat.id)]}
                 {@const pct = getPct(stat, todayTotals, todayBodyStats, todayWellness, recentBodyStats)}
                 {@const tgt = getTarget(stat)}
                 {@const cur = getTodayValue(stat, todayTotals, todayBodyStats, todayWellness, recentBodyStats)}
@@ -669,7 +741,7 @@
             <button class="goal-row" on:click={() => openEdit(stat)}>
               <div class="goal-info">
                 <span class="font-medium">{stat.label}</span>
-                {#if $goals[stat.id]}
+                {#if $goals[_goalStorageId(stat.id)]}
                   {@const pct = getPct(stat, todayTotals, todayBodyStats, todayWellness, recentBodyStats)}
                   {@const _tgtRaw = getTarget(stat)}
                   {@const _curRaw = getTodayValue(stat, todayTotals, todayBodyStats, todayWellness, recentBodyStats)}
