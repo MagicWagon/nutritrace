@@ -8,9 +8,13 @@
  * Cheap implementation: walks the last 14 days of diary rows and
  * counts distinct food ids. Not indexed on the server; if that becomes
  * a hot path we can materialize a `foods.last_used_at` column.
+ *
+ * Filters out tombstoned diary rows so agents don't get "recent" foods
+ * seeded from days the user has erased.
  */
 import { z } from 'zod';
 import db from '../../../db.js';
+import { safeJson, toolResult } from '../_util.js';
 
 const MAX_LIMIT = 30;
 const DEFAULT_LIMIT = 10;
@@ -33,12 +37,12 @@ export function registerRecentFoods(server, { userId }) {
       const since = _daysAgoLocal(LOOKBACK_DAYS);
       const rows = db.prepare(
         `SELECT items, date FROM diary
-          WHERE user_id = ? AND date >= ?
+          WHERE user_id = ? AND date >= ? AND deleted_at IS NULL
           ORDER BY date DESC`
       ).all(userId, since);
       const lastSeen = new Map();
       for (const r of rows) {
-        const items = _safeJson(r.items, []);
+        const items = safeJson(r.items, []);
         for (const it of items) {
           const id = it?.id ?? it?.food_id ?? it?.foodId;
           if (id == null) continue;
@@ -47,13 +51,7 @@ export function registerRecentFoods(server, { userId }) {
         if (lastSeen.size >= cap * 3) break;
       }
       const ids = Array.from(lastSeen.keys()).slice(0, cap);
-      if (!ids.length) {
-        const empty = { count: 0, items: [] };
-        return {
-          content: [{ type: 'text', text: JSON.stringify(empty, null, 2) }],
-          structuredContent: empty,
-        };
-      }
+      if (!ids.length) return toolResult({ count: 0, items: [] });
       const placeholders = ids.map(() => '?').join(',');
       const foods = db.prepare(
         `SELECT id, name, brand, barcode, portion, unit, nutrition, category
@@ -72,14 +70,10 @@ export function registerRecentFoods(server, { userId }) {
           portion: Number(f.portion) || null,
           unit: f.unit || null,
           category: f.category || null,
-          nutrition: _safeJson(f.nutrition, {}),
+          nutrition: safeJson(f.nutrition, {}),
           last_logged_on: lastSeen.get(f.id),
         }));
-      const result = { count: items.length, items };
-      return {
-        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-        structuredContent: result,
-      };
+      return toolResult({ count: items.length, items });
     }
   );
 }
@@ -88,7 +82,4 @@ function _daysAgoLocal(days) {
   const d = new Date();
   d.setDate(d.getDate() - days);
   return d.toLocaleDateString('sv-SE');
-}
-function _safeJson(s, fallback) {
-  try { return JSON.parse(s); } catch { return fallback; }
 }

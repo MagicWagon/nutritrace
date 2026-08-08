@@ -6,11 +6,15 @@
  * the order they were added, with resolved nutrition + timestamps.
  *
  * date defaults to today (server-local time). Format: YYYY-MM-DD.
+ * Callers whose users are in a different timezone should pass an
+ * explicit date rather than rely on the "today" default.
+ *
+ * Filters out tombstoned diary rows (deleted_at IS NOT NULL) so
+ * agents don't see items the user has since deleted.
  */
 import { z } from 'zod';
 import db from '../../../db.js';
-
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+import { DATE_RE, safeJson, todayLocal, toolResult, toolError } from '../_util.js';
 
 export function registerListDiary(server, { userId }) {
   server.registerTool(
@@ -18,38 +22,24 @@ export function registerListDiary(server, { userId }) {
     {
       title: 'List Diary Entries',
       description:
-        'Return the food items logged on a given date (YYYY-MM-DD, defaults to today). ' +
+        'Return the food items logged on a given date (YYYY-MM-DD, defaults to today in the SERVER\'s timezone). ' +
         'Each item includes name, meal slot, portion, unit, quantity, nutrition, and the ' +
-        'timestamp it was added.',
+        'timestamp it was added. Pass an explicit date for agents that need calendar accuracy in a different TZ.',
       inputSchema: {
         date: z.string().regex(DATE_RE, 'YYYY-MM-DD').optional(),
       },
     },
     async ({ date }) => {
-      const day = date || _todayLocal();
+      const day = date || todayLocal();
       if (!DATE_RE.test(day)) {
-        return _err(`Invalid date '${day}'; expected YYYY-MM-DD.`);
+        return toolError(`Invalid date '${day}'; expected YYYY-MM-DD.`);
       }
       const row = db.prepare(
-        `SELECT items, water, body_stats FROM diary WHERE user_id = ? AND date = ?`
+        `SELECT items FROM diary
+          WHERE user_id = ? AND date = ? AND deleted_at IS NULL`
       ).get(userId, day);
-      const items = row?.items ? _safeJson(row.items, []) : [];
-      const result = { date: day, items, count: items.length };
-      return {
-        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-        structuredContent: result,
-      };
+      const items = row?.items ? safeJson(row.items, []) : [];
+      return toolResult({ date: day, items, count: items.length });
     }
   );
-}
-
-function _todayLocal() {
-  // sv-SE gives YYYY-MM-DD in server-local time. Same trick the client uses.
-  return new Date().toLocaleDateString('sv-SE');
-}
-function _safeJson(s, fallback) {
-  try { return JSON.parse(s); } catch { return fallback; }
-}
-function _err(msg) {
-  return { content: [{ type: 'text', text: msg }], isError: true };
 }

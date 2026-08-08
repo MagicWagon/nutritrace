@@ -12,6 +12,7 @@
  */
 import { z } from 'zod';
 import db from '../../../db.js';
+import { safeJson, toolResult, toolError } from '../_util.js';
 
 const MAX_LIMIT = 50;
 const DEFAULT_LIMIT = 20;
@@ -32,7 +33,7 @@ export function registerSearchFoods(server, { userId }) {
     },
     async ({ query, limit }) => {
       const q = String(query || '').trim();
-      if (!q) return _err('query is required and cannot be empty.');
+      if (!q) return toolError('query is required and cannot be empty.');
       const cap = Math.min(MAX_LIMIT, Math.max(1, Number(limit) || DEFAULT_LIMIT));
       const like = `%${q}%`;
       const rows = db.prepare(
@@ -52,20 +53,9 @@ export function registerSearchFoods(server, { userId }) {
         portion: Number(r.portion) || null,
         unit: r.unit || null,
         category: r.category || null,
-        nutrition: _safeJson(r.nutrition, {}),
+        nutrition: safeJson(r.nutrition, {}),
       }));
-      const result = { query: q, count: items.length, limit: cap, items };
-      return {
-        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-        structuredContent: result,
-      };
+      return toolResult({ query: q, count: items.length, limit: cap, items });
     }
   );
-}
-
-function _safeJson(s, fallback) {
-  try { return JSON.parse(s); } catch { return fallback; }
-}
-function _err(msg) {
-  return { content: [{ type: 'text', text: msg }], isError: true };
 }

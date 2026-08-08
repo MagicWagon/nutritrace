@@ -9,9 +9,12 @@
  * endpoint. GET / DELETE explicitly return 405 (we don't run stateful
  * sessions, so the legacy standalone SSE stream + session-cleanup
  * verbs don't apply). Auth is bearer-token via the existing api_tokens
- * table with scope 'mcp:read'. Origin is validated against the same
- * ALLOWED_ORIGINS list the rest of the server honors, as a DNS-
- * rebinding defense per the MCP spec.
+ * table with scope 'mcp:read'. Origin is validated as a DNS-rebinding
+ * defense per the MCP spec.
+ *
+ * Middleware order: the ENABLED flag check runs BEFORE bearer auth so
+ * probes against a disabled endpoint can't consume the token's rate-
+ * limit budget.
  */
 import { Router } from 'express';
 import { bearerAuth, requireScope } from '../middleware/bearer-auth.js';
@@ -22,25 +25,41 @@ const router = Router();
 
 const ENABLED = _envFlag(process.env.MCP_ENABLED);
 
-// Parse ALLOWED_ORIGINS (comma-separated, same convention as CORS
-// config in server/index.js). Absent = allow same-origin only, which
-// for MCP over Streamable HTTP means no Origin header at all (typical
-// for server-to-server clients like Claude Desktop).
+// Parse ALLOWED_ORIGINS (comma-separated, same convention as the rest
+// of the server). If absent, origin-bearing requests fall back to a
+// same-Host check so a browser-based MCP inspector hitting the app's
+// own URL still works out of the box. Header-less server-to-server
+// clients (Claude Desktop, stdio bridges) always pass.
 const _originAllow = (process.env.ALLOWED_ORIGINS || '')
   .split(',')
   .map(s => s.trim())
   .filter(Boolean);
 
-function _isOriginAllowed(origin) {
-  if (!origin) return true;                    // No origin = server-to-server = ok
-  if (_originAllow.length === 0) return false; // Origin set + no allowlist = reject
-  return _originAllow.some(o => o === origin || o === '*');
+function _isOriginAllowed(origin, host) {
+  if (!origin) return true;                    // Server-to-server = ok
+  if (_originAllow.some(o => o === '*' || o === origin)) return true;
+  if (host) {
+    try {
+      const u = new URL(origin);
+      if (u.host === host) return true;         // Same-origin browser client
+    } catch { /* invalid Origin header → treat as reject */ }
+  }
+  return false;
 }
 
-router.post('/', bearerAuth, requireScope('mcp:read'), async (req, res) => {
+// Router-level gate: if MCP is disabled, respond 404 to every verb on
+// /api/mcp BEFORE running bearer auth. Prevents an attacker (or a
+// misconfigured agent) from burning a valid token's rate-limit budget
+// against a feature that isn't actually turned on.
+router.use((req, res, next) => {
   if (!ENABLED) return res.status(404).json({ error: 'MCP not enabled on this server' });
+  next();
+});
+
+router.post('/', bearerAuth, requireScope('mcp:read'), async (req, res) => {
   const origin = req.get('origin');
-  if (!_isOriginAllowed(origin)) {
+  const host = req.get('host');
+  if (!_isOriginAllowed(origin, host)) {
     return res.status(403).json({
       error: 'Origin not allowed',
       code: 'origin_rejected',
@@ -64,7 +83,6 @@ router.post('/', bearerAuth, requireScope('mcp:read'), async (req, res) => {
 // session termination. Return 405 with an explanatory body so clients
 // that speculatively try either get a useful error instead of a hang.
 router.get('/', bearerAuth, requireScope('mcp:read'), (req, res) => {
-  if (!ENABLED) return res.status(404).json({ error: 'MCP not enabled on this server' });
   res.status(405).json({
     jsonrpc: '2.0',
     id: null,
@@ -75,7 +93,6 @@ router.get('/', bearerAuth, requireScope('mcp:read'), (req, res) => {
   });
 });
 router.delete('/', bearerAuth, requireScope('mcp:read'), (req, res) => {
-  if (!ENABLED) return res.status(404).json({ error: 'MCP not enabled on this server' });
   res.status(405).json({
     jsonrpc: '2.0',
     id: null,
