@@ -706,8 +706,21 @@
   // wide-span) auto-expands to full width when it has enough items to
   // fill it comfortably, so we never render a lonely small card next
   // to empty space.
-  const LARGE_MEAL_THRESHOLD = 7;
-  const LONER_MIN_ITEMS      = 3;
+  // Wide-span thresholds tuned from Phase 5 feedback:
+  //   - LARGE_MEAL_THRESHOLD: 5+ items → automatic full width. A 5-item
+  //     card (~430px) is over half of a typical 900px viewport and
+  //     shames a small partner.
+  //   - HEIGHT_MISMATCH_DELTA: even below the large threshold, if two
+  //     adjacent cards would sit in the same row with an item-count
+  //     delta of 3+, wide-span the TALLER one. Prevents "Snack 1 (2
+  //     items) paired with empty Lunch (0)" leaving a stub next to a
+  //     dead zone next to a card that could have breathed.
+  //   - LONER_MIN_ITEMS: a card alone in its row (odd count, or after
+  //     a wide-span) only auto-spans if it has 3+ items; small solo
+  //     cards look better than stretched small cards.
+  const LARGE_MEAL_THRESHOLD  = 5;
+  const HEIGHT_MISMATCH_DELTA = 3;
+  const LONER_MIN_ITEMS       = 3;
   $: mealLayout = (() => {
     const out = meals.map((meal, mealIdx) => {
       const items = getMealItems(entry?.items || [], mealIdx);
@@ -717,7 +730,20 @@
         wideSpan: items.length >= LARGE_MEAL_THRESHOLD,
       };
     });
-    // Second pass: promote loners on odd rows.
+    // Second pass: pair-mismatch. Walk adjacent non-wide pairs; if the
+    // delta is big, promote the taller of the pair to wide-span so the
+    // shorter one gets a same-size partner in its new row (or auto-spans
+    // via the loner pass).
+    for (let i = 0; i < out.length - 1; i++) {
+      if (out[i].wideSpan || out[i + 1].wideSpan) continue;
+      const a = out[i].itemCount;
+      const b = out[i + 1].itemCount;
+      if (Math.abs(a - b) >= HEIGHT_MISMATCH_DELTA) {
+        if (a > b) out[i].wideSpan = true;
+        else       out[i + 1].wideSpan = true;
+      }
+    }
+    // Third pass: promote loners on odd rows.
     let col = 0;
     for (let i = 0; i < out.length; i++) {
       if (out[i].wideSpan) { col = 0; continue; }
