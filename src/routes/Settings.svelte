@@ -96,19 +96,14 @@
     push(`/settings?q=${encodeURIComponent(settingsQuery)}`);
   }
 
-  // Profile hero click routes based on viewport: desktop opens the
-  // Profile section inside the settings two-pane shell so the rail
-  // stays visible; mobile keeps the standalone /profile drill-in
-  // (there's no rail to preserve). Uses matchMedia at click time
-  // instead of a reactive derivation so it always reflects the
-  // current viewport width even after resizes.
-  function _openProfile() {
-    if (typeof window !== 'undefined' &&
-        window.matchMedia('(min-width: 1024px)').matches) {
-      push('/settings/profile');
-    } else {
-      push('/profile');
-    }
+  // Desktop welcome-hero: profile is expandable inline instead of
+  // routing away. Chevron rotates to indicate expand/collapse.
+  // Default expanded so the welcome pane is immediately useful
+  // (replaces the old "Pick a section" prompt). Mobile hero still
+  // routes to /profile — no rail context to preserve there.
+  let _profileHeroExpanded = true;
+  function _toggleProfileHero() {
+    _profileHeroExpanded = !_profileHeroExpanded;
   }
 
   // Section metadata — slug → title i18n key + icon. Used by the sub-page
@@ -575,7 +570,7 @@
       {@const _displayName = _nick || (_full && _full !== 'Local User' ? _full : '') || $_('settings.profile_hero.label_fallback')}
       {@const _hasName = _displayName !== $_('settings.profile_hero.label_fallback')}
       {@const _initial = (_displayName[0] || '?').toUpperCase()}
-      <button class="profile-hero" on:click={_openProfile}>
+      <button class="profile-hero" on:click={() => push('/profile')}>
         <div class="profile-hero-avatar">
           {#if _u.avatar_url}
             <img src={resolveAssetUrl(_u.avatar_url)} alt="" />
@@ -613,7 +608,8 @@
       {@const _displayName = _nick || (_full && _full !== 'Local User' ? _full : '') || $_('settings.profile_hero.label_fallback')}
       {@const _hasName = _displayName !== $_('settings.profile_hero.label_fallback')}
       {@const _initial = (_displayName[0] || '?').toUpperCase()}
-      <button class="profile-hero" on:click={_openProfile}>
+      <button class="profile-hero profile-hero-expander" on:click={_toggleProfileHero}
+        aria-expanded={_profileHeroExpanded}>
         <div class="profile-hero-avatar">
           {#if _u.avatar_url}
             <img src={resolveAssetUrl(_u.avatar_url)} alt="" />
@@ -631,14 +627,21 @@
             <span class="profile-hero-sub">{$_('settings.profile_hero.subtitle_empty')}</span>
           {/if}
         </div>
-        <span class="material-symbols-rounded profile-hero-chev">chevron_right</span>
+        <span class="material-symbols-rounded profile-hero-chev profile-hero-chev-toggle"
+          class:profile-hero-chev-open={_profileHeroExpanded}>expand_more</span>
       </button>
       {/if}
 
-            <div class="settings-hero-prompt">
-              <span class="material-symbols-rounded">tune</span>
-              <p>Pick a section from the left to configure NutriTrace.</p>
-            </div>
+            {#if _profileHeroExpanded}
+              <!-- Profile editor rendered inline inside the welcome
+                   pane. Uses the same <Profile /> component that
+                   routes to /settings/profile from the rail, but
+                   embedded here directly so users don't have to
+                   navigate anywhere to edit their info. -->
+              <div class="profile-hero-body">
+                <Profile />
+              </div>
+            {/if}
           </div>
         {/if}
       </div>
@@ -1257,29 +1260,18 @@
     :global(html:not(.force-mobile-layout)) .settings-desktop-hero { display: block; }
   }
 
-  /* Desktop welcome hero prompt (below the profile card in
-     .settings-desktop-hero). Sits in the empty-state area when
-     no section is picked — just a warm nudge, since the search bar
-     above and the rail on the left already do the heavy lifting. */
-  .settings-hero-prompt {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 20px 24px;
-    background: var(--surface-1);
-    border: 1px dashed var(--border);
-    border-radius: var(--radius-lg);
-    margin-top: 16px;
-    color: var(--text-2);
+  /* Desktop welcome hero: profile card is expandable inline. The
+     chevron rotates 180° when expanded so the visual affordance
+     matches an accordion. When expanded, the Profile editor renders
+     inside .profile-hero-body — no navigation, no route change. */
+  .profile-hero-expander { cursor: pointer; }
+  .profile-hero-chev-toggle {
+    transition: transform 160ms ease;
   }
-  .settings-hero-prompt :global(.material-symbols-rounded) {
-    color: var(--accent);
-    font-size: 28px;
-    flex-shrink: 0;
+  .profile-hero-chev-open {
+    transform: rotate(180deg);
   }
-  .settings-hero-prompt p {
-    margin: 0;
-    font-size: 14px;
-    line-height: 1.4;
+  .profile-hero-body {
+    margin-top: 12px;
   }
 </style>

@@ -3,12 +3,12 @@
   import { pop, location } from 'svelte-spa-router';
 
   // Embedded mode: when the Profile view is rendered inside the
-  // Settings two-pane shell (route /settings/profile) instead of
-  // its own /profile page, the outer Settings header already shows
-  // the "Profile" title + back button + we don't need the sticky
-  // page-header at all. Auto-detected from the URL so callers don't
-  // need to thread a prop through <svelte:component>.
-  $: _embedded = ($location || '').startsWith('/settings/');
+  // Settings shell — either as the /settings/profile section OR
+  // inline inside the desktop welcome hero at /settings — the
+  // outer Settings chrome already supplies the title / back button
+  // and we don't want our own sticky page-header duplicating it.
+  // Matches both '/settings' and '/settings/*' via startsWith.
+  $: _embedded = ($location || '').startsWith('/settings');
   import { _ } from 'svelte-i18n';
   import { get } from 'svelte/store';
   import { currentUser, userMgmtActive, logout as logoutAuth } from '../stores/auth.js';
