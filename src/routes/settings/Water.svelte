@@ -34,7 +34,10 @@
 </script>
 
 <div class="section-body">
-  <!-- Goal + unit -->
+
+  <!-- Group: Display -->
+  <p class="settings-group-heading">Display</p>
+  <p class="settings-group-sub">Unit shown for water values and where the water card appears.</p>
   <div class="card settings-card">
     <div class="setting-row">
       <span class="setting-label">{$_('settings_water.display_unit')}</span>
@@ -59,9 +62,9 @@
     </div>
   </div>
 
-  <!-- Containers list -->
-  <p class="section-title" style="margin-top:14px">{$_('settings_water.containers_title')}</p>
-  <p class="setting-desc" style="padding:0 var(--page-px) 10px">Quick-add buttons shown in the Diary for logging water intake</p>
+  <!-- Group: Containers -->
+  <p class="settings-group-heading">{$_('settings_water.containers_title')}</p>
+  <p class="settings-group-sub">Quick-add buttons shown in the Diary for logging water intake.</p>
   <div class="card settings-card">
     {#each $waterContainers as container, i}
       {#if i > 0}<div class="setting-divider"></div>{/if}
@@ -81,10 +84,7 @@
     {#if $waterContainers.length === 0}
       <p class="text-3 text-sm" style="padding:16px;text-align:center">{$_('settings_water.no_containers')}</p>
     {/if}
-  </div>
-
-  <!-- Add container form -->
-  <div class="card settings-card" style="margin-top:8px">
+    <div class="setting-divider"></div>
     <div style="padding:12px 16px 14px">
       <p class="setting-label" style="margin-bottom:10px">{$_('settings_water.add_container')}</p>
       <input class="input" type="text" placeholder={$_('settings_main_deep.container_name_ph')}
