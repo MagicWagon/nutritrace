@@ -11,6 +11,8 @@
 
   import MacroRing    from '../components/diary/MacroRing.svelte';
   import DaySummaryWidget from '../components/diary/DaySummaryWidget.svelte';
+  import WaterWidget       from '../components/diary/WaterWidget.svelte';
+  import WeightWidget      from '../components/diary/WeightWidget.svelte';
   import AddActivitySheet from '../components/diary/AddActivitySheet.svelte';
   import QuickCaloriesSheet from '../components/diary/QuickCaloriesSheet.svelte';
   import FastingWidget from '../components/diary/FastingWidget.svelte';
@@ -25,6 +27,7 @@
   import {
     currentDate, currentEntry, diaryTotals, macroPercents,
     prevDay, nextDay, loadEntry, removeDiaryItem, updateDiaryItem, saveBodyStats,
+    addWaterLog,
     copyMealItems, moveMealItems, clearMealItems, copyMealToDate, saveDiaryNote,
     splitRecipeItem, removeSplitChild, updateSplitChild,
     diaryShowNutritionSummary, diaryShowBodyStats, diaryLoadError,
@@ -1565,6 +1568,25 @@
         calorieGoalMode={$calorieGoalMode}
         mode={_totalsMode}
         onToggleMode={() => _totalsMode = _totalsMode === 'remaining' ? 'eaten' : 'remaining'}
+      />
+      {#if _waterShowInDiary}
+        <WaterWidget
+          logs={_waterLogs}
+          totalMl={_waterTotal}
+          goalMl={_waterGoalMl}
+          unit={_waterUnit}
+          containers={_waterContainers}
+          onQuickAdd={(ml) => addWaterLog(ml, $currentDate)}
+          onRemove={_removeWaterLog}
+        />
+      {/if}
+      <WeightWidget
+        currentWeight={bodyStatsData.weight ?? null}
+        unit={$weightUnit || 'kg'}
+        onSave={async (val) => {
+          bodyStatsData = { ...bodyStatsData, weight: val };
+          await saveBodyStatsLocal();
+        }}
       />
     </aside>
 
