@@ -472,6 +472,11 @@
   // Clear selection when tab changes (different list context); search does NOT clear selection.
   // Also exit manage mode on tab change so the count reflects the new list.
   $: { activeTab; selectedFoods = new Set(); manageMode = false; manageSelected = new Set(); }
+  // Clear the desktop detail pane on tab or filter change so users
+  // don't see a "ghost" preview of a food that isn't in the newly-
+  // filtered list. Applies to the pane; the modal sheet is user-
+  // dismissed so it doesn't need this treatment.
+  $: { activeTab; searchSource; activeCategoryFilter; _paneFood = null; }
 
   // Convert item portions to grams for total serving display
   const _toG = { g:1, ml:1, oz:28.35, lb:453.59, cup:240, tbsp:15, tsp:5 };
@@ -1900,7 +1905,10 @@
           {#each _renderList as food (food.id)}
             {@const _sel = selectedFoods.has(food)}
             {@const _mSel = manageMode && food.id != null && manageSelected.has(food.id)}
-            <li class="food-item card" class:food-selected={_sel || _mSel} in:fade={{ duration: 160 }}>
+            <li class="food-item card"
+                class:food-selected={_sel || _mSel}
+                class:food-pane-active={food.id != null && _paneFood?.id === food.id}
+                in:fade={{ duration: 160 }}>
               {#if pickMode}
                 <button class="food-select-btn" on:click={() => toggleSelect(food)} aria-label="Select">
                   <span class="food-check material-symbols-rounded" class:food-check-on={_sel}>
@@ -2132,6 +2140,7 @@
       <FoodDetailSheet
         embedded={true}
         food={_paneFood}
+        onDismiss={() => _paneFood = null}
         on:edit={onDetailEdit}
         on:addToDiary={onDetailAddToDiary}
         on:deleted={() => { _paneFood = null; detailSheetFood = null; load(); }}
@@ -3291,6 +3300,22 @@
       background: var(--accent-dim);
       color: var(--accent);
       border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+    }
+    /* Focus-visible ring for keyboard nav — matches the Settings
+       rail so tab-through has a consistent look across surfaces. */
+    :global(html:not(.force-mobile-layout)) .foods-rail-chips :global(.source-chip:focus-visible),
+    :global(html:not(.force-mobile-layout)) .foods-rail-chips :global(.source-chip-caret:focus-visible),
+    :global(html:not(.force-mobile-layout)) .foods-rail-chips :global(.cat-chip:focus-visible) {
+      outline: 2px solid var(--accent);
+      outline-offset: -2px;
+    }
+    /* Selected food card gets an accent border + subtle tint so the
+       list-vs-pane relationship is obvious. Only fires when the
+       detail pane is showing a food from the current list. */
+    :global(html:not(.force-mobile-layout)) :global(.food-item.food-pane-active) {
+      border-color: var(--accent);
+      background: color-mix(in srgb, var(--accent) 6%, var(--surface-1));
+      box-shadow: 0 0 0 1px var(--accent);
     }
     /* Split source chips (OFF, USDA) — keep the caret snug on the
        right of the pill. */

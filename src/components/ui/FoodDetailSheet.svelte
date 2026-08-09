@@ -37,13 +37,14 @@
    *   close        — user dismissed the sheet without action.
    */
   import { createEventDispatcher, tick } from 'svelte';
+  import { fade } from 'svelte/transition';
   import { _ } from 'svelte-i18n';
   import Sheet from './Sheet.svelte';
   import ActionSheet from './ActionSheet.svelte';
   import NutritionFactsBox from './NutritionFactsBox.svelte';
   import { resolveAssetUrl } from '../../lib/platform.js';
   import { Nutrition, energyUnitSuffix } from '../../lib/nutrition.js';
-  import { energyUnit, mealNames } from '../../stores/settings.js';
+  import { energyUnit, mealNames, disableAnimations } from '../../stores/settings.js';
   import { NtApi } from '../../lib/api.js';
   import { confirmDialog } from '../../stores/confirmDialog.js';
   import { showSuccess, showError } from '../../stores/toast.js';
@@ -54,6 +55,9 @@
   // wrapper), used by the Foods desktop right pane. Skips the
   // slide-up modal chrome and lets the parent decide layout.
   export let embedded = false;
+  // Callback fired by the embedded × button to clear the pane.
+  // Only rendered in embedded mode; ignored otherwise.
+  export let onDismiss = null;
 
   const dispatch = createEventDispatcher();
 
@@ -171,11 +175,24 @@
 </script>
 
 {#if embedded}
-  <div class="detail-embedded">
+  <div class="detail-embedded" aria-live="polite" aria-atomic="true">
     {#if _displayFood}
-      <!-- Inline header replaces the Sheet title when embedded. -->
+      {#key _displayFood?.id || _displayFood?.name}
+      <div class="detail-embedded-inner"
+        in:fade={{ duration: $disableAnimations ? 0 : 100 }}>
+      <!-- Inline header replaces the Sheet title when embedded.
+           × dismiss button (only when onDismiss is wired) lets the
+           user clear the pane back to the empty state. -->
       <header class="detail-embedded-header">
         <h3 class="detail-embedded-title">{_displayFood.name}</h3>
+        {#if onDismiss}
+          <button type="button" class="detail-embedded-close"
+            on:click={onDismiss}
+            aria-label="Clear detail preview"
+            title="Clear preview">
+            <span class="material-symbols-rounded">close</span>
+          </button>
+        {/if}
       </header>
       <div class="grid">
       <!-- LEFT — identity column (photo + brand + barcode pill). Matches
@@ -241,6 +258,8 @@
         {$_('foods.detail.edit')}
       </button>
     </div>
+      </div><!-- /.detail-embedded-inner -->
+      {/key}
     {:else}
       <!-- Embedded empty state — parent pane keeps its background,
            we just prompt the user to select something. -->
@@ -454,7 +473,28 @@
     font-weight: 700;
     color: var(--text-1);
     letter-spacing: -0.01em;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
+  .detail-embedded-close {
+    background: transparent;
+    border: none;
+    color: var(--text-3);
+    width: 26px;
+    height: 26px;
+    border-radius: var(--radius-full);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 120ms ease, color 120ms ease;
+  }
+  .detail-embedded-close:hover { background: var(--surface-2); color: var(--text-1); }
+  .detail-embedded-close :global(.material-symbols-rounded) { font-size: 18px; }
   .detail-embedded-empty {
     display: flex;
     flex-direction: column;

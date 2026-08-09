@@ -764,7 +764,16 @@
 {#if !needsLogin}<UpdateBanner />{/if}
 
 <!-- Page content -->
-{#key $location}
+<!-- Key on the top-level path segment (/settings, /foods, /goals, …)
+     instead of the full $location. Otherwise inner nav within a
+     shell that keeps the same component mounted (e.g. Settings
+     jumping between /settings/appearance → /settings/diary via
+     the desktop rail) still triggers a full <main> remount +
+     fade-in, which reads as a page load and blows away all local
+     state in the shell (rail scroll position, expand states,
+     matchMedia trackers, etc.). Segment-keyed means only true
+     shell changes animate. -->
+{#key ($location || '').split('/')[1] || ''}
   <main
     class="page-transition"
     class:has-topbar={showNav}
