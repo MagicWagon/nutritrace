@@ -1334,7 +1334,7 @@
     />
   </div>
 
-  <div class="page-content diary-content" style="padding-bottom:{contentPad}">
+  <div class="page-content diary-content" class:rail-notes-active={$diaryRailShowNotes && $diaryShowNotes} style="padding-bottom:{contentPad}">
     <!-- Main column: meal groups + activities + notes. On desktop
          (≥1280px) this sits inside a 2-col grid alongside the right
          rail. Below 1280px, the wrapper collapses to a no-op (block
@@ -1766,6 +1766,24 @@
           dynamicCaloriesOut={_dynamicCaloriesOut}
           adaptiveTdee={_adaptiveTdee}
         />
+      {/if}
+      {#if $diaryRailShowNotes && $diaryShowNotes}
+        <!-- Rail Notes widget. Same state as the bottom Notes card so
+             editing here syncs everywhere. Bottom card is CSS-hidden at
+             ≥1280px when this widget is enabled (mutual exclusion). -->
+        <section class="card rail-notes-widget">
+          <header class="rn-header">
+            <span class="material-symbols-rounded rn-icon">edit_note</span>
+            <span class="rn-title">{$_('diary_deep.day_notes')}</span>
+          </header>
+          <textarea class="rn-textarea" bind:value={_notesText}
+            on:blur={commitNotes}
+            placeholder={$_('diary.notes_placeholder')}
+            rows="3"></textarea>
+          <div class="rn-meta">
+            <span class="text-3 text-sm">{_notesSaving ? 'Saving…' : (_notesText ? `${_notesText.length} characters` : '')}</span>
+          </div>
+        </section>
       {/if}
     </aside>
 
@@ -2811,6 +2829,12 @@
        that Phases 2 and 3 deliberately kept for safety. */
     :global(.diary-topbar-actions) { display: none; }
     :global(.diary-bottom-bar)     { display: none; }
+    /* Notes mutual-exclusion: when the rail widget is showing Notes,
+       hide the bottom card so it doesn't render twice. If the user
+       turns off railShowNotes, the bottom card returns naturally. */
+    .diary-content.rail-notes-active .diary-main .diary-notes.card {
+      display: none;
+    }
     /* The inline `style="padding-bottom:{contentPad}"` on .diary-content
        reserves height for the (now-hidden) bottom bar. Reclaim it at
        wide so the diary doesn't have a huge empty gap under the last
@@ -2974,6 +2998,51 @@
   .diary-notes-preview { flex: 1; min-width: 0; font-size: 13px; color: var(--text-3); }
   .diary-notes-chevron { font-size: 20px; color: var(--text-3); margin-left: auto; flex-shrink: 0; }
   .diary-notes-body { padding: 0 14px 14px; }
+  /* Rail Notes widget — reuses .card base, matches the other rail
+     widgets' padding + header style. Textarea always visible (no
+     collapse — the rail's job is ambient access, not saving space). */
+  .rail-notes-widget {
+    padding: 16px 18px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .rn-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .rn-icon {
+    color: var(--accent);
+    font-size: 20px;
+  }
+  .rn-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-1);
+    letter-spacing: -0.01em;
+  }
+  .rn-textarea {
+    width: 100%;
+    min-height: 88px;
+    padding: 8px 10px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-1);
+    font-family: inherit;
+    font-size: 13px;
+    line-height: 1.4;
+    resize: vertical;
+  }
+  .rn-textarea:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: -1px;
+  }
+  .rn-meta {
+    min-height: 14px;
+  }
+
   .diary-notes-textarea {
     width: 100%; min-height: 80px; resize: vertical;
     padding: 10px 12px; border-radius: var(--radius-md);
