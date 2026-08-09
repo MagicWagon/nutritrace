@@ -13,7 +13,7 @@
   import UnitPicker  from '../components/ui/UnitPicker.svelte';
   import { portal } from '../lib/portal.js';
   import { scaleFactor as _unitScaleFactor, unitSystem as _unitSystem, amountAndUnit } from '../lib/units.js';
-  import { diaryPromptQuantity, warnUnitMismatch, showUnitMetadata } from '../stores/settings.js';
+  import { diaryPromptQuantity, warnUnitMismatch, showUnitMetadata, forceMobileLayout } from '../stores/settings.js';
   import { showSuccess, showError } from '../stores/toast.js';
   import { editorState, clearFoodEditorState } from '../stores/editorState.js';
   import { DB, localDateStr } from '../lib/db.js';
@@ -410,6 +410,17 @@
   // changes the user wants to make.
   let detailSheetOpen = false;
   let detailSheetFood = null;
+  // Desktop detail-pane state (Phase B). When the viewport is wide
+  // enough (≥1440px) AND force-mobile-layout is off, tapping a food
+  // populates this pane instead of opening the modal FoodDetailSheet.
+  // The pane is sticky-positioned in the third column of .foods-body.
+  let _paneFood = null;
+  let _foodsViewportPane = false;
+  $: _foodsPaneMode = _foodsViewportPane && !$forceMobileLayout;
+  // Phase D — keyboard shortcut plumbing. bind:this from the search
+  // input above; focused via ⌘K / Ctrl-K / '/' when the user isn't
+  // already typing in another field.
+  let _searchInputEl = null;
   let promptUnit = 'g';
 
   // Reactive nutrition preview for the qty prompt — recomputes whenever
@@ -900,7 +911,13 @@
       if (activeTab === 1) { openMealEditor(food, false); return; }
       if (activeTab === 2) { openMealEditor(food, true);  return; }
       detailSheetFood = food;
-      detailSheetOpen = true;
+      if (_foodsPaneMode) {
+        // Desktop wide: populate the right-pane preview instead of
+        // opening the modal sheet.
+        _paneFood = food;
+      } else {
+        detailSheetOpen = true;
+      }
       return;
     }
 
@@ -1378,11 +1395,61 @@
   // inside an async onMount (after any await) throws "Function called
   // outside component initialization" in Svelte 4.
   let _onVis = null;
+  let _paneMq = null;
+  let _paneMqHandler = null;
+  let _onKeyGlobal = null;
   onDestroy(() => {
     if (_onVis) document.removeEventListener('visibilitychange', _onVis);
+    if (_paneMq && _paneMqHandler) {
+      _paneMq.removeEventListener
+        ? _paneMq.removeEventListener('change', _paneMqHandler)
+        : _paneMq.removeListener(_paneMqHandler);
+    }
+    if (_onKeyGlobal) document.removeEventListener('keydown', _onKeyGlobal);
   });
 
   onMount(async () => {
+    // Desktop detail-pane viewport tracker. Threshold 1440px matches
+    // Foods Phase B — below that, the third column would squeeze the
+    // main list too tight to be useful, so we keep opening the modal
+    // sheet on tap. Combined with $forceMobileLayout reactively above.
+    if (typeof window !== 'undefined') {
+      _paneMq = window.matchMedia('(min-width: 1440px)');
+      _paneMqHandler = () => { _foodsViewportPane = _paneMq.matches; };
+      _foodsViewportPane = _paneMq.matches;
+      _paneMq.addEventListener
+        ? _paneMq.addEventListener('change', _paneMqHandler)
+        : _paneMq.addListener(_paneMqHandler);
+    }
+    // Global keyboard shortcut: '/' or ⌘K / Ctrl-K focuses the
+    // search input from anywhere on the page, matching the muscle
+    // memory of most desktop search UIs. Skipped when the user is
+    // already typing in a field, and when a sheet/dialog is open
+    // (a search focus underneath a modal reads as broken UX).
+    if (typeof document !== 'undefined') {
+      _onKeyGlobal = (e) => {
+        if (!_searchInputEl) return;
+        const target = e.target;
+        const inField = target && (
+          target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable
+        );
+        const isSlash = e.key === '/';
+        const isCmdK = (e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K');
+        if (isCmdK) {
+          e.preventDefault();
+          _searchInputEl.focus();
+          _searchInputEl.select?.();
+          return;
+        }
+        if (isSlash && !inField) {
+          e.preventDefault();
+          _searchInputEl.focus();
+        }
+      };
+      document.addEventListener('keydown', _onKeyGlobal);
+    }
     // Restore tab before load so the right list is fetched
     if (editorState.foodsActiveTab != null) {
       activeTab = editorState.foodsActiveTab;
@@ -1556,6 +1623,7 @@
         class="foods-search-input"
         type="search"
         placeholder={$_('foods.search_placeholder')}
+        bind:this={_searchInputEl}
         bind:value={search}
       />
       <button class="btn-scan-inline" on:click={() => scannerOpen = true} aria-label={$_('foods.scan_barcode')} title={$_('foods.scan_barcode')}>
@@ -2054,6 +2122,21 @@
     {/if}
   </div><!-- /.page-content -->
     </div><!-- /.foods-main -->
+
+    <!-- Desktop detail pane (Phase B) — reuses the FoodDetailSheet
+         component in embedded mode so the exact same identity /
+         nutrition / actions markup renders in both places. Empty
+         state prompts when nothing is selected. Only visible at
+         ≥1440px via CSS; mobile continues to use the modal sheet. -->
+    <aside class="foods-detail-pane">
+      <FoodDetailSheet
+        embedded={true}
+        food={_paneFood}
+        on:edit={onDetailEdit}
+        on:addToDiary={onDetailAddToDiary}
+        on:deleted={() => { _paneFood = null; detailSheetFood = null; load(); }}
+      />
+    </aside>
   </div><!-- /.foods-body -->
 </div>
 
@@ -3136,7 +3219,8 @@
   .foods-body {
     display: block;
   }
-  .foods-filter-rail {
+  .foods-filter-rail,
+  .foods-detail-pane {
     display: none;
   }
 
@@ -3227,6 +3311,62 @@
        in the rail. */
     :global(html:not(.force-mobile-layout)) .foods-mobile-chips {
       display: none;
+    }
+  }
+
+  /* Foods Phase B — right detail-preview pane at ≥1440px. Below
+     1440 the pane would squeeze the main list too tight; the
+     modal FoodDetailSheet keeps working on tap there. At ≥1440 the
+     pane replaces the sheet: tap a food and its identity /
+     nutrition / actions render inline in the third column instead
+     of sliding up as a modal. */
+  @media (min-width: 1440px) {
+    :global(html:not(.force-mobile-layout)) .foods-body {
+      grid-template-columns: 240px minmax(0, 1fr) 380px;
+    }
+    :global(html:not(.force-mobile-layout)) .foods-detail-pane {
+      display: block;
+      position: sticky;
+      top: calc(var(--page-top, var(--safe-top)) + 130px + var(--hamburger-row, 0px));
+      max-height: calc(100vh - var(--page-top, var(--safe-top)) - 150px - var(--hamburger-row, 0px));
+      overflow-y: auto;
+      padding: 16px;
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+    /* Phase C — main list becomes a 2-column card grid at ≥1440px
+       so the wide center column doesn't render 350-360px cards on
+       a 800px-wide surface. All food-list variants (Local, OFF,
+       USDA, Mealie, All-mode) inherit via :global. min-width:0 on
+       each card so long names don't blow the grid layout. */
+    :global(html:not(.force-mobile-layout)) :global(.food-list) {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 10px;
+    }
+    :global(html:not(.force-mobile-layout)) :global(.food-item) {
+      min-width: 0;
+    }
+  }
+  /* Phase C — three columns on ultrawide. Detail pane still takes
+     380px on the right, leaving a wide center; three cards read
+     more naturally than two very-wide ones at 1920+. */
+  @media (min-width: 1920px) {
+    :global(html:not(.force-mobile-layout)) :global(.food-list) {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+    }
+  }
+
+  /* Phase D — manage-mode top-right portaled action bar shifts
+     left on desktop to clear the detail pane (380px + 12px gap
+     + 12px right inset = 404). Below 1440 the pane isn't rendered
+     so the original right:12 anchor still works. */
+  @media (min-width: 1440px) {
+    :global(html:not(.force-mobile-layout)) :global(.foods-topbar-actions) {
+      right: 404px;
     }
   }
 </style>
