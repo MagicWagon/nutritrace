@@ -1222,11 +1222,6 @@
     /* Desktop-only vs mobile-only content in the pane */
     .settings-mobile-index { display: none; }
     .settings-desktop-hero { display: block; }
-
-    /* Back button in the header is meaningless on desktop — rail
-       always shows current section. Hide it so the layout doesn't
-       shift when drilling in. */
-    .settings-back { display: none !important; }
   }
 
   /* Desktop welcome hero prompt (below the profile card in
