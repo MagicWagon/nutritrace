@@ -5,14 +5,17 @@
  * Usage:
  *   node scripts/mcp-smoke.mjs <BASE_URL> <MCP_TOKEN>
  *   node scripts/mcp-smoke.mjs <BASE_URL> <MCP_TOKEN> --writes
+ *   node scripts/mcp-smoke.mjs <BASE_URL> <MCP_TOKEN> --writes --destroy
  *
- * Reads-only mode: the token must hold `mcp:read`. Default.
- * Writes mode:     add `--writes`; the token must ALSO hold `mcp:write`
- *                  and the server must have MCP_WRITE_ENABLED=1. The
- *                  writes tested are additive (log_water 250 ml, log a
- *                  body_stat weight snapshot) and are safe to run
- *                  against a real account — they land in the diary and
- *                  are undoable through the normal UI.
+ * Reads-only mode:  token must hold `mcp:read` (default).
+ * Writes mode:      add `--writes`; token must ALSO hold `mcp:write`
+ *                   and MCP_WRITE_ENABLED=1 on the server. Tests
+ *                   additive logs (250 ml water, weight snapshot) —
+ *                   safe against real accounts, undoable in the UI.
+ * Destroy mode:     add `--destroy`; token must ALSO hold `mcp:destroy`
+ *                   and MCP_DESTROY_ENABLED=1. Tests confirm=false
+ *                   rejection paths only, so no real data is mutated
+ *                   by the smoke script itself.
  *
  * Prints one line per check with PASS / FAIL. Exits non-zero if any
  * check failed. Negative-path checks (401 / 403) are required — if they
@@ -20,11 +23,12 @@
  */
 
 const argv = process.argv.slice(2);
-const WRITE_MODE = argv.includes('--writes');
+const WRITE_MODE   = argv.includes('--writes');
+const DESTROY_MODE = argv.includes('--destroy');
 const positional = argv.filter(a => !a.startsWith('--'));
 const [BASE, TOKEN] = positional;
 if (!BASE || !TOKEN) {
-  console.error('usage: node scripts/mcp-smoke.mjs <BASE_URL> <MCP_TOKEN> [--writes]');
+  console.error('usage: node scripts/mcp-smoke.mjs <BASE_URL> <MCP_TOKEN> [--writes] [--destroy]');
   process.exit(2);
 }
 
@@ -101,19 +105,31 @@ const WRITE_TOOLS = [
   'log_meal',
   'log_body_stat',
 ];
-const EXPECTED_TOOLS = new Set(WRITE_MODE ? [...READ_TOOLS, ...WRITE_TOOLS] : READ_TOOLS);
+const DESTROY_TOOLS = [
+  'delete_diary_entry',
+  'edit_diary_entry',
+  'create_food',
+];
+const expected = new Set([
+  ...READ_TOOLS,
+  ...(WRITE_MODE   ? WRITE_TOOLS   : []),
+  ...(DESTROY_MODE ? DESTROY_TOOLS : []),
+]);
+const EXPECTED_TOOLS = expected;
 {
   const r = await mcp('tools/list');
   const tools = r.json?.result?.tools || [];
   const names = new Set(tools.map(t => t.name));
   const missing = [...EXPECTED_TOOLS].filter(n => !names.has(n));
-  const unexpected = WRITE_MODE ? [] : WRITE_TOOLS.filter(n => names.has(n));
-  if (r.status === 200 && missing.length === 0 && unexpected.length === 0) {
+  const leaked = [];
+  if (!WRITE_MODE)   leaked.push(...WRITE_TOOLS.filter(n => names.has(n)));
+  if (!DESTROY_MODE) leaked.push(...DESTROY_TOOLS.filter(n => names.has(n)));
+  if (r.status === 200 && missing.length === 0 && leaked.length === 0) {
     line('PASS', `tools/list`, `${tools.length} tools`);
   } else {
     const notes = [];
-    if (missing.length)    notes.push(`missing=[${missing.join(',')}]`);
-    if (unexpected.length) notes.push(`write tools leaked without --writes: [${unexpected.join(',')}]`);
+    if (missing.length) notes.push(`missing=[${missing.join(',')}]`);
+    if (leaked.length)  notes.push(`gated tools leaked: [${leaked.join(',')}]`);
     line('FAIL', `tools/list`, `status=${r.status} ${notes.join(' ')}`);
   }
 }
@@ -157,6 +173,38 @@ if (WRITE_MODE) {
     const err = r.json?.result?.isError;
     if (err) line('PASS', 'log_meal (bogus id → clean tool error)');
     else     line('FAIL', 'log_meal (bogus id)', `did not return isError`);
+  }
+}
+
+// --- Destructive tools (opt-in with --destroy) ---
+// These check the gate/reject paths ONLY — no actual data is mutated
+// by the smoke script, because deletes/edits need a live entry_index
+// that varies per user and would need a live-log-then-delete flow.
+if (DESTROY_MODE) {
+  // Every destructive tool must refuse without confirm=true.
+  {
+    const r = await callTool('delete_diary_entry', { entry_index: 0 });
+    const err = r.json?.result?.isError;
+    const msg = r.json?.result?.content?.[0]?.text || '';
+    if (err && /confirm/i.test(msg)) line('PASS', 'delete_diary_entry (no confirm → refused)');
+    else                             line('FAIL', 'delete_diary_entry (no confirm)', `err=${err} msg=${msg.slice(0, 60)}`);
+  }
+  {
+    const r = await callTool('edit_diary_entry', { entry_index: 0, patch: { quantity: 2 } });
+    const err = r.json?.result?.isError;
+    const msg = r.json?.result?.content?.[0]?.text || '';
+    if (err && /confirm/i.test(msg)) line('PASS', 'edit_diary_entry (no confirm → refused)');
+    else                             line('FAIL', 'edit_diary_entry (no confirm)', `err=${err} msg=${msg.slice(0, 60)}`);
+  }
+  {
+    const r = await callTool('create_food', {
+      name: 'smoke-test-food-should-not-persist',
+      portion: 100, unit: 'g', nutrition: { calories: 100 },
+    });
+    const err = r.json?.result?.isError;
+    const msg = r.json?.result?.content?.[0]?.text || '';
+    if (err && /confirm/i.test(msg)) line('PASS', 'create_food (no confirm → refused)');
+    else                             line('FAIL', 'create_food (no confirm)', `err=${err} msg=${msg.slice(0, 60)}`);
   }
 }
 

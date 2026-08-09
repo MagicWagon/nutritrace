@@ -5,8 +5,10 @@
  * default, so no existing user sees any change. Write tools (Phase 2:
  * log_food, log_water, log_meal, log_body_stat) additionally require
  * MCP_WRITE_ENABLED=1 on the server AND the calling token holding the
- * `mcp:write` scope; either missing and the write tools don't appear
- * in tools/list.
+ * `mcp:write` scope. Destructive tools (Phase 3: delete_diary_entry,
+ * edit_diary_entry, create_food) require MCP_DESTROY_ENABLED=1 AND
+ * `mcp:destroy` scope AND every call to include confirm=true. Any
+ * missing gate and the corresponding tools don't appear in tools/list.
  *
  * Wire protocol: MCP Streamable HTTP, stateless mode. Single POST
  * endpoint. GET / DELETE explicitly return 405 (we don't run stateful
@@ -26,8 +28,9 @@ import { logger } from '../logger.js';
 
 const router = Router();
 
-const ENABLED       = _envFlag(process.env.MCP_ENABLED);
-const WRITE_ENABLED = _envFlag(process.env.MCP_WRITE_ENABLED);
+const ENABLED         = _envFlag(process.env.MCP_ENABLED);
+const WRITE_ENABLED   = _envFlag(process.env.MCP_WRITE_ENABLED);
+const DESTROY_ENABLED = _envFlag(process.env.MCP_DESTROY_ENABLED);
 
 // Parse ALLOWED_ORIGINS (comma-separated, same convention as the rest
 // of the server). Server-to-server MCP clients (Claude Desktop's HTTP
@@ -90,9 +93,11 @@ router.use((req, res, next) => {
 });
 
 router.post('/', bearerAuth, requireScope('mcp:read'), async (req, res) => {
-  // Stamp write eligibility onto the request for the tool registrar
-  // downstream. Both the server flag AND the token scope must be true.
-  req.mcpWrites = WRITE_ENABLED && !!req.apiToken?.scopes?.includes('mcp:write');
+  // Stamp write / destroy eligibility onto the request for the tool
+  // registrar downstream. Server flag AND matching token scope both
+  // required, independently.
+  req.mcpWrites  = WRITE_ENABLED   && !!req.apiToken?.scopes?.includes('mcp:write');
+  req.mcpDestroy = DESTROY_ENABLED && !!req.apiToken?.scopes?.includes('mcp:destroy');
   try {
     await handleMcpRequest(req, res);
   } catch (e) {

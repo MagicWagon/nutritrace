@@ -41,15 +41,30 @@ test('mcp:write scope is registered (Phase 2)', () => {
   assert.match(apiTokens, /'mcp:write'/);
 });
 
+test('mcp:destroy scope is registered (Phase 3)', () => {
+  assert.match(apiTokens, /'mcp:destroy'/);
+});
+
 test('MCP route computes write eligibility from MCP_WRITE_ENABLED + mcp:write scope', () => {
   assert.match(mcpRoute, /MCP_WRITE_ENABLED/);
   assert.match(mcpRoute, /mcp:write/);
   assert.match(mcpRoute, /req\.mcpWrites/);
 });
 
+test('MCP route computes destroy eligibility from MCP_DESTROY_ENABLED + mcp:destroy scope', () => {
+  assert.match(mcpRoute, /MCP_DESTROY_ENABLED/);
+  assert.match(mcpRoute, /mcp:destroy/);
+  assert.match(mcpRoute, /req\.mcpDestroy/);
+});
+
 test('MCP server registers write tools only when req.mcpWrites is true', () => {
   assert.match(mcpServer, /registerWriteTools/);
   assert.match(mcpServer, /req\.mcpWrites/);
+});
+
+test('MCP server registers destroy tools only when req.mcpDestroy is true', () => {
+  assert.match(mcpServer, /registerDestroyTools/);
+  assert.match(mcpServer, /req\.mcpDestroy/);
 });
 
 test('MCP transport is stateless (no session id generator)', () => {
@@ -85,6 +100,37 @@ test('All Phase 2 write tools are registered in registerWriteTools', () => {
   }
 });
 
+test('All Phase 3 destructive tools are registered in registerDestroyTools', () => {
+  const expected = [
+    'registerDeleteDiaryEntry',
+    'registerEditDiaryEntry',
+    'registerCreateFood',
+  ];
+  for (const fn of expected) {
+    assert.match(mcpTools, new RegExp(`\\b${fn}\\s*\\(`), `expected ${fn}() call in tools/index.js`);
+  }
+});
+
+test('Every Phase 3 destructive tool requires confirm=true', () => {
+  const destroyFiles = ['delete-diary-entry.js', 'edit-diary-entry.js', 'create-food.js'];
+  for (const f of destroyFiles) {
+    const src = readFileSync(
+      new URL(`../server/lib/mcp/tools/${f}`, import.meta.url),
+      'utf8'
+    );
+    assert.match(
+      src,
+      /confirm\s*!==\s*true/,
+      `${f} does not appear to require confirm=true — check its input handling`
+    );
+    assert.match(
+      src,
+      /confirm:\s*z\.boolean\(\)/,
+      `${f} does not declare confirm as a boolean in inputSchema`
+    );
+  }
+});
+
 test('@modelcontextprotocol/sdk is declared as a runtime dependency', () => {
   const deps = pkgJson.dependencies || {};
   assert.ok(deps['@modelcontextprotocol/sdk'], 'missing @modelcontextprotocol/sdk in dependencies');
@@ -104,6 +150,9 @@ test('MCP tool DB queries scope on user_id — no cross-user access', () => {
     'log-water.js',
     'log-meal.js',
     'log-body-stat.js',
+    'delete-diary-entry.js',
+    'edit-diary-entry.js',
+    'create-food.js',
   ];
   for (const f of toolFiles) {
     const src = readFileSync(

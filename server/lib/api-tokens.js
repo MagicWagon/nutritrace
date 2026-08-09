@@ -41,10 +41,17 @@ export const KNOWN_SCOPES = new Set([
   'mcp:read',
   // mcp:write unlocks Model Context Protocol WRITE tools (Phase 2:
   // log_food, log_water, log_meal, log_body_stat). Independent of
-  // mcp:read but tokens typically hold both — the write tools rely on
+  // mcp:read but tokens typically hold both. The write tools rely on
   // read primitives (food lookup, meal lookup) at execution time.
   // Requires MCP_WRITE_ENABLED=1 on the server for any effect.
   'mcp:write',
+  // mcp:destroy unlocks Model Context Protocol DESTRUCTIVE tools
+  // (Phase 3: edit_diary_entry, delete_diary_entry, create_food).
+  // Requires MCP_DESTROY_ENABLED=1 on the server AND each destructive
+  // tool call to include an explicit `confirm: true` argument. Kept
+  // separate from mcp:write so an admin can grant "log stuff" without
+  // granting "delete stuff that's already there".
+  'mcp:destroy',
 ]);
 
 function _hash(raw) {
