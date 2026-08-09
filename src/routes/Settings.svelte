@@ -968,6 +968,31 @@
     color: var(--text-3);
     padding: 4px 2px 2px;
   }
+
+  /* Grouped-card heading + subtitle used by Phase B sub-pages that
+     split a long list of rows into logical clusters (Diary settings
+     is the first migration). .settings-group-heading is the small
+     uppercase caption above each card; .settings-group-sub is an
+     optional one-liner explaining what the group covers. Margin
+     collapses cleanly against the following card. */
+  :global(.settings-group-heading) {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin: 20px 4px 4px;
+  }
+  :global(.settings-group-heading:first-child) {
+    margin-top: 4px;
+  }
+  :global(.settings-group-sub) {
+    font-size: 12px;
+    color: var(--text-3);
+    line-height: 1.4;
+    margin: 0 4px 10px;
+    max-width: 640px;
+  }
   /* Fill the .select-wrap so the CSS chevron (positioned 14px from the
      wrap's right edge) sits inside the visible pill instead of floating
      off to one side. Every .setting-row wrap has an explicit width

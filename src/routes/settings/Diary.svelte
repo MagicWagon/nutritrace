@@ -76,6 +76,10 @@
 </script>
 
 <div class="section-body">
+
+  <!-- Group: Food Row Display — what shows on each logged food row -->
+  <p class="settings-group-heading">Food Row Display</p>
+  <p class="settings-group-sub">Fields shown beneath each food entry in the diary.</p>
   <div class="card settings-card">
     <SettingRow label={$_('settings_diary.show_brand')} desc={$_('settings_diary.show_brand_desc')} divider={false}>
       <Toggle checked={$diaryShowBrands} on:change={e => diaryShowBrands.set(e.detail)} />
@@ -92,23 +96,44 @@
     <SettingRow label={$_('settings_diary.show_units')} desc={$_('settings_diary.show_units_desc')}>
       <Toggle checked={$diaryShowNutritionUnits} on:change={e => diaryShowNutritionUnits.set(e.detail)} />
     </SettingRow>
-    <SettingRow label={$_('settings_diary.show_macro_summary')} desc={$_('settings_diary.show_macro_summary_desc')}>
+    <SettingRow label={$_('settings_diary.show_portion')} desc={$_('settings_diary.show_portion_desc')}>
+      <Toggle checked={$diaryShowPortionSize} on:change={e => diaryShowPortionSize.set(e.detail)} />
+    </SettingRow>
+  </div>
+
+  <!-- Group: Meal Card Layout — controls on the meal card itself -->
+  <p class="settings-group-heading">Meal Card Layout</p>
+  <p class="settings-group-sub">Header, footer, and interaction on each meal card.</p>
+  <div class="card settings-card">
+    <SettingRow label={$_('settings_diary.show_macro_summary')} desc={$_('settings_diary.show_macro_summary_desc')} divider={false}>
       <Toggle checked={$diaryShowMacroSummary} on:change={e => diaryShowMacroSummary.set(e.detail)} />
     </SettingRow>
     <SettingRow label={$_('settings_diary.ask_quantity')} desc={$_('settings_diary.ask_quantity_desc')}>
       <Toggle checked={$diaryPromptQuantity} on:change={e => diaryPromptQuantity.set(e.detail)} />
     </SettingRow>
-
+    <SettingRow label={$_('settings_diary.show_progress_bar')} desc={$_('settings_diary.show_progress_bar_desc')}>
+      <Toggle checked={$diaryShowNutritionBar} on:change={e => diaryShowNutritionBar.set(e.detail)} />
+    </SettingRow>
+    <SettingRow label={$_('settings_diary.show_daily_notes')} desc={$_('settings_diary.show_daily_notes_desc')}>
+      <Toggle checked={$diaryShowNotes} on:change={e => diaryShowNotes.set(e.detail)} />
+    </SettingRow>
   </div>
 
-  <!-- Desktop rail widgets (≥1280px only). Each widget can be
-       independently hidden. Ignored on mobile — those users see the
-       classic top-right icons + bottom bar instead. Section-title
-       + description use inline margin overrides so browser-default
-       <p> margins don't inflate the spacing (.setting-desc is not a
-       global class — no reset applies here). -->
-  <p class="section-title" style="margin:0">Desktop Rail Widgets</p>
-  <p style="margin:0; padding:0 var(--page-px) 10px; font-size:12px; color:var(--text-3); line-height:1.4">Choose which widgets appear in the right column on wide screens (≥1280px). Hidden widgets don't render at all; they don't take space.</p>
+  <!-- Group: Nutrition Units — advanced serving/basis controls -->
+  <p class="settings-group-heading">Nutrition Units</p>
+  <p class="settings-group-sub">Off by default. Turn on if you log Open Food Facts liquids in grams or use custom serving units.</p>
+  <div class="card settings-card">
+    <SettingRow label={$_('settings_diary.unit_metadata')} desc={$_('settings_diary.unit_metadata_desc')} divider={false}>
+      <Toggle checked={$showUnitMetadata} on:change={e => showUnitMetadata.set(e.detail)} />
+    </SettingRow>
+    <SettingRow label={$_('settings_diary.warn_conversions')} desc={$_('settings_diary.warn_conversions_desc')}>
+      <Toggle checked={$warnUnitMismatch} on:change={e => warnUnitMismatch.set(e.detail)} />
+    </SettingRow>
+  </div>
+
+  <!-- Group: Desktop Rail Widgets — ≥1280px only -->
+  <p class="settings-group-heading">Desktop Rail Widgets</p>
+  <p class="settings-group-sub">Widgets in the right column on wide screens (≥1280px). Hidden widgets don't render at all; they don't take space.</p>
   <div class="card settings-card">
     <SettingRow label="Day Summary" desc="Calorie ring + macro cards." divider={false}>
       <Toggle checked={$diaryRailShowSummary} on:change={e => diaryRailShowSummary.set(e.detail)} />
@@ -127,32 +152,11 @@
     </SettingRow>
   </div>
 
-  <!-- Remaining diary settings continue in the original card below. -->
+  <!-- Group: Quick Calories -->
+  <p class="settings-group-heading">Quick Calories</p>
+  <p class="settings-group-sub">One-tap calorie entries when you don't want a full food row.</p>
   <div class="card settings-card">
-    <!-- Issues #69 + #70: master toggle for the nutrition basis,
-         serving units, and density fields. Default off so users
-         who don't need the extra fields aren't distracted by them.
-         Auto-on for anyone who turned on Warn About Unit
-         Conversions below (the natural signal of intent). -->
-    <SettingRow label={$_('settings_diary.unit_metadata')} desc={$_('settings_diary.unit_metadata_desc')} divider={false}>
-      <Toggle checked={$showUnitMetadata} on:change={e => showUnitMetadata.set(e.detail)} />
-    </SettingRow>
-    <div class="setting-divider"></div>
-    <!-- Sub-feature of Show Unit Metadata. Default off so users
-         who weigh everything in grams aren't nagged on Open Food
-         Facts per-100-ml drinks. Turning this on also implicitly
-         enables Show Unit Metadata at the call sites via the
-         reactive gate `$showUnitMetadata || $warnUnitMismatch`. -->
-    <SettingRow label={$_('settings_diary.warn_conversions')} desc={$_('settings_diary.warn_conversions_desc')} divider={false}>
-      <Toggle checked={$warnUnitMismatch} on:change={e => warnUnitMismatch.set(e.detail)} />
-    </SettingRow>
-    <SettingRow label={$_('settings_diary.show_portion')} desc={$_('settings_diary.show_portion_desc')}>
-      <Toggle checked={$diaryShowPortionSize} on:change={e => diaryShowPortionSize.set(e.detail)} />
-    </SettingRow>
-    <SettingRow label={$_('settings_diary.show_daily_notes')} desc={$_('settings_diary.show_daily_notes_desc')}>
-      <Toggle checked={$diaryShowNotes} on:change={e => diaryShowNotes.set(e.detail)} />
-    </SettingRow>
-    <SettingRow label={$_('settings_diary.show_quick_cals')} desc={$_('settings_diary.show_quick_cals_desc')}>
+    <SettingRow label={$_('settings_diary.show_quick_cals')} desc={$_('settings_diary.show_quick_cals_desc')} divider={false}>
       <Toggle checked={$showQuickCalories} on:change={e => showQuickCalories.set(e.detail)} />
     </SettingRow>
     {#if $showQuickCalories}
@@ -167,7 +171,13 @@
         </div>
       </div>
     {/if}
-    <SettingRow label={$_('settings_diary.show_activity')} desc={$_('settings_diary.show_activity_desc')}>
+  </div>
+
+  <!-- Group: Activity Section — manual activity logging & policy -->
+  <p class="settings-group-heading">Activity Section</p>
+  <p class="settings-group-sub">Manual workout logging shown as its own section under meals.</p>
+  <div class="card settings-card">
+    <SettingRow label={$_('settings_diary.show_activity')} desc={$_('settings_diary.show_activity_desc')} divider={false}>
       <Toggle checked={$diaryShowActivity} on:change={e => diaryShowActivity.set(e.detail)} />
     </SettingRow>
     {#if $diaryShowActivity}
@@ -199,7 +209,13 @@
         </div>
       </div>
     {/if}
-    <SettingRow label={$_('settings_diary.show_fasting')} desc={$_('settings_diary.show_fasting_desc')}>
+  </div>
+
+  <!-- Group: Fasting -->
+  <p class="settings-group-heading">Fasting</p>
+  <p class="settings-group-sub">Intermittent fasting section with an optional recurring schedule.</p>
+  <div class="card settings-card">
+    <SettingRow label={$_('settings_diary.show_fasting')} desc={$_('settings_diary.show_fasting_desc')} divider={false}>
       <Toggle checked={$fastingEnabled} on:change={e => fastingEnabled.set(e.detail)} />
     </SettingRow>
     {#if $fastingEnabled}
@@ -263,12 +279,11 @@
         </div>
       {/if}
     {/if}
-    <SettingRow label={$_('settings_diary.show_progress_bar')} desc={$_('settings_diary.show_progress_bar_desc')}>
-      <Toggle checked={$diaryShowNutritionBar} on:change={e => diaryShowNutritionBar.set(e.detail)} />
-    </SettingRow>
   </div>
 
-  <p class="sub-label">{$_('settings_diary.meal_names')}</p>
+  <!-- Group: Meal Names — reorderable list of meal slots -->
+  <p class="settings-group-heading">{$_('settings_diary.meal_names')}</p>
+  <p class="settings-group-sub">Drag to reorder. Order sets the sequence meals appear in the diary.</p>
   <!-- svelte-ignore a11y-no-static-element-interactions -->
   <div class="card settings-card drag-list"
     on:pointermove={onMealDragMove}
