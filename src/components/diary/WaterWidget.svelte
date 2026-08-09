@@ -81,12 +81,12 @@
   </div>
 
   <div class="ww-buttons">
-    {#each containers.slice(0, 3) as cont (cont.id ?? cont.volumeMl)}
+    {#each containers as cont (cont.id ?? cont.volumeMl)}
       <button class="ww-btn" on:click={() => onQuickAdd(cont.volumeMl)} title={cont.name}>
         {displayContainer(cont)}
       </button>
     {/each}
-    <button class="ww-btn ww-btn-ghost" on:click={openCustom} class:active={customOpen}>
+    <button class="ww-btn ww-btn-ghost ww-btn-full" on:click={openCustom} class:active={customOpen}>
       + Custom
     </button>
   </div>
@@ -178,6 +178,12 @@
     gap: 6px;
     margin-top: 2px;
   }
+  /* Custom button always spans the full width of the grid, no matter
+     how many container buttons are configured. Handles odd counts (3
+     containers → last container alone on row 2, custom full-width on
+     row 3) and even counts (4 containers → 2x2, custom full-width row 3)
+     without leaving a stray empty slot. */
+  .ww-btn-full { grid-column: 1 / -1; }
   .ww-btn {
     background: color-mix(in srgb, var(--water-blue) 12%, transparent);
     color: var(--text-1);
