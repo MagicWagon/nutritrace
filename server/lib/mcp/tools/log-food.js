@@ -135,6 +135,19 @@ export function registerLogFood(server, { userId }) {
         throw e;
       }
 
+      // Bump the food's usage counter + last-used date so it ranks in
+      // the app's Most Used / Recently Used pickers the same way a
+      // UI-driven log would. Matches POST /api/foods/:id/used.
+      try {
+        db.prepare(
+          `UPDATE foods
+              SET usage_count = usage_count + 1,
+                  last_used_at = MAX(COALESCE(last_used_at, ''), ?),
+                  updated_at = datetime('now')
+            WHERE id = ? AND user_id = ?`
+        ).run(day, food.id, userId);
+      } catch { /* non-fatal — the diary write already succeeded */ }
+
       return toolResult({
         ok: true,
         date: day,

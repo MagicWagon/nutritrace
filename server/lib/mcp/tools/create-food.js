@@ -104,8 +104,8 @@ export function registerCreateFood(server, { userId }) {
       }
 
       const result = db.prepare(
-        `INSERT INTO foods (user_id, name, brand, portion, unit, nutrition, category, barcode, notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO foods (user_id, name, brand, portion, unit, nutrition, category, barcode, notes, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
       ).run(
         userId,
         cleanName,

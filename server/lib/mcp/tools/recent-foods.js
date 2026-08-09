@@ -70,12 +70,21 @@ export function registerRecentFoods(server, { userId }) {
       // because the pre-slice included deleted rows.
       const allIds = Array.from(lastSeen.keys());
       if (!allIds.length) return toolResult({ count: 0, items: [] });
-      const placeholders = allIds.map(() => '?').join(',');
-      const foods = db.prepare(
-        `SELECT id, name, brand, barcode, portion, unit, nutrition, category
-           FROM foods
-          WHERE user_id = ? AND deleted_at IS NULL AND id IN (${placeholders})`
-      ).all(userId, ...allIds);
+      // Chunk the IN(...) list at 500 params to stay well below the
+      // SQLite bound-parameter limit (default 32,766 on modern builds
+      // but as low as 999 on older ones). Heavy meal-preppers can log
+      // thousands of distinct foods in a 14-day window.
+      const CHUNK = 500;
+      const foods = [];
+      for (let i = 0; i < allIds.length; i += CHUNK) {
+        const slice = allIds.slice(i, i + CHUNK);
+        const placeholders = slice.map(() => '?').join(',');
+        foods.push(...db.prepare(
+          `SELECT id, name, brand, barcode, portion, unit, nutrition, category
+             FROM foods
+            WHERE user_id = ? AND deleted_at IS NULL AND id IN (${placeholders})`
+        ).all(userId, ...slice));
+      }
       const byId = new Map(foods.map(f => [f.id, f]));
       const items = allIds
         .map(id => byId.get(id))

@@ -22,11 +22,31 @@
  * limit budget.
  */
 import { Router } from 'express';
-import { bearerAuth, requireScope } from '../middleware/bearer-auth.js';
+import { bearerAuth } from '../middleware/bearer-auth.js';
 import { handleMcpRequest } from '../lib/mcp/server.js';
 import { logger } from '../logger.js';
 
 const router = Router();
+
+// Custom scope check: accept ANY of the mcp:* scopes rather than
+// requiring mcp:read specifically. A token minted with just mcp:write
+// (or mcp:destroy) should still be able to hit /api/mcp — the tool
+// registrar downstream picks which tools it can see. Route-level
+// gating is coarse ("is this an MCP-capable token at all?"), not
+// per-verb.
+const MCP_SCOPES = ['mcp:read', 'mcp:write', 'mcp:destroy'];
+function requireAnyMcpScope(req, res, next) {
+  if (!req.apiToken) {
+    return res.status(401).json({ error: 'Token required', code: 'auth_missing' });
+  }
+  if (!MCP_SCOPES.some(s => req.apiToken.scopes.includes(s))) {
+    return res.status(403).json({
+      error: `Token lacks any of ${MCP_SCOPES.join(', ')}`,
+      code: 'auth_scope',
+    });
+  }
+  next();
+}
 
 const ENABLED         = _envFlag(process.env.MCP_ENABLED);
 const WRITE_ENABLED   = _envFlag(process.env.MCP_WRITE_ENABLED);
@@ -92,7 +112,32 @@ router.use((req, res, next) => {
   next();
 });
 
-router.post('/', bearerAuth, requireScope('mcp:read'), async (req, res) => {
+// GET / DELETE are stateless-transport dead-ends. Answer 405 BEFORE
+// bearerAuth so a speculative client that probes those verbs can't
+// burn the token's rate-limit budget on 405s. Body is informational
+// only; no auth or scope info is leaked because none is checked.
+router.get('/', (req, res) => {
+  res.status(405).json({
+    jsonrpc: '2.0',
+    id: null,
+    error: {
+      code: -32000,
+      message: 'GET not supported: NutriTrace runs MCP in stateless mode. Use POST.',
+    },
+  });
+});
+router.delete('/', (req, res) => {
+  res.status(405).json({
+    jsonrpc: '2.0',
+    id: null,
+    error: {
+      code: -32000,
+      message: 'DELETE not supported: stateless transport has no session to clean up.',
+    },
+  });
+});
+
+router.post('/', bearerAuth, requireAnyMcpScope, async (req, res) => {
   // Stamp write / destroy eligibility onto the request for the tool
   // registrar downstream. Server flag AND matching token scope both
   // required, independently.
@@ -110,30 +155,6 @@ router.post('/', bearerAuth, requireScope('mcp:read'), async (req, res) => {
       });
     }
   }
-});
-
-// Stateless transport: no standalone GET SSE stream, no DELETE for
-// session termination. Return 405 with an explanatory body so clients
-// that speculatively try either get a useful error instead of a hang.
-router.get('/', bearerAuth, requireScope('mcp:read'), (req, res) => {
-  res.status(405).json({
-    jsonrpc: '2.0',
-    id: null,
-    error: {
-      code: -32000,
-      message: 'GET not supported: NutriTrace runs MCP in stateless mode. Use POST.',
-    },
-  });
-});
-router.delete('/', bearerAuth, requireScope('mcp:read'), (req, res) => {
-  res.status(405).json({
-    jsonrpc: '2.0',
-    id: null,
-    error: {
-      code: -32000,
-      message: 'DELETE not supported: stateless transport has no session to clean up.',
-    },
-  });
 });
 
 function _envFlag(v) {

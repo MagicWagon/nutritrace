@@ -93,20 +93,19 @@ export function registerLogBodyStat(server, { userId }) {
           `Rejected: ${rejected.join('; ')}`
         );
       }
-      // Unit tag handling is subtle because the tag is SHARED across
-      // all fields of its kind (7 length metrics share lengths_unit;
-      // weight is the only weight-unit user, so simpler there):
+      // Unit tag handling is safety-critical because the tag is SHARED
+      // across all fields of its kind (7 length metrics share lengths_unit).
       //
-      //  a) Row already tagged (weight_unit / lengths_unit set): convert
-      //     our canonical kg/cm into the row's stored unit and preserve
-      //     the tag. Naively stamping 'kg'/'cm' would reinterpret the
-      //     pre-existing values.
-      //  b) Row has values of that kind but is UNTAGGED (legacy row):
-      //     honor the user's display setting for that unit, because the
-      //     pre-existing values were saved AS the display unit. Convert
-      //     our canonical value to match, and add the corresponding tag.
-      //  c) Row has no values of that kind yet: safe to stamp 'kg'/'cm'
-      //     and store our canonical value directly.
+      //  a) Row already tagged: convert canonical kg/cm into the row's
+      //     stored unit so the tag stays consistent.
+      //  b) Row has same-kind values but NO tag (legacy pre-tagging
+      //     row): REFUSE. Guessing the historical unit from the user's
+      //     CURRENT display preference is unsafe — users switch units
+      //     over time. Ask them to edit the day once in the app to
+      //     attach unit tags, then MCP writes will preserve them.
+      //  c) Row has no values of that kind: stamp 'kg'/'cm' and write
+      //     canonical values directly.
+      class LegacyBodyStatsError extends Error {}
       let next;
       try {
         next = mutateDiaryDay(userId, day, cur => {
@@ -114,14 +113,16 @@ export function registerLogBodyStat(server, { userId }) {
           const bs = cur.bodyStats || {};
 
           if (hasWeightWrite) {
-            let effectiveUnit;
-            if (bs.weight_unit) {
-              effectiveUnit = bs.weight_unit;                    // (a)
-            } else if (bs.weight != null) {
-              effectiveUnit = _userUnitPref(userId, 'weightUnit', 'kg');  // (b)
-            } else {
-              effectiveUnit = 'kg';                              // (c)
+            const tagged = !!bs.weight_unit;
+            const hasLegacy = !tagged && bs.weight != null;
+            if (hasLegacy) {
+              throw new LegacyBodyStatsError(
+                `Day ${day} has an untagged legacy weight value; cannot safely tag it as ` +
+                'kg or lb from MCP. Open the day in the app and re-save the weight once ' +
+                '(this attaches the unit tag), then MCP writes will merge correctly.'
+              );
             }
+            const effectiveUnit = tagged ? bs.weight_unit : 'kg';       // (a) or (c)
             if (effectiveUnit === 'lb') {
               merged.weight = Math.round(clean.weight * 2.20462 * 10) / 10;
             }
@@ -129,15 +130,16 @@ export function registerLogBodyStat(server, { userId }) {
           }
 
           if (hasLengthWrite) {
-            const anyExistingLength = LENGTH_KEYS.some(k => bs[k] != null);
-            let effectiveUnit;
-            if (bs.lengths_unit) {
-              effectiveUnit = bs.lengths_unit;                   // (a)
-            } else if (anyExistingLength) {
-              effectiveUnit = _userUnitPref(userId, 'lengthUnit', 'cm');  // (b)
-            } else {
-              effectiveUnit = 'cm';                              // (c)
+            const tagged = !!bs.lengths_unit;
+            const anyLegacy = !tagged && LENGTH_KEYS.some(k => bs[k] != null);
+            if (anyLegacy) {
+              throw new LegacyBodyStatsError(
+                `Day ${day} has untagged legacy length values; cannot safely tag them as ` +
+                'cm or in from MCP. Open the day in the app and re-save any length once ' +
+                '(this attaches the unit tag), then MCP writes will merge correctly.'
+              );
             }
+            const effectiveUnit = tagged ? bs.lengths_unit : 'cm';      // (a) or (c)
             if (effectiveUnit === 'in') {
               for (const k of LENGTH_KEYS) {
                 if (k in clean) merged[k] = Math.round((clean[k] / 2.54) * 10) / 10;
@@ -149,7 +151,8 @@ export function registerLogBodyStat(server, { userId }) {
           return { ...cur, bodyStats: merged };
         });
       } catch (e) {
-        if (e instanceof DiaryTombstonedError) return toolError(e.message);
+        if (e instanceof DiaryTombstonedError)    return toolError(e.message);
+        if (e instanceof LegacyBodyStatsError)    return toolError(e.message);
         throw e;
       }
 

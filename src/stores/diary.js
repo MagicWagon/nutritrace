@@ -93,6 +93,7 @@ const _KEEP_FIELDS = [
   'name', 'brand', 'portion', 'unit', 'quantity',   // history-protected snapshot
   'nutrition', 'notes',                             // history-protected snapshot
   'imgUrl',                                         // scrubbed by _stripCachedPaths, hydrated on read
+  'source', 'source_meal_id',                       // provenance (MCP writes / imports)
 ];
 function _toReferenceShape(items) {
   if (!Array.isArray(items)) return items;

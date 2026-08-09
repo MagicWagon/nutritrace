@@ -23,10 +23,16 @@ test('MCP route is mounted at /api/mcp on the main router', () => {
   assert.match(indexJs, /router\.use\('\/api\/mcp',\s*mcpRoutes\)/);
 });
 
-test('MCP route is feature-flagged on MCP_ENABLED and requires bearer + scope', () => {
+test('MCP route is feature-flagged on MCP_ENABLED and requires bearer + at-least-one mcp:* scope', () => {
   assert.match(mcpRoute, /MCP_ENABLED/);
   assert.match(mcpRoute, /bearerAuth/);
-  assert.match(mcpRoute, /requireScope\('mcp:read'\)/);
+  // Any-of-mcp:* check: route-level gate accepts read, write, OR destroy
+  // (so a write-only or destroy-only token isn't unusable). Per-tool
+  // scope enforcement happens at registration time.
+  assert.match(mcpRoute, /requireAnyMcpScope/);
+  assert.match(mcpRoute, /'mcp:read'/);
+  assert.match(mcpRoute, /'mcp:write'/);
+  assert.match(mcpRoute, /'mcp:destroy'/);
 });
 
 test('MCP route validates Origin as a DNS-rebinding defense', () => {
