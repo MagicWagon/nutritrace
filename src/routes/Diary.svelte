@@ -437,20 +437,38 @@
   // subscription below (each new entry increments the key once).
   let _weekStripRefreshKey = 0;
 
-  // Polish batch 4: right-rail collapse toggle. When true, the whole
-  // right rail hides on desktop and the meal grid expands to fill the
-  // viewport. Persisted to localStorage so the preference sticks
-  // across sessions. Small chevron button top-right of the rail
-  // (visible only at ≥1280px) toggles it.
-  let _railCollapsed = false;
+  // Polish batch 4: right-rail mode. Two states:
+  //   'pinned' — rail always visible in the desktop grid (default)
+  //   'hidden' — rail folded out of the grid; a small chevron tab
+  //     hovers on the right edge; clicking opens the rail as a
+  //     slide-in overlay (fixed, right-anchored, own scroll). The
+  //     overlay has a pin button to switch back to 'pinned', and a
+  //     close button to dismiss while staying in 'hidden' mode.
+  // Persisted to localStorage so the choice survives reloads.
+  let _railMode = 'pinned';
+  let _railOverlay = false;
   try {
     if (typeof localStorage !== 'undefined') {
-      _railCollapsed = localStorage.getItem('nt:diaryRailCollapsed') === '1';
+      const v = localStorage.getItem('nt:diaryRailMode');
+      if (v === 'hidden' || v === 'pinned') _railMode = v;
     }
   } catch { /* ignore */ }
-  function toggleRail() {
-    _railCollapsed = !_railCollapsed;
-    try { localStorage.setItem('nt:diaryRailCollapsed', _railCollapsed ? '1' : '0'); } catch { /* ignore */ }
+  function _persistRailMode() {
+    try { localStorage.setItem('nt:diaryRailMode', _railMode); } catch { /* ignore */ }
+  }
+  function railPin() {
+    _railMode = 'pinned';
+    _railOverlay = false;
+    _persistRailMode();
+  }
+  function railHide() {
+    _railMode = 'hidden';
+    _railOverlay = false;
+    _persistRailMode();
+  }
+  function railToggleOverlay() {
+    if (_railMode !== 'hidden') return;
+    _railOverlay = !_railOverlay;
   }
 
   // Polish batch 4: loading skeleton during day-swap. When the user
@@ -1420,7 +1438,8 @@
   <div
     class="page-content diary-content"
     class:rail-notes-active={$diaryRailShowNotes && $diaryShowNotes}
-    class:rail-collapsed={_railCollapsed}
+    class:rail-hidden={_railMode === 'hidden'}
+    class:rail-overlay-open={_railMode === 'hidden' && _railOverlay}
     class:day-loading={_daySwapLoading}
     style="padding-bottom:{contentPad}"
   >
@@ -1811,17 +1830,57 @@
          the bottom bar + top-right icons continue to serve. Widgets
          are additive as later phases land (Phase 2 = just DaySummary,
          Phase 3 adds Water + Weight, etc.). -->
-    <aside class="diary-right-col">
-      <!-- Rail collapse toggle. Small chevron button at the top of the
-           rail (or floating on the meal-cols side when collapsed). -->
+    <!-- Right-edge tab. Only visible when the rail is in 'hidden' mode
+         (on desktop). Clicking it toggles the overlay slide-in. -->
+    {#if _railMode === 'hidden'}
       <button
-        class="rail-collapse-btn"
-        on:click={toggleRail}
-        aria-label={_railCollapsed ? 'Expand right rail' : 'Collapse right rail'}
-        title={_railCollapsed ? 'Show widgets' : 'Hide widgets'}
+        class="rail-edge-tab"
+        on:click={railToggleOverlay}
+        aria-label={_railOverlay ? 'Close widget panel' : 'Open widget panel'}
+        aria-expanded={_railOverlay}
+        title={_railOverlay ? 'Close widgets' : 'Show widgets'}
       >
-        <span class="material-symbols-rounded">{_railCollapsed ? 'chevron_left' : 'chevron_right'}</span>
+        <span class="material-symbols-rounded">
+          {_railOverlay ? 'chevron_right' : 'chevron_left'}
+        </span>
       </button>
+    {/if}
+    <aside class="diary-right-col">
+      <!-- Rail controls: pin when hidden (make permanent), or hide
+           when pinned (fold out of the grid). Small icon buttons at
+           the top-right so they're always visible above widgets. -->
+      <div class="rail-controls">
+        {#if _railMode === 'pinned'}
+          <button
+            type="button"
+            class="rail-ctrl-btn"
+            on:click={railHide}
+            aria-label="Hide widget panel"
+            title="Hide widgets (edge tab reopens)"
+          >
+            <span class="material-symbols-rounded">right_panel_close</span>
+          </button>
+        {:else}
+          <button
+            type="button"
+            class="rail-ctrl-btn"
+            on:click={railPin}
+            aria-label="Pin widget panel"
+            title="Pin widgets"
+          >
+            <span class="material-symbols-rounded">push_pin</span>
+          </button>
+          <button
+            type="button"
+            class="rail-ctrl-btn"
+            on:click={() => _railOverlay = false}
+            aria-label="Close widget panel"
+            title="Close"
+          >
+            <span class="material-symbols-rounded">close</span>
+          </button>
+        {/if}
+      </div>
       {#if $diaryRailShowSummary}
         <DaySummaryWidget
           eatenKcal={$_calTween}
@@ -2813,6 +2872,12 @@
     display: contents;
   }
   .diary-right-col { display: none; }
+  /* Rail controls (pin/close chevrons) and edge-tab are desktop-only.
+     Hide them explicitly on mobile so the button elements don't
+     render at all — the mobile layout has its own top-right icons
+     + bottom bar and doesn't use the rail. */
+  .rail-edge-tab,
+  .rail-controls { display: none; }
 
   @media (min-width: 1280px) {
     .diary-content {
@@ -2951,42 +3016,105 @@
       display: none;
     }
 
-    /* Rail collapse — user can hide the whole rail via the chevron
-       button at its top. Grid switches to a single column so meals
-       fill the viewport width. Only the collapse button stays
-       visible (floats at the right edge). */
-    .diary-content.rail-collapsed {
-      grid-template-columns: minmax(0, 1fr);
+    /* Rail control bar. Small icon buttons at the top-right corner
+       of the rail (pin/hide/close depending on mode). Keeps its own
+       row so widgets below aren't shoved around. */
+    .rail-controls {
+      display: flex;
+      justify-content: flex-end;
+      gap: 4px;
+      margin-bottom: -6px;   /* pull first widget up close */
     }
-    .diary-content.rail-collapsed .diary-right-col > *:not(.rail-collapse-btn) {
-      display: none;
-    }
-    .diary-content.rail-collapsed .diary-right-col {
-      position: absolute;
-      right: 12px;
-      top: 12px;
-    }
-
-    /* Collapse chevron. Sits in the rail's top area when expanded and
-       floats at the top-right when collapsed. */
-    .rail-collapse-btn {
-      align-self: flex-end;
-      background: var(--surface-2);
-      border: 1px solid var(--border);
+    .rail-ctrl-btn {
+      background: transparent;
+      border: 1px solid transparent;
       border-radius: var(--radius-full);
-      width: 28px;
-      height: 28px;
+      width: 26px;
+      height: 26px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
+      color: var(--text-3);
+      cursor: pointer;
+      padding: 0;
+      transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+    }
+    .rail-ctrl-btn:hover {
+      background: var(--surface-2);
+      color: var(--text-1);
+      border-color: var(--border);
+    }
+    .rail-ctrl-btn .material-symbols-rounded { font-size: 16px; }
+
+    /* Rail hidden mode. Grid collapses to a single column; the aside
+       stops rendering in-flow. A small edge-tab button floats on the
+       right edge of the viewport so the user can pull the panel back
+       out as an overlay whenever they need it. */
+    .diary-content.rail-hidden {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .diary-content.rail-hidden .diary-right-col {
+      display: none;
+    }
+    /* Overlay mode: rail returns as a fixed slide-in panel on the
+       right edge with its own scroll region. Sits above the page
+       content, doesn't dim the background (widgets are additive, not
+       a modal task). */
+    .diary-content.rail-overlay-open .diary-right-col {
+      display: flex;
+      position: fixed;
+      top: 80px;
+      right: 12px;
+      bottom: 12px;
+      width: 380px;
+      max-width: calc(100vw - 24px);
+      z-index: 40;
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: 0 20px 50px -20px rgba(0,0,0,0.35);
+      padding: 12px;
+      overflow-y: auto;
+      animation: rail-slide-in 200ms ease-out;
+    }
+    @keyframes rail-slide-in {
+      from { transform: translateX(24px); opacity: 0; }
+      to   { transform: translateX(0);    opacity: 1; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .diary-content.rail-overlay-open .diary-right-col { animation: none; }
+    }
+
+    /* Right-edge tab: small vertical chevron button pinned to the
+       right side of the viewport, visible only in hidden mode. Uses
+       fixed positioning so it survives scroll. */
+    .rail-edge-tab {
+      position: fixed;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 24px;
+      height: 56px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-right: none;
+      border-top-left-radius: var(--radius-md);
+      border-bottom-left-radius: var(--radius-md);
       color: var(--text-2);
       cursor: pointer;
       padding: 0;
-      transition: background 120ms ease, color 120ms ease;
-      margin-bottom: -4px;   /* pull first widget up close */
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 41;
+      transition: background 120ms ease, color 120ms ease, width 120ms ease;
     }
-    .rail-collapse-btn:hover { background: var(--surface-3); color: var(--text-1); }
-    .rail-collapse-btn .material-symbols-rounded { font-size: 16px; }
+    .rail-edge-tab:hover {
+      background: var(--surface-3);
+      color: var(--text-1);
+      width: 28px;
+    }
+    .rail-edge-tab .material-symbols-rounded { font-size: 18px; }
 
     /* Day-swap loading skeleton — subtle shimmer on the meal-cols
        block while the new day's data is in flight. The fade transition
