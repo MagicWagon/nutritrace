@@ -19,6 +19,7 @@
   import { _ } from 'svelte-i18n';
   import MacroRing from './MacroRing.svelte';
   import { Nutrition } from '../../lib/nutrition.js';
+  import { macroLegendMode } from '../../stores/settings.js';
 
   // Tweened animated totals from Diary.svelte
   export let eatenKcal    = 0;
@@ -72,10 +73,20 @@
 <section class="day-summary-widget card">
   <header class="dsw-header">
     <span class="dsw-title">Today</span>
-    <button class="dsw-mode-toggle" on:click={onToggleMode} aria-label="Toggle remaining / eaten">
-      {mode === 'remaining' ? 'Remaining' : 'Eaten'}
-      <span class="material-symbols-rounded dsw-toggle-icon">swap_vert</span>
-    </button>
+    <div class="dsw-toolbar">
+      <button
+        class="dsw-legend-toggle"
+        on:click={() => macroLegendMode.set($macroLegendMode === 'grams' ? 'percent' : 'grams')}
+        aria-label="Toggle macro display between percent and grams"
+        title="Toggle percent / grams">
+        <span class="dsw-lt-opt" class:dsw-lt-active={$macroLegendMode === 'percent'}>%</span>
+        <span class="dsw-lt-opt" class:dsw-lt-active={$macroLegendMode === 'grams'}>g</span>
+      </button>
+      <button class="dsw-mode-toggle" on:click={onToggleMode} aria-label="Toggle remaining / eaten">
+        {mode === 'remaining' ? 'Remaining' : 'Eaten'}
+        <span class="material-symbols-rounded dsw-toggle-icon">swap_vert</span>
+      </button>
+    </div>
   </header>
 
   <div class="dsw-ring">
@@ -152,6 +163,11 @@
     color: var(--text-1);
     letter-spacing: -0.01em;
   }
+  .dsw-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
   .dsw-mode-toggle {
     display: inline-flex;
     align-items: center;
@@ -168,6 +184,37 @@
   }
   .dsw-mode-toggle:hover { background: var(--surface-3); color: var(--text-1); }
   .dsw-toggle-icon { font-size: 14px; }
+
+  /* Percent / grams pill toggle. Two segments in one rounded container;
+     active side is filled with accent tint, inactive is muted. Matches
+     the ns-legend-toggle pattern used inside the nutrition sheet so
+     users see the same control on both surfaces. */
+  .dsw-legend-toggle {
+    display: inline-flex;
+    align-items: center;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-full);
+    padding: 2px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-3);
+    line-height: 1;
+    overflow: hidden;
+  }
+  .dsw-legend-toggle:hover { background: var(--surface-3); }
+  .dsw-lt-opt {
+    padding: 3px 8px;
+    border-radius: var(--radius-full);
+    transition: background 120ms ease, color 120ms ease;
+    min-width: 18px;
+    text-align: center;
+  }
+  .dsw-lt-active {
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+    color: var(--text-1);
+  }
 
   .dsw-ring {
     /* MacroRing renders two sibling elements (SVG ring, then a percent
