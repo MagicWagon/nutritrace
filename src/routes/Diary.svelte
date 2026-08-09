@@ -697,6 +697,42 @@
     diaryTotalsMode.set(next);
   }
 
+  // ── Meal grid layout (Phase 5 desktop redesign) ─────────────────────────
+  // At ≥1280px, meals render in a 2-col grid. Meals with a lot of items
+  // (>= LARGE_MEAL_THRESHOLD) span both columns so they don't awkwardly
+  // stretch a small partner card via row alignment; align-items:start on
+  // the grid handles size differences between paired cards. A meal that
+  // would otherwise be alone in a row (odd count, or preceded by a
+  // wide-span) auto-expands to full width when it has enough items to
+  // fill it comfortably, so we never render a lonely small card next
+  // to empty space.
+  const LARGE_MEAL_THRESHOLD = 7;
+  const LONER_MIN_ITEMS      = 3;
+  $: mealLayout = (() => {
+    const out = meals.map((meal, mealIdx) => {
+      const items = getMealItems(entry?.items || [], mealIdx);
+      return {
+        meal, mealIdx, items,
+        itemCount: items.length,
+        wideSpan: items.length >= LARGE_MEAL_THRESHOLD,
+      };
+    });
+    // Second pass: promote loners on odd rows.
+    let col = 0;
+    for (let i = 0; i < out.length; i++) {
+      if (out[i].wideSpan) { col = 0; continue; }
+      const nextIsWide = i + 1 < out.length && out[i + 1].wideSpan;
+      const isLast     = i === out.length - 1;
+      if (col === 0 && (isLast || nextIsWide) && out[i].itemCount >= LONER_MIN_ITEMS) {
+        out[i].wideSpan = true;
+        col = 0;
+      } else {
+        col = (col + 1) % 2;
+      }
+    }
+    return out;
+  })();
+
   // Nutrition bar: visible NUTRIMENTS that have goals set
   $: nutritionBarItems = (() => {
     if (!$diaryShowNutritionBar) return [];
@@ -1234,10 +1270,13 @@
     {#if $fastingEnabled}
       <FastingWidget />
     {/if}
-    <!-- Meal groups -->
-    {#each meals as meal, mealIdx}
-      {@const items = getMealItems(entry.items, mealIdx)}
-      <section class="meal-group card" id="meal-{mealIdx}" in:fly={{ y: 18, duration: _isInitialMount && !$disableAnimations ? 280 : 0, delay: _isInitialMount && !$disableAnimations ? 60 + mealIdx * 55 : 0 }}>
+    <!-- Meal groups. Wrapped in .meal-grid so at ≥1280px they lay out as
+         a 2-col grid with wide-span rules for large / loner meals. Below
+         that breakpoint .meal-grid collapses to a plain flex-column
+         stack (unchanged from pre-Phase-5). -->
+    <div class="meal-grid">
+    {#each mealLayout as { meal, mealIdx, items, wideSpan } (mealIdx)}
+      <section class="meal-group card" class:wide-span={wideSpan} id="meal-{mealIdx}" in:fly={{ y: 18, duration: _isInitialMount && !$disableAnimations ? 280 : 0, delay: _isInitialMount && !$disableAnimations ? 60 + mealIdx * 55 : 0 }}>
         <div class="meal-header" style="--meal-color:{mealColor(mealIdx)}">
           <span class="meal-type-icon material-symbols-rounded">{mealIcon(meal)}</span>
           <span class="meal-name">{meal}</span>
@@ -1456,6 +1495,7 @@
         {/if}
       </section>
     {/each}
+    </div><!-- /.meal-grid -->
 
     {#if $diaryShowActivity}
       {@const acts = $dayActivity || []}
@@ -2493,6 +2533,14 @@
     gap: 12px;
     min-width: 0;   /* prevents grid children from overflowing on long text */
   }
+  /* Meal grid: below 1280px, plain flex-column (parity with pre-Phase 5).
+     At ≥1280px, promoted to a 2-col dense grid with wide-span rules. */
+  .meal-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+  }
   .diary-right-col { display: none; }
 
   @media (min-width: 1280px) {
@@ -2516,6 +2564,25 @@
          being clipped by an artificial height cap (see Phase 3 feedback).
          If we later want Day Summary specifically to stay pinned while
          scrolling meals, add position: sticky to that widget only. */
+    }
+
+    /* Phase 5: meals lay out as a 2-col grid with:
+         - dense flow so smaller meals backfill gaps left by wide-spans
+         - align-items:start so a 2-item card next to a 5-item card
+           doesn't get its height stretched (that's the "why bottom-half
+           empty" ugly pattern before this)
+         - .wide-span: meals with >= 7 items OR a loner on an odd row
+           span both columns for their own row */
+    .meal-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      grid-auto-flow: dense;
+      column-gap: 12px;
+      row-gap: 12px;
+      align-items: start;
+    }
+    .meal-grid > .meal-group.wide-span {
+      grid-column: 1 / -1;
     }
 
     /* Phase 4: right rail now carries feature-parity with the bottom
