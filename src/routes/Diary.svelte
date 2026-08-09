@@ -10,6 +10,7 @@
   import { cubicOut } from 'svelte/easing';
 
   import MacroRing    from '../components/diary/MacroRing.svelte';
+  import DaySummaryWidget from '../components/diary/DaySummaryWidget.svelte';
   import AddActivitySheet from '../components/diary/AddActivitySheet.svelte';
   import QuickCaloriesSheet from '../components/diary/QuickCaloriesSheet.svelte';
   import FastingWidget from '../components/diary/FastingWidget.svelte';
@@ -1213,6 +1214,11 @@
   </div>
 
   <div class="page-content diary-content" style="padding-bottom:{contentPad}">
+    <!-- Main column: meal groups + activities + notes. On desktop
+         (≥1280px) this sits inside a 2-col grid alongside the right
+         rail. Below 1280px, the wrapper collapses to a no-op (block
+         layout, no visual difference from pre-Phase-2). -->
+    <div class="diary-main">
 {#if $diaryLoadError}
       <div class="server-error-banner">
         <span class="material-symbols-rounded">cloud_off</span>
@@ -1536,6 +1542,31 @@
         {/if}
       </section>
     {/if}
+    </div><!-- /.diary-main -->
+
+    <!-- Right rail (Phase 2+ desktop redesign).
+         Only visible at ≥1280px via CSS; hidden on mobile/tablet where
+         the bottom bar + top-right icons continue to serve. Widgets
+         are additive as later phases land (Phase 2 = just DaySummary,
+         Phase 3 adds Water + Weight, etc.). -->
+    <aside class="diary-right-col">
+      <DaySummaryWidget
+        eatenKcal={$_calTween}
+        protein={$_protTween}
+        carbs={$_carbTween}
+        fat={$_fatTween}
+        goalKcal={caloriesGoalAdjusted}
+        baseGoalKcal={caloriesGoal}
+        activeKcal={_effectiveActive}
+        proteinGoal={protGoal}
+        carbGoal={carbGoal}
+        fatGoal={fatGoal}
+        energyUnit={$energyUnit}
+        calorieGoalMode={$calorieGoalMode}
+        mode={_totalsMode}
+        onToggleMode={() => _totalsMode = _totalsMode === 'remaining' ? 'eaten' : 'remaining'}
+      />
+    </aside>
 
   </div>
 </div>
@@ -2402,19 +2433,49 @@
   .diary-content { padding-top: 12px; padding-bottom: 16px; gap: 12px; display: flex; flex-direction: column; }
 
   /* Desktop redesign — Phase 1: content max-width cap.
-     On wide viewports the diary content column is centered and capped so
-     line-lengths / card widths stop growing on 27" monitors. Mobile behavior
-     unchanged (no min-width applied). The sticky date bar stays full-width
-     so its glass-blur background + border-bottom span the viewport as
-     designed; only its INNER buttons are pushed inward to align with the
-     capped content column below. Later phases add the right column, meal
-     grid, week strip; this is just the shell. */
+     Phase 2: two-column layout + right rail with DaySummary widget.
+
+     Below 1280px: .diary-main wraps children in a no-op block; the
+     .diary-right-col is hidden entirely. Everything behaves as before.
+
+     At ≥1280px: .diary-content becomes a CSS grid with the main column
+     (meals + activities + notes) and a fixed-width right rail. The
+     sticky date bar stays full-width so its glass blur + border span
+     the viewport; only its inner padding shifts inward to align with
+     the capped content column below. */
+  /* .diary-main is the wrapper around meals + activities + notes.
+     Below 1280px it's the sole flex child of .diary-content, so its
+     OWN children need the flex-column + gap that used to live on
+     .diary-content. At ≥1280px it becomes one column of the grid.
+     Kept unconditional so mobile behavior is identical to pre-Phase 2. */
+  .diary-main {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;   /* prevents grid children from overflowing on long text */
+  }
+  .diary-right-col { display: none; }
+
   @media (min-width: 1280px) {
     .diary-content {
       max-width: 1600px;
       margin-left: auto;
       margin-right: auto;
       width: 100%;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 360px;
+      column-gap: 20px;
+      align-items: start;
+    }
+    .diary-right-col {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      position: sticky;
+      top: calc(var(--page-top, var(--safe-top)) + 120px + var(--hamburger-row, 0px));
+      max-height: calc(100vh - var(--page-top, var(--safe-top)) - 140px);
+      overflow-y: auto;
+      padding-right: 4px;   /* room for scrollbar without cropping */
     }
     /* Match the date-bar internal padding to align its buttons with the
        centered content column below (rather than capping the whole bar,
