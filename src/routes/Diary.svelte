@@ -1368,6 +1368,118 @@
   });
 </script>
 
+<!-- Rail widgets snippet. Defined at the top level so it's in
+     scope for BOTH render sites: (a) the sticky in-grid aside
+     inside .diary-content for pinned mode, and (b) the portaled
+     overlay aside outside .page-shell for hidden+overlay mode.
+     Svelte 5 snippets have block scope — a definition inside a
+     block is not visible outside it. -->
+{#snippet railWidgets()}
+  {#if (_railMode === 'hidden' && _railOverlay) || (_railMode === 'pinned' && !$diaryRailShowSummary)}
+    <div class="rail-controls">
+      {#if _railMode === 'pinned'}
+        <button
+          type="button"
+          class="rail-ctrl-btn"
+          on:click={railHide}
+          aria-label="Hide widget panel"
+          title="Hide widgets (edge tab reopens)"
+        >
+          <span class="material-symbols-rounded">right_panel_close</span>
+        </button>
+      {:else}
+        <button
+          type="button"
+          class="rail-ctrl-btn"
+          on:click={railPin}
+          aria-label="Pin widget panel"
+          title="Pin widgets"
+        >
+          <span class="material-symbols-rounded">push_pin</span>
+        </button>
+        <button
+          type="button"
+          class="rail-ctrl-btn"
+          on:click={() => _railOverlay = false}
+          aria-label="Close widget panel"
+          title="Close"
+        >
+          <span class="material-symbols-rounded">close</span>
+        </button>
+      {/if}
+    </div>
+  {/if}
+  {#if $diaryRailShowSummary}
+    <DaySummaryWidget
+      eatenKcal={$_calTween}
+      protein={$_protTween}
+      carbs={$_carbTween}
+      fat={$_fatTween}
+      goalKcal={caloriesGoalAdjusted}
+      proteinGoal={protGoal}
+      carbGoal={carbGoal}
+      fatGoal={fatGoal}
+      onOpenSummary={() => diaryShowNutritionSummary.set(true)}
+      railMode={_railMode}
+      onRailModeToggle={railHide}
+    />
+  {/if}
+  {#if $diaryRailShowWater && _waterShowInDiary}
+    <WaterWidget
+      logs={_waterLogs}
+      totalMl={_waterTotal}
+      goalMl={_waterGoalMl}
+      unit={_waterUnit}
+      containers={_waterContainers}
+      onQuickAdd={(ml) => addWaterLog(ml, $currentDate)}
+      onRemove={_removeWaterLog}
+    />
+  {/if}
+  {#if $diaryRailShowWeight}
+    <WeightWidget
+      currentWeight={bodyStatsData.weight ?? null}
+      unit={$weightUnit || 'kg'}
+      onSave={async (val) => {
+        bodyStatsData = { ...bodyStatsData, weight: val };
+        await saveBodyStatsLocal();
+      }}
+    />
+  {/if}
+  {#if $diaryRailShowMeasurements}
+    <BodyMeasurementsWidget
+      stats={bodyStatsData}
+      unit={$lengthUnit || 'in'}
+      onOpen={openBodyStats}
+    />
+  {/if}
+  {#if $diaryRailShowActivityWidget}
+    <ActivityImpactWidget
+      activeKcal={_effectiveActive}
+      baseGoalKcal={caloriesGoal}
+      adjustedGoalKcal={caloriesGoalAdjusted}
+      energyUnit={$energyUnit}
+      calorieGoalMode={$calorieGoalMode}
+      dynamicCaloriesOut={_dynamicCaloriesOut}
+      adaptiveTdee={_adaptiveTdee}
+    />
+  {/if}
+  {#if $diaryRailShowNotes && $diaryShowNotes}
+    <section class="card rail-notes-widget">
+      <header class="rn-header">
+        <span class="material-symbols-rounded rn-icon">edit_note</span>
+        <span class="rn-title">{$_('diary_deep.day_notes')}</span>
+      </header>
+      <textarea class="rn-textarea" bind:value={_notesText}
+        on:blur={commitNotes}
+        placeholder={$_('diary.notes_placeholder')}
+        rows="3"></textarea>
+      <div class="rn-meta">
+        <span class="text-3 text-sm">{_notesSaving ? 'Saving…' : (_notesText ? `${_notesText.length} characters` : '')}</span>
+      </div>
+    </section>
+  {/if}
+{/snippet}
+
 <div class="page-shell diary-page">
   <!-- Action icons — fixed at top-right, same level as hamburger -->
   <div use:portal class="diary-topbar-actions">
@@ -1838,137 +1950,25 @@
     {#if _railMode === 'hidden' && _wideViewport}
       <button
         use:portal
+        type="button"
         class="rail-edge-tab"
         on:click={railToggleOverlay}
         aria-label={_railOverlay ? 'Close widget panel' : 'Open widget panel'}
         aria-expanded={_railOverlay}
         title={_railOverlay ? 'Close widgets' : 'Show widgets'}
       >
-        <span class="material-symbols-rounded">
+        <span class="material-symbols-rounded" style="pointer-events:none">
           {_railOverlay ? 'chevron_right' : 'chevron_left'}
         </span>
       </button>
     {/if}
-    {#snippet railWidgets()}
-      <!-- Rail controls fallback chip. The pin/hide button lives
-           INSIDE the DaySummaryWidget header when that widget is
-           visible (aligns with meal-column top edge). Show this
-           chip only in two cases:
-             (a) Day Summary widget is disabled, so the widget-
-                 embedded pin/hide isn't rendered.
-             (b) Overlay is open — the pin + close controls need
-                 to be visible on the overlay panel itself. -->
-      {#if (_railMode === 'hidden' && _railOverlay) || (_railMode === 'pinned' && !$diaryRailShowSummary)}
-        <div class="rail-controls">
-          {#if _railMode === 'pinned'}
-            <button
-              type="button"
-              class="rail-ctrl-btn"
-              on:click={railHide}
-              aria-label="Hide widget panel"
-              title="Hide widgets (edge tab reopens)"
-            >
-              <span class="material-symbols-rounded">right_panel_close</span>
-            </button>
-          {:else}
-            <button
-              type="button"
-              class="rail-ctrl-btn"
-              on:click={railPin}
-              aria-label="Pin widget panel"
-              title="Pin widgets"
-            >
-              <span class="material-symbols-rounded">push_pin</span>
-            </button>
-            <button
-              type="button"
-              class="rail-ctrl-btn"
-              on:click={() => _railOverlay = false}
-              aria-label="Close widget panel"
-              title="Close"
-            >
-              <span class="material-symbols-rounded">close</span>
-            </button>
-          {/if}
-        </div>
-      {/if}
-      {#if $diaryRailShowSummary}
-        <DaySummaryWidget
-          eatenKcal={$_calTween}
-          protein={$_protTween}
-          carbs={$_carbTween}
-          fat={$_fatTween}
-          goalKcal={caloriesGoalAdjusted}
-          proteinGoal={protGoal}
-          carbGoal={carbGoal}
-          fatGoal={fatGoal}
-          onOpenSummary={() => diaryShowNutritionSummary.set(true)}
-          railMode={_railMode}
-          onRailModeToggle={railHide}
-        />
-      {/if}
-      {#if $diaryRailShowWater && _waterShowInDiary}
-        <WaterWidget
-          logs={_waterLogs}
-          totalMl={_waterTotal}
-          goalMl={_waterGoalMl}
-          unit={_waterUnit}
-          containers={_waterContainers}
-          onQuickAdd={(ml) => addWaterLog(ml, $currentDate)}
-          onRemove={_removeWaterLog}
-        />
-      {/if}
-      {#if $diaryRailShowWeight}
-        <WeightWidget
-          currentWeight={bodyStatsData.weight ?? null}
-          unit={$weightUnit || 'kg'}
-          onSave={async (val) => {
-            bodyStatsData = { ...bodyStatsData, weight: val };
-            await saveBodyStatsLocal();
-          }}
-        />
-      {/if}
-      {#if $diaryRailShowMeasurements}
-        <BodyMeasurementsWidget
-          stats={bodyStatsData}
-          unit={$lengthUnit || 'in'}
-          onOpen={openBodyStats}
-        />
-      {/if}
-      {#if $diaryRailShowActivityWidget}
-        <ActivityImpactWidget
-          activeKcal={_effectiveActive}
-          baseGoalKcal={caloriesGoal}
-          adjustedGoalKcal={caloriesGoalAdjusted}
-          energyUnit={$energyUnit}
-          calorieGoalMode={$calorieGoalMode}
-          dynamicCaloriesOut={_dynamicCaloriesOut}
-          adaptiveTdee={_adaptiveTdee}
-        />
-      {/if}
-      {#if $diaryRailShowNotes && $diaryShowNotes}
-        <!-- Rail Notes widget. Same state as the bottom Notes card so
-             editing here syncs everywhere. Bottom card is CSS-hidden at
-             ≥1280px when this widget is enabled (mutual exclusion). -->
-        <section class="card rail-notes-widget">
-          <header class="rn-header">
-            <span class="material-symbols-rounded rn-icon">edit_note</span>
-            <span class="rn-title">{$_('diary_deep.day_notes')}</span>
-          </header>
-          <textarea class="rn-textarea" bind:value={_notesText}
-            on:blur={commitNotes}
-            placeholder={$_('diary.notes_placeholder')}
-            rows="3"></textarea>
-          <div class="rn-meta">
-            <span class="text-3 text-sm">{_notesSaving ? 'Saving…' : (_notesText ? `${_notesText.length} characters` : '')}</span>
-          </div>
-        </section>
-      {/if}
-    {/snippet}
-
     <!-- PINNED mode: rail sits inside the desktop grid, sticky
          below the week strip. Rendered only when in pinned mode so
-         we don't waste layout space when the rail is hidden. -->
+         we don't waste layout space when the rail is hidden.
+         Snippet is defined at the top of the component (outside
+         .diary-content) so both this render and the portaled
+         overlay render below can resolve it — Svelte 5 snippets
+         have block scope. -->
     {#if _railMode === 'pinned'}
       <aside class="diary-right-col">
         {@render railWidgets()}
@@ -2933,12 +2933,24 @@
       position: sticky;
       top: calc(var(--page-top, var(--safe-top)) + 190px + var(--hamburger-row, 0px));
       align-self: start;
+      /* Leave a small margin under the viewport bottom so the last
+         widget isn't flush with the browser chrome. */
       max-height: calc(100vh - var(--page-top, var(--safe-top)) - 200px - var(--hamburger-row, 0px));
       overflow-y: auto;
-      /* Custom scroll padding on the right so the scrollbar doesn't
-         squish against the rounded card corners. */
+      /* Visible thin scrollbar so users know they can scroll when
+         the stack exceeds the rail height. Firefox uses
+         scrollbar-width; webkit uses ::-webkit-scrollbar. */
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
       padding-right: 4px;
     }
+    .diary-right-col::-webkit-scrollbar { width: 8px; }
+    .diary-right-col::-webkit-scrollbar-track { background: transparent; }
+    .diary-right-col::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: var(--radius-full);
+    }
+    .diary-right-col::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
     /* Widgets never shrink to fit the rail's max-height — they keep
        their natural size, and the rail scrolls internally when the
        stack overflows. Without this, flex-shrink:1 default squishes
