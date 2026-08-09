@@ -2954,8 +2954,10 @@
     /* Widgets never shrink to fit the rail's max-height — they keep
        their natural size, and the rail scrolls internally when the
        stack overflows. Without this, flex-shrink:1 default squishes
-       the last widget into the sliver of remaining space. */
-    .diary-right-col > * { flex-shrink: 0; }
+       the widgets. :global(*) is required because widget component
+       roots (WaterWidget, WeightWidget, etc.) don't carry Diary's
+       scoping hash, so an un-globalized `> *` would fail to match. */
+    .diary-right-col > :global(*) { flex-shrink: 0; }
     /* When the diary shows a banner (announcement), the sticky
        elements above shift down; keep the rail in sync. */
     .diary-content.has-banner .diary-right-col {
@@ -3164,7 +3166,7 @@
       align-self: auto;
       animation: rail-slide-in 200ms ease-out;
     }
-    .diary-right-col-overlay > * { flex-shrink: 0; }
+    .diary-right-col-overlay > :global(*) { flex-shrink: 0; }
     @keyframes rail-slide-in {
       from { transform: translateX(24px); opacity: 0; }
       to   { transform: translateX(0);    opacity: 1; }
