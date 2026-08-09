@@ -20,6 +20,7 @@
   import { NtApi } from '../../lib/api.js';
   import { localDateStr } from '../../lib/db.js';
   import { Nutrition } from '../../lib/nutrition.js';
+  import { disableAnimations } from '../../stores/settings.js';
 
   export let currentDate     = localDateStr();
   export let calorieGoal     = 2000;
@@ -157,7 +158,7 @@
       </span>
 
       {#if hoveredIso === day.iso && day.stats}
-        <div class="ws-popover" transition:fade|local={{ duration: 120 }}>
+        <div class="ws-popover" transition:fade|local={{ duration: $disableAnimations ? 0 : 120 }}>
           <div class="ws-pop-date">{day.iso}</div>
           <div class="ws-pop-kcal">
             <span class="ws-pop-num">{day.stats.kcal.toLocaleString()}</span>
