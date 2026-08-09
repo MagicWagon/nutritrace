@@ -82,6 +82,19 @@
   let settingsSearch = '';
   $: settingsQuery = settingsSearch.toLowerCase().trim();
 
+  // On mobile / narrow, typing into the search bar while on a
+  // sub-page auto-navigates back to the index with the query so
+  // filtering shows the matching sections. On desktop the search
+  // filters the always-visible left rail in place — no navigation
+  // needed. Threshold matches the two-pane shell (1024px).
+  function _onSearchInput() {
+    if (!currentSection) return;
+    if (typeof window === 'undefined') return;
+    if (window.matchMedia('(min-width: 1024px)').matches) return;
+    if (!settingsQuery) return;
+    push(`/settings?q=${encodeURIComponent(settingsQuery)}`);
+  }
+
   // Section metadata — slug → title i18n key + icon. Used by the sub-page
   // header to show the section name.
   const SECTION_META = {
@@ -480,18 +493,22 @@
       {/if}
     </header>
 
-    {#if !currentSection}
-      <div class="settings-search-bar">
-        <span class="material-symbols-rounded settings-search-icon">search</span>
-        <input class="settings-search-input" type="search" placeholder={$_('settings_main_deep.search_ph')}
-          bind:value={settingsSearch} />
-        {#if settingsSearch}
-          <button class="settings-search-clear btn-icon" on:click={() => settingsSearch = ''} title="Clear search">
-            <span class="material-symbols-rounded" style="font-size:18px">close</span>
-          </button>
-        {/if}
-      </div>
-    {/if}
+    <!-- Search bar renders on every settings view (index AND
+         sub-pages). On sub-pages, typing filters the left rail
+         (desktop) or drops back to the index with the query active
+         (mobile) so the user can jump between sections without
+         losing their query. -->
+    <div class="settings-search-bar">
+      <span class="material-symbols-rounded settings-search-icon">search</span>
+      <input class="settings-search-input" type="search" placeholder={$_('settings_main_deep.search_ph')}
+        bind:value={settingsSearch}
+        on:input={_onSearchInput} />
+      {#if settingsSearch}
+        <button class="settings-search-clear btn-icon" on:click={() => settingsSearch = ''} title="Clear search">
+          <span class="material-symbols-rounded" style="font-size:18px">close</span>
+        </button>
+      {/if}
+    </div>
   </div>
 
   <div class="page-content settings-content" class:subpage-view={!!currentSection}>
