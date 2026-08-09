@@ -40,8 +40,9 @@
   export let calorieGoalMode  = 'fixed';   // 'fixed' | 'dynamic' | 'adaptive'
 
   // Interactive
-  export let mode             = 'remaining';   // 'remaining' | 'eaten'
+  export let mode             = 'remaining';   // 'remaining' | 'eaten'  (drives hero kcal only)
   export let onToggleMode     = () => {};
+  export let onOpenSummary    = () => {};      // opens the full Nutrition Summary sheet
 
   $: remainingKcal = Math.max(0, goalKcal - eatenKcal);
   $: overGoal      = eatenKcal > goalKcal;
@@ -52,13 +53,19 @@
     : Nutrition.displayEnergy(eatenKcal, energyUnit);
   $: kcalGoal = Nutrition.displayEnergy(goalKcal, energyUnit);
 
-  // Per-macro display value based on current mode
+  // Per-macro display value follows $macroLegendMode (matches the full
+  // Nutrition Summary sheet's macro pills exactly):
+  //   'percent' → "82 g Protein"       (raw current, no goal)
+  //   'grams'   → "82/150 g Protein"   (current/goal when goal exists)
+  // The Remaining/Eaten toggle at the widget header only affects the
+  // hero kcal number; macro rows always show what was actually eaten
+  // so the % / g toggle is the sole knob that shapes them.
   function macroDisplay(actual, goal) {
-    if (mode === 'remaining' && goal != null) {
-      const rem = goal - actual;
-      return { value: Math.round(rem * 10) / 10, suffix: rem >= 0 ? 'g left' : 'g over' };
+    const cur = Math.round(actual);
+    if ($macroLegendMode === 'grams' && goal != null) {
+      return { current: cur, goal: Math.round(goal), withGoal: true };
     }
-    return { value: Math.round(actual * 10) / 10, suffix: 'g' };
+    return { current: cur, goal: null, withGoal: false };
   }
   $: pDisp = macroDisplay(protein, proteinGoal);
   $: cDisp = macroDisplay(carbs,   carbGoal);
@@ -85,6 +92,9 @@
       <button class="dsw-mode-toggle" on:click={onToggleMode} aria-label="Toggle remaining / eaten">
         {mode === 'remaining' ? 'Remaining' : 'Eaten'}
         <span class="material-symbols-rounded dsw-toggle-icon">swap_vert</span>
+      </button>
+      <button class="dsw-open" on:click={onOpenSummary} title="Open full nutrition summary">
+        <span class="material-symbols-rounded">open_in_full</span>
       </button>
     </div>
   </header>
@@ -132,15 +142,24 @@
   <div class="dsw-macros">
     <div class="dsw-macro-row" style="--macro-color:var(--macro-protein)">
       <span class="dsw-macro-label">Protein</span>
-      <span class="dsw-macro-value">{pDisp.value} <span class="dsw-macro-suffix">{pDisp.suffix}</span></span>
+      <span class="dsw-macro-value">
+        {pDisp.current}{#if pDisp.withGoal}<span class="dsw-macro-goal">/{pDisp.goal}</span>{/if}
+        <span class="dsw-macro-suffix">g</span>
+      </span>
     </div>
     <div class="dsw-macro-row" style="--macro-color:var(--macro-carbs)">
       <span class="dsw-macro-label">Carbs</span>
-      <span class="dsw-macro-value">{cDisp.value} <span class="dsw-macro-suffix">{cDisp.suffix}</span></span>
+      <span class="dsw-macro-value">
+        {cDisp.current}{#if cDisp.withGoal}<span class="dsw-macro-goal">/{cDisp.goal}</span>{/if}
+        <span class="dsw-macro-suffix">g</span>
+      </span>
     </div>
     <div class="dsw-macro-row" style="--macro-color:var(--macro-fat)">
       <span class="dsw-macro-label">Fat</span>
-      <span class="dsw-macro-value">{fDisp.value} <span class="dsw-macro-suffix">{fDisp.suffix}</span></span>
+      <span class="dsw-macro-value">
+        {fDisp.current}{#if fDisp.withGoal}<span class="dsw-macro-goal">/{fDisp.goal}</span>{/if}
+        <span class="dsw-macro-suffix">g</span>
+      </span>
     </div>
   </div>
 </section>
@@ -296,4 +315,23 @@
     color: var(--text-3);
     margin-left: 2px;
   }
+  .dsw-macro-goal {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-3);
+  }
+  /* Open-full-summary icon button (matches Body Measurements widget) */
+  .dsw-open {
+    background: transparent;
+    border: none;
+    color: var(--text-3);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: var(--radius-sm);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .dsw-open:hover { color: var(--text-1); background: var(--surface-2); }
+  .dsw-open .material-symbols-rounded { font-size: 16px; }
 </style>

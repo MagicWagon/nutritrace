@@ -13,7 +13,6 @@
   import DaySummaryWidget from '../components/diary/DaySummaryWidget.svelte';
   import WaterWidget       from '../components/diary/WaterWidget.svelte';
   import WeightWidget      from '../components/diary/WeightWidget.svelte';
-  import NutrientDetailWidget from '../components/diary/NutrientDetailWidget.svelte';
   import BodyMeasurementsWidget from '../components/diary/BodyMeasurementsWidget.svelte';
   import ActivityImpactWidget from '../components/diary/ActivityImpactWidget.svelte';
   import AddActivitySheet from '../components/diary/AddActivitySheet.svelte';
@@ -1571,6 +1570,7 @@
         calorieGoalMode={$calorieGoalMode}
         mode={_totalsMode}
         onToggleMode={() => _totalsMode = _totalsMode === 'remaining' ? 'eaten' : 'remaining'}
+        onOpenSummary={() => diaryShowNutritionSummary.set(true)}
       />
       {#if _waterShowInDiary}
         <WaterWidget
@@ -1595,12 +1595,6 @@
         stats={bodyStatsData}
         unit={$lengthUnit || 'in'}
         onOpen={openBodyStats}
-      />
-      <NutrientDetailWidget
-        items={nutritionBarItems}
-        mode={_totalsMode}
-        showUnits={$diaryShowNutritionUnits}
-        onOpen={() => diaryShowNutritionSummary.set(true)}
       />
       <ActivityImpactWidget
         activeKcal={_effectiveActive}
