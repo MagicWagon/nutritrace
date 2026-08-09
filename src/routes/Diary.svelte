@@ -2874,7 +2874,7 @@
      content grid, giving 7-day-at-a-glance context + click-to-nav. */
   .diary-week-strip-wrap { display: none; }
   @media (min-width: 1280px) {
-    :where(html:not(.force-mobile-layout)) .diary-week-strip-wrap {
+    :global(html:not(.force-mobile-layout)) .diary-week-strip-wrap {
       display: block;
       position: sticky;
       top: calc(var(--page-top, var(--safe-top)) + 120px + var(--hamburger-row, 0px));
@@ -2920,14 +2920,14 @@
   .rail-controls { display: none; }
 
   @media (min-width: 1280px) {
-    :where(html:not(.force-mobile-layout)) .diary-content {
+    :global(html:not(.force-mobile-layout)) .diary-content {
       width: 100%;
       display: grid;
       grid-template-columns: minmax(0, 1fr) 360px;
       column-gap: 20px;
       align-items: start;
     }
-    :where(html:not(.force-mobile-layout)) .diary-right-col {
+    :global(html:not(.force-mobile-layout)) .diary-right-col {
       display: flex;
       flex-direction: column;
       gap: 12px;
@@ -2951,23 +2951,23 @@
       scrollbar-color: var(--border) transparent;
       padding-right: 4px;
     }
-    :where(html:not(.force-mobile-layout)) .diary-right-col::-webkit-scrollbar { width: 8px; }
-    :where(html:not(.force-mobile-layout)) .diary-right-col::-webkit-scrollbar-track { background: transparent; }
-    :where(html:not(.force-mobile-layout)) .diary-right-col::-webkit-scrollbar-thumb {
+    :global(html:not(.force-mobile-layout)) .diary-right-col::-webkit-scrollbar { width: 8px; }
+    :global(html:not(.force-mobile-layout)) .diary-right-col::-webkit-scrollbar-track { background: transparent; }
+    :global(html:not(.force-mobile-layout)) .diary-right-col::-webkit-scrollbar-thumb {
       background: var(--border);
       border-radius: var(--radius-full);
     }
-    :where(html:not(.force-mobile-layout)) .diary-right-col::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+    :global(html:not(.force-mobile-layout)) .diary-right-col::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
     /* Widgets never shrink to fit the rail's max-height — they keep
        their natural size, and the rail scrolls internally when the
        stack overflows. Without this, flex-shrink:1 default squishes
        the widgets. :global(*) is required because widget component
        roots (WaterWidget, WeightWidget, etc.) don't carry Diary's
        scoping hash, so an un-globalized `> *` would fail to match. */
-    :where(html:not(.force-mobile-layout)) .diary-right-col > :global(*) { flex-shrink: 0; }
+    :global(html:not(.force-mobile-layout)) .diary-right-col > :global(*) { flex-shrink: 0; }
     /* When the diary shows a banner (announcement), the sticky
        elements above shift down; keep the rail in sync. */
-    :where(html:not(.force-mobile-layout)) .diary-content.has-banner .diary-right-col {
+    :global(html:not(.force-mobile-layout)) .diary-content.has-banner .diary-right-col {
       top: calc(var(--page-top, var(--safe-top)) + 252px + var(--hamburger-row, 0px));
       max-height: calc(100vh - var(--page-top, var(--safe-top)) - 262px - var(--hamburger-row, 0px));
     }
@@ -2980,13 +2980,13 @@
        alternating meal/snack configs this cleanly separates main
        meals into one column and snacks into the other. Card positions
        stay fixed under data changes (no auto-balance shuffle). */
-    :where(html:not(.force-mobile-layout)) .meal-cols {
+    :global(html:not(.force-mobile-layout)) .meal-cols {
       display: grid;
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       column-gap: 12px;
       align-items: start;
     }
-    :where(html:not(.force-mobile-layout)) .meal-col {
+    :global(html:not(.force-mobile-layout)) .meal-col {
       display: flex;
       flex-direction: column;
       gap: 12px;
@@ -3001,31 +3001,31 @@
        hover subtly signals it's clickable. On mobile / narrow this whole
        rule is skipped so the standard "big Tap to add food" empty state
        still renders below 1280px (touch users want the bigger target). */
-    :where(html:not(.force-mobile-layout)) .meal-col > .meal-group.empty {
+    :global(html:not(.force-mobile-layout)) .meal-col > .meal-group.empty {
       transition: background 160ms ease, border-color 160ms ease;
     }
-    :where(html:not(.force-mobile-layout)) .meal-col > .meal-group.empty :global(.meal-empty) {
+    :global(html:not(.force-mobile-layout)) .meal-col > .meal-group.empty :global(.meal-empty) {
       padding: 6px 12px;
       opacity: 0.7;
     }
-    :where(html:not(.force-mobile-layout)) .meal-col > .meal-group.empty :global(.meal-empty-icon) {
+    :global(html:not(.force-mobile-layout)) .meal-col > .meal-group.empty :global(.meal-empty-icon) {
       font-size: 16px;
     }
-    :where(html:not(.force-mobile-layout)) .meal-col > .meal-group.empty:hover {
+    :global(html:not(.force-mobile-layout)) .meal-col > .meal-group.empty:hover {
       border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
     }
-    :where(html:not(.force-mobile-layout)) .meal-col > .meal-group.empty:hover :global(.meal-empty) {
+    :global(html:not(.force-mobile-layout)) .meal-col > .meal-group.empty:hover :global(.meal-empty) {
       opacity: 1;
     }
     /* Soften card shadows a touch at wide viewports — feels less boxy
        on a desktop where multiple cards sit next to each other. */
-    :where(html:not(.force-mobile-layout)) .meal-col > .meal-group {
+    :global(html:not(.force-mobile-layout)) .meal-col > .meal-group {
       box-shadow: 0 1px 3px -1px rgba(0,0,0,0.08);
     }
     /* Phase 7: grab-cursor + subtle lift while dragging. */
-    :where(html:not(.force-mobile-layout)) .meal-col > .meal-group[draggable="true"] { cursor: grab; }
-    :where(html:not(.force-mobile-layout)) .meal-col > .meal-group[draggable="true"]:active { cursor: grabbing; }
-    :where(html:not(.force-mobile-layout)) .meal-col > .meal-group.dragging {
+    :global(html:not(.force-mobile-layout)) .meal-col > .meal-group[draggable="true"] { cursor: grab; }
+    :global(html:not(.force-mobile-layout)) .meal-col > .meal-group[draggable="true"]:active { cursor: grabbing; }
+    :global(html:not(.force-mobile-layout)) .meal-col > .meal-group.dragging {
       opacity: 0.25;
       transform: scale(0.985);
       transition: opacity 120ms ease, transform 120ms ease;
@@ -3033,7 +3033,7 @@
     /* Batch 5: item-drop target ring. When the user drags a food
        item over a different meal, that meal card gets an accent
        outline + tint so the drop zone is obvious. */
-    :where(html:not(.force-mobile-layout)) .meal-col > .meal-group.item-drop-target {
+    :global(html:not(.force-mobile-layout)) .meal-col > .meal-group.item-drop-target {
       outline: 2px dashed var(--accent);
       outline-offset: -2px;
       background: color-mix(in srgb, var(--accent) 6%, var(--surface-1));
@@ -3043,7 +3043,7 @@
        interactive without being noisy. Skipped on touch (:hover fires
        oddly on tap-and-hold). */
     @media (hover: hover) {
-      :where(html:not(.force-mobile-layout)) .meal-col > .meal-group:not(.dragging):hover {
+      :global(html:not(.force-mobile-layout)) .meal-col > .meal-group:not(.dragging):hover {
         transform: translateY(-1px);
         box-shadow: 0 6px 20px -8px rgba(0,0,0,0.14);
         transition: transform 160ms ease, box-shadow 160ms ease;
@@ -3053,7 +3053,7 @@
         box-shadow: 0 8px 24px -8px rgba(0,0,0,0.6);
       }
       /* Right rail widgets get the same treatment. */
-      :where(html:not(.force-mobile-layout)) .diary-right-col > :hover {
+      :global(html:not(.force-mobile-layout)) .diary-right-col > :hover {
         transform: translateY(-1px);
         box-shadow: 0 6px 20px -8px rgba(0,0,0,0.14);
         transition: transform 160ms ease, box-shadow 160ms ease;
@@ -3062,9 +3062,9 @@
     /* Keyboard focus rings — visible + accent-colored on interactive
        elements. Focus-visible so mouse clicks don't leave a lingering
        ring on buttons the user just clicked. */
-    :where(html:not(.force-mobile-layout)) .diary-right-col button:focus-visible,
-    :where(html:not(.force-mobile-layout)) .diary-right-col :global([role="button"]):focus-visible,
-    :where(html:not(.force-mobile-layout)) .meal-col > .meal-group:focus-visible,
+    :global(html:not(.force-mobile-layout)) .diary-right-col button:focus-visible,
+    :global(html:not(.force-mobile-layout)) .diary-right-col :global([role="button"]):focus-visible,
+    :global(html:not(.force-mobile-layout)) .meal-col > .meal-group:focus-visible,
     :global(html:not(.force-mobile-layout) .week-strip) .ws-day:focus-visible {
       outline: 2px solid var(--accent);
       outline-offset: 2px;
@@ -3085,7 +3085,7 @@
     /* Notes mutual-exclusion: when the rail widget is showing Notes,
        hide the bottom card so it doesn't render twice. If the user
        turns off railShowNotes, the bottom card returns naturally. */
-    :where(html:not(.force-mobile-layout)) .diary-content.rail-notes-active .diary-main .diary-notes.card {
+    :global(html:not(.force-mobile-layout)) .diary-content.rail-notes-active .diary-main .diary-notes.card {
       display: none;
     }
 
@@ -3095,24 +3095,24 @@
        the panel a clear identity and a stable home for the
        controls so widgets below can align with the meal-column
        top edge cleanly. */
-    :where(html:not(.force-mobile-layout)) .rail-title {
+    :global(html:not(.force-mobile-layout)) .rail-title {
       display: flex;
       align-items: center;
       justify-content: space-between;
       padding: 2px 4px 4px;
     }
-    :where(html:not(.force-mobile-layout)) .rail-title-text {
+    :global(html:not(.force-mobile-layout)) .rail-title-text {
       font-size: 12px;
       font-weight: 600;
       color: var(--text-3);
       text-transform: uppercase;
       letter-spacing: 0.08em;
     }
-    :where(html:not(.force-mobile-layout)) .rail-title-actions {
+    :global(html:not(.force-mobile-layout)) .rail-title-actions {
       display: flex;
       gap: 2px;
     }
-    :where(html:not(.force-mobile-layout)) .rail-ctrl-btn {
+    :global(html:not(.force-mobile-layout)) .rail-ctrl-btn {
       background: transparent;
       border: 1px solid transparent;
       border-radius: var(--radius-full);
@@ -3126,21 +3126,21 @@
       padding: 0;
       transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
     }
-    :where(html:not(.force-mobile-layout)) .rail-ctrl-btn:hover {
+    :global(html:not(.force-mobile-layout)) .rail-ctrl-btn:hover {
       background: var(--surface-2);
       color: var(--text-1);
       border-color: var(--border);
     }
-    :where(html:not(.force-mobile-layout)) .rail-ctrl-btn .material-symbols-rounded { font-size: 16px; }
+    :global(html:not(.force-mobile-layout)) .rail-ctrl-btn .material-symbols-rounded { font-size: 16px; }
 
     /* Rail hidden mode. Grid collapses to a single column; the aside
        stops rendering in-flow. A small edge-tab button floats on the
        right edge of the viewport so the user can pull the panel back
        out as an overlay whenever they need it. */
-    :where(html:not(.force-mobile-layout)) .diary-content.rail-hidden {
+    :global(html:not(.force-mobile-layout)) .diary-content.rail-hidden {
       grid-template-columns: minmax(0, 1fr);
     }
-    :where(html:not(.force-mobile-layout)) .diary-content.rail-hidden .diary-right-col {
+    :global(html:not(.force-mobile-layout)) .diary-content.rail-hidden .diary-right-col {
       display: none;
     }
     /* Overlay mode: rail returns as a fixed slide-in panel on the
@@ -3152,7 +3152,7 @@
        along, so scoped styles apply. Fixed positioning resolves
        against the viewport now that the aside is outside the
        .page-transition scroll container. */
-    :where(html:not(.force-mobile-layout)) .diary-right-col-overlay {
+    :global(html:not(.force-mobile-layout)) .diary-right-col-overlay {
       display: flex;
       flex-direction: column;
       gap: 12px;
@@ -3175,19 +3175,19 @@
       align-self: auto;
       animation: rail-slide-in 200ms ease-out;
     }
-    :where(html:not(.force-mobile-layout)) .diary-right-col-overlay > :global(*) { flex-shrink: 0; }
+    :global(html:not(.force-mobile-layout)) .diary-right-col-overlay > :global(*) { flex-shrink: 0; }
     @keyframes rail-slide-in {
       from { transform: translateX(24px); opacity: 0; }
       to   { transform: translateX(0);    opacity: 1; }
     }
     @media (prefers-reduced-motion: reduce) {
-      :where(html:not(.force-mobile-layout)) .diary-content.rail-overlay-open .diary-right-col { animation: none; }
+      :global(html:not(.force-mobile-layout)) .diary-content.rail-overlay-open .diary-right-col { animation: none; }
     }
 
     /* Right-edge tab: small vertical chevron button pinned to the
        right side of the viewport, visible only in hidden mode. Uses
        fixed positioning so it survives scroll. */
-    :where(html:not(.force-mobile-layout)) .rail-edge-tab {
+    :global(html:not(.force-mobile-layout)) .rail-edge-tab {
       position: fixed;
       right: 0;
       top: 50%;
@@ -3208,22 +3208,22 @@
       z-index: 41;
       transition: background 120ms ease, color 120ms ease, width 120ms ease;
     }
-    :where(html:not(.force-mobile-layout)) .rail-edge-tab:hover {
+    :global(html:not(.force-mobile-layout)) .rail-edge-tab:hover {
       background: var(--surface-3);
       color: var(--text-1);
       width: 28px;
     }
-    :where(html:not(.force-mobile-layout)) .rail-edge-tab .material-symbols-rounded { font-size: 18px; }
+    :global(html:not(.force-mobile-layout)) .rail-edge-tab .material-symbols-rounded { font-size: 18px; }
 
     /* Day-swap loading skeleton — subtle shimmer on the meal-cols
        block while the new day's data is in flight. The fade transition
        covers fast loads; skeletons kick in visually if the load is
        slow enough for the fade to complete first. */
-    :where(html:not(.force-mobile-layout)) .diary-content.day-loading .meal-cols > .meal-col > .meal-group {
+    :global(html:not(.force-mobile-layout)) .diary-content.day-loading .meal-cols > .meal-col > .meal-group {
       position: relative;
       overflow: hidden;
     }
-    :where(html:not(.force-mobile-layout)) .diary-content.day-loading .meal-cols > .meal-col > .meal-group::after {
+    :global(html:not(.force-mobile-layout)) .diary-content.day-loading .meal-cols > .meal-col > .meal-group::after {
       content: "";
       position: absolute;
       inset: 0;
@@ -3241,7 +3241,7 @@
       100% { transform: translateX(100%); }
     }
     @media (prefers-reduced-motion: reduce) {
-      :where(html:not(.force-mobile-layout)) .diary-content.day-loading .meal-cols > .meal-col > .meal-group::after {
+      :global(html:not(.force-mobile-layout)) .diary-content.day-loading .meal-cols > .meal-col > .meal-group::after {
         animation: none;
       }
     }
@@ -3249,7 +3249,7 @@
        reserves height for the (now-hidden) bottom bar. Reclaim it at
        wide so the diary doesn't have a huge empty gap under the last
        meal / notes card. !important because inline style otherwise wins. */
-    :where(html:not(.force-mobile-layout)) .diary-content { padding-bottom: 24px !important; }
+    :global(html:not(.force-mobile-layout)) .diary-content { padding-bottom: 24px !important; }
 
   }
 

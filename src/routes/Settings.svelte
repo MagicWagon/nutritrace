@@ -1163,7 +1163,7 @@
     /* Settings fills the viewport width — no outer max-width cap.
        Same principle you asked for on Diary: don't waste horizontal
        real estate on ultrawides. */
-    :where(html:not(.force-mobile-layout)) .settings-two-pane {
+    :global(html:not(.force-mobile-layout)) .settings-two-pane {
       display: grid;
       grid-template-columns: 280px minmax(0, 1fr);
       gap: 24px;
@@ -1175,7 +1175,7 @@
        because .section-toggle is a shared class rendered inside a
        snippet — the same reason the Diary rail needed :global(*)
        on its widget children. */
-    :where(html:not(.force-mobile-layout)) .settings-nav-rail {
+    :global(html:not(.force-mobile-layout)) .settings-nav-rail {
       display: flex;
       flex-direction: column;
       gap: 2px;
@@ -1190,7 +1190,7 @@
       scrollbar-width: thin;
       scrollbar-color: var(--border) transparent;
     }
-    :where(html:not(.force-mobile-layout)) .settings-nav-rail :global(.section-toggle) {
+    :global(html:not(.force-mobile-layout)) .settings-nav-rail :global(.section-toggle) {
       background: transparent;
       border: none;
       min-height: 36px;
@@ -1199,25 +1199,25 @@
       font-size: 13px;
       gap: 10px;
     }
-    :where(html:not(.force-mobile-layout)) .settings-nav-rail :global(.section-toggle:hover) {
+    :global(html:not(.force-mobile-layout)) .settings-nav-rail :global(.section-toggle:hover) {
       background: var(--surface-2);
     }
-    :where(html:not(.force-mobile-layout)) .settings-nav-rail :global(.section-toggle.active) {
+    :global(html:not(.force-mobile-layout)) .settings-nav-rail :global(.section-toggle.active) {
       background: var(--accent-dim);
       color: var(--accent);
     }
-    :where(html:not(.force-mobile-layout)) .settings-nav-rail :global(.section-toggle .si) {
+    :global(html:not(.force-mobile-layout)) .settings-nav-rail :global(.section-toggle .si) {
       width: 24px;
       height: 24px;
       font-size: 18px;
     }
-    :where(html:not(.force-mobile-layout)) .settings-nav-rail :global(.section-toggle .chevron) { display: none; }
-    :where(html:not(.force-mobile-layout)) .settings-nav-rail :global(.settings-group-label) {
+    :global(html:not(.force-mobile-layout)) .settings-nav-rail :global(.section-toggle .chevron) { display: none; }
+    :global(html:not(.force-mobile-layout)) .settings-nav-rail :global(.settings-group-label) {
       margin: 12px 4px 4px;
       font-size: 10px;
       letter-spacing: 0.1em;
     }
-    :where(html:not(.force-mobile-layout)) .settings-nav-rail :global(.settings-group-label:first-child) {
+    :global(html:not(.force-mobile-layout)) .settings-nav-rail :global(.settings-group-label:first-child) {
       margin-top: 2px;
     }
 
@@ -1225,8 +1225,8 @@
        rows extend to the viewport edge. */
 
     /* Desktop-only vs mobile-only content in the pane */
-    :where(html:not(.force-mobile-layout)) .settings-mobile-index { display: none; }
-    :where(html:not(.force-mobile-layout)) .settings-desktop-hero { display: block; }
+    :global(html:not(.force-mobile-layout)) .settings-mobile-index { display: none; }
+    :global(html:not(.force-mobile-layout)) .settings-desktop-hero { display: block; }
   }
 
   /* Desktop welcome hero prompt (below the profile card in
