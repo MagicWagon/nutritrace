@@ -46,6 +46,7 @@
   import Email             from './settings/Email.svelte';
   import ApiTokens         from './settings/ApiTokens.svelte';
   import About             from './settings/About.svelte';
+  import Profile           from './Profile.svelte';
 
   // ── Route param → current section ──────────────────────────────────────
   // svelte-spa-router route `/settings/:section` → params.section.
@@ -95,6 +96,21 @@
     push(`/settings?q=${encodeURIComponent(settingsQuery)}`);
   }
 
+  // Profile hero click routes based on viewport: desktop opens the
+  // Profile section inside the settings two-pane shell so the rail
+  // stays visible; mobile keeps the standalone /profile drill-in
+  // (there's no rail to preserve). Uses matchMedia at click time
+  // instead of a reactive derivation so it always reflects the
+  // current viewport width even after resizes.
+  function _openProfile() {
+    if (typeof window !== 'undefined' &&
+        window.matchMedia('(min-width: 1024px)').matches) {
+      push('/settings/profile');
+    } else {
+      push('/profile');
+    }
+  }
+
   // Section metadata — slug → title i18n key + icon. Used by the sub-page
   // header to show the section name.
   const SECTION_META = {
@@ -124,6 +140,7 @@
     email:             { titleKey: 'settings.email.section',             icon: 'mail' },
     apiTokens:         { titleKey: null,                                 icon: 'key' },
     about:             { titleKey: 'settings.about.section',             icon: 'info' },
+    profile:           { titleKey: 'profile.title',                      icon: 'person' },
   };
 
   // Slug → per-section component. Drives the <svelte:component> dispatch
@@ -155,6 +172,7 @@
     email:             Email,
     apiTokens:         ApiTokens,
     about:             About,
+    profile:           Profile,
   };
 
   // Keyword index for the settings search bar. Adding new keywords here
@@ -301,6 +319,16 @@
      same handlers; visual density is context-styled via the parent
      class (.settings-nav-rail vs .settings-mobile-index). -->
 {#snippet sectionButtons()}
+  <!-- Profile always sits at the top — it's the account-level entry
+       and gets a matching hero card in the welcome pane, but users
+       inside a deep section should also be able to jump straight
+       here from the rail. -->
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'profile')} class:active={currentSection === 'profile'} on:click={() => toggleSection('profile')}>
+    <span class="material-symbols-rounded si">person</span>
+    <span>{$_('profile.title')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
+
   <p class="settings-group-label">{$_('settings_main.group_display')}</p>
   <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'appearance')} class:active={currentSection === 'appearance'} on:click={() => toggleSection('appearance')}>
     <span class="material-symbols-rounded si">contrast</span>
@@ -547,7 +575,7 @@
       {@const _displayName = _nick || (_full && _full !== 'Local User' ? _full : '') || $_('settings.profile_hero.label_fallback')}
       {@const _hasName = _displayName !== $_('settings.profile_hero.label_fallback')}
       {@const _initial = (_displayName[0] || '?').toUpperCase()}
-      <button class="profile-hero" on:click={() => push('/profile')}>
+      <button class="profile-hero" on:click={_openProfile}>
         <div class="profile-hero-avatar">
           {#if _u.avatar_url}
             <img src={resolveAssetUrl(_u.avatar_url)} alt="" />
@@ -585,7 +613,7 @@
       {@const _displayName = _nick || (_full && _full !== 'Local User' ? _full : '') || $_('settings.profile_hero.label_fallback')}
       {@const _hasName = _displayName !== $_('settings.profile_hero.label_fallback')}
       {@const _initial = (_displayName[0] || '?').toUpperCase()}
-      <button class="profile-hero" on:click={() => push('/profile')}>
+      <button class="profile-hero" on:click={_openProfile}>
         <div class="profile-hero-avatar">
           {#if _u.avatar_url}
             <img src={resolveAssetUrl(_u.avatar_url)} alt="" />
