@@ -20,7 +20,31 @@
   import { NtApi } from '../../lib/api.js';
   import { localDateStr } from '../../lib/db.js';
   import { Nutrition } from '../../lib/nutrition.js';
-  import { disableAnimations } from '../../stores/settings.js';
+  import { disableAnimations, dateFormat } from '../../stores/settings.js';
+
+  // Mirrors Diary.svelte's formatDateSub — respects the user's
+  // Settings → Regional → Date Format preference (ISO / US / EU /
+  // natural). Kept inline here because there's no shared date-format
+  // helper in src/lib/ yet; if a third consumer shows up, extract.
+  function _formatIsoForUser(iso, fmt) {
+    if (!iso) return '';
+    const dt = new Date(iso + 'T12:00:00');
+    fmt = fmt || 'ISO';
+    if (fmt === 'US') {
+      const m  = String(dt.getMonth() + 1).padStart(2, '0');
+      const dy = String(dt.getDate()).padStart(2, '0');
+      return `${m}/${dy}/${dt.getFullYear()}`;
+    }
+    if (fmt === 'EU') {
+      const m  = String(dt.getMonth() + 1).padStart(2, '0');
+      const dy = String(dt.getDate()).padStart(2, '0');
+      return `${dy}/${m}/${dt.getFullYear()}`;
+    }
+    if (fmt === 'natural') {
+      return dt.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+    return iso;   // ISO / fallback
+  }
 
   export let currentDate     = localDateStr();
   export let calorieGoal     = 2000;
@@ -159,7 +183,7 @@
 
       {#if hoveredIso === day.iso && day.stats}
         <div class="ws-popover" transition:fade|local={{ duration: $disableAnimations ? 0 : 120 }}>
-          <div class="ws-pop-date">{day.iso}</div>
+          <div class="ws-pop-date">{_formatIsoForUser(day.iso, $dateFormat)}</div>
           <div class="ws-pop-kcal">
             <span class="ws-pop-num">{day.stats.kcal.toLocaleString()}</span>
             <span class="ws-pop-unit">kcal</span>
