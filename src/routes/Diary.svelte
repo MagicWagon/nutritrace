@@ -706,58 +706,22 @@
   // wide-span) auto-expands to full width when it has enough items to
   // fill it comfortably, so we never render a lonely small card next
   // to empty space.
-  // Wide-span thresholds tuned from Phase 5 feedback:
-  //   - LARGE_MEAL_THRESHOLD: 5+ items → automatic full width. A 5-item
-  //     card (~430px) is over half of a typical 900px viewport and
-  //     shames a small partner.
-  //   - HEIGHT_MISMATCH_DELTA: even below the large threshold, if two
-  //     adjacent cards would sit in the same row with an item-count
-  //     delta of 3+, wide-span the TALLER one. Prevents "Snack 1 (2
-  //     items) paired with empty Lunch (0)" leaving a stub next to a
-  //     dead zone next to a card that could have breathed.
-  //   - LONER_MIN_ITEMS: a card alone in its row (odd count, or after
-  //     a wide-span) only auto-spans if it has 3+ items; small solo
-  //     cards look better than stretched small cards.
-  const LARGE_MEAL_THRESHOLD  = 5;
-  const HEIGHT_MISMATCH_DELTA = 3;
-  const LONER_MIN_ITEMS       = 3;
-  $: mealLayout = (() => {
-    const out = meals.map((meal, mealIdx) => {
-      const items = getMealItems(entry?.items || [], mealIdx);
-      return {
-        meal, mealIdx, items,
-        itemCount: items.length,
-        wideSpan: items.length >= LARGE_MEAL_THRESHOLD,
-      };
-    });
-    // Second pass: pair-mismatch. Walk adjacent non-wide pairs; if the
-    // delta is big, promote the taller of the pair to wide-span so the
-    // shorter one gets a same-size partner in its new row (or auto-spans
-    // via the loner pass).
-    for (let i = 0; i < out.length - 1; i++) {
-      if (out[i].wideSpan || out[i + 1].wideSpan) continue;
-      const a = out[i].itemCount;
-      const b = out[i + 1].itemCount;
-      if (Math.abs(a - b) >= HEIGHT_MISMATCH_DELTA) {
-        if (a > b) out[i].wideSpan = true;
-        else       out[i + 1].wideSpan = true;
-      }
-    }
-    // Third pass: promote loners on odd rows.
-    let col = 0;
-    for (let i = 0; i < out.length; i++) {
-      if (out[i].wideSpan) { col = 0; continue; }
-      const nextIsWide = i + 1 < out.length && out[i + 1].wideSpan;
-      const isLast     = i === out.length - 1;
-      if (col === 0 && (isLast || nextIsWide) && out[i].itemCount >= LONER_MIN_ITEMS) {
-        out[i].wideSpan = true;
-        col = 0;
-      } else {
-        col = (col + 1) % 2;
-      }
-    }
-    return out;
-  })();
+  // Meal layout for the 2-col grid (≥1280px). Simple: every meal is a
+  // grid cell at its natural width. Empty meals get a `.compact` class
+  // so they render as a single-line header chip instead of a full card
+  // with a big "Tap to add food" area — packs the space efficiently
+  // without any wide-span trickery. Cards use align-items:start so a
+  // 2-item snack doesn't get stretched next to a 6-item breakfast; the
+  // resulting vertical gap is the price of honesty and small enough to
+  // feel intentional now that empty meals aren't padding it out.
+  $: mealLayout = meals.map((meal, mealIdx) => {
+    const items = getMealItems(entry?.items || [], mealIdx);
+    return {
+      meal, mealIdx, items,
+      itemCount: items.length,
+      isEmpty:   items.length === 0,
+    };
+  });
 
   // Nutrition bar: visible NUTRIMENTS that have goals set
   $: nutritionBarItems = (() => {
@@ -1297,12 +1261,13 @@
       <FastingWidget />
     {/if}
     <!-- Meal groups. Wrapped in .meal-grid so at ≥1280px they lay out as
-         a 2-col grid with wide-span rules for large / loner meals. Below
-         that breakpoint .meal-grid collapses to a plain flex-column
+         a 2-col grid; empty meals collapse to compact header-only chips
+         so the grid stays visually balanced without wide-span logic.
+         Below that breakpoint .meal-grid collapses to a plain flex-column
          stack (unchanged from pre-Phase-5). -->
     <div class="meal-grid">
-    {#each mealLayout as { meal, mealIdx, items, wideSpan } (mealIdx)}
-      <section class="meal-group card" class:wide-span={wideSpan} id="meal-{mealIdx}" in:fly={{ y: 18, duration: _isInitialMount && !$disableAnimations ? 280 : 0, delay: _isInitialMount && !$disableAnimations ? 60 + mealIdx * 55 : 0 }}>
+    {#each mealLayout as { meal, mealIdx, items, isEmpty } (mealIdx)}
+      <section class="meal-group card" class:empty={isEmpty} id="meal-{mealIdx}" in:fly={{ y: 18, duration: _isInitialMount && !$disableAnimations ? 280 : 0, delay: _isInitialMount && !$disableAnimations ? 60 + mealIdx * 55 : 0 }}>
         <div class="meal-header" style="--meal-color:{mealColor(mealIdx)}">
           <span class="meal-type-icon material-symbols-rounded">{mealIcon(meal)}</span>
           <span class="meal-name">{meal}</span>
@@ -2586,23 +2551,49 @@
          scrolling meals, add position: sticky to that widget only. */
     }
 
-    /* Phase 5: meals lay out as a 2-col grid with:
-         - dense flow so smaller meals backfill gaps left by wide-spans
-         - align-items:start so a 2-item card next to a 5-item card
-           doesn't get its height stretched (that's the "why bottom-half
-           empty" ugly pattern before this)
-         - .wide-span: meals with >= 7 items OR a loner on an odd row
-           span both columns for their own row */
+    /* Phase 5: meals lay out as a 2-col grid.
+         - align-items:start so a 2-item snack next to a 6-item breakfast
+           doesn't get stretched (the vertical gap that creates is the
+           price of honesty, minimised by the compact-empty style below)
+         - empty meals render as single-line header chips so they don't
+           waste space with a big "Tap to add food" area; the gaps that
+           result are small and rhythmic instead of large and lonely
+         - no wide-span logic; every meal is a natural-width grid cell */
     .meal-grid {
       display: grid;
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-      grid-auto-flow: dense;
       column-gap: 12px;
       row-gap: 12px;
       align-items: start;
     }
-    .meal-grid > .meal-group.wide-span {
-      grid-column: 1 / -1;
+    /* Compact empty-meal chip — header row only, no body / macro footer,
+       hover subtly signals it's clickable. On mobile / narrow this whole
+       rule is skipped so the standard "big Tap to add food" empty state
+       still renders below 1280px (touch users want the bigger target). */
+    .meal-grid > .meal-group.empty {
+      transition: background 160ms ease, border-color 160ms ease;
+    }
+    .meal-grid > .meal-group.empty :global(.meal-empty) {
+      padding: 6px 12px;
+      opacity: 0.7;
+    }
+    .meal-grid > .meal-group.empty :global(.meal-empty-icon) {
+      font-size: 16px;
+    }
+    .meal-grid > .meal-group.empty:hover {
+      border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+    }
+    .meal-grid > .meal-group.empty:hover :global(.meal-empty) {
+      opacity: 1;
+    }
+    /* Soften card shadows a touch at wide viewports — feels less boxy
+       on a desktop where multiple cards sit next to each other. */
+    .meal-grid > .meal-group {
+      box-shadow: 0 1px 3px -1px rgba(0,0,0,0.08);
+    }
+    :global([data-theme="dark"]) .meal-grid > .meal-group,
+    :global(:root:not([data-theme="light"])) .meal-grid > .meal-group {
+      box-shadow: 0 4px 14px -8px rgba(0,0,0,0.55);
     }
 
     /* Phase 4: right rail now carries feature-parity with the bottom
