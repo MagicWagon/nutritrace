@@ -1600,6 +1600,7 @@
         items={nutritionBarItems}
         mode={_totalsMode}
         showUnits={$diaryShowNutritionUnits}
+        onOpen={() => diaryShowNutritionSummary.set(true)}
       />
       <ActivityImpactWidget
         activeKcal={_effectiveActive}

@@ -16,6 +16,7 @@
   export let items       = [];    // [{id, label, cur, rem, tgt, pct, over, unit}]
   export let mode        = 'remaining';   // 'remaining' | 'eaten'
   export let showUnits   = true;
+  export let onOpen      = () => {};      // opens the full Nutrition Summary sheet
 
   // Nutrients already shown by Day Summary (its ring, hero kcal, and
   // colored macro rows). Filtered out here so this widget is purely
@@ -40,6 +41,9 @@
     <header class="nw-header">
       <span class="material-symbols-rounded nw-icon">monitoring</span>
       <span class="nw-title">Other nutrients</span>
+      <button class="nw-open" on:click={onOpen} title="Open full nutrition summary">
+        <span class="material-symbols-rounded">open_in_full</span>
+      </button>
     </header>
 
     <div class="nw-list">
@@ -87,7 +91,21 @@
     font-weight: 700;
     color: var(--text-1);
     letter-spacing: -0.01em;
+    flex: 1;
   }
+  .nw-open {
+    background: transparent;
+    border: none;
+    color: var(--text-3);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: var(--radius-sm);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .nw-open:hover { color: var(--text-1); background: var(--surface-2); }
+  .nw-open .material-symbols-rounded { font-size: 16px; }
 
   .nw-list {
     display: flex;
