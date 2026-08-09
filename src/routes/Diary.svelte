@@ -505,6 +505,60 @@
   function _onMealDragEnd() {
     _dragMealIdx = -1;
   }
+
+  // Batch 5: drag a single food item from one meal to another within
+  // the same day. Distinct MIME type so it doesn't collide with the
+  // meal-level drag (which targets the week strip). Drop target is
+  // every meal header. Same viewport gate as the meal drag.
+  //
+  //   1. User grabs a diary-item row (draggable={_wideViewport})
+  //   2. dragstart stores the entry-level item index in
+  //      application/x-nt-diary-item-idx
+  //   3. Every meal-group accepts the drop; dragover paints an accent
+  //      ring via _itemDropTarget
+  //   4. drop calls updateDiaryItem(idx, { meal: targetMealIdx }) —
+  //      no confirmation, this is a same-day cheap move
+  let _dragItemIdx    = -1;
+  let _itemDropTarget = -1;
+  function _onItemDragStart(e, itemIdx) {
+    if (!e.dataTransfer) return;
+    _dragItemIdx = itemIdx;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('application/x-nt-diary-item-idx', String(itemIdx));
+    e.dataTransfer.setData('text/plain', `item:${itemIdx}`);
+    e.stopPropagation();
+  }
+  function _onItemDragEnd() {
+    _dragItemIdx    = -1;
+    _itemDropTarget = -1;
+  }
+  function _onMealItemDragOver(e, mealIdx) {
+    if (!e.dataTransfer) return;
+    // Only paint / accept when an item is being dragged, not a whole meal
+    if (!e.dataTransfer.types.includes('application/x-nt-diary-item-idx')) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    _itemDropTarget = mealIdx;
+  }
+  function _onMealItemDragLeave(mealIdx) {
+    if (_itemDropTarget === mealIdx) _itemDropTarget = -1;
+  }
+  async function _onMealItemDrop(e, targetMealIdx) {
+    if (!e.dataTransfer) return;
+    const raw = e.dataTransfer.getData('application/x-nt-diary-item-idx');
+    _itemDropTarget = -1;
+    if (raw === '' || raw == null) return;
+    const idx = Number(raw);
+    if (!Number.isInteger(idx) || idx < 0) return;
+    e.preventDefault();
+    // No-op if the item is already in the target meal
+    let entry = null;
+    currentEntry.subscribe(v => entry = v)();
+    const item = entry?.items?.[idx];
+    if (!item) return;
+    if (Number(item.meal ?? 0) === Number(targetMealIdx)) return;
+    await updateDiaryItem(idx, { meal: Number(targetMealIdx) });
+  }
   function _onDropMealOnWeekDay(targetIso, mealIdx) {
     if (mealIdx == null || mealIdx < 0) return;
     if (targetIso === $currentDate) {
@@ -1404,12 +1458,16 @@
         class="meal-group card"
         class:empty={isEmpty}
         class:dragging={_dragMealIdx === mealIdx}
+        class:item-drop-target={_itemDropTarget === mealIdx}
         id="meal-{mealIdx}"
         style="order:{mealIdx}"
         in:fly={{ y: 18, duration: _isInitialMount && !$disableAnimations ? 280 : 0, delay: _isInitialMount && !$disableAnimations ? 60 + mealIdx * 55 : 0 }}
         draggable={!isEmpty && _wideViewport}
         on:dragstart={(e) => _onMealDragStart(e, mealIdx)}
         on:dragend={_onMealDragEnd}
+        on:dragover={(e) => _onMealItemDragOver(e, mealIdx)}
+        on:dragleave={() => _onMealItemDragLeave(mealIdx)}
+        on:drop={(e) => _onMealItemDrop(e, mealIdx)}
       >
         <div class="meal-header" style="--meal-color:{mealColor(mealIdx)}">
           <span class="meal-type-icon material-symbols-rounded">{mealIcon(meal)}</span>
@@ -1449,6 +1507,10 @@
               {@const _itemEnergy = Nutrition.displayEnergy(formatKcal(item), $energyUnit)}
               <div class="diary-item" in:fly={{ y: 6, duration: _isInitialMount && !$disableAnimations ? 180 : 0 }}
                 class:item-selected={selectMode && selectedItems.has(item._i)}
+                class:item-dragging={_dragItemIdx === item._i}
+                draggable={_wideViewport && !selectMode}
+                on:dragstart={(e) => _onItemDragStart(e, item._i)}
+                on:dragend={_onItemDragEnd}
                 on:touchstart|passive={e => onItemTouchStart(e, item)}
                 on:touchmove|passive={onItemTouchMove}
                 on:touchend={onItemTouchEnd}
@@ -2830,6 +2892,14 @@
       transform: scale(0.985);
       transition: opacity 120ms ease, transform 120ms ease;
     }
+    /* Batch 5: item-drop target ring. When the user drags a food
+       item over a different meal, that meal card gets an accent
+       outline + tint so the drop zone is obvious. */
+    .meal-col > .meal-group.item-drop-target {
+      outline: 2px dashed var(--accent);
+      outline-offset: -2px;
+      background: color-mix(in srgb, var(--accent) 6%, var(--surface-1));
+    }
     /* Polish: hover elevation on desktop with hover-capable input.
        Subtle 2px lift + slightly stronger shadow signals card is
        interactive without being noisy. Skipped on touch (:hover fires
@@ -3238,6 +3308,11 @@
     -webkit-touch-callout: none;
   }
   .diary-item:last-child { border-bottom: none; }
+  /* Batch 5: item-level drag affordance. Grab cursor on desktop
+     where drag is wired; dim the row while it's the source. */
+  .diary-item[draggable="true"] { cursor: grab; }
+  .diary-item[draggable="true"]:active { cursor: grabbing; }
+  .diary-item.item-dragging { opacity: 0.4; }
   .diary-item:active { background: var(--surface-2); }
   .diary-item.item-selected { background: var(--accent-dim); }
 
