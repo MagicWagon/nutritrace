@@ -2,18 +2,30 @@
   /**
    * Diary → right column → Nutrient Detail widget.
    *
-   * Replaces the current bottom-bar-expanded nutrient list (fiber /
-   * sodium / sugar / vitamins / minerals) with an inline always-visible
-   * card in the right rail. Same data shape (nutritionBarItems from
-   * Diary.svelte), same colors, respects the `remaining` / `eaten`
-   * mode toggle.
+   * Complements Day Summary rather than duplicating it. Day Summary
+   * already handles calories + P/C/F (with the macro ring + hero
+   * number + gram rows). This widget shows the OTHER nutrients the
+   * user has enabled in Settings → Nutrients: fiber, sodium, sat fat,
+   * cholesterol, sugars, and any vitamins / minerals they track.
    *
-   * Hidden entirely when the user has turned off "Show Nutrient Bar"
-   * in Settings → Diary (matches diaryShowNutritionBar behavior).
+   * The primary macros are filtered out here so the widget always
+   * adds information rather than repeating it. If a user only tracks
+   * the basic macros, the widget hides entirely (nothing extra to show).
+   * Also hidden when Settings → Diary → Show Nutrient Bar is off.
    */
   export let items       = [];    // [{id, label, cur, rem, tgt, pct, over, unit}]
   export let mode        = 'remaining';   // 'remaining' | 'eaten'
   export let showUnits   = true;
+
+  // Nutrients already shown by Day Summary (its ring, hero kcal, and
+  // colored macro rows). Filtered out here so this widget is purely
+  // additive detail — saves rail space and prevents the "wait, isn't
+  // that already up there?" reaction.
+  const DAY_SUMMARY_KEYS = new Set([
+    'calories', 'kilojoules',
+    'protein', 'carbohydrates', 'fat',
+  ]);
+  $: extraItems = items.filter(nb => !DAY_SUMMARY_KEYS.has(nb.id));
 
   function nutrientBarColor(id) {
     if (id === 'fat' || id === 'saturated-fat') return 'var(--macro-fat)';
@@ -23,15 +35,15 @@
   }
 </script>
 
-{#if items.length > 0}
+{#if extraItems.length > 0}
   <section class="nutrient-widget card">
     <header class="nw-header">
       <span class="material-symbols-rounded nw-icon">monitoring</span>
-      <span class="nw-title">Nutrients</span>
+      <span class="nw-title">Other nutrients</span>
     </header>
 
     <div class="nw-list">
-      {#each items as nb (nb.id)}
+      {#each extraItems as nb (nb.id)}
         <div class="nw-row" class:nw-over={nb.over}>
           <span class="nw-label">{nb.label}</span>
           <div class="nw-bar-track">
