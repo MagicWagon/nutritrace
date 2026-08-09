@@ -1627,15 +1627,9 @@
         carbs={$_carbTween}
         fat={$_fatTween}
         goalKcal={caloriesGoalAdjusted}
-        baseGoalKcal={caloriesGoal}
-        activeKcal={_effectiveActive}
         proteinGoal={protGoal}
         carbGoal={carbGoal}
         fatGoal={fatGoal}
-        energyUnit={$energyUnit}
-        calorieGoalMode={$calorieGoalMode}
-        mode={_totalsMode}
-        onToggleMode={() => _totalsMode = _totalsMode === 'remaining' ? 'eaten' : 'remaining'}
         onOpenSummary={() => diaryShowNutritionSummary.set(true)}
       />
       {#if _waterShowInDiary}
