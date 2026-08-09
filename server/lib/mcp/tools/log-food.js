@@ -32,8 +32,11 @@ export function registerLogFood(server, { userId }) {
         food_id:  z.number().int().positive(),
         date:     z.string().regex(DATE_RE, 'YYYY-MM-DD').optional(),
         meal:     z.number().int().min(0).max(9).optional(),
-        quantity: z.number().positive().optional(),
-        portion:  z.number().positive().optional(),
+        // quantity capped at 999 servings so an agent that confuses
+        // 'grams' with 'quantity' can't poison daily totals with 500×
+        // multipliers. Real logs are 0.25-10 servings.
+        quantity: z.number().positive().max(999).optional(),
+        portion:  z.number().positive().max(10000).optional(),
         unit:     z.string().max(20).optional(),
         notes:    z.string().max(500).optional(),
       },

@@ -58,16 +58,19 @@ export function registerLogWater(server, { userId }) {
       // narrow-no-break-space AM/PM even for a 12h user. Formatting
       // manually keeps every MCP-logged entry consistent with the
       // client-produced strings ('9:15 AM' / '21:15').
-      const isToday = day === todayLocal();
-      const tfRow = db.prepare(
-        `SELECT value FROM user_settings
-          WHERE user_id = ? AND key = 'timeFormat' AND deleted_at IS NULL`
-      ).get(userId);
-      const use24 = safeJson(tfRow?.value, '12h') === '24h';
-      const log = {
-        amount: Math.round(amount_ml),
-        time: time || (isToday ? _formatTime(new Date(), use24) : (use24 ? '12:00' : '12:00 PM')),
-      };
+      // Look up the timeFormat setting lazily — only when we need to
+      // synthesise a default. Every explicit-time call skips the query.
+      let logTime = time;
+      if (!logTime) {
+        const isToday = day === todayLocal();
+        const tfRow = db.prepare(
+          `SELECT value FROM user_settings
+            WHERE user_id = ? AND key = 'timeFormat' AND deleted_at IS NULL`
+        ).get(userId);
+        const use24 = safeJson(tfRow?.value, '12h') === '24h';
+        logTime = isToday ? _formatTime(new Date(), use24) : (use24 ? '12:00' : '12:00 PM');
+      }
+      const log = { amount: Math.round(amount_ml), time: logTime };
 
       let next;
       try {

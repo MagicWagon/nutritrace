@@ -12,7 +12,8 @@
  * row editor's job).
  */
 import { z } from 'zod';
-import { DATE_RE, todayLocal, toolResult, toolError } from '../_util.js';
+import db from '../../../db.js';
+import { DATE_RE, safeJson, todayLocal, toolResult, toolError } from '../_util.js';
 import { mutateDiaryDay, DiaryTombstonedError } from '../_diary-write.js';
 
 export function registerEditDiaryEntry(server, { userId }) {
@@ -82,6 +83,37 @@ export function registerEditDiaryEntry(server, { userId }) {
                 're-log with the desired portion.'
               );
             }
+            // Refuse portion patch when the source food has alt_units
+            // defined — client-side portion math is nonlinear for those
+            // (issues #69/#70) and a pure numeric rescale would silently
+            // disagree with UI-produced values. Same guard log_food uses.
+            if (typeof original.food_server_id === 'number') {
+              const foodRow = db.prepare(
+                `SELECT alt_units FROM foods WHERE user_id = ? AND id = ? AND deleted_at IS NULL`
+              ).get(userId, original.food_server_id);
+              const parsedAlt = foodRow?.alt_units ? safeJson(foodRow.alt_units, null) : null;
+              if (Array.isArray(parsedAlt) && parsedAlt.length > 0) {
+                throw new RangeError(
+                  "Source food has alt_units defined (non-linear per-unit conversions); " +
+                  "portion patch can't be scaled correctly here. Delete + re-log via the " +
+                  "app to pick a different alt-unit portion."
+                );
+              }
+            }
+            // Nested `nutrition:{}` is the modern shape; legacy items
+            // stored their nutriments as flat top-level fields (calories,
+            // protein, ...). Refuse portion patch on legacy flat items —
+            // scaling only the (empty) nested object would leave the flat
+            // fields untouched and daily totals wrong.
+            const rawNutrition = original.nutrition && typeof original.nutrition === 'object'
+              ? original.nutrition
+              : null;
+            if (!rawNutrition || Object.keys(rawNutrition).length === 0) {
+              throw new RangeError(
+                'Entry has no nested nutrition object (legacy flat-fields shape). ' +
+                'Portion patch is unsafe here — delete + re-log to update the portion.'
+              );
+            }
             const oldPortion = Number(original.portion) || null;
             if (!oldPortion) {
               throw new RangeError(
@@ -91,9 +123,6 @@ export function registerEditDiaryEntry(server, { userId }) {
             }
             const factor = patch.portion / oldPortion;
             merged.portion = patch.portion;
-            const rawNutrition = original.nutrition && typeof original.nutrition === 'object'
-              ? original.nutrition
-              : {};
             merged.nutrition = Object.fromEntries(
               Object.entries(rawNutrition).map(([k, v]) =>
                 [k, typeof v === 'number' ? Math.round(v * factor * 100) / 100 : v]

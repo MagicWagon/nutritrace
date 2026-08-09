@@ -68,14 +68,18 @@ export function registerCreateFood(server, { userId }) {
       if (!cleanName) return toolError('name is required and cannot be blank.');
 
       // Filter nutrition to known keys with finite values. Silent drop
-      // rather than reject-the-whole-call so partial data still lands
-      // — but report what was dropped so the agent can retry.
+      // rather than reject-the-whole-call so partial data still lands,
+      // but report what was dropped so the agent can retry. Per-value
+      // sanity cap catches hallucinated 1e12 values before they poison
+      // the catalog (real per-portion nutriments are all under 10000).
+      const MAX_NUT_VALUE = 100000;
       const clean = {};
       const rejected = [];
       for (const [k, v] of Object.entries(nutrition || {})) {
-        if (!NUTRIMENT_KEYS.has(k)) { rejected.push(`${k} (unknown key)`); continue; }
-        if (!Number.isFinite(v))    { rejected.push(`${k} (not a number)`); continue; }
-        if (v < 0)                  { rejected.push(`${k} (negative)`); continue; }
+        if (!NUTRIMENT_KEYS.has(k))  { rejected.push(`${k} (unknown key)`); continue; }
+        if (!Number.isFinite(v))     { rejected.push(`${k} (not a number)`); continue; }
+        if (v < 0)                   { rejected.push(`${k} (negative)`); continue; }
+        if (v > MAX_NUT_VALUE)       { rejected.push(`${k} (${v} exceeds ${MAX_NUT_VALUE} cap)`); continue; }
         clean[k] = Math.round(v * 100) / 100;
       }
       if (Object.keys(clean).length === 0) {
