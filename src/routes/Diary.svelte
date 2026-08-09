@@ -2535,7 +2535,7 @@
        wide so the diary doesn't have a huge empty gap under the last
        meal / notes card. !important because inline style otherwise wins. */
     .diary-content { padding-bottom: 24px !important; }
-  }
+
     /* Match the date-bar internal padding to align its buttons with the
        centered content column below (rather than capping the whole bar,
        which would break the full-viewport glass blur + border). */
