@@ -2493,11 +2493,12 @@
       display: flex;
       flex-direction: column;
       gap: 12px;
-      position: sticky;
-      top: calc(var(--page-top, var(--safe-top)) + 120px + var(--hamburger-row, 0px));
-      max-height: calc(100vh - var(--page-top, var(--safe-top)) - 140px);
-      overflow-y: auto;
-      padding-right: 4px;   /* room for scrollbar without cropping */
+      /* Rail flows with the page: no sticky, no max-height cap. Grid's
+         align-items: start on .diary-content keeps this column top-aligned
+         even when the meals column is taller. This prevents widgets from
+         being clipped by an artificial height cap (see Phase 3 feedback).
+         If we later want Day Summary specifically to stay pinned while
+         scrolling meals, add position: sticky to that widget only. */
     }
     /* Match the date-bar internal padding to align its buttons with the
        centered content column below (rather than capping the whole bar,
