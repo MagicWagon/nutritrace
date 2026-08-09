@@ -25,8 +25,36 @@
   export let calorieGoal     = 2000;
   export let refreshKey      = 0;      // bump to force reload from parent
   export let onSelectDate    = (_iso) => {};
+  export let onDropMeal      = (_iso, _mealIdx) => {};   // Phase 7 drag-copy
 
-  const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+  // Drag/drop state — highlight the day currently being hovered
+  let dragOverIso = null;
+  function _isMealDrag(e) {
+    return e.dataTransfer?.types?.includes?.('application/x-nt-meal-idx');
+  }
+  function _onDayDragOver(e, iso) {
+    if (!_isMealDrag(e) || iso === currentDate) return;   // block same-day self-drop
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    dragOverIso = iso;
+  }
+  function _onDayDragLeave(iso) {
+    if (dragOverIso === iso) dragOverIso = null;
+  }
+  function _onDayDrop(e, iso) {
+    if (!_isMealDrag(e)) return;
+    e.preventDefault();
+    const raw = e.dataTransfer.getData('application/x-nt-meal-idx');
+    const mealIdx = parseInt(raw, 10);
+    dragOverIso = null;
+    if (Number.isFinite(mealIdx) && iso !== currentDate) {
+      onDropMeal(iso, mealIdx);
+    }
+  }
+
+  // Full weekday names — desktop has plenty of room. If a narrower
+  // rail size is ever added, swap this to a short/abbreviated set.
+  const DOW = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
   let byDate = new Map();   // iso → { kcal, protein, carbs, fat, water_ml, items }
   let loading = true;
@@ -107,9 +135,13 @@
       class:selected={day.isSelected}
       class:today={day.isToday}
       class:no-data={!day.hasData}
+      class:drag-over={dragOverIso === day.iso}
       on:click={() => onSelectDate(day.iso)}
       on:mouseenter={() => hoveredIso = day.iso}
       on:mouseleave={() => { if (hoveredIso === day.iso) hoveredIso = null; }}
+      on:dragover={(e) => _onDayDragOver(e, day.iso)}
+      on:dragleave={() => _onDayDragLeave(day.iso)}
+      on:drop={(e) => _onDayDrop(e, day.iso)}
       title="Switch diary to {day.iso}"
     >
       <span class="ws-dow">{day.dow}</span>
@@ -184,12 +216,23 @@
   }
   .ws-day.no-data { opacity: 0.6; }
 
+  /* Drag-over highlight while a meal card is dragged from Diary */
+  .ws-day.drag-over {
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+    border-color: var(--accent);
+    outline: 2px dashed var(--accent);
+    outline-offset: -2px;
+    transform: translateY(-1px);
+    transition: transform 100ms ease-out, background 100ms ease, border-color 100ms ease;
+  }
+
   .ws-dow {
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 700;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
     color: var(--text-3);
+    white-space: nowrap;
   }
   .ws-dnum {
     font-size: 14px;

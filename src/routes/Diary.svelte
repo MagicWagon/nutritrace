@@ -433,6 +433,45 @@
   // so the strip's cached daily totals reload. Tied to currentEntry
   // subscription below (each new entry increments the key once).
   let _weekStripRefreshKey = 0;
+
+  // Phase 7: drag-to-copy meals across the week strip.
+  //   1. User grabs a populated meal card (draggable={!isEmpty && today})
+  //   2. WeekStrip cells accept the drop and fire onDropMeal(iso, mealIdx)
+  //   3. Diary calls copyMealToDate(sourceMealIdx, targetIso, sourceMealIdx)
+  //      — same meal slot preserved on the target day
+  // Only allowed when viewing today's diary because copyMealToDate reads
+  // items from the currently-viewed date.
+  let _dragMealIdx = -1;
+  function _onMealDragStart(e, mealIdx) {
+    if (!e.dataTransfer) return;
+    _dragMealIdx = mealIdx;
+    e.dataTransfer.effectAllowed = 'copy';
+    e.dataTransfer.setData('application/x-nt-meal-idx', String(mealIdx));
+    // Some browsers need this fallback for cross-element drags
+    e.dataTransfer.setData('text/plain', `meal:${mealIdx}`);
+  }
+  function _onMealDragEnd() {
+    _dragMealIdx = -1;
+  }
+  async function _onDropMealOnWeekDay(targetIso, mealIdx) {
+    if (mealIdx == null || mealIdx < 0) return;
+    if (targetIso === $currentDate) {
+      showInfo("Can't copy a meal onto the same day.");
+      return;
+    }
+    try {
+      const n = await copyMealToDate(mealIdx, targetIso, mealIdx);
+      if (n > 0) {
+        const label = meals[mealIdx] || `meal ${mealIdx + 1}`;
+        showSuccess(`Copied ${n} item${n === 1 ? '' : 's'} from ${label} to ${targetIso}.`);
+        _weekStripRefreshKey = _weekStripRefreshKey + 1;
+      } else {
+        showInfo('Nothing to copy — that meal is empty.');
+      }
+    } catch (err) {
+      showError(err?.message || 'Copy failed.');
+    }
+  }
   $: if (_prevCalPct !== null && $goalCelebrations && !$disableAnimations && calPct >= 100 && _prevCalPct < 100) {
     _calGoalCelebrating = true;
     setTimeout(() => { _calGoalCelebrating = false; }, 1200);
@@ -1266,6 +1305,7 @@
       calorieGoal={caloriesGoalAdjusted}
       refreshKey={_weekStripRefreshKey}
       onSelectDate={(iso) => loadEntry(iso)}
+      onDropMeal={_onDropMealOnWeekDay}
     />
   </div>
 
@@ -1292,7 +1332,16 @@
          stack (unchanged from pre-Phase-5). -->
     <div class="meal-grid">
     {#each mealLayout as { meal, mealIdx, items, isEmpty } (mealIdx)}
-      <section class="meal-group card" class:empty={isEmpty} id="meal-{mealIdx}" in:fly={{ y: 18, duration: _isInitialMount && !$disableAnimations ? 280 : 0, delay: _isInitialMount && !$disableAnimations ? 60 + mealIdx * 55 : 0 }}>
+      <section
+        class="meal-group card"
+        class:empty={isEmpty}
+        class:dragging={_dragMealIdx === mealIdx}
+        id="meal-{mealIdx}"
+        in:fly={{ y: 18, duration: _isInitialMount && !$disableAnimations ? 280 : 0, delay: _isInitialMount && !$disableAnimations ? 60 + mealIdx * 55 : 0 }}
+        draggable={!isEmpty && $currentDate === localDateStr()}
+        on:dragstart={(e) => _onMealDragStart(e, mealIdx)}
+        on:dragend={_onMealDragEnd}
+      >
         <div class="meal-header" style="--meal-color:{mealColor(mealIdx)}">
           <span class="meal-type-icon material-symbols-rounded">{mealIcon(meal)}</span>
           <span class="meal-name">{meal}</span>
@@ -2629,6 +2678,17 @@
        on a desktop where multiple cards sit next to each other. */
     .meal-grid > .meal-group {
       box-shadow: 0 1px 3px -1px rgba(0,0,0,0.08);
+    }
+    /* Phase 7: grab-cursor + subtle lift while dragging so users see
+       the card as pickable. Only populated meals on today are actually
+       draggable (see draggable attr binding); empty/past cards get no
+       hover cue. */
+    .meal-grid > .meal-group[draggable="true"] { cursor: grab; }
+    .meal-grid > .meal-group[draggable="true"]:active { cursor: grabbing; }
+    .meal-grid > .meal-group.dragging {
+      opacity: 0.55;
+      transform: scale(0.985);
+      transition: opacity 120ms ease, transform 120ms ease;
     }
     :global([data-theme="dark"]) .meal-grid > .meal-group,
     :global(:root:not([data-theme="light"])) .meal-grid > .meal-group {
