@@ -92,8 +92,27 @@
     // banner both sit outside <main>. Dialogs, sheets, sidebars and bottom
     // navigation retain their own touch handling.
     if (event.target.closest?.('[role="dialog"], .sheet-backdrop, .sidebar-panel, .sidebar-backdrop, .bottom-nav')) return;
-    const pageScroller = document.querySelector('.page-transition');
-    if (event.touches.length !== 1 || (pageScroller?.scrollTop || 0) > 0) return;
+    if (event.touches.length !== 1) return;
+    // Walk up from the touch target to the nearest scrolling ancestor.
+    // Editor pages have their own overflow container that sits on top of
+    // .page-transition (position: fixed + overflow-y: auto) so its
+    // scrollTop climbs while .page-transition stays at 0 — this walk-up
+    // catches whichever container is actually scrolling.
+    let el = event.target;
+    let foundScroller = false;
+    while (el && el !== document.body) {
+      const s = getComputedStyle(el);
+      if ((s.overflowY === 'auto' || s.overflowY === 'scroll') && el.scrollHeight > el.clientHeight) {
+        if (el.scrollTop > 0) return;
+        foundScroller = true;
+        break;
+      }
+      el = el.parentElement;
+    }
+    if (!foundScroller) {
+      const rootScroll = window.scrollY || document.scrollingElement?.scrollTop || 0;
+      if (rootScroll > 0) return;
+    }
     _pullStartX = event.touches[0].clientX;
     _pullStartY = event.touches[0].clientY;
     _pullDistance = 0;
