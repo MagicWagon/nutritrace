@@ -748,23 +748,24 @@
     diaryTotalsMode.set(next);
   }
 
-  // ── Meal grid layout (Phase 5 desktop redesign) ─────────────────────────
-  // At ≥1280px, meals render in a 2-col grid. Meals with a lot of items
-  // (>= LARGE_MEAL_THRESHOLD) span both columns so they don't awkwardly
-  // stretch a small partner card via row alignment; align-items:start on
-  // the grid handles size differences between paired cards. A meal that
-  // would otherwise be alone in a row (odd count, or preceded by a
-  // wide-span) auto-expands to full width when it has enough items to
-  // fill it comfortably, so we never render a lonely small card next
-  // to empty space.
-  // Meal layout for the 2-col grid (≥1280px). Simple: every meal is a
-  // grid cell at its natural width. Empty meals get a `.compact` class
-  // so they render as a single-line header chip instead of a full card
-  // with a big "Tap to add food" area — packs the space efficiently
-  // without any wide-span trickery. Cards use align-items:start so a
-  // 2-item snack doesn't get stretched next to a 6-item breakfast; the
-  // resulting vertical gap is the price of honesty and small enough to
-  // feel intentional now that empty meals aren't padding it out.
+  // ── Meal layout (Phase 5 desktop redesign) ─────────────────────────────
+  // At ≥1280px, meals render as TWO independent flex-columns instead of
+  // a row-aligned 2-col grid. Each column stacks its own cards top-to-
+  // bottom with no cross-column row alignment — so a tall breakfast in
+  // the left column doesn't force a gap next to a short snack 1 in the
+  // right column. Reading pattern becomes "down the left, then down
+  // the right," same as newspapers / dashboards / macOS System Settings.
+  //
+  // Split is by index parity (even → left, odd → right) so cards stay
+  // in fixed positions across every data change. Adding items to Lunch
+  // never causes another meal to jump columns; only the affected card
+  // grows in place. For alternating meal/snack configs the split lands
+  // as "main meals column + snacks column," which is semantically
+  // clean; for non-alternating configs the split is arbitrary but
+  // stable and the height mismatches are smaller so it degrades fine.
+  //
+  // Below 1280px the split is CSS-collapsed into a single column
+  // stack via the .meal-cols container (see the media query).
   $: mealLayout = meals.map((meal, mealIdx) => {
     const items = getMealItems(entry?.items || [], mealIdx);
     return {
@@ -773,6 +774,8 @@
       isEmpty:   items.length === 0,
     };
   });
+  $: mealsLeft  = mealLayout.filter(m => m.mealIdx % 2 === 0);
+  $: mealsRight = mealLayout.filter(m => m.mealIdx % 2 === 1);
 
   // Nutrition bar: visible NUTRIMENTS that have goals set
   $: nutritionBarItems = (() => {
@@ -1324,18 +1327,27 @@
     {#if $fastingEnabled}
       <FastingWidget />
     {/if}
-    <!-- Meal groups. Wrapped in .meal-grid so at ≥1280px they lay out as
-         a 2-col grid; empty meals collapse to compact header-only chips
-         so the grid stays visually balanced without wide-span logic.
-         Below that breakpoint .meal-grid collapses to a plain flex-column
-         stack (unchanged from pre-Phase-5). -->
-    <div class="meal-grid">
-    {#each mealLayout as { meal, mealIdx, items, isEmpty } (mealIdx)}
+    <!-- Meal groups. Rendered via a Svelte 5 snippet `mealCard` so we
+         can consume it twice below — once per column (mealsLeft +
+         mealsRight) — without duplicating ~230 lines of card markup.
+         At ≥1280px .meal-cols becomes a 2-col grid where each column
+         is an independent flex-column, so a tall breakfast in the
+         left column doesn't force a gap next to a shorter card in
+         the right column (each column packs tightly). Below 1280px
+         the columns' children flatten into a single flex-column and
+         are re-ordered by `style="order:{mealIdx}"` to preserve
+         temporal reading order (Breakfast, Snack 1, Lunch, ...). -->
+    {#snippet mealCard(m)}
+      {@const meal    = m.meal}
+      {@const mealIdx = m.mealIdx}
+      {@const items   = m.items}
+      {@const isEmpty = m.isEmpty}
       <section
         class="meal-group card"
         class:empty={isEmpty}
         class:dragging={_dragMealIdx === mealIdx}
         id="meal-{mealIdx}"
+        style="order:{mealIdx}"
         in:fly={{ y: 18, duration: _isInitialMount && !$disableAnimations ? 280 : 0, delay: _isInitialMount && !$disableAnimations ? 60 + mealIdx * 55 : 0 }}
         draggable={!isEmpty}
         on:dragstart={(e) => _onMealDragStart(e, mealIdx)}
@@ -1558,8 +1570,20 @@
           {/if}
         {/if}
       </section>
-    {/each}
-    </div><!-- /.meal-grid -->
+    {/snippet}
+
+    <div class="meal-cols">
+      <div class="meal-col">
+        {#each mealsLeft as m (m.mealIdx)}
+          {@render mealCard(m)}
+        {/each}
+      </div>
+      <div class="meal-col">
+        {#each mealsRight as m (m.mealIdx)}
+          {@render mealCard(m)}
+        {/each}
+      </div>
+    </div>
 
     {#if $diaryShowActivity}
       {@const acts = $dayActivity || []}
@@ -2605,13 +2629,23 @@
     gap: 12px;
     min-width: 0;   /* prevents grid children from overflowing on long text */
   }
-  /* Meal grid: below 1280px, plain flex-column (parity with pre-Phase 5).
-     At ≥1280px, promoted to a 2-col dense grid with wide-span rules. */
-  .meal-grid {
+  /* Meal columns.
+     Below 1280px: .meal-cols is a plain flex-column; .meal-col children
+     use display:contents so all meal cards become direct flex children
+     of .meal-cols and re-order via inline `order:{mealIdx}` back into
+     temporal order (Breakfast → Snack 1 → Lunch → ...).
+     At ≥1280px (see media query below): .meal-cols becomes a 2-col
+     grid and each .meal-col is a real independent flex-column, so
+     cards in the right column pack tightly against each other and
+     don't inherit a gap from the left column's taller cards. */
+  .meal-cols {
     display: flex;
     flex-direction: column;
     gap: 12px;
     min-width: 0;
+  }
+  .meal-col {
+    display: contents;
   }
   .diary-right-col { display: none; }
 
@@ -2638,59 +2672,66 @@
          scrolling meals, add position: sticky to that widget only. */
     }
 
-    /* Phase 5: meals lay out as a 2-col grid.
-         - align-items:start so a 2-item snack next to a 6-item breakfast
-           doesn't get stretched (the vertical gap that creates is the
-           price of honesty, minimised by the compact-empty style below)
-         - empty meals render as single-line header chips so they don't
-           waste space with a big "Tap to add food" area; the gaps that
-           result are small and rhythmic instead of large and lonely
-         - no wide-span logic; every meal is a natural-width grid cell */
-    .meal-grid {
+    /* Two independent flex-columns. Each meal-col packs its own cards
+       top-to-bottom; no cross-column row alignment. A tall breakfast
+       in the left column no longer leaves a gap next to a shorter
+       card in the right column — the right column just keeps stacking.
+       Split is by index parity (even → left, odd → right); for
+       alternating meal/snack configs this cleanly separates main
+       meals into one column and snacks into the other. Card positions
+       stay fixed under data changes (no auto-balance shuffle). */
+    .meal-cols {
       display: grid;
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       column-gap: 12px;
-      row-gap: 12px;
       align-items: start;
     }
+    .meal-col {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-width: 0;
+    }
+    /* The inline `order:{mealIdx}` on each meal-group is only
+       load-bearing on mobile where .meal-col is display:contents and
+       cards flatten into .meal-cols; here at desktop the cards live
+       in their real column containers so `order` is a no-op. */
+
     /* Compact empty-meal chip — header row only, no body / macro footer,
        hover subtly signals it's clickable. On mobile / narrow this whole
        rule is skipped so the standard "big Tap to add food" empty state
        still renders below 1280px (touch users want the bigger target). */
-    .meal-grid > .meal-group.empty {
+    .meal-col > .meal-group.empty {
       transition: background 160ms ease, border-color 160ms ease;
     }
-    .meal-grid > .meal-group.empty :global(.meal-empty) {
+    .meal-col > .meal-group.empty :global(.meal-empty) {
       padding: 6px 12px;
       opacity: 0.7;
     }
-    .meal-grid > .meal-group.empty :global(.meal-empty-icon) {
+    .meal-col > .meal-group.empty :global(.meal-empty-icon) {
       font-size: 16px;
     }
-    .meal-grid > .meal-group.empty:hover {
+    .meal-col > .meal-group.empty:hover {
       border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
     }
-    .meal-grid > .meal-group.empty:hover :global(.meal-empty) {
+    .meal-col > .meal-group.empty:hover :global(.meal-empty) {
       opacity: 1;
     }
     /* Soften card shadows a touch at wide viewports — feels less boxy
        on a desktop where multiple cards sit next to each other. */
-    .meal-grid > .meal-group {
+    .meal-col > .meal-group {
       box-shadow: 0 1px 3px -1px rgba(0,0,0,0.08);
     }
-    /* Phase 7: grab-cursor + subtle lift while dragging so users see
-       the card as pickable. Only populated meals on today are actually
-       draggable (see draggable attr binding); empty/past cards get no
-       hover cue. */
-    .meal-grid > .meal-group[draggable="true"] { cursor: grab; }
-    .meal-grid > .meal-group[draggable="true"]:active { cursor: grabbing; }
-    .meal-grid > .meal-group.dragging {
+    /* Phase 7: grab-cursor + subtle lift while dragging. */
+    .meal-col > .meal-group[draggable="true"] { cursor: grab; }
+    .meal-col > .meal-group[draggable="true"]:active { cursor: grabbing; }
+    .meal-col > .meal-group.dragging {
       opacity: 0.55;
       transform: scale(0.985);
       transition: opacity 120ms ease, transform 120ms ease;
     }
-    :global([data-theme="dark"]) .meal-grid > .meal-group,
-    :global(:root:not([data-theme="light"])) .meal-grid > .meal-group {
+    :global([data-theme="dark"]) .meal-col > .meal-group,
+    :global(:root:not([data-theme="light"])) .meal-col > .meal-group {
       box-shadow: 0 4px 14px -8px rgba(0,0,0,0.55);
     }
 
