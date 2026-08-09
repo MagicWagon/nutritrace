@@ -13,6 +13,7 @@
   import { onMount, tick } from 'svelte';
   import { push, querystring } from 'svelte-spa-router';
   import { _ } from 'svelte-i18n';
+  import { slide } from 'svelte/transition';
 
   import { currentUser, userMgmtActive } from '../stores/auth.js';
   import { isNative, getServerUrl, resolveAssetUrl, apiUrl, getAuthToken } from '../lib/platform.js';
@@ -97,14 +98,19 @@
   }
 
   // Desktop welcome-hero: profile is expandable inline instead of
-  // routing away. Chevron rotates to indicate expand/collapse.
-  // Default expanded so the welcome pane is immediately useful
-  // (replaces the old "Pick a section" prompt). Mobile hero still
-  // routes to /profile — no rail context to preserve there.
+  // routing away. Chevron rotates + body slides in/out. Default
+  // expanded so the welcome pane is immediately useful (replaces
+  // the old "Pick a section" prompt). Mobile hero still routes to
+  // /profile — no rail context to preserve there.
   let _profileHeroExpanded = true;
   function _toggleProfileHero() {
     _profileHeroExpanded = !_profileHeroExpanded;
   }
+  // When the user navigates to /settings/profile from the rail
+  // (from any other section), auto-expand so the profile editor is
+  // visible on land — matches the welcome-hero-view behavior, so
+  // "Profile from rail" and "Profile as landing" look identical.
+  $: if (currentSection === 'profile') _profileHeroExpanded = true;
 
   // Section metadata — slug → title i18n key + icon. Used by the sub-page
   // header to show the section name.
@@ -558,11 +564,22 @@
              * no currentSection + desktop → welcome hero (profile
                card + short "pick a section" prompt) -->
       <div class="settings-pane">
-        {#if currentSection}
+        {#if currentSection && currentSection !== 'profile'}
           <svelte:component this={SECTION_COMPONENTS[currentSection]} />
         {:else}
-          <!-- Mobile index: profile hero + full section list -->
+          <!-- No section OR /settings/profile: both render the same
+               welcome-hero view (profile card + expanded editor).
+               When arriving via rail's Profile item, the auto-expand
+               reactive above forces the hero open so the layout is
+               identical to landing at /settings. -->
+          <!-- Mobile index: profile hero + full section list. When
+               currentSection === 'profile', mobile drills straight
+               into the Profile editor (no hero + list — that would
+               be a wasted extra tap on phone). -->
           <div class="settings-mobile-index">
+          {#if currentSection === 'profile'}
+            <Profile />
+          {:else}
 {#if sectionVisible(settingsQuery, 'profile')}
       {@const _u = $currentUser || {}}
       {@const _nick = (_u.nickname || '').trim()}
@@ -594,6 +611,7 @@
 
             {@render sectionButtons()}
             <div style="height:24px"></div>
+          {/if}
           </div>
 
           <!-- Desktop hero: profile card + prompt. Left rail already
@@ -635,10 +653,12 @@
             {#if _profileHeroExpanded}
               <!-- Profile editor rendered inline inside the welcome
                    pane. Uses the same <Profile /> component that
-                   routes to /settings/profile from the rail, but
-                   embedded here directly so users don't have to
-                   navigate anywhere to edit their info. -->
-              <div class="profile-hero-body">
+                   the rail's Profile section renders, but embedded
+                   directly so users don't have to navigate to edit
+                   their info. slide transition gives the accordion
+                   the drop-down feel the user asked for. -->
+              <div class="profile-hero-body"
+                transition:slide={{ duration: 220 }}>
                 <Profile />
               </div>
             {/if}
