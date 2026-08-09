@@ -2401,6 +2401,30 @@
 
   .diary-content { padding-top: 12px; padding-bottom: 16px; gap: 12px; display: flex; flex-direction: column; }
 
+  /* Desktop redesign — Phase 1: content max-width cap.
+     On wide viewports the diary content column is centered and capped so
+     line-lengths / card widths stop growing on 27" monitors. Mobile behavior
+     unchanged (no min-width applied). The sticky date bar stays full-width
+     so its glass-blur background + border-bottom span the viewport as
+     designed; only its INNER buttons are pushed inward to align with the
+     capped content column below. Later phases add the right column, meal
+     grid, week strip; this is just the shell. */
+  @media (min-width: 1280px) {
+    .diary-content {
+      max-width: 1600px;
+      margin-left: auto;
+      margin-right: auto;
+      width: 100%;
+    }
+    /* Match the date-bar internal padding to align its buttons with the
+       centered content column below (rather than capping the whole bar,
+       which would break the full-viewport glass blur + border). */
+    .diary-date-bar {
+      padding-left: max(var(--page-px), calc((100vw - 1600px) / 2 + var(--page-px)));
+      padding-right: max(var(--page-px), calc((100vw - 1600px) / 2 + var(--page-px)));
+    }
+  }
+
   /* Water blue — dedicated color, always blue regardless of theme accent */
   :global(:root) { --water-blue: #2196F3; --water-blue-dim: rgba(33,150,243,0.15); }
 
