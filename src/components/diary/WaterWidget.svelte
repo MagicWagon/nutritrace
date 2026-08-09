@@ -29,6 +29,14 @@
   $: displayTotal = formatMl(totalMl);
   $: displayGoal  = formatMl(goalMl);
 
+  // Brief pulse animation on the bar when totalMl grows (new log added
+  // via a quick-add button). Increments a key so the class toggles even
+  // for consecutive additions of the same amount.
+  let _lastTotal = 0;
+  let _pulseKey  = 0;
+  $: if (totalMl > _lastTotal) { _pulseKey++; }
+  $: _lastTotal = totalMl;
+
   function formatMl(ml) {
     if (unit === 'oz') return `${(ml / 29.5735).toFixed(0)} fl oz`;
     if (unit === 'L')  return `${(ml / 1000).toFixed(2)} L`;
@@ -77,7 +85,9 @@
   </header>
 
   <div class="ww-bar-track" title="{pct}%">
-    <div class="ww-bar-fill" style="width:{pct}%"></div>
+    {#key _pulseKey}
+      <div class="ww-bar-fill ww-bar-fill-pulse" style="width:{pct}%"></div>
+    {/key}
   </div>
 
   <div class="ww-buttons">
@@ -170,6 +180,20 @@
     background: linear-gradient(90deg, #42A5F5, var(--water-blue));
     border-radius: var(--radius-full);
     transition: width 0.4s cubic-bezier(0.34, 1.2, 0.64, 1);
+  }
+  /* Pulse animation fires whenever _pulseKey bumps (i.e. totalMl grew).
+     A brief brightness + subtle scale on the fill signals the value
+     just changed, so the user sees their tap register even mid-scroll. */
+  .ww-bar-fill-pulse {
+    animation: ww-fill-pulse 620ms ease-out;
+  }
+  @keyframes ww-fill-pulse {
+    0%   { filter: brightness(1);    box-shadow: 0 0 0 rgba(33,150,243,0); }
+    30%  { filter: brightness(1.35); box-shadow: 0 0 12px rgba(33,150,243,0.55); }
+    100% { filter: brightness(1);    box-shadow: 0 0 0 rgba(33,150,243,0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ww-bar-fill-pulse { animation: none; }
   }
 
   .ww-buttons {

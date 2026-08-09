@@ -2756,6 +2756,38 @@
       transform: scale(0.985);
       transition: opacity 120ms ease, transform 120ms ease;
     }
+    /* Polish: hover elevation on desktop with hover-capable input.
+       Subtle 2px lift + slightly stronger shadow signals card is
+       interactive without being noisy. Skipped on touch (:hover fires
+       oddly on tap-and-hold). */
+    @media (hover: hover) {
+      .meal-col > .meal-group:not(.dragging):hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px -8px rgba(0,0,0,0.14);
+        transition: transform 160ms ease, box-shadow 160ms ease;
+      }
+      :global([data-theme="dark"]) .meal-col > .meal-group:not(.dragging):hover,
+      :global(:root:not([data-theme="light"])) .meal-col > .meal-group:not(.dragging):hover {
+        box-shadow: 0 8px 24px -8px rgba(0,0,0,0.6);
+      }
+      /* Right rail widgets get the same treatment. */
+      .diary-right-col > :hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px -8px rgba(0,0,0,0.14);
+        transition: transform 160ms ease, box-shadow 160ms ease;
+      }
+    }
+    /* Keyboard focus rings — visible + accent-colored on interactive
+       elements. Focus-visible so mouse clicks don't leave a lingering
+       ring on buttons the user just clicked. */
+    .diary-right-col button:focus-visible,
+    .diary-right-col :global([role="button"]):focus-visible,
+    .meal-col > .meal-group:focus-visible,
+    :global(.week-strip) .ws-day:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+      border-radius: var(--radius-sm);
+    }
     :global([data-theme="dark"]) .meal-col > .meal-group,
     :global(:root:not([data-theme="light"])) .meal-col > .meal-group {
       box-shadow: 0 4px 14px -8px rgba(0,0,0,0.55);
