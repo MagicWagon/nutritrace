@@ -227,7 +227,7 @@
     <div class="setting-row">
       <div>
         <span class="setting-label">Force Mobile Layout</span>
-        <div class="setting-desc">Keep the mobile pattern (single-column Diary, drill-in Settings) even on wide screens. Turn this on if you prefer the phone-style layout on your desktop.</div>
+        <div class="setting-desc">For users who prefer the compact phone-style layout on desktop. When on, the desktop breakpoints (Diary right rail, Settings two-pane, week strip) are all disabled at every viewport width, and drag-to-copy meals is turned off. Keep this off to use the full desktop experience.</div>
       </div>
       <Toggle checked={$forceMobileLayout} on:change={e => forceMobileLayout.set(e.detail)} />
     </div>

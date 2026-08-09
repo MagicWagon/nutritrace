@@ -17,7 +17,7 @@
 
   import { currentUser, userMgmtActive } from '../stores/auth.js';
   import { isNative, getServerUrl, resolveAssetUrl, apiUrl, getAuthToken } from '../lib/platform.js';
-  import { bannerStyle, envLocks as envLocksStore, appearance as appearanceStore, wellnessEnabled, goals as goalsStore } from '../stores/settings.js';
+  import { bannerStyle, envLocks as envLocksStore, appearance as appearanceStore, wellnessEnabled, goals as goalsStore, disableAnimations } from '../stores/settings.js';
 
   // Per-section pages — one component per slug, dispatched by
   // SECTION_COMPONENTS below.
@@ -222,6 +222,11 @@
   // rule in the stylesheet, so this change doesn't leak on mobile.
   $: sectionVisible = (query, key) => {
     if (!query) return true;
+    // Never hide the section the user is currently on. Otherwise
+    // a mid-typing search that doesn't match their active section
+    // makes the rail feel like it lost their place — the active
+    // item vanishes even though they're still ON that page.
+    if (key === currentSection) return true;
     return (SECTION_KEYWORDS[key] || []).some(kw => kw.includes(query));
   };
   // Rail "no matches" placeholder — set to true when the query is
@@ -238,7 +243,22 @@
   // Server (blocks sync) → Goals (drives every calorie calc) →
   // Wellness (unlocks activity-adjusted goals) → Appearance
   // (personal preference). Only the ones whose condition matches
-  // render; if all pass, the block is omitted entirely.
+  // render; if all pass, the block is omitted entirely. Users can
+  // also × any card they don't intend to configure — dismissals
+  // persist in localStorage as a comma-separated key list.
+  let _onboardingDismissed = new Set();
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const raw = localStorage.getItem('nt:onboardingDismissed') || '';
+      _onboardingDismissed = new Set(raw.split(',').filter(Boolean));
+    }
+  } catch { /* ignore */ }
+  function _dismissOnboarding(key) {
+    _onboardingDismissed = new Set([..._onboardingDismissed, key]);
+    try {
+      localStorage.setItem('nt:onboardingDismissed', [..._onboardingDismissed].join(','));
+    } catch { /* ignore */ }
+  }
   $: _onboardingCards = (() => {
     const cards = [];
     if (isNative && !getServerUrl()) {
@@ -254,7 +274,7 @@
     if ($appearanceStore === 'system') {
       cards.push({ key: 'appearance', icon: 'contrast', label: 'Choose a Theme', desc: 'Pick a light / dark preference and accent color.' });
     }
-    return cards;
+    return cards.filter(c => !_onboardingDismissed.has(c.key));
   })();
 
   // Admin group + Server Connection index row visibility. `isNativeLocal`
@@ -356,83 +376,83 @@
        and gets a matching hero card in the welcome pane, but users
        inside a deep section should also be able to jump straight
        here from the rail. -->
-  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'profile')} class:active={currentSection === 'profile'} on:click={() => toggleSection('profile')}>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'profile')} class:active={currentSection === 'profile'} aria-current={currentSection === 'profile' ? 'page' : undefined} on:click={() => toggleSection('profile')}>
     <span class="material-symbols-rounded si">person</span>
     <span>{$_('profile.title')}</span>
     <span class="material-symbols-rounded chevron">expand_more</span>
   </button>
 
   <p class="settings-group-label">{$_('settings_main.group_display')}</p>
-  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'appearance')} class:active={currentSection === 'appearance'} on:click={() => toggleSection('appearance')}>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'appearance')} class:active={currentSection === 'appearance'} aria-current={currentSection === 'appearance' ? 'page' : undefined} on:click={() => toggleSection('appearance')}>
     <span class="material-symbols-rounded si">contrast</span>
     <span>{$_('settings.appearance.section')}</span>
     <span class="material-symbols-rounded chevron">expand_more</span>
   </button>
-  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'regional')} class:active={currentSection === 'regional'} on:click={() => toggleSection('regional')}>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'regional')} class:active={currentSection === 'regional'} aria-current={currentSection === 'regional' ? 'page' : undefined} on:click={() => toggleSection('regional')}>
     <span class="material-symbols-rounded si">language</span>
     <span>{$_('settings.regional.section')}</span>
     <span class="material-symbols-rounded chevron">expand_more</span>
   </button>
-  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'diary')} class:active={currentSection === 'diary'} on:click={() => toggleSection('diary')}>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'diary')} class:active={currentSection === 'diary'} aria-current={currentSection === 'diary' ? 'page' : undefined} on:click={() => toggleSection('diary')}>
     <span class="material-symbols-rounded si">book</span>
     <span>{$_('settings.diary.section')}</span>
     <span class="material-symbols-rounded chevron">expand_more</span>
   </button>
-  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'water')} class:active={currentSection === 'water'} on:click={() => toggleSection('water')}>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'water')} class:active={currentSection === 'water'} aria-current={currentSection === 'water' ? 'page' : undefined} on:click={() => toggleSection('water')}>
     <span class="material-symbols-rounded si">water_drop</span>
     <span>{$_('settings.water.section')}</span>
     <span class="material-symbols-rounded chevron">expand_more</span>
   </button>
-  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'foods')} class:active={currentSection === 'foods'} on:click={() => toggleSection('foods')}>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'foods')} class:active={currentSection === 'foods'} aria-current={currentSection === 'foods' ? 'page' : undefined} on:click={() => toggleSection('foods')}>
     <span class="material-symbols-rounded si">restaurant</span>
     <span>{$_('settings.foods.section')}</span>
     <span class="material-symbols-rounded chevron">expand_more</span>
   </button>
 
   <p class="settings-group-label">Data &amp; Tracking</p>
-  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'goals')} class:active={currentSection === 'goals'} on:click={() => toggleSection('goals')}>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'goals')} class:active={currentSection === 'goals'} aria-current={currentSection === 'goals' ? 'page' : undefined} on:click={() => toggleSection('goals')}>
     <span class="material-symbols-rounded si">flag</span>
     <span>{$_('settings.goals.section')}</span>
     <span class="material-symbols-rounded chevron">expand_more</span>
   </button>
-  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'bodyStats')} class:active={currentSection === 'bodyStats'} on:click={() => toggleSection('bodyStats')}>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'bodyStats')} class:active={currentSection === 'bodyStats'} aria-current={currentSection === 'bodyStats' ? 'page' : undefined} on:click={() => toggleSection('bodyStats')}>
     <span class="material-symbols-rounded si">straighten</span>
     <span>{$_('settings.body_stats.section')}</span>
     <span class="material-symbols-rounded chevron">expand_more</span>
   </button>
-  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'statistics')} class:active={currentSection === 'statistics'} on:click={() => toggleSection('statistics')}>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'statistics')} class:active={currentSection === 'statistics'} aria-current={currentSection === 'statistics' ? 'page' : undefined} on:click={() => toggleSection('statistics')}>
     <span class="material-symbols-rounded si">bar_chart</span>
     <span>{$_('settings.statistics.section')}</span>
     <span class="material-symbols-rounded chevron">expand_more</span>
   </button>
-  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'nutrients')} class:active={currentSection === 'nutrients'} on:click={() => toggleSection('nutrients')}>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'nutrients')} class:active={currentSection === 'nutrients'} aria-current={currentSection === 'nutrients' ? 'page' : undefined} on:click={() => toggleSection('nutrients')}>
     <span class="material-symbols-rounded si">science</span>
     <span>{$_('settings.nutrients.section')}</span>
     <span class="material-symbols-rounded chevron">expand_more</span>
   </button>
-  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'categories')} class:active={currentSection === 'categories'} on:click={() => toggleSection('categories')}>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'categories')} class:active={currentSection === 'categories'} aria-current={currentSection === 'categories' ? 'page' : undefined} on:click={() => toggleSection('categories')}>
     <span class="material-symbols-rounded si">category</span>
     <span>{$_('settings.categories.section')}</span>
     <span class="material-symbols-rounded chevron">expand_more</span>
   </button>
-  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'customUnits')} class:active={currentSection === 'customUnits'} on:click={() => toggleSection('customUnits')}>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'customUnits')} class:active={currentSection === 'customUnits'} aria-current={currentSection === 'customUnits' ? 'page' : undefined} on:click={() => toggleSection('customUnits')}>
     <span class="material-symbols-rounded si">straighten</span>
     <span>{$_('settings_stats.custom_units')}</span>
     <span class="material-symbols-rounded chevron">expand_more</span>
   </button>
 
   <p class="settings-group-label">{$_('settings_integrations.group')}</p>
-  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'connectedServices')} class:active={currentSection === 'connectedServices'} on:click={() => toggleSection('connectedServices')}>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'connectedServices')} class:active={currentSection === 'connectedServices'} aria-current={currentSection === 'connectedServices' ? 'page' : undefined} on:click={() => toggleSection('connectedServices')}>
     <span class="material-symbols-rounded si">link</span>
     <span>{$_('settings.connected_services.section')}</span>
     <span class="material-symbols-rounded chevron">expand_more</span>
   </button>
-  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'ai')} class:active={currentSection === 'ai'} on:click={() => toggleSection('ai')}>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'ai')} class:active={currentSection === 'ai'} aria-current={currentSection === 'ai' ? 'page' : undefined} on:click={() => toggleSection('ai')}>
     <span class="material-symbols-rounded si">bolt</span>
     <span>{$_('settings.ai.section')}</span>
     <span class="material-symbols-rounded chevron">expand_more</span>
   </button>
-  <button class="section-toggle wellness-toggle" class:hidden={!sectionVisible(settingsQuery, 'wellness')} class:active={currentSection === 'wellness'} on:click={() => toggleSection('wellness')}>
+  <button class="section-toggle wellness-toggle" class:hidden={!sectionVisible(settingsQuery, 'wellness')} class:active={currentSection === 'wellness'} aria-current={currentSection === 'wellness' ? 'page' : undefined} on:click={() => toggleSection('wellness')}>
     <span class="material-symbols-rounded si">favorite</span>
     <span>{$_('settings.wellness.section')}</span>
     <span class="material-symbols-rounded chevron">expand_more</span>
@@ -440,40 +460,40 @@
 
   <p class="settings-group-label">App</p>
   {#if isNative}
-    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'serverConnection')} class:active={currentSection === 'serverConnection'} on:click={() => toggleSection('serverConnection')}>
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'serverConnection')} class:active={currentSection === 'serverConnection'} aria-current={currentSection === 'serverConnection' ? 'page' : undefined} on:click={() => toggleSection('serverConnection')}>
       <span class="material-symbols-rounded si">cloud_sync</span>
       <span>{$_('settings.server.section')}</span>
       <span class="material-symbols-rounded chevron">expand_more</span>
     </button>
   {/if}
-  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'notifications')} class:active={currentSection === 'notifications'} on:click={() => toggleSection('notifications')}>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'notifications')} class:active={currentSection === 'notifications'} aria-current={currentSection === 'notifications' ? 'page' : undefined} on:click={() => toggleSection('notifications')}>
     <span class="material-symbols-rounded si">notifications</span>
     <span>{$_('settings.notifications.section')}</span>
     <span class="material-symbols-rounded chevron">expand_more</span>
   </button>
-  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'backup')} class:active={currentSection === 'backup'} on:click={() => toggleSection('backup')}>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'backup')} class:active={currentSection === 'backup'} aria-current={currentSection === 'backup' ? 'page' : undefined} on:click={() => toggleSection('backup')}>
     <span class="material-symbols-rounded si">backup</span>
     <span>{$_('settings.backup.section')}</span>
     <span class="material-symbols-rounded chevron">expand_more</span>
   </button>
-  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'importExport')} class:active={currentSection === 'importExport'} on:click={() => toggleSection('importExport')}>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'importExport')} class:active={currentSection === 'importExport'} aria-current={currentSection === 'importExport' ? 'page' : undefined} on:click={() => toggleSection('importExport')}>
     <span class="material-symbols-rounded si">import_export</span>
     <span>{$_('settings.importExport.section')}</span>
     <span class="material-symbols-rounded chevron">expand_more</span>
   </button>
   {#if $userMgmtActive && !isNativeLocal}
-    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'sharing')} class:active={currentSection === 'sharing'} on:click={() => toggleSection('sharing')}>
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'sharing')} class:active={currentSection === 'sharing'} aria-current={currentSection === 'sharing' ? 'page' : undefined} on:click={() => toggleSection('sharing')}>
       <span class="material-symbols-rounded si">group</span>
       <span>{$_('settings.sharing.section')}</span>
       <span class="material-symbols-rounded chevron">expand_more</span>
     </button>
   {/if}
-  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'updates')} class:active={currentSection === 'updates'} on:click={() => toggleSection('updates')}>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'updates')} class:active={currentSection === 'updates'} aria-current={currentSection === 'updates' ? 'page' : undefined} on:click={() => toggleSection('updates')}>
     <span class="material-symbols-rounded si">system_update</span>
     <span>{$_('settings.updates.section')}</span>
     <span class="material-symbols-rounded chevron">expand_more</span>
   </button>
-  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'helpImprove')} class:active={currentSection === 'helpImprove'} on:click={() => toggleSection('helpImprove')}>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'helpImprove')} class:active={currentSection === 'helpImprove'} aria-current={currentSection === 'helpImprove' ? 'page' : undefined} on:click={() => toggleSection('helpImprove')}>
     <span class="material-symbols-rounded si">troubleshoot</span>
     <span>{$_('settings.diagnostics.section')}</span>
     <span class="material-symbols-rounded chevron">expand_more</span>
@@ -481,27 +501,27 @@
 
   {#if !isNativeLocal && (!$userMgmtActive || $currentUser?.role === 'admin')}
     <p class="settings-group-label">{$_('settings_admin_group')}</p>
-    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'users')} class:active={currentSection === 'users'} on:click={() => toggleSection('users')}>
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'users')} class:active={currentSection === 'users'} aria-current={currentSection === 'users' ? 'page' : undefined} on:click={() => toggleSection('users')}>
       <span class="material-symbols-rounded si">group</span>
       <span>{$_('settings.users.section')}</span>
       <span class="material-symbols-rounded chevron">expand_more</span>
     </button>
     {#if $userMgmtActive && $currentUser?.role === 'admin'}
-      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'authentication')} class:active={currentSection === 'authentication'} on:click={() => toggleSection('authentication')}>
+      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'authentication')} class:active={currentSection === 'authentication'} aria-current={currentSection === 'authentication' ? 'page' : undefined} on:click={() => toggleSection('authentication')}>
         <span class="material-symbols-rounded si">vpn_key</span>
         <span>{$_('settings.authentication.section')}</span>
         <span class="material-symbols-rounded chevron">expand_more</span>
       </button>
     {/if}
     {#if $currentUser?.role === 'admin'}
-      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'email')} class:active={currentSection === 'email'} on:click={() => toggleSection('email')}>
+      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'email')} class:active={currentSection === 'email'} aria-current={currentSection === 'email' ? 'page' : undefined} on:click={() => toggleSection('email')}>
         <span class="material-symbols-rounded si">mail</span>
         <span>{$_('settings.email.section')}</span>
         <span class="material-symbols-rounded chevron">expand_more</span>
       </button>
     {/if}
     {#if $currentUser?.role === 'admin'}
-      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'apiTokens')} class:active={currentSection === 'apiTokens'} on:click={() => toggleSection('apiTokens')}>
+      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'apiTokens')} class:active={currentSection === 'apiTokens'} aria-current={currentSection === 'apiTokens' ? 'page' : undefined} on:click={() => toggleSection('apiTokens')}>
         <span class="material-symbols-rounded si">key</span>
         <span>API Tokens</span>
         <span class="material-symbols-rounded chevron">expand_more</span>
@@ -509,7 +529,7 @@
     {/if}
   {/if}
 
-  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'about')} class:active={currentSection === 'about'} on:click={() => toggleSection('about')}>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'about')} class:active={currentSection === 'about'} aria-current={currentSection === 'about' ? 'page' : undefined} on:click={() => toggleSection('about')}>
     <span class="material-symbols-rounded si">info</span>
     <span>{$_('settings.about.section')}</span>
     <span class="material-symbols-rounded chevron">expand_more</span>
@@ -703,7 +723,7 @@
                    their info. slide transition gives the accordion
                    the drop-down feel the user asked for. -->
               <div class="profile-hero-body"
-                transition:slide={{ duration: 220 }}>
+                transition:slide={{ duration: $disableAnimations ? 0 : 220 }}>
                 <Profile />
               </div>
             {/if}
@@ -719,14 +739,22 @@
                 <p class="settings-onboarding-heading">Get Set Up</p>
                 <div class="settings-onboarding-grid">
                   {#each _onboardingCards as card (card.key)}
-                    <button type="button" class="settings-onboarding-card"
-                      on:click={() => toggleSection(card.key)}>
-                      <span class="material-symbols-rounded">{card.icon}</span>
-                      <div class="settings-onboarding-copy">
-                        <span class="settings-onboarding-label">{card.label}</span>
-                        <span class="settings-onboarding-desc">{card.desc}</span>
-                      </div>
-                    </button>
+                    <div class="settings-onboarding-card-wrap">
+                      <button type="button" class="settings-onboarding-card"
+                        on:click={() => toggleSection(card.key)}>
+                        <span class="material-symbols-rounded">{card.icon}</span>
+                        <div class="settings-onboarding-copy">
+                          <span class="settings-onboarding-label">{card.label}</span>
+                          <span class="settings-onboarding-desc">{card.desc}</span>
+                        </div>
+                      </button>
+                      <button type="button" class="settings-onboarding-dismiss"
+                        on:click|stopPropagation={() => _dismissOnboarding(card.key)}
+                        aria-label="Dismiss {card.label}"
+                        title="Dismiss">
+                        <span class="material-symbols-rounded">close</span>
+                      </button>
+                    </div>
                   {/each}
                 </div>
               </div>
@@ -1426,6 +1454,39 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 10px;
+  }
+  /* Wrap positions the × dismiss button inside the card corner.
+     Whole card is still the primary click target (routes to the
+     section); the × uses stopPropagation so it doesn't bubble. */
+  .settings-onboarding-card-wrap { position: relative; }
+  .settings-onboarding-dismiss {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 22px;
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-full);
+    color: var(--text-3);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 120ms ease, background 120ms ease, color 120ms ease;
+  }
+  .settings-onboarding-card-wrap:hover .settings-onboarding-dismiss,
+  .settings-onboarding-dismiss:focus-visible {
+    opacity: 1;
+  }
+  .settings-onboarding-dismiss:hover {
+    background: var(--surface-3);
+    color: var(--text-1);
+  }
+  .settings-onboarding-dismiss :global(.material-symbols-rounded) {
+    font-size: 14px;
+    color: inherit;
   }
   .settings-onboarding-card {
     display: flex;
