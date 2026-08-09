@@ -435,12 +435,12 @@
   let _weekStripRefreshKey = 0;
 
   // Phase 7: drag-to-copy meals across the week strip.
-  //   1. User grabs a populated meal card (draggable={!isEmpty && today})
+  //   1. User grabs a populated meal card (draggable={!isEmpty}; works
+  //      on any viewed day — copyMealToDate uses currentDate as source)
   //   2. WeekStrip cells accept the drop and fire onDropMeal(iso, mealIdx)
-  //   3. Diary calls copyMealToDate(sourceMealIdx, targetIso, sourceMealIdx)
-  //      — same meal slot preserved on the target day
-  // Only allowed when viewing today's diary because copyMealToDate reads
-  // items from the currently-viewed date.
+  //   3. Diary opens the existing Copy sheet pre-populated with target
+  //      date + source meal so users can adjust the target meal slot
+  //      or bail before the write actually happens
   let _dragMealIdx = -1;
   function _onMealDragStart(e, mealIdx) {
     if (!e.dataTransfer) return;
@@ -453,24 +453,23 @@
   function _onMealDragEnd() {
     _dragMealIdx = -1;
   }
-  async function _onDropMealOnWeekDay(targetIso, mealIdx) {
+  function _onDropMealOnWeekDay(targetIso, mealIdx) {
     if (mealIdx == null || mealIdx < 0) return;
     if (targetIso === $currentDate) {
       showInfo("Can't copy a meal onto the same day.");
       return;
     }
-    try {
-      const n = await copyMealToDate(mealIdx, targetIso, mealIdx);
-      if (n > 0) {
-        const label = meals[mealIdx] || `meal ${mealIdx + 1}`;
-        showSuccess(`Copied ${n} item${n === 1 ? '' : 's'} from ${label} to ${targetIso}.`);
-        _weekStripRefreshKey = _weekStripRefreshKey + 1;
-      } else {
-        showInfo('Nothing to copy — that meal is empty.');
-      }
-    } catch (err) {
-      showError(err?.message || 'Copy failed.');
-    }
+    // Open the same Copy sheet the meal ⋮ menu uses, pre-populated
+    // with the target date + source meal slot as defaults. User can
+    // change the target meal in the dropdown, then confirm. Consistent
+    // with the existing Copy flow — no invisible write on a drop.
+    copyMode      = 'meal';
+    actionMealIdx = mealIdx;
+    copyDate      = targetIso;
+    copyMeal      = Number(mealIdx) || 0;
+    // copySourceName is reactive on copyMode + actionMealIdx above,
+    // so it'll pick up the source meal's name without an assignment.
+    _lockAndOpen(() => showCopySheet = true);
   }
   $: if (_prevCalPct !== null && $goalCelebrations && !$disableAnimations && calPct >= 100 && _prevCalPct < 100) {
     _calGoalCelebrating = true;
@@ -1338,7 +1337,7 @@
         class:dragging={_dragMealIdx === mealIdx}
         id="meal-{mealIdx}"
         in:fly={{ y: 18, duration: _isInitialMount && !$disableAnimations ? 280 : 0, delay: _isInitialMount && !$disableAnimations ? 60 + mealIdx * 55 : 0 }}
-        draggable={!isEmpty && $currentDate === localDateStr()}
+        draggable={!isEmpty}
         on:dragstart={(e) => _onMealDragStart(e, mealIdx)}
         on:dragend={_onMealDragEnd}
       >
