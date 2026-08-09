@@ -517,6 +517,18 @@ export const diaryShowPortionSize   = createSettingStore('diaryShowPortionSize',
 export const showQuickCalories      = createSettingStore('showQuickCalories',       true);
 export const quickCaloriesDisplay   = createSettingStore('quickCaloriesDisplay',    'summed');
 export const diaryShowNotes         = createSettingStore('diaryShowNotes',          true);
+
+// Desktop diary redesign — right-rail widget visibility. Each widget
+// can be independently hidden by the user. Defaults show everything so
+// a fresh install feels complete; power users trim to their taste in
+// Settings → Diary → Desktop rail widgets.
+export const diaryRailShowSummary      = createSettingStore('diaryRailShowSummary',       true);
+export const diaryRailShowWater        = createSettingStore('diaryRailShowWater',         true);
+export const diaryRailShowWeight       = createSettingStore('diaryRailShowWeight',        true);
+export const diaryRailShowMeasurements = createSettingStore('diaryRailShowMeasurements',  true);
+export const diaryRailShowActivity     = createSettingStore('diaryRailShowActivity',      true);
+export const diaryRailShowNotes        = createSettingStore('diaryRailShowNotes',         true);
+
 // Activity logging (issue #3 — opt-in calorie-burn entry that offsets daily goal)
 export const diaryShowActivity      = createSettingStore('diaryShowActivity',        false);
 export const manualActivityPolicy   = createSettingStore('manualActivityPolicy',     'wearable_wins'); // 'wearable_wins' | 'manual_wins' | 'additive'

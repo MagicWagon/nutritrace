@@ -46,7 +46,10 @@
            calorieGoalMode, calorieGoalFactor,
            diaryShowActivity, manualActivityPolicy, calorieAdjustFromActivity,
            fastingEnabled,
-           wellnessEnabled } from '../stores/settings.js';
+           wellnessEnabled,
+           diaryRailShowSummary, diaryRailShowWater, diaryRailShowWeight,
+           diaryRailShowMeasurements, diaryRailShowActivity as diaryRailShowActivityWidget,
+           diaryRailShowNotes } from '../stores/settings.js';
   import { dayActivity, activitySummary, loadActivity, deleteActivity } from '../stores/activity.js';
   import WaterBanner  from '../components/banners/WaterBanner.svelte';
   import { editorState } from '../stores/editorState.js';
@@ -1712,18 +1715,20 @@
          are additive as later phases land (Phase 2 = just DaySummary,
          Phase 3 adds Water + Weight, etc.). -->
     <aside class="diary-right-col">
-      <DaySummaryWidget
-        eatenKcal={$_calTween}
-        protein={$_protTween}
-        carbs={$_carbTween}
-        fat={$_fatTween}
-        goalKcal={caloriesGoalAdjusted}
-        proteinGoal={protGoal}
-        carbGoal={carbGoal}
-        fatGoal={fatGoal}
-        onOpenSummary={() => diaryShowNutritionSummary.set(true)}
-      />
-      {#if _waterShowInDiary}
+      {#if $diaryRailShowSummary}
+        <DaySummaryWidget
+          eatenKcal={$_calTween}
+          protein={$_protTween}
+          carbs={$_carbTween}
+          fat={$_fatTween}
+          goalKcal={caloriesGoalAdjusted}
+          proteinGoal={protGoal}
+          carbGoal={carbGoal}
+          fatGoal={fatGoal}
+          onOpenSummary={() => diaryShowNutritionSummary.set(true)}
+        />
+      {/if}
+      {#if $diaryRailShowWater && _waterShowInDiary}
         <WaterWidget
           logs={_waterLogs}
           totalMl={_waterTotal}
@@ -1734,28 +1739,34 @@
           onRemove={_removeWaterLog}
         />
       {/if}
-      <WeightWidget
-        currentWeight={bodyStatsData.weight ?? null}
-        unit={$weightUnit || 'kg'}
-        onSave={async (val) => {
-          bodyStatsData = { ...bodyStatsData, weight: val };
-          await saveBodyStatsLocal();
-        }}
-      />
-      <BodyMeasurementsWidget
-        stats={bodyStatsData}
-        unit={$lengthUnit || 'in'}
-        onOpen={openBodyStats}
-      />
-      <ActivityImpactWidget
-        activeKcal={_effectiveActive}
-        baseGoalKcal={caloriesGoal}
-        adjustedGoalKcal={caloriesGoalAdjusted}
-        energyUnit={$energyUnit}
-        calorieGoalMode={$calorieGoalMode}
-        dynamicCaloriesOut={_dynamicCaloriesOut}
-        adaptiveTdee={_adaptiveTdee}
-      />
+      {#if $diaryRailShowWeight}
+        <WeightWidget
+          currentWeight={bodyStatsData.weight ?? null}
+          unit={$weightUnit || 'kg'}
+          onSave={async (val) => {
+            bodyStatsData = { ...bodyStatsData, weight: val };
+            await saveBodyStatsLocal();
+          }}
+        />
+      {/if}
+      {#if $diaryRailShowMeasurements}
+        <BodyMeasurementsWidget
+          stats={bodyStatsData}
+          unit={$lengthUnit || 'in'}
+          onOpen={openBodyStats}
+        />
+      {/if}
+      {#if $diaryRailShowActivityWidget}
+        <ActivityImpactWidget
+          activeKcal={_effectiveActive}
+          baseGoalKcal={caloriesGoal}
+          adjustedGoalKcal={caloriesGoalAdjusted}
+          energyUnit={$energyUnit}
+          calorieGoalMode={$calorieGoalMode}
+          dynamicCaloriesOut={_dynamicCaloriesOut}
+          adaptiveTdee={_adaptiveTdee}
+        />
+      {/if}
     </aside>
 
   </div>

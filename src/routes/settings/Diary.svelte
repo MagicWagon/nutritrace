@@ -11,6 +11,9 @@
     diaryShowActivity, manualActivityPolicy, calorieAdjustFromActivity,
     showQuickCalories, quickCaloriesDisplay,
     diaryShowNutritionBar,
+    diaryRailShowSummary, diaryRailShowWater, diaryRailShowWeight,
+    diaryRailShowMeasurements, diaryRailShowActivity as diaryRailShowActivityWidget,
+    diaryRailShowNotes,
     healthConnectEnabled,
     fastingEnabled, fastingDefaultHours, fastingNotifyOnGoal,
     fastingScheduleEnabled, fastingScheduleTime, fastingScheduleDays, fastingScheduleGoal,
@@ -106,6 +109,44 @@
     <div class="setting-row">
       <div><span class="setting-label">{$_('settings_diary.ask_quantity')}</span><div class="setting-desc">{$_('settings_diary.ask_quantity_desc')}</div></div>
       <Toggle checked={$diaryPromptQuantity} on:change={e => diaryPromptQuantity.set(e.detail)} />
+    </div>
+
+    <!-- Desktop rail widgets (≥1280px only). Each widget can be
+         independently hidden. Ignored on mobile — those users see the
+         classic top-right icons + bottom bar instead. -->
+    <div class="setting-divider"></div>
+    <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:2px">
+      <span class="setting-label">Desktop rail widgets</span>
+      <span class="setting-desc">Choose which widgets appear in the right column on wide screens (≥1280px). Hidden widgets don't render at all; they don't take space.</span>
+    </div>
+    <div class="setting-row">
+      <div><span class="setting-label">Day Summary (ring + macros)</span></div>
+      <Toggle checked={$diaryRailShowSummary} on:change={e => diaryRailShowSummary.set(e.detail)} />
+    </div>
+    <div class="setting-divider"></div>
+    <div class="setting-row">
+      <div><span class="setting-label">Water</span></div>
+      <Toggle checked={$diaryRailShowWater} on:change={e => diaryRailShowWater.set(e.detail)} />
+    </div>
+    <div class="setting-divider"></div>
+    <div class="setting-row">
+      <div><span class="setting-label">Weight</span></div>
+      <Toggle checked={$diaryRailShowWeight} on:change={e => diaryRailShowWeight.set(e.detail)} />
+    </div>
+    <div class="setting-divider"></div>
+    <div class="setting-row">
+      <div><span class="setting-label">Body measurements</span></div>
+      <Toggle checked={$diaryRailShowMeasurements} on:change={e => diaryRailShowMeasurements.set(e.detail)} />
+    </div>
+    <div class="setting-divider"></div>
+    <div class="setting-row">
+      <div><span class="setting-label">Activity impact</span><div class="setting-desc">Only renders when a wearable is connected.</div></div>
+      <Toggle checked={$diaryRailShowActivityWidget} on:change={e => diaryRailShowActivityWidget.set(e.detail)} />
+    </div>
+    <div class="setting-divider"></div>
+    <div class="setting-row">
+      <div><span class="setting-label">Day notes</span><div class="setting-desc">Puts the notes card in the rail instead of at the bottom of the meal list. (Coming in a later batch.)</div></div>
+      <Toggle checked={$diaryRailShowNotes} on:change={e => diaryRailShowNotes.set(e.detail)} />
     </div>
     <div class="setting-divider"></div>
     <!-- Issues #69 + #70: master toggle for the nutrition basis,
