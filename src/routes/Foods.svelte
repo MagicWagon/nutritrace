@@ -3239,7 +3239,15 @@
       grid-template-columns: 240px minmax(0, 1fr);
       gap: 20px;
       align-items: start;
-      padding: 0 var(--page-px);
+      /* Match page-content's 12px top padding so the rail top border
+         aligns with the first card's top edge in the middle column
+         (page-content has padding: 12px var(--page-px) 0). */
+      padding: 12px var(--page-px) 0;
+    }
+    /* Middle column has its own .page-content padding — zero out
+       here to avoid doubling with the new .foods-body padding. */
+    :global(html:not(.force-mobile-layout)) .foods-main :global(.page-content) {
+      padding-top: 0;
     }
     /* Rail — sticks below the sticky search bar. Its top offset
        matches the sticky bar's bottom edge (search + tabs + safe
@@ -3347,7 +3355,7 @@
      of sliding up as a modal. */
   @media (min-width: 1440px) {
     :global(html:not(.force-mobile-layout)) .foods-body {
-      grid-template-columns: 240px minmax(0, 1fr) 380px;
+      grid-template-columns: 240px minmax(0, 1fr) 420px;
     }
     :global(html:not(.force-mobile-layout)) .foods-detail-pane {
       display: block;
@@ -3386,12 +3394,12 @@
   }
 
   /* Phase D — manage-mode top-right portaled action bar shifts
-     left on desktop to clear the detail pane (380px + 12px gap
-     + 12px right inset = 404). Below 1440 the pane isn't rendered
-     so the original right:12 anchor still works. */
+     left on desktop to clear the detail pane (420 pane + 20 gap
+     + 12 right inset + a little slack). Below 1440 the pane isn't
+     rendered so the original right:12 anchor still works. */
   @media (min-width: 1440px) {
     :global(html:not(.force-mobile-layout)) :global(.foods-topbar-actions) {
-      right: 404px;
+      right: 452px;
     }
   }
 </style>

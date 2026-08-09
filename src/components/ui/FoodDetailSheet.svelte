@@ -460,6 +460,22 @@
     flex-direction: column;
     gap: 12px;
   }
+  /* Force single-column stack in the pane no matter the viewport
+     width. The sheet's .grid rule flips to two columns at ≥768px
+     viewport, but the pane is only ~380-420px wide — media queries
+     look at viewport, not container, so without this override the
+     content gets squeezed into two ~180px columns and spills off
+     the right edge. */
+  .detail-embedded :global(.grid) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* Pane hero photo — cap so it doesn't dominate the pane on tall
+     images. */
+  .detail-embedded :global(.hero-photo),
+  .detail-embedded :global(.hero-stub) {
+    max-height: 220px;
+    aspect-ratio: auto;
+  }
   .detail-embedded-header {
     display: flex;
     align-items: baseline;
