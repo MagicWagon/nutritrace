@@ -21,6 +21,21 @@ const TOKEN_BYTES = 32;  // 256-bit secret
  *  (`read:meals`, `read:diary`) and any write scopes will be added back
  *  alongside the endpoints they unlock — gating tokens on scopes the server
  *  can't actually serve is just confusing UI. */
+/**
+ * One-line human descriptions per scope, surfaced to the Settings UI so
+ * admins picking scopes at token-creation time don't have to guess what
+ * each grants. Kept next to KNOWN_SCOPES so the two stay in sync — a
+ * scope registered here but missing from KNOWN_SCOPES (or vice versa)
+ * is a bug the wiring test catches on load.
+ */
+export const SCOPE_DESCRIPTIONS = {
+  'read:foods':      "Read the token owner's foods library. Used by CookTrace federation.",
+  'write:workouts':  "Post workouts into the token owner's wellness history. Used by LiftTrace federation.",
+  'mcp:read':        'MCP: read the diary, goals, daily totals, and foods catalog (5 tools).',
+  'mcp:write':       'MCP: log food / water / meals / body stats (4 additive tools). Requires MCP_WRITE_ENABLED=1 on the server.',
+  'mcp:destroy':     'MCP: delete or edit diary entries, create catalog foods (3 tools). Requires MCP_DESTROY_ENABLED=1 AND every call to include confirm=true.',
+};
+
 export const KNOWN_SCOPES = new Set([
   'read:foods',
   // write:workouts unlocks POST /api/v1/workouts — used by LiftTrace to
