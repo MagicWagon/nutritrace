@@ -15,6 +15,7 @@
   import WeightWidget      from '../components/diary/WeightWidget.svelte';
   import BodyMeasurementsWidget from '../components/diary/BodyMeasurementsWidget.svelte';
   import ActivityImpactWidget from '../components/diary/ActivityImpactWidget.svelte';
+  import WeekStrip           from '../components/diary/WeekStrip.svelte';
   import AddActivitySheet from '../components/diary/AddActivitySheet.svelte';
   import QuickCaloriesSheet from '../components/diary/QuickCaloriesSheet.svelte';
   import FastingWidget from '../components/diary/FastingWidget.svelte';
@@ -302,6 +303,13 @@
     : { items: [], bodyStats: {} };
   $: totals = $diaryTotals || {};
 
+  // Bump the week-strip refetch key whenever an entry's item count
+  // or item-nutrition changes so the strip's daily-totals cache stays
+  // in sync with what the user just logged. `_weekStripSig` is a cheap
+  // digest string that changes on any meaningful diary mutation.
+  $: _weekStripSig = `${$currentDate}|${(entry.items || []).length}|${(entry.water || []).length}`;
+  $: if (_weekStripSig) { _weekStripRefreshKey = (_weekStripRefreshKey + 1); }
+
   // Nutrition Summary drill-down: tap a nutrient row → show top contributing
   // items for that nutrient sorted descending. Only one expanded at a time so
   // the modal stays compact. Auto-collapses when the modal closes. The
@@ -420,6 +428,11 @@
   let _waterGoalCelebrating = false;
   let _prevCalPct   = null;
   let _prevWaterPct = null;
+
+  // Phase 6: week strip refetch key. Bumped whenever entry data changes
+  // so the strip's cached daily totals reload. Tied to currentEntry
+  // subscription below (each new entry increments the key once).
+  let _weekStripRefreshKey = 0;
   $: if (_prevCalPct !== null && $goalCelebrations && !$disableAnimations && calPct >= 100 && _prevCalPct < 100) {
     _calGoalCelebrating = true;
     setTimeout(() => { _calGoalCelebrating = false; }, 1200);
@@ -1242,6 +1255,18 @@
     <button class="btn-icon accent" on:click={nextDay} aria-label={$_('diary.nav.next_day')} title={$_('diary.nav.next_day')}>
       <span class="material-symbols-rounded">chevron_right</span>
     </button>
+  </div>
+
+  <!-- Week strip (Phase 6 desktop). Sticky below the date bar at
+       ≥1280px; hidden on mobile. Data refetches whenever the diary
+       store fires an update (bumps refreshKey). -->
+  <div class="diary-week-strip-wrap">
+    <WeekStrip
+      currentDate={$currentDate}
+      calorieGoal={caloriesGoalAdjusted}
+      refreshKey={_weekStripRefreshKey}
+      onSelectDate={(iso) => loadEntry(iso)}
+    />
   </div>
 
   <div class="page-content diary-content" style="padding-bottom:{contentPad}">
@@ -2507,6 +2532,20 @@
      sticky date bar stays full-width so its glass blur + border span
      the viewport; only its inner padding shifts inward to align with
      the capped content column below. */
+  /* Week strip wrapper — hidden below 1280px so mobile keeps its
+     familiar prev/next arrow date bar as the sole day navigator. At
+     wide viewports the strip renders between the date bar and the
+     content grid, giving 7-day-at-a-glance context + click-to-nav. */
+  .diary-week-strip-wrap { display: none; }
+  @media (min-width: 1280px) {
+    .diary-week-strip-wrap {
+      display: block;
+      position: sticky;
+      top: calc(var(--page-top, var(--safe-top)) + 120px + var(--hamburger-row, 0px));
+      z-index: 8;
+    }
+  }
+
   /* .diary-main is the wrapper around meals + activities + notes.
      Below 1280px it's the sole flex child of .diary-content, so its
      OWN children need the flex-column + gap that used to live on
