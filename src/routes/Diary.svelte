@@ -13,6 +13,9 @@
   import DaySummaryWidget from '../components/diary/DaySummaryWidget.svelte';
   import WaterWidget       from '../components/diary/WaterWidget.svelte';
   import WeightWidget      from '../components/diary/WeightWidget.svelte';
+  import NutrientDetailWidget from '../components/diary/NutrientDetailWidget.svelte';
+  import BodyMeasurementsWidget from '../components/diary/BodyMeasurementsWidget.svelte';
+  import ActivityImpactWidget from '../components/diary/ActivityImpactWidget.svelte';
   import AddActivitySheet from '../components/diary/AddActivitySheet.svelte';
   import QuickCaloriesSheet from '../components/diary/QuickCaloriesSheet.svelte';
   import FastingWidget from '../components/diary/FastingWidget.svelte';
@@ -1588,6 +1591,25 @@
           await saveBodyStatsLocal();
         }}
       />
+      <BodyMeasurementsWidget
+        stats={bodyStatsData}
+        unit={$lengthUnit || 'in'}
+        onOpen={openBodyStats}
+      />
+      <NutrientDetailWidget
+        items={nutritionBarItems}
+        mode={_totalsMode}
+        showUnits={$diaryShowNutritionUnits}
+      />
+      <ActivityImpactWidget
+        activeKcal={_effectiveActive}
+        baseGoalKcal={caloriesGoal}
+        adjustedGoalKcal={caloriesGoalAdjusted}
+        energyUnit={$energyUnit}
+        calorieGoalMode={$calorieGoalMode}
+        dynamicCaloriesOut={_dynamicCaloriesOut}
+        adaptiveTdee={_adaptiveTdee}
+      />
     </aside>
 
   </div>
@@ -2500,6 +2522,20 @@
          If we later want Day Summary specifically to stay pinned while
          scrolling meals, add position: sticky to that widget only. */
     }
+
+    /* Phase 4: right rail now carries feature-parity with the bottom
+       bar + top-right icons (day summary, water, weight, body
+       measurements, nutrient detail, activity impact). Hide both
+       mobile-only surfaces at ≥1280px to eliminate the redundancy
+       that Phases 2 and 3 deliberately kept for safety. */
+    :global(.diary-topbar-actions) { display: none; }
+    :global(.diary-bottom-bar)     { display: none; }
+    /* The inline `style="padding-bottom:{contentPad}"` on .diary-content
+       reserves height for the (now-hidden) bottom bar. Reclaim it at
+       wide so the diary doesn't have a huge empty gap under the last
+       meal / notes card. !important because inline style otherwise wins. */
+    .diary-content { padding-bottom: 24px !important; }
+  }
     /* Match the date-bar internal padding to align its buttons with the
        centered content column below (rather than capping the whole bar,
        which would break the full-viewport glass blur + border). */
