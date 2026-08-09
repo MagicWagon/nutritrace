@@ -1113,12 +1113,9 @@
   .settings-mobile-index { display: block; }
 
   @media (min-width: 1024px) {
-    .settings-content {
-      max-width: 1400px;
-      margin-left: auto;
-      margin-right: auto;
-      width: 100%;
-    }
+    /* Settings fills the viewport width — no outer max-width cap.
+       Same principle you asked for on Diary: don't waste horizontal
+       real estate on ultrawides. */
     .settings-two-pane {
       display: grid;
       grid-template-columns: 280px minmax(0, 1fr);
@@ -1177,10 +1174,8 @@
       margin-top: 2px;
     }
 
-    /* Right pane — capped so setting rows stay readable */
-    .settings-pane {
-      max-width: 820px;
-    }
+    /* Right pane fills its grid column — no max-width so setting
+       rows extend to the viewport edge. */
 
     /* Desktop-only vs mobile-only content in the pane */
     .settings-mobile-index { display: none; }

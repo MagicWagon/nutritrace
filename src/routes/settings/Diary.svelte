@@ -1,6 +1,7 @@
 <script>
   import { _ } from 'svelte-i18n';
   import Toggle from '../../components/settings/Toggle.svelte';
+  import SettingRow from '../../components/settings/SettingRow.svelte';
   import { DB } from '../../lib/db.js';
   import { mealIcon } from '../../lib/mealIcon.js';
   import {
@@ -76,40 +77,27 @@
 
 <div class="section-body">
   <div class="card settings-card">
-    <div class="setting-row">
-      <div><span class="setting-label">{$_('settings_diary.show_brand')}</span><div class="setting-desc">{$_('settings_diary.show_brand_desc')}</div></div>
+    <SettingRow label={$_('settings_diary.show_brand')} desc={$_('settings_diary.show_brand_desc')} divider={false}>
       <Toggle checked={$diaryShowBrands} on:change={e => diaryShowBrands.set(e.detail)} />
-    </div>
-    <div class="setting-divider"></div>
-    <div class="setting-row">
-      <div><span class="setting-label">{$_('settings_diary.show_timestamps')}</span><div class="setting-desc">{$_('settings_diary.show_timestamps_desc')}</div></div>
+    </SettingRow>
+    <SettingRow label={$_('settings_diary.show_timestamps')} desc={$_('settings_diary.show_timestamps_desc')}>
       <Toggle checked={$diaryShowTimestamps} on:change={e => diaryShowTimestamps.set(e.detail)} />
-    </div>
-    <div class="setting-divider"></div>
-    <div class="setting-row">
-      <div><span class="setting-label">{$_('settings_diary.show_thumbnails')}</span><div class="setting-desc">{$_('settings_diary.show_thumbnails_desc')}</div></div>
+    </SettingRow>
+    <SettingRow label={$_('settings_diary.show_thumbnails')} desc={$_('settings_diary.show_thumbnails_desc')}>
       <Toggle checked={$diaryShowThumbnails} on:change={e => diaryShowThumbnails.set(e.detail)} />
-    </div>
-    <div class="setting-divider"></div>
-    <div class="setting-row">
-      <div><span class="setting-label">{$_('settings_diary.show_all_nutrients')}</span><div class="setting-desc">{$_('settings_diary.show_all_nutrients_desc')}</div></div>
+    </SettingRow>
+    <SettingRow label={$_('settings_diary.show_all_nutrients')} desc={$_('settings_diary.show_all_nutrients_desc')}>
       <Toggle checked={$diaryShowAllNutrients} on:change={e => diaryShowAllNutrients.set(e.detail)} />
-    </div>
-    <div class="setting-divider"></div>
-    <div class="setting-row">
-      <div><span class="setting-label">{$_('settings_diary.show_units')}</span><div class="setting-desc">{$_('settings_diary.show_units_desc')}</div></div>
+    </SettingRow>
+    <SettingRow label={$_('settings_diary.show_units')} desc={$_('settings_diary.show_units_desc')}>
       <Toggle checked={$diaryShowNutritionUnits} on:change={e => diaryShowNutritionUnits.set(e.detail)} />
-    </div>
-    <div class="setting-divider"></div>
-    <div class="setting-row">
-      <div><span class="setting-label">{$_('settings_diary.show_macro_summary')}</span><div class="setting-desc">{$_('settings_diary.show_macro_summary_desc')}</div></div>
+    </SettingRow>
+    <SettingRow label={$_('settings_diary.show_macro_summary')} desc={$_('settings_diary.show_macro_summary_desc')}>
       <Toggle checked={$diaryShowMacroSummary} on:change={e => diaryShowMacroSummary.set(e.detail)} />
-    </div>
-    <div class="setting-divider"></div>
-    <div class="setting-row">
-      <div><span class="setting-label">{$_('settings_diary.ask_quantity')}</span><div class="setting-desc">{$_('settings_diary.ask_quantity_desc')}</div></div>
+    </SettingRow>
+    <SettingRow label={$_('settings_diary.ask_quantity')} desc={$_('settings_diary.ask_quantity_desc')}>
       <Toggle checked={$diaryPromptQuantity} on:change={e => diaryPromptQuantity.set(e.detail)} />
-    </div>
+    </SettingRow>
 
   </div>
 
@@ -122,30 +110,21 @@
   <p class="section-title" style="margin:0">Desktop Rail Widgets</p>
   <p style="margin:0; padding:0 var(--page-px) 10px; font-size:12px; color:var(--text-3); line-height:1.4">Choose which widgets appear in the right column on wide screens (≥1280px). Hidden widgets don't render at all; they don't take space.</p>
   <div class="card settings-card">
-    <div class="setting-row">
-      <div><span class="setting-label">Day Summary</span><div class="setting-desc">Calorie ring + macro cards.</div></div>
+    <SettingRow label="Day Summary" desc="Calorie ring + macro cards." divider={false}>
       <Toggle checked={$diaryRailShowSummary} on:change={e => diaryRailShowSummary.set(e.detail)} />
-    </div>
-    <div class="setting-divider"></div>
-    <div class="setting-row">
-      <div><span class="setting-label">Water</span></div>
+    </SettingRow>
+    <SettingRow label="Water">
       <Toggle checked={$diaryRailShowWater} on:change={e => diaryRailShowWater.set(e.detail)} />
-    </div>
-    <div class="setting-divider"></div>
-    <div class="setting-row">
-      <div><span class="setting-label">Body Stats</span><div class="setting-desc">Weight + measurements in one card.</div></div>
+    </SettingRow>
+    <SettingRow label="Body Stats" desc="Weight + measurements in one card.">
       <Toggle checked={$diaryRailShowBodyStats} on:change={e => diaryRailShowBodyStats.set(e.detail)} />
-    </div>
-    <div class="setting-divider"></div>
-    <div class="setting-row">
-      <div><span class="setting-label">Activity Impact</span><div class="setting-desc">Only renders when a wearable is connected.</div></div>
+    </SettingRow>
+    <SettingRow label="Activity Impact" desc="Only renders when a wearable is connected.">
       <Toggle checked={$diaryRailShowActivityWidget} on:change={e => diaryRailShowActivityWidget.set(e.detail)} />
-    </div>
-    <div class="setting-divider"></div>
-    <div class="setting-row">
-      <div><span class="setting-label">Day Notes</span><div class="setting-desc">Puts the notes card in the rail instead of at the bottom of the meal list.</div></div>
+    </SettingRow>
+    <SettingRow label="Day Notes" desc="Puts the notes card in the rail instead of at the bottom of the meal list.">
       <Toggle checked={$diaryRailShowNotes} on:change={e => diaryRailShowNotes.set(e.detail)} />
-    </div>
+    </SettingRow>
   </div>
 
   <!-- Remaining diary settings continue in the original card below. -->
@@ -155,35 +134,27 @@
          who don't need the extra fields aren't distracted by them.
          Auto-on for anyone who turned on Warn About Unit
          Conversions below (the natural signal of intent). -->
-    <div class="setting-row">
-      <div><span class="setting-label">{$_('settings_diary.unit_metadata')}</span><div class="setting-desc">{$_('settings_diary.unit_metadata_desc')}</div></div>
+    <SettingRow label={$_('settings_diary.unit_metadata')} desc={$_('settings_diary.unit_metadata_desc')} divider={false}>
       <Toggle checked={$showUnitMetadata} on:change={e => showUnitMetadata.set(e.detail)} />
-    </div>
+    </SettingRow>
     <div class="setting-divider"></div>
     <!-- Sub-feature of Show Unit Metadata. Default off so users
          who weigh everything in grams aren't nagged on Open Food
          Facts per-100-ml drinks. Turning this on also implicitly
          enables Show Unit Metadata at the call sites via the
          reactive gate `$showUnitMetadata || $warnUnitMismatch`. -->
-    <div class="setting-row">
-      <div><span class="setting-label">{$_('settings_diary.warn_conversions')}</span><div class="setting-desc">{$_('settings_diary.warn_conversions_desc')}</div></div>
+    <SettingRow label={$_('settings_diary.warn_conversions')} desc={$_('settings_diary.warn_conversions_desc')} divider={false}>
       <Toggle checked={$warnUnitMismatch} on:change={e => warnUnitMismatch.set(e.detail)} />
-    </div>
-    <div class="setting-divider"></div>
-    <div class="setting-row">
-      <div><span class="setting-label">{$_('settings_diary.show_portion')}</span><div class="setting-desc">{$_('settings_diary.show_portion_desc')}</div></div>
+    </SettingRow>
+    <SettingRow label={$_('settings_diary.show_portion')} desc={$_('settings_diary.show_portion_desc')}>
       <Toggle checked={$diaryShowPortionSize} on:change={e => diaryShowPortionSize.set(e.detail)} />
-    </div>
-    <div class="setting-divider"></div>
-    <div class="setting-row">
-      <div><span class="setting-label">{$_('settings_diary.show_daily_notes')}</span><div class="setting-desc">{$_('settings_diary.show_daily_notes_desc')}</div></div>
+    </SettingRow>
+    <SettingRow label={$_('settings_diary.show_daily_notes')} desc={$_('settings_diary.show_daily_notes_desc')}>
       <Toggle checked={$diaryShowNotes} on:change={e => diaryShowNotes.set(e.detail)} />
-    </div>
-    <div class="setting-divider"></div>
-    <div class="setting-row">
-      <div><span class="setting-label">{$_('settings_diary.show_quick_cals')}</span><div class="setting-desc">{$_('settings_diary.show_quick_cals_desc')}</div></div>
+    </SettingRow>
+    <SettingRow label={$_('settings_diary.show_quick_cals')} desc={$_('settings_diary.show_quick_cals_desc')}>
       <Toggle checked={$showQuickCalories} on:change={e => showQuickCalories.set(e.detail)} />
-    </div>
+    </SettingRow>
     {#if $showQuickCalories}
       <div class="setting-divider"></div>
       <div class="setting-row">
@@ -196,17 +167,13 @@
         </div>
       </div>
     {/if}
-    <div class="setting-divider"></div>
-    <div class="setting-row">
-      <div><span class="setting-label">{$_('settings_diary.show_activity')}</span><div class="setting-desc">{$_('settings_diary.show_activity_desc')}</div></div>
+    <SettingRow label={$_('settings_diary.show_activity')} desc={$_('settings_diary.show_activity_desc')}>
       <Toggle checked={$diaryShowActivity} on:change={e => diaryShowActivity.set(e.detail)} />
-    </div>
+    </SettingRow>
     {#if $diaryShowActivity}
-      <div class="setting-divider"></div>
-      <div class="setting-row">
-        <div><span class="setting-label">{$_('settings_diary.adjust_calorie_goal')}</span><div class="setting-desc">{$_('settings_diary.adjust_calorie_goal_desc')}</div></div>
+      <SettingRow label={$_('settings_diary.adjust_calorie_goal')} desc={$_('settings_diary.adjust_calorie_goal_desc')}>
         <Toggle checked={$calorieAdjustFromActivity} on:change={e => calorieAdjustFromActivity.set(e.detail)} />
-      </div>
+      </SettingRow>
     {/if}
     {#if $diaryShowActivity && $calorieAdjustFromActivity && (!isNativeLocal || $healthConnectEnabled)}
       <div class="setting-divider"></div>
@@ -232,11 +199,9 @@
         </div>
       </div>
     {/if}
-    <div class="setting-divider"></div>
-    <div class="setting-row">
-      <div><span class="setting-label">{$_('settings_diary.show_fasting')}</span><div class="setting-desc">{$_('settings_diary.show_fasting_desc')}</div></div>
+    <SettingRow label={$_('settings_diary.show_fasting')} desc={$_('settings_diary.show_fasting_desc')}>
       <Toggle checked={$fastingEnabled} on:change={e => fastingEnabled.set(e.detail)} />
-    </div>
+    </SettingRow>
     {#if $fastingEnabled}
       <div class="setting-divider"></div>
       <div class="setting-row" style="flex-direction:column;align-items:stretch;gap:8px">
@@ -250,11 +215,9 @@
           {/each}
         </div>
       </div>
-      <div class="setting-divider"></div>
-      <div class="setting-row">
-        <div><span class="setting-label">{$_('settings_diary.notify_goal')}</span><div class="setting-desc">{$_('settings_diary.notify_goal_desc')}</div></div>
+      <SettingRow label={$_('settings_diary.notify_goal')} desc={$_('settings_diary.notify_goal_desc')}>
         <Toggle checked={$fastingNotifyOnGoal} on:change={e => fastingNotifyOnGoal.set(e.detail)} />
-      </div>
+      </SettingRow>
 
       <div class="setting-divider"></div>
       <div class="setting-row">
@@ -300,11 +263,9 @@
         </div>
       {/if}
     {/if}
-    <div class="setting-divider"></div>
-    <div class="setting-row">
-      <div><span class="setting-label">{$_('settings_diary.show_progress_bar')}</span><div class="setting-desc">{$_('settings_diary.show_progress_bar_desc')}</div></div>
+    <SettingRow label={$_('settings_diary.show_progress_bar')} desc={$_('settings_diary.show_progress_bar_desc')}>
       <Toggle checked={$diaryShowNutritionBar} on:change={e => diaryShowNutritionBar.set(e.detail)} />
-    </div>
+    </SettingRow>
   </div>
 
   <p class="sub-label">{$_('settings_diary.meal_names')}</p>
