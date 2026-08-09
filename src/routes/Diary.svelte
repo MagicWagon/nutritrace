@@ -1846,41 +1846,48 @@
       </button>
     {/if}
     <aside class="diary-right-col">
-      <!-- Rail controls: pin when hidden (make permanent), or hide
-           when pinned (fold out of the grid). Small icon buttons at
-           the top-right so they're always visible above widgets. -->
-      <div class="rail-controls">
-        {#if _railMode === 'pinned'}
-          <button
-            type="button"
-            class="rail-ctrl-btn"
-            on:click={railHide}
-            aria-label="Hide widget panel"
-            title="Hide widgets (edge tab reopens)"
-          >
-            <span class="material-symbols-rounded">right_panel_close</span>
-          </button>
-        {:else}
-          <button
-            type="button"
-            class="rail-ctrl-btn"
-            on:click={railPin}
-            aria-label="Pin widget panel"
-            title="Pin widgets"
-          >
-            <span class="material-symbols-rounded">push_pin</span>
-          </button>
-          <button
-            type="button"
-            class="rail-ctrl-btn"
-            on:click={() => _railOverlay = false}
-            aria-label="Close widget panel"
-            title="Close"
-          >
-            <span class="material-symbols-rounded">close</span>
-          </button>
-        {/if}
-      </div>
+      <!-- Rail controls fallback chip. The pin/hide button lives
+           INSIDE the DaySummaryWidget header when that widget is
+           visible (aligns with meal-column top edge). Show this
+           chip only in two cases:
+             (a) Day Summary widget is disabled, so the widget-
+                 embedded pin/hide isn't rendered.
+             (b) Overlay is open — the pin + close controls need
+                 to be visible on the overlay panel itself. -->
+      {#if (_railMode === 'hidden' && _railOverlay) || (_railMode === 'pinned' && !$diaryRailShowSummary)}
+        <div class="rail-controls">
+          {#if _railMode === 'pinned'}
+            <button
+              type="button"
+              class="rail-ctrl-btn"
+              on:click={railHide}
+              aria-label="Hide widget panel"
+              title="Hide widgets (edge tab reopens)"
+            >
+              <span class="material-symbols-rounded">right_panel_close</span>
+            </button>
+          {:else}
+            <button
+              type="button"
+              class="rail-ctrl-btn"
+              on:click={railPin}
+              aria-label="Pin widget panel"
+              title="Pin widgets"
+            >
+              <span class="material-symbols-rounded">push_pin</span>
+            </button>
+            <button
+              type="button"
+              class="rail-ctrl-btn"
+              on:click={() => _railOverlay = false}
+              aria-label="Close widget panel"
+              title="Close"
+            >
+              <span class="material-symbols-rounded">close</span>
+            </button>
+          {/if}
+        </div>
+      {/if}
       {#if $diaryRailShowSummary}
         <DaySummaryWidget
           eatenKcal={$_calTween}
@@ -1892,6 +1899,8 @@
           carbGoal={carbGoal}
           fatGoal={fatGoal}
           onOpenSummary={() => diaryShowNutritionSummary.set(true)}
+          railMode={_railMode}
+          onRailModeToggle={railHide}
         />
       {/if}
       {#if $diaryRailShowWater && _waterShowInDiary}
@@ -2891,12 +2900,26 @@
       display: flex;
       flex-direction: column;
       gap: 12px;
-      /* Rail flows with the page: no sticky, no max-height cap. Grid's
-         align-items: start on .diary-content keeps this column top-aligned
-         even when the meals column is taller. This prevents widgets from
-         being clipped by an artificial height cap (see Phase 3 feedback).
-         If we later want Day Summary specifically to stay pinned while
-         scrolling meals, add position: sticky to that widget only. */
+      /* Rail follows the scroll: sticky-positioned below the week
+         strip so widgets stay visible while the user scrolls through
+         a long day. Own scroll region if it would overflow the
+         viewport (many widgets + measurements list). Offset matches
+         the week-strip sticky top plus its ~60px height + 12px gap. */
+      position: sticky;
+      top: calc(var(--page-top, var(--safe-top)) + 190px + var(--hamburger-row, 0px));
+      align-self: start;
+      max-height: calc(100vh - var(--page-top, var(--safe-top)) - 210px - var(--hamburger-row, 0px));
+      overflow-y: auto;
+      /* No top padding: widgets align flush with the meal-column
+         top edge. The rail-controls chevron floats over the top-
+         right corner of the first widget as a chip so it doesn't
+         steal vertical space. */
+    }
+    /* When the diary shows a banner (announcement), the sticky
+       elements above shift down; keep the rail in sync. */
+    .diary-content.has-banner .diary-right-col {
+      top: calc(var(--page-top, var(--safe-top)) + 252px + var(--hamburger-row, 0px));
+      max-height: calc(100vh - var(--page-top, var(--safe-top)) - 272px - var(--hamburger-row, 0px));
     }
 
     /* Two independent flex-columns. Each meal-col packs its own cards
@@ -3016,21 +3039,33 @@
       display: none;
     }
 
-    /* Rail control bar. Small icon buttons at the top-right corner
-       of the rail (pin/hide/close depending on mode). Keeps its own
-       row so widgets below aren't shoved around. */
+    /* Rail control bar. Absolutely positioned at the top-right of
+       the rail so it floats OVER any padding without pushing the
+       first widget down. This keeps the widget top edge aligned
+       with the meal-column top edge on desktop, and with the
+       overlay's own top edge in hidden mode. */
     .rail-controls {
       display: flex;
       justify-content: flex-end;
-      gap: 4px;
-      margin-bottom: -6px;   /* pull first widget up close */
+      gap: 2px;
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      z-index: 2;
+      /* Solid chip background so the icons read cleanly even when
+         they float over the first widget's top-right corner. */
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-full);
+      padding: 2px;
+      box-shadow: 0 2px 6px -3px rgba(0,0,0,0.25);
     }
     .rail-ctrl-btn {
       background: transparent;
       border: 1px solid transparent;
       border-radius: var(--radius-full);
-      width: 26px;
-      height: 26px;
+      width: 22px;
+      height: 22px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
