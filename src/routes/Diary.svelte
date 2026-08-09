@@ -2901,25 +2901,30 @@
       flex-direction: column;
       gap: 12px;
       /* Rail follows the scroll: sticky-positioned below the week
-         strip so widgets stay visible while the user scrolls through
-         a long day. Own scroll region if it would overflow the
-         viewport (many widgets + measurements list). Offset matches
-         the week-strip sticky top plus its ~60px height + 12px gap. */
+         strip so widgets stay visible while scrolling meals. If the
+         combined widget stack is taller than the remaining viewport,
+         the rail becomes its own scroll region so all widgets stay
+         reachable via the rail's own scrollbar. Offset matches the
+         week-strip sticky top plus its ~60px height + 12px gap. */
       position: sticky;
       top: calc(var(--page-top, var(--safe-top)) + 190px + var(--hamburger-row, 0px));
       align-self: start;
-      max-height: calc(100vh - var(--page-top, var(--safe-top)) - 210px - var(--hamburger-row, 0px));
+      max-height: calc(100vh - var(--page-top, var(--safe-top)) - 200px - var(--hamburger-row, 0px));
       overflow-y: auto;
-      /* No top padding: widgets align flush with the meal-column
-         top edge. The rail-controls chevron floats over the top-
-         right corner of the first widget as a chip so it doesn't
-         steal vertical space. */
+      /* Custom scroll padding on the right so the scrollbar doesn't
+         squish against the rounded card corners. */
+      padding-right: 4px;
     }
+    /* Widgets never shrink to fit the rail's max-height — they keep
+       their natural size, and the rail scrolls internally when the
+       stack overflows. Without this, flex-shrink:1 default squishes
+       the last widget into the sliver of remaining space. */
+    .diary-right-col > * { flex-shrink: 0; }
     /* When the diary shows a banner (announcement), the sticky
        elements above shift down; keep the rail in sync. */
     .diary-content.has-banner .diary-right-col {
       top: calc(var(--page-top, var(--safe-top)) + 252px + var(--hamburger-row, 0px));
-      max-height: calc(100vh - var(--page-top, var(--safe-top)) - 272px - var(--hamburger-row, 0px));
+      max-height: calc(100vh - var(--page-top, var(--safe-top)) - 262px - var(--hamburger-row, 0px));
     }
 
     /* Two independent flex-columns. Each meal-col packs its own cards
@@ -3098,7 +3103,7 @@
     .diary-content.rail-overlay-open .diary-right-col {
       display: flex;
       position: fixed;
-      top: 80px;
+      top: calc(var(--page-top, var(--safe-top)) + 60px + var(--hamburger-row, 0px));
       right: 12px;
       bottom: 12px;
       width: 380px;
@@ -3110,6 +3115,10 @@
       box-shadow: 0 20px 50px -20px rgba(0,0,0,0.35);
       padding: 12px;
       overflow-y: auto;
+      /* Reset sticky/pinned constraints so overlay uses its own
+         fixed dimensions, not the sticky-mode max-height. */
+      max-height: none;
+      align-self: auto;
       animation: rail-slide-in 200ms ease-out;
     }
     @keyframes rail-slide-in {

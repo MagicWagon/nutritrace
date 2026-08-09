@@ -52,6 +52,9 @@
       <span class="dsw-lt-opt" class:dsw-lt-active={$macroLegendMode === 'percent'}>%</span>
       <span class="dsw-lt-opt" class:dsw-lt-active={$macroLegendMode === 'grams'}>g</span>
     </button>
+    <button class="dsw-open" on:click={onOpenSummary} title="Open full nutrition summary">
+      <span class="material-symbols-rounded">open_in_full</span>
+    </button>
     {#if onRailModeToggle && railMode === 'pinned'}
       <button
         type="button"
@@ -63,9 +66,6 @@
         <span class="material-symbols-rounded">right_panel_close</span>
       </button>
     {/if}
-    <button class="dsw-open" on:click={onOpenSummary} title="Open full nutrition summary">
-      <span class="material-symbols-rounded">open_in_full</span>
-    </button>
   </header>
 
   <div class="dsw-ring">
