@@ -115,11 +115,12 @@
 
   <!-- Desktop rail widgets (≥1280px only). Each widget can be
        independently hidden. Ignored on mobile — those users see the
-       classic top-right icons + bottom bar instead. Rendered as its
-       own card with a real section title so it doesn't visually
-       merge with the toggles above. -->
-  <p class="section-title" style="margin-top:14px">Desktop Rail Widgets</p>
-  <p class="setting-desc" style="padding:0 var(--page-px) 10px">Choose which widgets appear in the right column on wide screens (≥1280px). Hidden widgets don't render at all; they don't take space.</p>
+       classic top-right icons + bottom bar instead. Section-title
+       + description use inline margin overrides so browser-default
+       <p> margins don't inflate the spacing (.setting-desc is not a
+       global class — no reset applies here). -->
+  <p class="section-title" style="margin:0">Desktop Rail Widgets</p>
+  <p style="margin:0; padding:0 var(--page-px) 10px; font-size:12px; color:var(--text-3); line-height:1.4">Choose which widgets appear in the right column on wide screens (≥1280px). Hidden widgets don't render at all; they don't take space.</p>
   <div class="card settings-card">
     <div class="setting-row">
       <div><span class="setting-label">Day Summary</span><div class="setting-desc">Calorie ring + macro cards.</div></div>

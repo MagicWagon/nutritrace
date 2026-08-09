@@ -1375,8 +1375,14 @@
      Svelte 5 snippets have block scope — a definition inside a
      block is not visible outside it. -->
 {#snippet railWidgets()}
-  {#if (_railMode === 'hidden' && _railOverlay) || (_railMode === 'pinned' && !$diaryRailShowSummary)}
-    <div class="rail-controls">
+  <!-- Rail title bar. Always the first row of the widget stack —
+       gives the panel a clear identity and a consistent home for
+       the mode controls (pin/hide/close). Replaces the previous
+       "put the hide button inside DaySummary's header" approach
+       so DaySummary can go back to just %/g toggle + open_in_full. -->
+  <header class="rail-title">
+    <span class="rail-title-text">Overview</span>
+    <div class="rail-title-actions">
       {#if _railMode === 'pinned'}
         <button
           type="button"
@@ -1408,7 +1414,7 @@
         </button>
       {/if}
     </div>
-  {/if}
+  </header>
   {#if $diaryRailShowSummary}
     <DaySummaryWidget
       eatenKcal={$_calTween}
@@ -1420,8 +1426,6 @@
       carbGoal={carbGoal}
       fatGoal={fatGoal}
       onOpenSummary={() => diaryShowNutritionSummary.set(true)}
-      railMode={_railMode}
-      onRailModeToggle={railHide}
     />
   {/if}
   {#if $diaryRailShowWater && _waterShowInDiary}
@@ -3082,26 +3086,28 @@
       display: none;
     }
 
-    /* Rail control bar. Absolutely positioned at the top-right of
-       the rail so it floats OVER any padding without pushing the
-       first widget down. This keeps the widget top edge aligned
-       with the meal-column top edge on desktop, and with the
-       overlay's own top edge in hidden mode. */
-    .rail-controls {
+    /* Rail title bar. First row of the widget stack — a small
+       header row with an 'Overview' label on the left and the
+       mode-control buttons (pin/hide/close) on the right. Gives
+       the panel a clear identity and a stable home for the
+       controls so widgets below can align with the meal-column
+       top edge cleanly. */
+    .rail-title {
       display: flex;
-      justify-content: flex-end;
+      align-items: center;
+      justify-content: space-between;
+      padding: 2px 4px 4px;
+    }
+    .rail-title-text {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-3);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .rail-title-actions {
+      display: flex;
       gap: 2px;
-      position: absolute;
-      top: 8px;
-      right: 8px;
-      z-index: 2;
-      /* Solid chip background so the icons read cleanly even when
-         they float over the first widget's top-right corner. */
-      background: var(--surface-2);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-full);
-      padding: 2px;
-      box-shadow: 0 2px 6px -3px rgba(0,0,0,0.25);
     }
     .rail-ctrl-btn {
       background: transparent;

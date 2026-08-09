@@ -32,14 +32,6 @@
 
   // Interactive
   export let onOpenSummary    = () => {};
-
-  // Rail-mode controls: parent passes a callback + current mode so
-  // the pin/hide button lives in the widget header (no separate
-  // control row above the widget that would push it below the
-  // meal-column top edge). If onRailModeToggle is not wired, the
-  // button is omitted entirely (mobile / other surfaces).
-  export let railMode           = null;   // 'pinned' | 'hidden' | null
-  export let onRailModeToggle   = null;   // () => void
 </script>
 
 <section class="day-summary-widget card">
@@ -55,17 +47,6 @@
     <button class="dsw-open" on:click={onOpenSummary} title="Open full nutrition summary">
       <span class="material-symbols-rounded">open_in_full</span>
     </button>
-    {#if onRailModeToggle && railMode === 'pinned'}
-      <button
-        type="button"
-        class="dsw-open dsw-rail-btn"
-        on:click={onRailModeToggle}
-        aria-label="Hide widget panel"
-        title="Hide widgets (edge tab reopens)"
-      >
-        <span class="material-symbols-rounded">right_panel_close</span>
-      </button>
-    {/if}
   </header>
 
   <div class="dsw-ring">
