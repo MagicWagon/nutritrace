@@ -344,7 +344,6 @@
   .setting-action:hover { background: var(--surface-2); }
   .setting-label { font-size: 14px; font-weight: 500; }
   .setting-divider { height: 1px; background: var(--border); margin: 0 16px; }
-  .setting-desc { font-size: 12px; color: var(--text-3); line-height: 1.5; font-weight: 400; }
   .si { font-size: 22px; flex-shrink: 0; }
   .sub-label {
     font-size: 11px;

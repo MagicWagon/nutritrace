@@ -17,7 +17,7 @@
 
   import { currentUser, userMgmtActive } from '../stores/auth.js';
   import { isNative, getServerUrl, resolveAssetUrl, apiUrl, getAuthToken } from '../lib/platform.js';
-  import { bannerStyle, envLocks as envLocksStore } from '../stores/settings.js';
+  import { bannerStyle, envLocks as envLocksStore, appearance as appearanceStore, wellnessEnabled, goals as goalsStore } from '../stores/settings.js';
 
   // Per-section pages — one component per slug, dispatched by
   // SECTION_COMPONENTS below.
@@ -224,6 +224,38 @@
     if (!query) return true;
     return (SECTION_KEYWORDS[key] || []).some(kw => kw.includes(query));
   };
+  // Rail "no matches" placeholder — set to true when the query is
+  // non-empty AND every section keyword-map entry fails to match.
+  // Shown at the bottom of the rail so users see feedback instead
+  // of a mysteriously blank column when they mistype.
+  $: _railNoMatches = !!settingsQuery &&
+    !Object.keys(SECTION_KEYWORDS).some(k => sectionVisible(settingsQuery, k));
+
+  // Onboarding shortcut cards for the desktop welcome hero — each
+  // card is state-gated so it disappears once configured. That way
+  // established users see a clean welcome; new users get nudges to
+  // the things that most benefit from being set up first. Order:
+  // Server (blocks sync) → Goals (drives every calorie calc) →
+  // Wellness (unlocks activity-adjusted goals) → Appearance
+  // (personal preference). Only the ones whose condition matches
+  // render; if all pass, the block is omitted entirely.
+  $: _onboardingCards = (() => {
+    const cards = [];
+    if (isNative && !getServerUrl()) {
+      cards.push({ key: 'serverConnection', icon: 'cloud_sync', label: 'Connect a Server', desc: 'Sync your diary across devices.' });
+    }
+    const _g = $goalsStore || {};
+    if (!_g.calories) {
+      cards.push({ key: 'goals', icon: 'flag', label: 'Set Your Goals', desc: 'Calorie + macro targets to track against.' });
+    }
+    if (!$wellnessEnabled) {
+      cards.push({ key: 'wellness', icon: 'favorite', label: 'Set Up Wellness', desc: 'Connect Fitbit, Garmin, or Health Connect.' });
+    }
+    if ($appearanceStore === 'system') {
+      cards.push({ key: 'appearance', icon: 'contrast', label: 'Choose a Theme', desc: 'Pick a light / dark preference and accent color.' });
+    }
+    return cards;
+  })();
 
   // Admin group + Server Connection index row visibility. `isNativeLocal`
   // is native standalone (no server bound). Reactive on getServerUrl()
@@ -554,6 +586,19 @@
            going back to the index. Hidden on mobile via CSS. -->
       <aside class="settings-nav-rail">
         {@render sectionButtons()}
+        {#if _railNoMatches}
+          <!-- Every section-toggle got .hidden'd by the query — show
+               a friendly placeholder so the rail isn't a mystery-
+               blank column. -->
+          <div class="settings-nav-empty">
+            <span class="material-symbols-rounded">search_off</span>
+            <p>No sections match "{settingsSearch}"</p>
+            <button type="button" class="settings-nav-clear"
+              on:click={() => settingsSearch = ''}>
+              Clear search
+            </button>
+          </div>
+        {/if}
       </aside>
 
       <!-- Right pane. Contents differ by state + viewport:
@@ -660,6 +705,30 @@
               <div class="profile-hero-body"
                 transition:slide={{ duration: 220 }}>
                 <Profile />
+              </div>
+            {/if}
+
+            <!-- Onboarding shortcut grid. Only rendered on the
+                 desktop welcome pane (not the /settings/profile
+                 route), and only when at least one card is state-
+                 relevant. Cards disappear once the underlying
+                 thing is configured — established users see a
+                 clean welcome, new users get one-click nudges. -->
+            {#if !currentSection && _onboardingCards.length > 0}
+              <div class="settings-onboarding">
+                <p class="settings-onboarding-heading">Get Set Up</p>
+                <div class="settings-onboarding-grid">
+                  {#each _onboardingCards as card (card.key)}
+                    <button type="button" class="settings-onboarding-card"
+                      on:click={() => toggleSection(card.key)}>
+                      <span class="material-symbols-rounded">{card.icon}</span>
+                      <div class="settings-onboarding-copy">
+                        <span class="settings-onboarding-label">{card.label}</span>
+                        <span class="settings-onboarding-desc">{card.desc}</span>
+                      </div>
+                    </button>
+                  {/each}
+                </div>
               </div>
             {/if}
           </div>
@@ -1013,7 +1082,7 @@
   :global(.drag-handle:active) { cursor: grabbing; color: var(--accent); }
 
   :global(.setting-label) { font-size: 14px; font-weight: 500; flex: 1; }
-  :global(.setting-desc)  { font-size: 12px; color: var(--text-3); margin-top: 2px; font-weight: 400; }
+  :global(.setting-desc)  { font-size: 12px; color: var(--text-3); margin-top: 2px; font-weight: 400; line-height: 1.4; }
   :global(.setting-divider) { height: 1px; background: var(--border); margin: 0 16px; }
 
   :global(.sub-label) {
@@ -1257,6 +1326,13 @@
       background: var(--accent-dim);
       color: var(--accent);
     }
+    /* Focus-visible ring for keyboard nav — makes Tab-through of
+       the rail obvious without adding a mouse-hover ring. */
+    :global(html:not(.force-mobile-layout)) .settings-nav-rail :global(.section-toggle:focus-visible) {
+      outline: 2px solid var(--accent);
+      outline-offset: -2px;
+      background: var(--surface-2);
+    }
     :global(html:not(.force-mobile-layout)) .settings-nav-rail :global(.section-toggle .si) {
       width: 24px;
       height: 24px;
@@ -1270,6 +1346,41 @@
     }
     :global(html:not(.force-mobile-layout)) .settings-nav-rail :global(.settings-group-label:first-child) {
       margin-top: 2px;
+    }
+    /* Empty-search state — small centered placeholder inside the
+       rail with a Clear affordance so the user can escape without
+       manually reaching for the search input. */
+    :global(html:not(.force-mobile-layout)) .settings-nav-rail .settings-nav-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 24px 12px;
+      text-align: center;
+      color: var(--text-3);
+    }
+    :global(html:not(.force-mobile-layout)) .settings-nav-rail .settings-nav-empty :global(.material-symbols-rounded) {
+      font-size: 28px;
+      opacity: 0.7;
+    }
+    :global(html:not(.force-mobile-layout)) .settings-nav-rail .settings-nav-empty p {
+      margin: 0;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    :global(html:not(.force-mobile-layout)) .settings-nav-rail .settings-nav-clear {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-2);
+      padding: 4px 10px;
+      border-radius: var(--radius-full);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    :global(html:not(.force-mobile-layout)) .settings-nav-rail .settings-nav-clear:hover {
+      background: var(--surface-2);
+      color: var(--text-1);
     }
 
     /* Right pane fills its grid column — no max-width so setting
@@ -1293,5 +1404,70 @@
   }
   .profile-hero-body {
     margin-top: 12px;
+  }
+
+  /* Onboarding shortcuts on the welcome pane. Compact card grid
+     that auto-fits — one wide card on narrow, 2-4 across on wider
+     viewports. Each card routes to a settings section that most
+     benefits from being set up first. Cards disappear once the
+     underlying feature is configured (see _onboardingCards). */
+  .settings-onboarding {
+    margin-top: 24px;
+  }
+  .settings-onboarding-heading {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin: 0 4px 8px;
+  }
+  .settings-onboarding-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 10px;
+  }
+  .settings-onboarding-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    text-align: left;
+    transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
+  }
+  .settings-onboarding-card:hover {
+    background: var(--surface-2);
+    border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+    transform: translateY(-1px);
+  }
+  .settings-onboarding-card:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+  .settings-onboarding-card :global(.material-symbols-rounded) {
+    color: var(--accent);
+    font-size: 22px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .settings-onboarding-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .settings-onboarding-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-1);
+  }
+  .settings-onboarding-desc {
+    font-size: 12px;
+    color: var(--text-3);
+    line-height: 1.4;
   }
 </style>

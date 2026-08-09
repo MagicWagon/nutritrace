@@ -956,7 +956,6 @@
     min-height: 50px;
   }
   .setting-label { font-size: 14px; font-weight: 500; flex: 1; }
-  .setting-desc  { font-size: 12px; color: var(--text-3); margin-top: 2px; font-weight: 400; }
   .setting-divider { height: 1px; background: var(--border); margin: 0 16px; }
 
   .sub-label {
