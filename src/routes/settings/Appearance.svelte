@@ -152,6 +152,10 @@
 </script>
 
 <div class="section-body">
+
+  <!-- Group: Theme & Color -->
+  <p class="settings-group-heading">Theme &amp; Color</p>
+  <p class="settings-group-sub">System theme and accent palette used across the app.</p>
   <div class="card settings-card">
     <div class="setting-row">
       <span class="setting-label">{$_('settings.appearance.theme')}</span>
@@ -186,7 +190,12 @@
         </button>
       </div>
     </div>
-    <div class="setting-divider"></div>
+  </div>
+
+  <!-- Group: Navigation -->
+  <p class="settings-group-heading">Navigation</p>
+  <p class="settings-group-sub">How you get around the app and where you land on open.</p>
+  <div class="card settings-card">
     <div class="setting-row">
       <span class="setting-label">{$_('settings.appearance.navigation_style')}</span>
       <div class="select-wrap" style="width:150px">
@@ -214,7 +223,12 @@
         </select>
       </div>
     </div>
-    <div class="setting-divider"></div>
+  </div>
+
+  <!-- Group: Motion & Chrome -->
+  <p class="settings-group-heading">Motion &amp; Chrome</p>
+  <p class="settings-group-sub">Animation intensity and top-of-page banner treatment.</p>
+  <div class="card settings-card">
     <div class="setting-row">
       <span class="setting-label">{$_('settings_main.reduce_motion')}</span>
       <Toggle checked={disableAnimations} on:change={e => { disableAnimations = e.detail; set('disableAnimations', e.detail); }} />
@@ -242,6 +256,7 @@
       </div>
     </div>
     {#if $bannerStyle === 'animated'}
+      <div class="setting-divider"></div>
       <div class="setting-row">
         <div>
           <span class="setting-label">{$_('settings_main.anim_style')}</span>
@@ -258,6 +273,7 @@
       </div>
     {/if}
   </div>
+
 </div>
 
 <!-- Custom color picker sheet -->
