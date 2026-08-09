@@ -1592,18 +1592,27 @@
       </section>
     {/snippet}
 
-    <div class="meal-cols">
-      <div class="meal-col">
-        {#each mealsLeft as m (m.mealIdx)}
-          {@render mealCard(m)}
-        {/each}
+    <!-- {#key $currentDate} re-mounts the whole meal-cols block when the
+         user swaps to another day (via prev/next arrows OR week-strip
+         click), triggering the outer fade so the day change feels like
+         a swap rather than an abrupt content replace. Individual card
+         entrance animations stay gated on _isInitialMount (fires once
+         at initial page mount, not on every re-render). Fade honors
+         the disableAnimations setting. -->
+    {#key $currentDate}
+      <div class="meal-cols" in:fade|local={{ duration: $disableAnimations ? 0 : 180 }}>
+        <div class="meal-col">
+          {#each mealsLeft as m (m.mealIdx)}
+            {@render mealCard(m)}
+          {/each}
+        </div>
+        <div class="meal-col">
+          {#each mealsRight as m (m.mealIdx)}
+            {@render mealCard(m)}
+          {/each}
+        </div>
       </div>
-      <div class="meal-col">
-        {#each mealsRight as m (m.mealIdx)}
-          {@render mealCard(m)}
-        {/each}
-      </div>
-    </div>
+    {/key}
 
     {#if $diaryShowActivity}
       {@const acts = $dayActivity || []}
@@ -2671,9 +2680,6 @@
 
   @media (min-width: 1280px) {
     .diary-content {
-      max-width: 1600px;
-      margin-left: auto;
-      margin-right: auto;
       width: 100%;
       display: grid;
       grid-template-columns: minmax(0, 1fr) 360px;
@@ -2768,13 +2774,6 @@
        meal / notes card. !important because inline style otherwise wins. */
     .diary-content { padding-bottom: 24px !important; }
 
-    /* Match the date-bar internal padding to align its buttons with the
-       centered content column below (rather than capping the whole bar,
-       which would break the full-viewport glass blur + border). */
-    .diary-date-bar {
-      padding-left: max(var(--page-px), calc((100vw - 1600px) / 2 + var(--page-px)));
-      padding-right: max(var(--page-px), calc((100vw - 1600px) / 2 + var(--page-px)));
-    }
   }
 
   /* Water blue — dedicated color, always blue regardless of theme accent */

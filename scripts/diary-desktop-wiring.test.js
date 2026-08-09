@@ -35,8 +35,6 @@ test('Diary imports all six right-rail widgets', () => {
 // ── Wide-viewport media query gates the redesign (Phase 1) ────────────────
 test('Diary gates the desktop redesign at min-width: 1280px', () => {
   assert.match(diarySrc, /@media\s*\(\s*min-width\s*:\s*1280px\s*\)/, 'no 1280px media query');
-  // Content max-width cap should be present
-  assert.match(diarySrc, /max-width:\s*1600px/, 'no 1600px content cap');
 });
 
 // ── Two-column shell + right rail (Phase 2) ───────────────────────────────
