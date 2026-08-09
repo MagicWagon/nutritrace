@@ -1339,7 +1339,12 @@
       gap: 2px;
       position: sticky;
       top: calc(var(--page-top, var(--safe-top)) + 130px + var(--hamburger-row, 0px));
-      max-height: calc(100vh - var(--page-top, var(--safe-top)) - 150px - var(--hamburger-row, 0px));
+      max-height: calc(100vh
+        - var(--page-top, var(--safe-top))
+        - 150px
+        - var(--hamburger-row, 0px)
+        - var(--nav-h, 0px)
+        - var(--safe-bottom, 0px));
       overflow-y: auto;
       padding: 10px 8px;
       background: var(--surface-1);

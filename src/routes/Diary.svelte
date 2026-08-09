@@ -2940,9 +2940,16 @@
       position: sticky;
       top: calc(var(--page-top, var(--safe-top)) + 190px + var(--hamburger-row, 0px));
       align-self: start;
-      /* Leave a small margin under the viewport bottom so the last
-         widget isn't flush with the browser chrome. */
-      max-height: calc(100vh - var(--page-top, var(--safe-top)) - 200px - var(--hamburger-row, 0px));
+      /* Leave a small margin under the viewport bottom AND account
+         for the persistent bottom nav (--nav-h + --safe-bottom) so
+         the last widget's action buttons don't get clipped by the
+         nav bar. */
+      max-height: calc(100vh
+        - var(--page-top, var(--safe-top))
+        - 200px
+        - var(--hamburger-row, 0px)
+        - var(--nav-h, 0px)
+        - var(--safe-bottom, 0px));
       overflow-y: auto;
       /* Visible thin scrollbar so users know they can scroll when
          the stack exceeds the rail height. Firefox uses

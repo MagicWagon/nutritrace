@@ -829,7 +829,14 @@
   // fast (~200ms) so it reads as a single motion: sheet drops, editor or
   // qty prompt comes up underneath in the same beat.
   function onDetailEdit(e) {
-    openEditor(e.detail.food, 'foodList');
+    const food = e.detail.food;
+    // Route by the current tab — meals/recipes need MealEditor, not
+    // FoodEditor. Preserves existing edit destinations while letting
+    // the desktop pane's Edit button do the right thing for the
+    // currently-viewed catalog.
+    if (activeTab === 1) return openMealEditor(food, false);
+    if (activeTab === 2) return openMealEditor(food, true);
+    openEditor(food, 'foodList');
   }
 
   async function onDetailAddToDiary(e) {
@@ -913,8 +920,18 @@
       // Previous behavior was openEditor(food, 'foodList') — full-page
       // navigation to /foods/edit; preserved as the Edit-button destination
       // on the new sheet so no FoodEditor functionality is lost.
-      if (activeTab === 1) { openMealEditor(food, false); return; }
-      if (activeTab === 2) { openMealEditor(food, true);  return; }
+      // Meals / Recipes: on desktop pane mode, populate the pane
+      // (preview reuses the food-shaped nutrition + name + brand);
+      // on mobile, drop straight into the MealEditor since there's
+      // no pane to preview into.
+      if (activeTab === 1) {
+        if (_foodsPaneMode) { _paneFood = food; return; }
+        return openMealEditor(food, false);
+      }
+      if (activeTab === 2) {
+        if (_foodsPaneMode) { _paneFood = food; return; }
+        return openMealEditor(food, true);
+      }
       detailSheetFood = food;
       if (_foodsPaneMode) {
         // Desktop wide: populate the right-pane preview instead of
@@ -1661,15 +1678,26 @@
        over the filter surface. -->
   <div class="foods-body">
     <aside class="foods-filter-rail">
-      <p class="foods-filter-heading">Sources</p>
-      <div class="foods-rail-chips foods-rail-sources">
-        {@render sourceChips()}
-      </div>
+      {#if availableSources.length > 1}
+        <!-- Sources heading + chips only make sense when there's
+             more than one source to pick from. Meals/Recipes with
+             just Local (no shared users) hide the section entirely
+             — no dead heading with a single chip beneath. -->
+        <p class="foods-filter-heading">Sources</p>
+        <div class="foods-rail-chips foods-rail-sources">
+          {@render sourceChips()}
+        </div>
+      {/if}
       {#if activeTab === 0 && searchSource === 'local' && $foodsShowCategories && $foodCategories && $foodCategories.length > 0}
         <p class="foods-filter-heading">Categories</p>
         <div class="foods-rail-chips foods-rail-cats">
           {@render catChips()}
         </div>
+      {/if}
+      {#if availableSources.length <= 1 && !(activeTab === 0 && searchSource === 'local' && $foodsShowCategories && $foodCategories && $foodCategories.length > 0)}
+        <!-- Rail would be empty otherwise — leave a low-key hint so
+             the column doesn't render as a mysteriously-empty box. -->
+        <p class="foods-filter-empty">No filters available for this tab.</p>
       {/if}
     </aside>
 
@@ -3278,6 +3306,14 @@
     :global(html:not(.force-mobile-layout)) .foods-filter-heading:first-child {
       margin-top: 0;
     }
+    :global(html:not(.force-mobile-layout)) .foods-filter-empty {
+      margin: 4px;
+      padding: 12px 8px;
+      color: var(--text-3);
+      font-size: 12px;
+      line-height: 1.4;
+      text-align: center;
+    }
     /* Rail chip containers — flip from horizontal scroll to
        vertical flow. Every chip inside becomes a full-width row. */
     :global(html:not(.force-mobile-layout)) .foods-rail-chips {
@@ -3361,7 +3397,17 @@
       display: block;
       position: sticky;
       top: calc(var(--page-top, var(--safe-top)) + 130px + var(--hamburger-row, 0px));
-      max-height: calc(100vh - var(--page-top, var(--safe-top)) - 150px - var(--hamburger-row, 0px));
+      /* Subtract EVERYTHING between the pane's top and the viewport
+         bottom: safe-top, sticky bar (130), hamburger row, bottom
+         nav (var(--nav-h) + safe-bottom), and a small slack. Without
+         the bottom-nav terms the pane's action buttons (Add to
+         Diary, Edit, Delete) got clipped by the bottom nav bar. */
+      max-height: calc(100vh
+        - var(--page-top, var(--safe-top))
+        - 150px
+        - var(--hamburger-row, 0px)
+        - var(--nav-h, 0px)
+        - var(--safe-bottom, 0px));
       overflow-y: auto;
       padding: 16px;
       background: var(--surface-1);
