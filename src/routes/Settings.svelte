@@ -276,6 +276,167 @@
   });
 </script>
 
+<!-- Settings section-list snippet. Defined at the top level so it's
+     usable from BOTH render sites: (a) the mobile index (below the
+     profile hero, as a single stacked column), and (b) the desktop
+     left rail (Phase A: two-pane shell at ≥1024px). Same markup +
+     same handlers; visual density is context-styled via the parent
+     class (.settings-nav-rail vs .settings-mobile-index). -->
+{#snippet sectionButtons()}
+  <p class="settings-group-label">{$_('settings_main.group_display')}</p>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'appearance')} class:active={currentSection === 'appearance'} on:click={() => toggleSection('appearance')}>
+    <span class="material-symbols-rounded si">contrast</span>
+    <span>{$_('settings.appearance.section')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'regional')} class:active={currentSection === 'regional'} on:click={() => toggleSection('regional')}>
+    <span class="material-symbols-rounded si">language</span>
+    <span>{$_('settings.regional.section')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'diary')} class:active={currentSection === 'diary'} on:click={() => toggleSection('diary')}>
+    <span class="material-symbols-rounded si">book</span>
+    <span>{$_('settings.diary.section')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'water')} class:active={currentSection === 'water'} on:click={() => toggleSection('water')}>
+    <span class="material-symbols-rounded si">water_drop</span>
+    <span>{$_('settings.water.section')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'foods')} class:active={currentSection === 'foods'} on:click={() => toggleSection('foods')}>
+    <span class="material-symbols-rounded si">restaurant</span>
+    <span>{$_('settings.foods.section')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
+
+  <p class="settings-group-label">Data &amp; Tracking</p>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'goals')} class:active={currentSection === 'goals'} on:click={() => toggleSection('goals')}>
+    <span class="material-symbols-rounded si">flag</span>
+    <span>{$_('settings.goals.section')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'bodyStats')} class:active={currentSection === 'bodyStats'} on:click={() => toggleSection('bodyStats')}>
+    <span class="material-symbols-rounded si">straighten</span>
+    <span>{$_('settings.body_stats.section')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'statistics')} class:active={currentSection === 'statistics'} on:click={() => toggleSection('statistics')}>
+    <span class="material-symbols-rounded si">bar_chart</span>
+    <span>{$_('settings.statistics.section')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'nutrients')} class:active={currentSection === 'nutrients'} on:click={() => toggleSection('nutrients')}>
+    <span class="material-symbols-rounded si">science</span>
+    <span>{$_('settings.nutrients.section')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'categories')} class:active={currentSection === 'categories'} on:click={() => toggleSection('categories')}>
+    <span class="material-symbols-rounded si">category</span>
+    <span>{$_('settings.categories.section')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'customUnits')} class:active={currentSection === 'customUnits'} on:click={() => toggleSection('customUnits')}>
+    <span class="material-symbols-rounded si">straighten</span>
+    <span>{$_('settings_stats.custom_units')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
+
+  <p class="settings-group-label">{$_('settings_integrations.group')}</p>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'connectedServices')} class:active={currentSection === 'connectedServices'} on:click={() => toggleSection('connectedServices')}>
+    <span class="material-symbols-rounded si">link</span>
+    <span>{$_('settings.connected_services.section')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'ai')} class:active={currentSection === 'ai'} on:click={() => toggleSection('ai')}>
+    <span class="material-symbols-rounded si">bolt</span>
+    <span>{$_('settings.ai.section')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
+  <button class="section-toggle wellness-toggle" class:hidden={!sectionVisible(settingsQuery, 'wellness')} class:active={currentSection === 'wellness'} on:click={() => toggleSection('wellness')}>
+    <span class="material-symbols-rounded si">favorite</span>
+    <span>{$_('settings.wellness.section')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
+
+  <p class="settings-group-label">App</p>
+  {#if isNative}
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'serverConnection')} class:active={currentSection === 'serverConnection'} on:click={() => toggleSection('serverConnection')}>
+      <span class="material-symbols-rounded si">cloud_sync</span>
+      <span>{$_('settings.server.section')}</span>
+      <span class="material-symbols-rounded chevron">expand_more</span>
+    </button>
+  {/if}
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'notifications')} class:active={currentSection === 'notifications'} on:click={() => toggleSection('notifications')}>
+    <span class="material-symbols-rounded si">notifications</span>
+    <span>{$_('settings.notifications.section')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'backup')} class:active={currentSection === 'backup'} on:click={() => toggleSection('backup')}>
+    <span class="material-symbols-rounded si">backup</span>
+    <span>{$_('settings.backup.section')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'importExport')} class:active={currentSection === 'importExport'} on:click={() => toggleSection('importExport')}>
+    <span class="material-symbols-rounded si">import_export</span>
+    <span>{$_('settings.importExport.section')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
+  {#if $userMgmtActive && !isNativeLocal}
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'sharing')} class:active={currentSection === 'sharing'} on:click={() => toggleSection('sharing')}>
+      <span class="material-symbols-rounded si">group</span>
+      <span>{$_('settings.sharing.section')}</span>
+      <span class="material-symbols-rounded chevron">expand_more</span>
+    </button>
+  {/if}
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'updates')} class:active={currentSection === 'updates'} on:click={() => toggleSection('updates')}>
+    <span class="material-symbols-rounded si">system_update</span>
+    <span>{$_('settings.updates.section')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'helpImprove')} class:active={currentSection === 'helpImprove'} on:click={() => toggleSection('helpImprove')}>
+    <span class="material-symbols-rounded si">troubleshoot</span>
+    <span>{$_('settings.diagnostics.section')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
+
+  {#if !isNativeLocal && (!$userMgmtActive || $currentUser?.role === 'admin')}
+    <p class="settings-group-label">{$_('settings_admin_group')}</p>
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'users')} class:active={currentSection === 'users'} on:click={() => toggleSection('users')}>
+      <span class="material-symbols-rounded si">group</span>
+      <span>{$_('settings.users.section')}</span>
+      <span class="material-symbols-rounded chevron">expand_more</span>
+    </button>
+    {#if $userMgmtActive && $currentUser?.role === 'admin'}
+      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'authentication')} class:active={currentSection === 'authentication'} on:click={() => toggleSection('authentication')}>
+        <span class="material-symbols-rounded si">vpn_key</span>
+        <span>{$_('settings.authentication.section')}</span>
+        <span class="material-symbols-rounded chevron">expand_more</span>
+      </button>
+    {/if}
+    {#if $currentUser?.role === 'admin'}
+      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'email')} class:active={currentSection === 'email'} on:click={() => toggleSection('email')}>
+        <span class="material-symbols-rounded si">mail</span>
+        <span>{$_('settings.email.section')}</span>
+        <span class="material-symbols-rounded chevron">expand_more</span>
+      </button>
+    {/if}
+    {#if $currentUser?.role === 'admin'}
+      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'apiTokens')} class:active={currentSection === 'apiTokens'} on:click={() => toggleSection('apiTokens')}>
+        <span class="material-symbols-rounded si">key</span>
+        <span>API Tokens</span>
+        <span class="material-symbols-rounded chevron">expand_more</span>
+      </button>
+    {/if}
+  {/if}
+
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'about')} class:active={currentSection === 'about'} on:click={() => toggleSection('about')}>
+    <span class="material-symbols-rounded si">info</span>
+    <span>{$_('settings.about.section')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
+{/snippet}
+
 <div class="page-shell">
   <!-- Header + search bar share one sticky container so the search row
        stays flush with the header in BOTH compact and banner-on modes.
@@ -335,21 +496,29 @@
 
   <div class="page-content settings-content" class:subpage-view={!!currentSection}>
 
-    {#if currentSection}
-      <!-- Sub-page: dispatch to the section component. Every extracted
-           file owns its own inner layout (some wrap in .section-body,
-           some render straight into a .card settings-card). -->
-      <svelte:component this={SECTION_COMPONENTS[currentSection]} />
-    {:else}
-      <!-- Index: profile hero + section-toggle rows grouped by
-           settings-group-label. Tapping a row navigates to its
-           sub-page; the accordion pattern is retired. -->
+    <div class="settings-two-pane">
 
-      <!-- ── Profile hero — identity card at the top of Settings.
-           Avatar + name (nickname → full name → "My Profile" fallback) +
-           optional admin pill. Click → /profile. Hidden during search
-           when no profile keyword matches so it doesn't dilute results. -->
-      {#if sectionVisible(settingsQuery, 'profile')}
+      <!-- Left rail (desktop only, ≥1024px). Always shows the full
+           section list so users can jump between sections without
+           going back to the index. Hidden on mobile via CSS. -->
+      <aside class="settings-nav-rail">
+        {@render sectionButtons()}
+      </aside>
+
+      <!-- Right pane. Contents differ by state + viewport:
+             * currentSection set → sub-section component (both mobile
+               and desktop use this)
+             * no currentSection + mobile → full index (profile hero
+               + section list stacked)
+             * no currentSection + desktop → welcome hero (profile
+               card + short "pick a section" prompt) -->
+      <div class="settings-pane">
+        {#if currentSection}
+          <svelte:component this={SECTION_COMPONENTS[currentSection]} />
+        {:else}
+          <!-- Mobile index: profile hero + full section list -->
+          <div class="settings-mobile-index">
+{#if sectionVisible(settingsQuery, 'profile')}
       {@const _u = $currentUser || {}}
       {@const _nick = (_u.nickname || '').trim()}
       {@const _full = (_u.full_name || '').trim()}
@@ -378,188 +547,54 @@
       </button>
       {/if}
 
-      <p class="settings-group-label">{$_('settings_main.group_display')}</p>
-      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'appearance')} on:click={() => toggleSection('appearance')}>
-        <span class="material-symbols-rounded si">contrast</span>
-        <span>{$_('settings.appearance.section')}</span>
-        <span class="material-symbols-rounded chevron">expand_more</span>
-      </button>
-      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'regional')} on:click={() => toggleSection('regional')}>
-        <span class="material-symbols-rounded si">language</span>
-        <span>{$_('settings.regional.section')}</span>
-        <span class="material-symbols-rounded chevron">expand_more</span>
-      </button>
-      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'diary')} on:click={() => toggleSection('diary')}>
-        <span class="material-symbols-rounded si">book</span>
-        <span>{$_('settings.diary.section')}</span>
-        <span class="material-symbols-rounded chevron">expand_more</span>
-      </button>
-      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'water')} on:click={() => toggleSection('water')}>
-        <span class="material-symbols-rounded si">water_drop</span>
-        <span>{$_('settings.water.section')}</span>
-        <span class="material-symbols-rounded chevron">expand_more</span>
-      </button>
-      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'foods')} on:click={() => toggleSection('foods')}>
-        <span class="material-symbols-rounded si">restaurant</span>
-        <span>{$_('settings.foods.section')}</span>
-        <span class="material-symbols-rounded chevron">expand_more</span>
-      </button>
+            {@render sectionButtons()}
+            <div style="height:24px"></div>
+          </div>
 
-      <p class="settings-group-label">Data &amp; Tracking</p>
-      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'goals')} on:click={() => toggleSection('goals')}>
-        <span class="material-symbols-rounded si">flag</span>
-        <span>{$_('settings.goals.section')}</span>
-        <span class="material-symbols-rounded chevron">expand_more</span>
+          <!-- Desktop hero: profile card + prompt. Left rail already
+               shows the section list on desktop, so we don't repeat
+               it here — just a warm entry point + the search
+               already present in the sticky top bar. -->
+          <div class="settings-desktop-hero">
+{#if sectionVisible(settingsQuery, 'profile')}
+      {@const _u = $currentUser || {}}
+      {@const _nick = (_u.nickname || '').trim()}
+      {@const _full = (_u.full_name || '').trim()}
+      {@const _displayName = _nick || (_full && _full !== 'Local User' ? _full : '') || $_('settings.profile_hero.label_fallback')}
+      {@const _hasName = _displayName !== $_('settings.profile_hero.label_fallback')}
+      {@const _initial = (_displayName[0] || '?').toUpperCase()}
+      <button class="profile-hero" on:click={() => push('/profile')}>
+        <div class="profile-hero-avatar">
+          {#if _u.avatar_url}
+            <img src={resolveAssetUrl(_u.avatar_url)} alt="" />
+          {:else if _hasName}
+            <span class="profile-hero-initial">{_initial}</span>
+          {:else}
+            <span class="material-symbols-rounded">person</span>
+          {/if}
+        </div>
+        <div class="profile-hero-info">
+          <span class="profile-hero-name">{_displayName}</span>
+          {#if _hasName && _u.role === 'admin' && $userMgmtActive}
+            <span class="profile-hero-role">{$_('common.admin')}</span>
+          {:else if !_hasName}
+            <span class="profile-hero-sub">{$_('settings.profile_hero.subtitle_empty')}</span>
+          {/if}
+        </div>
+        <span class="material-symbols-rounded profile-hero-chev">chevron_right</span>
       </button>
-      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'bodyStats')} on:click={() => toggleSection('bodyStats')}>
-        <span class="material-symbols-rounded si">straighten</span>
-        <span>{$_('settings.body_stats.section')}</span>
-        <span class="material-symbols-rounded chevron">expand_more</span>
-      </button>
-      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'statistics')} on:click={() => toggleSection('statistics')}>
-        <span class="material-symbols-rounded si">bar_chart</span>
-        <span>{$_('settings.statistics.section')}</span>
-        <span class="material-symbols-rounded chevron">expand_more</span>
-      </button>
-      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'nutrients')} on:click={() => toggleSection('nutrients')}>
-        <span class="material-symbols-rounded si">science</span>
-        <span>{$_('settings.nutrients.section')}</span>
-        <span class="material-symbols-rounded chevron">expand_more</span>
-      </button>
-      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'categories')} on:click={() => toggleSection('categories')}>
-        <span class="material-symbols-rounded si">category</span>
-        <span>{$_('settings.categories.section')}</span>
-        <span class="material-symbols-rounded chevron">expand_more</span>
-      </button>
-      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'customUnits')} on:click={() => toggleSection('customUnits')}>
-        <span class="material-symbols-rounded si">straighten</span>
-        <span>{$_('settings_stats.custom_units')}</span>
-        <span class="material-symbols-rounded chevron">expand_more</span>
-      </button>
-
-      <p class="settings-group-label">{$_('settings_integrations.group')}</p>
-      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'connectedServices')} on:click={() => toggleSection('connectedServices')}>
-        <span class="material-symbols-rounded si">link</span>
-        <span>{$_('settings.connected_services.section')}</span>
-        <span class="material-symbols-rounded chevron">expand_more</span>
-      </button>
-      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'ai')} on:click={() => toggleSection('ai')}>
-        <span class="material-symbols-rounded si">bolt</span>
-        <span>{$_('settings.ai.section')}</span>
-        <span class="material-symbols-rounded chevron">expand_more</span>
-      </button>
-      <button class="section-toggle wellness-toggle" class:hidden={!sectionVisible(settingsQuery, 'wellness')} on:click={() => toggleSection('wellness')}>
-        <span class="material-symbols-rounded si">favorite</span>
-        <span>{$_('settings.wellness.section')}</span>
-        <span class="material-symbols-rounded chevron">expand_more</span>
-      </button>
-
-      <p class="settings-group-label">App</p>
-
-      <!-- ── Server Connection (native only — manages connection to a remote
-           NutriTrace server). PWA users have no "server connection" concept;
-           their Log Out lives in My Profile. -->
-      {#if isNative}
-        <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'serverConnection')} on:click={() => toggleSection('serverConnection')}>
-          <span class="material-symbols-rounded si">cloud_sync</span>
-          <span>{$_('settings.server.section')}</span>
-          <span class="material-symbols-rounded chevron">expand_more</span>
-        </button>
       {/if}
 
-      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'notifications')} on:click={() => toggleSection('notifications')}>
-        <span class="material-symbols-rounded si">notifications</span>
-        <span>{$_('settings.notifications.section')}</span>
-        <span class="material-symbols-rounded chevron">expand_more</span>
-      </button>
-      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'backup')} on:click={() => toggleSection('backup')}>
-        <span class="material-symbols-rounded si">backup</span>
-        <span>{$_('settings.backup.section')}</span>
-        <span class="material-symbols-rounded chevron">expand_more</span>
-      </button>
-      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'importExport')} on:click={() => toggleSection('importExport')}>
-        <span class="material-symbols-rounded si">import_export</span>
-        <span>{$_('settings.importExport.section')}</span>
-        <span class="material-symbols-rounded chevron">expand_more</span>
-      </button>
-
-      <!-- Sharing (per-user; hidden in native local mode — no one to share with) -->
-      {#if $userMgmtActive && !isNativeLocal}
-        <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'sharing')} on:click={() => toggleSection('sharing')}>
-          <span class="material-symbols-rounded si">group</span>
-          <span>{$_('settings.sharing.section')}</span>
-          <span class="material-symbols-rounded chevron">expand_more</span>
-        </button>
-      {/if}
-
-      <!-- Updates — in-app version check + APK install (Android) + admin server-update banner (PWA).
-           Sits in the App section (not Admin) so non-admin members on
-           multi-user instances can still reach their per-device update
-           controls. Canonical position across TraceApps: right before
-           Diagnostics. -->
-      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'updates')} on:click={() => toggleSection('updates')}>
-        <span class="material-symbols-rounded si">system_update</span>
-        <span>{$_('settings.updates.section')}</span>
-        <span class="material-symbols-rounded chevron">expand_more</span>
-      </button>
-      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'helpImprove')} on:click={() => toggleSection('helpImprove')}>
-        <span class="material-symbols-rounded si">troubleshoot</span>
-        <span>{$_('settings.diagnostics.section')}</span>
-        <span class="material-symbols-rounded chevron">expand_more</span>
-      </button>
-
-      <!-- ── Admin group (server-side users / auth / SMTP — only meaningful
-           when there's a real server with user management to administer).
-           Shown when: not native standalone AND (single-user → Users
-           on-ramp visible to the synthetic admin, or multi-user admin
-           viewer). Hidden entirely for non-admin members on multi-user. -->
-      {#if !isNativeLocal && (!$userMgmtActive || $currentUser?.role === 'admin')}
-        <p class="settings-group-label">{$_('settings_admin_group')}</p>
-
-        <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'users')} on:click={() => toggleSection('users')}>
-          <span class="material-symbols-rounded si">group</span>
-          <span>{$_('settings.users.section')}</span>
-          <span class="material-symbols-rounded chevron">expand_more</span>
-        </button>
-
-        {#if $userMgmtActive && $currentUser?.role === 'admin'}
-          <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'authentication')} on:click={() => toggleSection('authentication')}>
-            <span class="material-symbols-rounded si">vpn_key</span>
-            <span>{$_('settings.authentication.section')}</span>
-            <span class="material-symbols-rounded chevron">expand_more</span>
-          </button>
+            <div class="settings-hero-prompt">
+              <span class="material-symbols-rounded">tune</span>
+              <p>Pick a section from the left to configure NutriTrace.</p>
+            </div>
+          </div>
         {/if}
+      </div>
 
-        {#if $currentUser?.role === 'admin'}
-          <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'email')} on:click={() => toggleSection('email')}>
-            <span class="material-symbols-rounded si">mail</span>
-            <span>{$_('settings.email.section')}</span>
-            <span class="material-symbols-rounded chevron">expand_more</span>
-          </button>
-        {/if}
+    </div>
 
-        <!-- API Tokens — no env var gate anymore (was NT_FEATURES_API=1,
-             removed in rc.42). Visible in both multi-user mode (real admin
-             user) and single-user mode (the synthetic local user is admin
-             by definition). -->
-        {#if $currentUser?.role === 'admin'}
-          <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'apiTokens')} on:click={() => toggleSection('apiTokens')}>
-            <span class="material-symbols-rounded si">key</span>
-            <span>API Tokens</span>
-            <span class="material-symbols-rounded chevron">expand_more</span>
-          </button>
-        {/if}
-      {/if}
-
-      <!-- About — standalone footer item, no group label. Always last. -->
-      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'about')} on:click={() => toggleSection('about')}>
-        <span class="material-symbols-rounded si">info</span>
-        <span>{$_('settings.about.section')}</span>
-        <span class="material-symbols-rounded chevron">expand_more</span>
-      </button>
-
-      <div style="height:24px"></div>
-    {/if}
   </div>
 
 </div>
@@ -582,9 +617,14 @@
      never render at all — only the dispatched section component does
      — but the :global guard is kept as a safety net for any extracted
      child that happens to render a .section-toggle etc. of its own. */
-  .subpage-view :global(.section-toggle) { display: none; }
-  .subpage-view :global(.settings-group-label) { display: none; }
-  .subpage-view :global(.profile-hero) { display: none; }
+  /* Scope the subpage-view hides to the mobile index only — on
+     desktop the rail (.settings-nav-rail) legitimately renders
+     .section-toggle + .settings-group-label rows even when a
+     sub-section is active, so a blanket :global hide would nuke
+     the rail. */
+  .subpage-view .settings-mobile-index :global(.section-toggle) { display: none; }
+  .subpage-view .settings-mobile-index :global(.settings-group-label) { display: none; }
+  .subpage-view .settings-mobile-index :global(.profile-hero) { display: none; }
   /* Kill the slide transition on land — the body is already visible
      the moment the sub-page mounts, an entry animation would just be
      a 180ms delay before the user can interact. */
@@ -1053,5 +1093,128 @@
     border-radius: 99px;
     margin-left: 6px;
     vertical-align: middle;
+  }
+
+  /* ───────────────────────────────────────────────────────────────
+     Phase A: Two-pane desktop shell (≥1024px).
+
+     Mobile / narrow (default): single column. Mobile index renders
+     the profile hero + full section list. Sub-pages render solo.
+     Nav rail + desktop hero are hidden.
+
+     Desktop (≥1024px): grid split — left rail (280px) with the
+     section list + right pane (rest) with either the sub-section
+     content or a welcome hero. Content column capped so setting
+     rows don't stretch unreadably wide. Back button hidden — the
+     rail's active-state indicator is now the "where am I" cue. */
+  .settings-two-pane { display: block; }
+  .settings-nav-rail,
+  .settings-desktop-hero { display: none; }
+  .settings-mobile-index { display: block; }
+
+  @media (min-width: 1024px) {
+    .settings-content {
+      max-width: 1400px;
+      margin-left: auto;
+      margin-right: auto;
+      width: 100%;
+    }
+    .settings-two-pane {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      gap: 24px;
+      align-items: start;
+    }
+
+    /* Left rail — sticky below the header + search bar, own scroll
+       if the section list overflows. Uses :global(*) on children
+       because .section-toggle is a shared class rendered inside a
+       snippet — the same reason the Diary rail needed :global(*)
+       on its widget children. */
+    .settings-nav-rail {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      position: sticky;
+      top: calc(var(--page-top, var(--safe-top)) + 130px + var(--hamburger-row, 0px));
+      max-height: calc(100vh - var(--page-top, var(--safe-top)) - 150px - var(--hamburger-row, 0px));
+      overflow-y: auto;
+      padding: 10px 8px;
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+    .settings-nav-rail :global(.section-toggle) {
+      background: transparent;
+      border: none;
+      min-height: 36px;
+      padding: 8px 10px;
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      gap: 10px;
+    }
+    .settings-nav-rail :global(.section-toggle:hover) {
+      background: var(--surface-2);
+    }
+    .settings-nav-rail :global(.section-toggle.active) {
+      background: var(--accent-dim);
+      color: var(--accent);
+    }
+    .settings-nav-rail :global(.section-toggle .si) {
+      width: 24px;
+      height: 24px;
+      font-size: 18px;
+    }
+    .settings-nav-rail :global(.section-toggle .chevron) { display: none; }
+    .settings-nav-rail :global(.settings-group-label) {
+      margin: 12px 4px 4px;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+    }
+    .settings-nav-rail :global(.settings-group-label:first-child) {
+      margin-top: 2px;
+    }
+
+    /* Right pane — capped so setting rows stay readable */
+    .settings-pane {
+      max-width: 820px;
+    }
+
+    /* Desktop-only vs mobile-only content in the pane */
+    .settings-mobile-index { display: none; }
+    .settings-desktop-hero { display: block; }
+
+    /* Back button in the header is meaningless on desktop — rail
+       always shows current section. Hide it so the layout doesn't
+       shift when drilling in. */
+    .settings-back { display: none !important; }
+  }
+
+  /* Desktop welcome hero prompt (below the profile card in
+     .settings-desktop-hero). Sits in the empty-state area when
+     no section is picked — just a warm nudge, since the search bar
+     above and the rail on the left already do the heavy lifting. */
+  .settings-hero-prompt {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 20px 24px;
+    background: var(--surface-1);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-lg);
+    margin-top: 16px;
+    color: var(--text-2);
+  }
+  .settings-hero-prompt :global(.material-symbols-rounded) {
+    color: var(--accent);
+    font-size: 28px;
+    flex-shrink: 0;
+  }
+  .settings-hero-prompt p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.4;
   }
 </style>

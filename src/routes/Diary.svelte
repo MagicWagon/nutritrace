@@ -3019,7 +3019,7 @@
     .meal-col > .meal-group[draggable="true"] { cursor: grab; }
     .meal-col > .meal-group[draggable="true"]:active { cursor: grabbing; }
     .meal-col > .meal-group.dragging {
-      opacity: 0.55;
+      opacity: 0.25;
       transform: scale(0.985);
       transition: opacity 120ms ease, transform 120ms ease;
     }
