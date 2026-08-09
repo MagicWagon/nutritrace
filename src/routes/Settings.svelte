@@ -164,7 +164,7 @@
   const SECTION_KEYWORDS = {
     serverConnection:  ['server','connection','sync','cloud','local','remote','connect','disconnect','url'],
     authentication:    ['authentication','auth','sso','single sign-on','single sign on','oidc','openid','authentik','keycloak','authelia','pocket id','auth0','google','password login','admin group'],
-    appearance:        ['appearance','theme','dark','light','accent','color','navigation','sidebar','persistent','start page','animations','celebrations','reduce motion','banner','page banner'],
+    appearance:        ['appearance','theme','dark','light','accent','color','navigation','sidebar','persistent','start page','animations','celebrations','reduce motion','banner','page banner','force mobile','mobile layout','mobile view','phone layout','narrow layout'],
     regional:          ['regional','language','translation','date format','time format','locale','date','time','12h','24h','units','energy unit','weight unit','height','circumference','distance','temperature','imperial','metric'],
     diary:             ['diary','brands','timestamps','thumbnails','nutrients','nutrition units','macros','macro summary','prompt quantity','portion size','nutrition bar','goals progress','meal names','meals','activity','activity section','exercise','activity template','workout template','template','compendium','met','fasting','fast','intermittent fasting','if','16:8','omad','time restricted','unit metadata','unit conversion','unit conversions','nutrition basis','basis','serving units','serving sizes','density','g/ml','slice','bottle','cookie','milliliter','milliliters','mass','volume','oil','honey','warn','daily notes','notes','quick calories','quick cal','bolt','adjust calorie','calorie adjustment','earn back','wearable activity','activity policy','widget','widgets','rail','right rail','right column','desktop rail','desktop widgets','day summary widget','water widget','weight widget','measurements widget','activity impact','day notes'],
     foods:             ['foods','thumbnails','category','notes','yesterday meals','sort order','sort','barcode','scan','beep','flashlight','crop photos','search all','all sources','merged search','default source','default search','my foods','off','usda','mealie'],
@@ -191,12 +191,17 @@
     about:             ['about','version','nutritrace'],
   };
 
-  // Sub-page mode hides every non-matching row via subpage-view :global()
-  // rules in the shell CSS, but keep the row-level guard too so the
-  // index-mode search filter still works: on the index, only sections
-  // whose keywords include the query show up.
+  // Visibility predicate for section-toggle rows. Only filters when
+  // there's an active search query; presence of currentSection no
+  // longer collapses the list. Historically this predicate returned
+  // `key === currentSection` on a sub-page — that was safe when the
+  // mobile drill-in hid every section-toggle anyway, but the desktop
+  // rail (Phase A two-pane) needs every section to stay visible so
+  // users can jump between them without going back to the index.
+  // The mobile sub-page still hides all toggles via the scoped
+  // `.subpage-view .settings-mobile-index :global(.section-toggle)`
+  // rule in the stylesheet, so this change doesn't leak on mobile.
   $: sectionVisible = (query, key) => {
-    if (currentSection) return key === currentSection;
     if (!query) return true;
     return (SECTION_KEYWORDS[key] || []).some(kw => kw.includes(query));
   };
@@ -1158,7 +1163,7 @@
     /* Settings fills the viewport width — no outer max-width cap.
        Same principle you asked for on Diary: don't waste horizontal
        real estate on ultrawides. */
-    .settings-two-pane {
+    :where(html:not(.force-mobile-layout)) .settings-two-pane {
       display: grid;
       grid-template-columns: 280px minmax(0, 1fr);
       gap: 24px;
@@ -1170,7 +1175,7 @@
        because .section-toggle is a shared class rendered inside a
        snippet — the same reason the Diary rail needed :global(*)
        on its widget children. */
-    .settings-nav-rail {
+    :where(html:not(.force-mobile-layout)) .settings-nav-rail {
       display: flex;
       flex-direction: column;
       gap: 2px;
@@ -1185,7 +1190,7 @@
       scrollbar-width: thin;
       scrollbar-color: var(--border) transparent;
     }
-    .settings-nav-rail :global(.section-toggle) {
+    :where(html:not(.force-mobile-layout)) .settings-nav-rail :global(.section-toggle) {
       background: transparent;
       border: none;
       min-height: 36px;
@@ -1194,25 +1199,25 @@
       font-size: 13px;
       gap: 10px;
     }
-    .settings-nav-rail :global(.section-toggle:hover) {
+    :where(html:not(.force-mobile-layout)) .settings-nav-rail :global(.section-toggle:hover) {
       background: var(--surface-2);
     }
-    .settings-nav-rail :global(.section-toggle.active) {
+    :where(html:not(.force-mobile-layout)) .settings-nav-rail :global(.section-toggle.active) {
       background: var(--accent-dim);
       color: var(--accent);
     }
-    .settings-nav-rail :global(.section-toggle .si) {
+    :where(html:not(.force-mobile-layout)) .settings-nav-rail :global(.section-toggle .si) {
       width: 24px;
       height: 24px;
       font-size: 18px;
     }
-    .settings-nav-rail :global(.section-toggle .chevron) { display: none; }
-    .settings-nav-rail :global(.settings-group-label) {
+    :where(html:not(.force-mobile-layout)) .settings-nav-rail :global(.section-toggle .chevron) { display: none; }
+    :where(html:not(.force-mobile-layout)) .settings-nav-rail :global(.settings-group-label) {
       margin: 12px 4px 4px;
       font-size: 10px;
       letter-spacing: 0.1em;
     }
-    .settings-nav-rail :global(.settings-group-label:first-child) {
+    :where(html:not(.force-mobile-layout)) .settings-nav-rail :global(.settings-group-label:first-child) {
       margin-top: 2px;
     }
 
@@ -1220,8 +1225,8 @@
        rows extend to the viewport edge. */
 
     /* Desktop-only vs mobile-only content in the pane */
-    .settings-mobile-index { display: none; }
-    .settings-desktop-hero { display: block; }
+    :where(html:not(.force-mobile-layout)) .settings-mobile-index { display: none; }
+    :where(html:not(.force-mobile-layout)) .settings-desktop-hero { display: block; }
   }
 
   /* Desktop welcome hero prompt (below the profile card in

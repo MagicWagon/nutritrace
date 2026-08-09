@@ -522,6 +522,12 @@ export const diaryShowNotes         = createSettingStore('diaryShowNotes',      
 // can be independently hidden by the user. Defaults show everything so
 // a fresh install feels complete; power users trim to their taste in
 // Settings → Diary → Desktop rail widgets.
+// Force-mobile layout: when true, the desktop breakpoints (two-pane
+// Settings, Diary right rail, week strip, etc.) are all gated off
+// even at wide viewport widths so users who prefer the mobile
+// pattern on their desktop get exactly that.
+export const forceMobileLayout         = createSettingStore('forceMobileLayout',         false);
+
 export const diaryRailShowSummary      = createSettingStore('diaryRailShowSummary',       true);
 export const diaryRailShowWater        = createSettingStore('diaryRailShowWater',         true);
 export const diaryRailShowBodyStats    = createSettingStore('diaryRailShowBodyStats',     true);

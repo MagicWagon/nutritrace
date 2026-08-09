@@ -5,7 +5,7 @@
   import Sheet from '../../components/ui/Sheet.svelte';
   import { DB } from '../../lib/db.js';
   import {
-    appearance, accentColor, sidebarPersistent, goalCelebrations,
+    appearance, accentColor, sidebarPersistent, goalCelebrations, forceMobileLayout,
     bannerStyle, bannerAnimation,
     applyAppearance, applyAccentColor, scheduleSave,
   } from '../../stores/settings.js';
@@ -222,6 +222,14 @@
           {#each START_PAGE_OPTS as o}<option value={o.value}>{o.label}</option>{/each}
         </select>
       </div>
+    </div>
+    <div class="setting-divider"></div>
+    <div class="setting-row">
+      <div>
+        <span class="setting-label">Force Mobile Layout</span>
+        <div class="setting-desc">Keep the mobile pattern (single-column Diary, drill-in Settings) even on wide screens. Turn this on if you prefer the phone-style layout on your desktop.</div>
+      </div>
+      <Toggle checked={$forceMobileLayout} on:change={e => forceMobileLayout.set(e.detail)} />
     </div>
   </div>
 

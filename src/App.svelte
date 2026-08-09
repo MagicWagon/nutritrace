@@ -10,7 +10,7 @@
   import ConfirmDialogMount from './components/ui/ConfirmDialogMount.svelte';
   import { DB, localDateStr } from './lib/db.js';
   import { currentDate, loadEntry } from './stores/diary.js';
-  import { navStyle, applyAccentColor, accentColor, applyAppearance, appearance, disableAnimations, sidebarPersistent, language, pageBanners, bannerStyle, bannerAnimation } from './stores/settings.js';
+  import { navStyle, applyAccentColor, accentColor, applyAppearance, appearance, disableAnimations, sidebarPersistent, language, pageBanners, bannerStyle, bannerAnimation, forceMobileLayout } from './stores/settings.js';
   import { locale, _ } from 'svelte-i18n';
   import { currentUser, userMgmtActive, setupRequired, loadAuthState, handleOidcCallback } from './stores/auth.js';
   import { needsNativeSetup, isNative, getNativeMode, getServerUrl, apiUrl } from './lib/platform.js';
@@ -292,6 +292,13 @@
   // Apply/remove no-animations class when setting changes
   $: if (typeof document !== 'undefined') {
     document.documentElement.classList.toggle('no-animations', !!$disableAnimations);
+  }
+  // Force-mobile layout: gates every desktop @media rule via the
+  // :where(html:not(.force-mobile-layout)) prefix in Diary + Settings
+  // stylesheets. When on, wide viewports still get the mobile pattern
+  // (single-column diary, drill-in settings, no rail, no week strip).
+  $: if (typeof document !== 'undefined') {
+    document.documentElement.classList.toggle('force-mobile-layout', !!$forceMobileLayout);
   }
   // Apply/remove banner-gradient class on the document so portaled top-bar
   // action buttons (which live outside the .page-header in the DOM, e.g.
