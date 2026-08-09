@@ -20,6 +20,7 @@
   export let containers   = [];
   export let onQuickAdd   = () => {};
   export let onRemove     = () => {};
+  export let onOpen       = null;   // opens the full water sheet
 
   let customOpen = false;
   let customAmt  = '';
@@ -82,6 +83,11 @@
     <span class="material-symbols-rounded ww-icon">water_drop</span>
     <span class="ww-title">Water</span>
     <span class="ww-total">{displayTotal} <span class="ww-of">of {displayGoal}</span></span>
+    {#if onOpen}
+      <button class="ww-open" on:click={onOpen} title="Open water sheet" aria-label="Open water sheet">
+        <span class="material-symbols-rounded">open_in_full</span>
+      </button>
+    {/if}
   </header>
 
   <div class="ww-bar-track" title="{pct}%">
@@ -168,6 +174,20 @@
     color: var(--text-3);
     margin-left: 2px;
   }
+  .ww-open {
+    background: transparent;
+    border: none;
+    color: var(--text-3);
+    cursor: pointer;
+    padding: 4px;
+    margin-left: 4px;
+    border-radius: var(--radius-sm);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .ww-open:hover { color: var(--text-1); background: var(--surface-2); }
+  .ww-open .material-symbols-rounded { font-size: 16px; }
 
   .ww-bar-track {
     height: 8px;

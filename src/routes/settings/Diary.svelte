@@ -11,8 +11,8 @@
     diaryShowActivity, manualActivityPolicy, calorieAdjustFromActivity,
     showQuickCalories, quickCaloriesDisplay,
     diaryShowNutritionBar,
-    diaryRailShowSummary, diaryRailShowWater, diaryRailShowWeight,
-    diaryRailShowMeasurements, diaryRailShowActivity as diaryRailShowActivityWidget,
+    diaryRailShowSummary, diaryRailShowWater, diaryRailShowBodyStats,
+    diaryRailShowActivity as diaryRailShowActivityWidget,
     diaryRailShowNotes,
     healthConnectEnabled,
     fastingEnabled, fastingDefaultHours, fastingNotifyOnGoal,
@@ -133,13 +133,8 @@
     </div>
     <div class="setting-divider"></div>
     <div class="setting-row">
-      <div><span class="setting-label">Weight</span></div>
-      <Toggle checked={$diaryRailShowWeight} on:change={e => diaryRailShowWeight.set(e.detail)} />
-    </div>
-    <div class="setting-divider"></div>
-    <div class="setting-row">
-      <div><span class="setting-label">Body Measurements</span></div>
-      <Toggle checked={$diaryRailShowMeasurements} on:change={e => diaryRailShowMeasurements.set(e.detail)} />
+      <div><span class="setting-label">Body Stats</span><div class="setting-desc">Weight + measurements in one card.</div></div>
+      <Toggle checked={$diaryRailShowBodyStats} on:change={e => diaryRailShowBodyStats.set(e.detail)} />
     </div>
     <div class="setting-divider"></div>
     <div class="setting-row">

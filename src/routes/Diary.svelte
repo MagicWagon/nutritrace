@@ -12,8 +12,7 @@
   import MacroRing    from '../components/diary/MacroRing.svelte';
   import DaySummaryWidget from '../components/diary/DaySummaryWidget.svelte';
   import WaterWidget       from '../components/diary/WaterWidget.svelte';
-  import WeightWidget      from '../components/diary/WeightWidget.svelte';
-  import BodyMeasurementsWidget from '../components/diary/BodyMeasurementsWidget.svelte';
+  import BodyStatsWidget   from '../components/diary/BodyStatsWidget.svelte';
   import ActivityImpactWidget from '../components/diary/ActivityImpactWidget.svelte';
   import WeekStrip           from '../components/diary/WeekStrip.svelte';
   import AddActivitySheet from '../components/diary/AddActivitySheet.svelte';
@@ -47,8 +46,8 @@
            diaryShowActivity, manualActivityPolicy, calorieAdjustFromActivity,
            fastingEnabled,
            wellnessEnabled,
-           diaryRailShowSummary, diaryRailShowWater, diaryRailShowWeight,
-           diaryRailShowMeasurements, diaryRailShowActivity as diaryRailShowActivityWidget,
+           diaryRailShowSummary, diaryRailShowWater, diaryRailShowBodyStats,
+           diaryRailShowActivity as diaryRailShowActivityWidget,
            diaryRailShowNotes } from '../stores/settings.js';
   import { dayActivity, activitySummary, loadActivity, deleteActivity } from '../stores/activity.js';
   import WaterBanner  from '../components/banners/WaterBanner.svelte';
@@ -1437,22 +1436,19 @@
       containers={_waterContainers}
       onQuickAdd={(ml) => addWaterLog(ml, $currentDate)}
       onRemove={_removeWaterLog}
+      onOpen={() => showWaterQuickAdd = true}
     />
   {/if}
-  {#if $diaryRailShowWeight}
-    <WeightWidget
+  {#if $diaryRailShowBodyStats}
+    <BodyStatsWidget
       currentWeight={bodyStatsData.weight ?? null}
-      unit={$weightUnit || 'kg'}
-      onSave={async (val) => {
+      weightUnit={$weightUnit || 'kg'}
+      stats={bodyStatsData}
+      lengthUnit={$lengthUnit || 'in'}
+      onSaveWeight={async (val) => {
         bodyStatsData = { ...bodyStatsData, weight: val };
         await saveBodyStatsLocal();
       }}
-    />
-  {/if}
-  {#if $diaryRailShowMeasurements}
-    <BodyMeasurementsWidget
-      stats={bodyStatsData}
-      unit={$lengthUnit || 'in'}
       onOpen={openBodyStats}
     />
   {/if}

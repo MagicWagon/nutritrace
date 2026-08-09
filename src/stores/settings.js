@@ -524,8 +524,7 @@ export const diaryShowNotes         = createSettingStore('diaryShowNotes',      
 // Settings → Diary → Desktop rail widgets.
 export const diaryRailShowSummary      = createSettingStore('diaryRailShowSummary',       true);
 export const diaryRailShowWater        = createSettingStore('diaryRailShowWater',         true);
-export const diaryRailShowWeight       = createSettingStore('diaryRailShowWeight',        true);
-export const diaryRailShowMeasurements = createSettingStore('diaryRailShowMeasurements',  true);
+export const diaryRailShowBodyStats    = createSettingStore('diaryRailShowBodyStats',     true);
 export const diaryRailShowActivity     = createSettingStore('diaryRailShowActivity',      true);
 export const diaryRailShowNotes        = createSettingStore('diaryRailShowNotes',         true);
 
