@@ -1418,6 +1418,87 @@
   on:resize={_closeTierDropdowns}
 />
 
+<!-- Source + category chip snippets. Rendered inline in the mobile
+     sticky bar (horizontal scroll) AND inside the desktop
+     .foods-filter-rail (vertical list). Same event handlers +
+     state either way — snippet-driven so behavior stays in one
+     place while the layout adapts. -->
+{#snippet sourceChips()}
+  {#if availableSources.length > 1}
+    {#each availableSources as src}
+      {#if src.value === 'off'}
+        <div class="source-chip-wrap">
+          <button class="source-chip source-chip-split"
+                  class:active={activeChips.off}
+                  on:click={() => _onChipTap('off')}
+                  on:contextmenu|preventDefault={() => _toggleChipInMulti('off')}
+                  on:touchstart|passive={(e) => _startChipLongPress('off', e)}
+                  on:touchmove|passive={_maybeCancelChipLongPress}
+                  on:touchend={_cancelChipLongPress}
+                  on:touchcancel={_cancelChipLongPress}>
+            {src.label}
+            {#if offTiersFiltered}<span class="tier-active-dot" title="OFF tier filter active"></span>{/if}
+          </button>
+          <button class="source-chip-caret"
+                  class:active={activeChips.off}
+                  class:open={offDropdownOpen}
+                  bind:this={offCaretEl}
+                  on:click={openOffDropdown}
+                  aria-label="Filter OFF results by quality tier"
+                  aria-expanded={offDropdownOpen}>
+            <span class="material-symbols-rounded">expand_more</span>
+          </button>
+        </div>
+      {:else if src.value === 'usda'}
+        <div class="source-chip-wrap">
+          <button class="source-chip source-chip-split"
+                  class:active={activeChips.usda}
+                  on:click={() => _onChipTap('usda')}
+                  on:contextmenu|preventDefault={() => _toggleChipInMulti('usda')}
+                  on:touchstart|passive={(e) => _startChipLongPress('usda', e)}
+                  on:touchmove|passive={_maybeCancelChipLongPress}
+                  on:touchend={_cancelChipLongPress}
+                  on:touchcancel={_cancelChipLongPress}>
+            {src.label}
+            {#if usdaTiersFiltered}<span class="tier-active-dot" title="USDA tier filter active"></span>{/if}
+          </button>
+          <button class="source-chip-caret"
+                  class:active={activeChips.usda}
+                  class:open={usdaDropdownOpen}
+                  bind:this={usdaCaretEl}
+                  on:click={openUsdaDropdown}
+                  aria-label="Filter USDA results by data type"
+                  aria-expanded={usdaDropdownOpen}>
+            <span class="material-symbols-rounded">expand_more</span>
+          </button>
+        </div>
+      {:else}
+        <button class="source-chip"
+                class:active={activeChips[src.value]}
+                on:click={() => _onChipTap(src.value)}
+                on:contextmenu|preventDefault={() => _toggleChipInMulti(src.value)}
+                on:touchstart|passive={(e) => _startChipLongPress(src.value, e)}
+                on:touchmove|passive={_maybeCancelChipLongPress}
+                on:touchend={_cancelChipLongPress}
+                on:touchcancel={_cancelChipLongPress}>
+          {src.label}
+        </button>
+      {/if}
+    {/each}
+  {/if}
+{/snippet}
+
+{#snippet catChips()}
+  {#if activeTab === 0 && searchSource === 'local' && $foodsShowCategories && $foodCategories && $foodCategories.length > 0}
+    <button class="cat-chip" class:active={!activeCategoryFilter}
+      on:click={() => activeCategoryFilter = ''}>{$_('foods.category_all')}</button>
+    {#each $foodCategories as cat}
+      <button class="cat-chip" class:active={activeCategoryFilter === _catName(cat)}
+        on:click={() => activeCategoryFilter = activeCategoryFilter === _catName(cat) ? '' : _catName(cat)}>{$foodsShowLabels ? _catDisplay(cat) : _catName(cat)}</button>
+    {/each}
+  {/if}
+{/snippet}
+
 <div class="page-shell">
   <!-- Manage-mode action icons — fixed at top-right, matches Diary UX -->
   {#if manageMode}
@@ -1483,86 +1564,43 @@
     </div>
   </div>
 
-  <!-- Source chips: Foods tab gets the full list (Local + OFF/USDA/Mealie/Shared
-       depending on which are enabled). Meals + Recipes tabs only show the row
-       when there's actually something to filter (Local + From Others). -->
-  {#if availableSources.length > 1}
+  <!-- Mobile chip rows — horizontal scroll inside the sticky bar
+       (sources) + below the sticky bar (categories). Both are
+       CSS-hidden on desktop (≥1280px) since the .foods-filter-rail
+       shows the same chips vertically. -->
+  <div class="foods-mobile-chips">
     <div class="source-chip-row">
-      {#each availableSources as src}
-        {#if src.value === 'off'}
-          <div class="source-chip-wrap">
-            <button class="source-chip source-chip-split"
-                    class:active={activeChips.off}
-                    on:click={() => _onChipTap('off')}
-                    on:contextmenu|preventDefault={() => _toggleChipInMulti('off')}
-                    on:touchstart|passive={(e) => _startChipLongPress('off', e)}
-                    on:touchmove|passive={_maybeCancelChipLongPress}
-                    on:touchend={_cancelChipLongPress}
-                    on:touchcancel={_cancelChipLongPress}>
-              {src.label}
-              {#if offTiersFiltered}<span class="tier-active-dot" title="OFF tier filter active"></span>{/if}
-            </button>
-            <button class="source-chip-caret"
-                    class:active={activeChips.off}
-                    class:open={offDropdownOpen}
-                    bind:this={offCaretEl}
-                    on:click={openOffDropdown}
-                    aria-label="Filter OFF results by quality tier"
-                    aria-expanded={offDropdownOpen}>
-              <span class="material-symbols-rounded">expand_more</span>
-            </button>
-          </div>
-        {:else if src.value === 'usda'}
-          <div class="source-chip-wrap">
-            <button class="source-chip source-chip-split"
-                    class:active={activeChips.usda}
-                    on:click={() => _onChipTap('usda')}
-                    on:contextmenu|preventDefault={() => _toggleChipInMulti('usda')}
-                    on:touchstart|passive={(e) => _startChipLongPress('usda', e)}
-                    on:touchmove|passive={_maybeCancelChipLongPress}
-                    on:touchend={_cancelChipLongPress}
-                    on:touchcancel={_cancelChipLongPress}>
-              {src.label}
-              {#if usdaTiersFiltered}<span class="tier-active-dot" title="USDA tier filter active"></span>{/if}
-            </button>
-            <button class="source-chip-caret"
-                    class:active={activeChips.usda}
-                    class:open={usdaDropdownOpen}
-                    bind:this={usdaCaretEl}
-                    on:click={openUsdaDropdown}
-                    aria-label="Filter USDA results by data type"
-                    aria-expanded={usdaDropdownOpen}>
-              <span class="material-symbols-rounded">expand_more</span>
-            </button>
-          </div>
-        {:else}
-          <button class="source-chip"
-                  class:active={activeChips[src.value]}
-                  on:click={() => _onChipTap(src.value)}
-                  on:contextmenu|preventDefault={() => _toggleChipInMulti(src.value)}
-                  on:touchstart|passive={(e) => _startChipLongPress(src.value, e)}
-                  on:touchmove|passive={_maybeCancelChipLongPress}
-                  on:touchend={_cancelChipLongPress}
-                  on:touchcancel={_cancelChipLongPress}>
-            {src.label}
-          </button>
-        {/if}
-      {/each}
+      {@render sourceChips()}
     </div>
-  {/if}
+  </div>
   </div>
 
-  <!-- Category filter chips (Local + Foods tab only) -->
-  {#if activeTab === 0 && searchSource === 'local' && $foodsShowCategories && $foodCategories && $foodCategories.length > 0}
+  <div class="foods-mobile-chips">
     <div class="cat-filter-row">
-      <button class="cat-chip" class:active={!activeCategoryFilter}
-        on:click={() => activeCategoryFilter = ''}>{$_('foods.category_all')}</button>
-      {#each $foodCategories as cat}
-        <button class="cat-chip" class:active={activeCategoryFilter === _catName(cat)}
-          on:click={() => activeCategoryFilter = activeCategoryFilter === _catName(cat) ? '' : _catName(cat)}>{$foodsShowLabels ? _catDisplay(cat) : _catName(cat)}</button>
-      {/each}
+      {@render catChips()}
     </div>
-  {/if}
+  </div>
+
+  <!-- Foods body: two-pane split at ≥1280px. Left rail holds the
+       filter chips vertically; main pane holds the food list. Below
+       1280px (or when force-mobile-layout is on) this collapses to
+       a single main column and the .foods-mobile-chips above take
+       over the filter surface. -->
+  <div class="foods-body">
+    <aside class="foods-filter-rail">
+      <p class="foods-filter-heading">Sources</p>
+      <div class="foods-rail-chips foods-rail-sources">
+        {@render sourceChips()}
+      </div>
+      {#if activeTab === 0 && searchSource === 'local' && $foodsShowCategories && $foodCategories && $foodCategories.length > 0}
+        <p class="foods-filter-heading">Categories</p>
+        <div class="foods-rail-chips foods-rail-cats">
+          {@render catChips()}
+        </div>
+      {/if}
+    </aside>
+
+    <div class="foods-main">
 
   <!-- Yesterday's meals (pick mode only) -->
   {#if pickMode && yesterdayMeals.length > 0 && !search && activeTab === 1}
@@ -2014,7 +2052,9 @@
         {/if}
       {/if}
     {/if}
-  </div>
+  </div><!-- /.page-content -->
+    </div><!-- /.foods-main -->
+  </div><!-- /.foods-body -->
 </div>
 
 <!-- Multi-item portion sheet -->
@@ -3079,4 +3119,114 @@
     pointer-events: all;
   }
   .select-mode-title { color: var(--accent); }
+
+  /* ───────────────────────────────────────────────────────────────
+     Foods desktop Phase A — left filter rail (≥1280px).
+
+     Mobile / narrow (default): chip rows sit inline in the sticky
+     bar (sources) and just below it (categories), scrolling
+     horizontally. That behavior is unchanged.
+
+     Desktop (≥1280px, unless force-mobile-layout is on): the same
+     chip-render snippets flow vertically into a 240px sticky rail
+     on the left of the foods body; the mobile inline chip rows
+     are hidden. Same handlers, same state — one code path, two
+     layouts, mirroring the Diary right-rail + Settings two-pane
+     pattern. */
+  .foods-body {
+    display: block;
+  }
+  .foods-filter-rail {
+    display: none;
+  }
+
+  @media (min-width: 1280px) {
+    :global(html:not(.force-mobile-layout)) .foods-body {
+      display: grid;
+      grid-template-columns: 240px minmax(0, 1fr);
+      gap: 20px;
+      align-items: start;
+      padding: 0 var(--page-px);
+    }
+    /* Rail — sticks below the sticky search bar. Its top offset
+       matches the sticky bar's bottom edge (search + tabs + safe
+       area). Own scroll if the filter list is very tall. */
+    :global(html:not(.force-mobile-layout)) .foods-filter-rail {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      position: sticky;
+      top: calc(var(--page-top, var(--safe-top)) + 130px + var(--hamburger-row, 0px));
+      max-height: calc(100vh - var(--page-top, var(--safe-top)) - 150px - var(--hamburger-row, 0px));
+      overflow-y: auto;
+      padding: 12px 10px;
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+    :global(html:not(.force-mobile-layout)) .foods-filter-heading {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-3);
+      margin: 8px 4px 6px;
+    }
+    :global(html:not(.force-mobile-layout)) .foods-filter-heading:first-child {
+      margin-top: 0;
+    }
+    /* Rail chip containers — flip from horizontal scroll to
+       vertical flow. Every chip inside becomes a full-width row. */
+    :global(html:not(.force-mobile-layout)) .foods-rail-chips {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      overflow: visible;
+      padding: 0;
+    }
+    /* Chip restyle inside the rail: full-width, left-aligned pills
+       instead of round mobile chips. Uses :global() because the
+       chip markup lives inside the snippet (rendered inside the
+       rail via {@render sourceChips()}), so Diary's scoping hash
+       won't be on them without opting out. */
+    :global(html:not(.force-mobile-layout)) .foods-rail-chips :global(.source-chip),
+    :global(html:not(.force-mobile-layout)) .foods-rail-chips :global(.source-chip-split),
+    :global(html:not(.force-mobile-layout)) .foods-rail-chips :global(.cat-chip) {
+      width: 100%;
+      justify-content: flex-start;
+      text-align: left;
+      padding: 8px 12px;
+      border-radius: var(--radius-md);
+      border-width: 1px;
+      font-weight: 500;
+    }
+    :global(html:not(.force-mobile-layout)) .foods-rail-chips :global(.source-chip.active),
+    :global(html:not(.force-mobile-layout)) .foods-rail-chips :global(.cat-chip.active) {
+      background: var(--accent-dim);
+      color: var(--accent);
+      border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+    }
+    /* Split source chips (OFF, USDA) — keep the caret snug on the
+       right of the pill. */
+    :global(html:not(.force-mobile-layout)) .foods-rail-chips :global(.source-chip-wrap) {
+      display: flex;
+      width: 100%;
+    }
+    :global(html:not(.force-mobile-layout)) .foods-rail-chips :global(.source-chip-wrap .source-chip) {
+      flex: 1 1 auto;
+      border-top-right-radius: 0;
+      border-bottom-right-radius: 0;
+    }
+    :global(html:not(.force-mobile-layout)) .foods-rail-chips :global(.source-chip-caret) {
+      border-top-left-radius: 0;
+      border-bottom-left-radius: 0;
+    }
+    /* Hide mobile chip scrollers on desktop — same chips now live
+       in the rail. */
+    :global(html:not(.force-mobile-layout)) .foods-mobile-chips {
+      display: none;
+    }
+  }
 </style>
