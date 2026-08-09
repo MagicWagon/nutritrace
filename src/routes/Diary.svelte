@@ -434,6 +434,26 @@
   // subscription below (each new entry increments the key once).
   let _weekStripRefreshKey = 0;
 
+  // Phase 7: viewport-width tracker so drag-to-copy is only enabled
+  // at ≥1280px where the week strip (drop target) actually renders.
+  // Below that, dragging would silently no-op (nowhere to drop); the
+  // ⋮ → Copy flow covers the touch use case.
+  let _wideViewport = false;
+  function _syncWideViewport() {
+    if (typeof window === 'undefined') return;
+    _wideViewport = window.matchMedia('(min-width: 1280px)').matches;
+  }
+  onMount(() => {
+    _syncWideViewport();
+    const mq = window.matchMedia('(min-width: 1280px)');
+    const handler = () => _syncWideViewport();
+    // .addEventListener is the modern signature; keep .addListener for older Safari
+    mq.addEventListener ? mq.addEventListener('change', handler) : mq.addListener(handler);
+    return () => {
+      mq.removeEventListener ? mq.removeEventListener('change', handler) : mq.removeListener(handler);
+    };
+  });
+
   // Phase 7: drag-to-copy meals across the week strip.
   //   1. User grabs a populated meal card (draggable={!isEmpty}; works
   //      on any viewed day — copyMealToDate uses currentDate as source)
@@ -1349,7 +1369,7 @@
         id="meal-{mealIdx}"
         style="order:{mealIdx}"
         in:fly={{ y: 18, duration: _isInitialMount && !$disableAnimations ? 280 : 0, delay: _isInitialMount && !$disableAnimations ? 60 + mealIdx * 55 : 0 }}
-        draggable={!isEmpty}
+        draggable={!isEmpty && _wideViewport}
         on:dragstart={(e) => _onMealDragStart(e, mealIdx)}
         on:dragend={_onMealDragEnd}
       >
