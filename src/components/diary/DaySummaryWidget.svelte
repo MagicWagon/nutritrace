@@ -170,9 +170,12 @@
   .dsw-toggle-icon { font-size: 14px; }
 
   .dsw-ring {
-    display: flex;
-    justify-content: center;
+    /* MacroRing renders two sibling elements (SVG ring, then a percent
+       legend). Block layout lets the SVG center itself (its own
+       margin:0 auto handles that) and the legend flows below on its
+       own line — a flex wrapper here would put them side by side. */
     margin: 2px 0 -8px;
+    text-align: center;
   }
 
   .dsw-kcal-hero {
