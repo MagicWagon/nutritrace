@@ -437,6 +437,35 @@
   // subscription below (each new entry increments the key once).
   let _weekStripRefreshKey = 0;
 
+  // Polish batch 4: right-rail collapse toggle. When true, the whole
+  // right rail hides on desktop and the meal grid expands to fill the
+  // viewport. Persisted to localStorage so the preference sticks
+  // across sessions. Small chevron button top-right of the rail
+  // (visible only at ≥1280px) toggles it.
+  let _railCollapsed = false;
+  try {
+    if (typeof localStorage !== 'undefined') {
+      _railCollapsed = localStorage.getItem('nt:diaryRailCollapsed') === '1';
+    }
+  } catch { /* ignore */ }
+  function toggleRail() {
+    _railCollapsed = !_railCollapsed;
+    try { localStorage.setItem('nt:diaryRailCollapsed', _railCollapsed ? '1' : '0'); } catch { /* ignore */ }
+  }
+
+  // Polish batch 4: loading skeleton during day-swap. When the user
+  // clicks a week-strip day (or the arrow buttons), track that the
+  // new entry is loading so the meal-cols block can show skeleton
+  // cards instead of stale-then-instant-swap. The fade transition
+  // covers the wait when the load is fast; skeletons take over if
+  // the API is slow enough that the user would otherwise see empty.
+  let _daySwapLoading = false;
+  async function _loadEntryTracked(iso) {
+    _daySwapLoading = true;
+    try { await loadEntry(iso); }
+    finally { _daySwapLoading = false; }
+  }
+
   // Phase 7: viewport-width tracker so drag-to-copy is only enabled
   // at ≥1280px where the week strip (drop target) actually renders.
   // Below that, dragging would silently no-op (nowhere to drop); the
@@ -1329,12 +1358,18 @@
       currentDate={$currentDate}
       calorieGoal={caloriesGoalAdjusted}
       refreshKey={_weekStripRefreshKey}
-      onSelectDate={(iso) => loadEntry(iso)}
+      onSelectDate={(iso) => _loadEntryTracked(iso)}
       onDropMeal={_onDropMealOnWeekDay}
     />
   </div>
 
-  <div class="page-content diary-content" class:rail-notes-active={$diaryRailShowNotes && $diaryShowNotes} style="padding-bottom:{contentPad}">
+  <div
+    class="page-content diary-content"
+    class:rail-notes-active={$diaryRailShowNotes && $diaryShowNotes}
+    class:rail-collapsed={_railCollapsed}
+    class:day-loading={_daySwapLoading}
+    style="padding-bottom:{contentPad}"
+  >
     <!-- Main column: meal groups + activities + notes. On desktop
          (≥1280px) this sits inside a 2-col grid alongside the right
          rail. Below 1280px, the wrapper collapses to a no-op (block
@@ -1715,6 +1750,16 @@
          are additive as later phases land (Phase 2 = just DaySummary,
          Phase 3 adds Water + Weight, etc.). -->
     <aside class="diary-right-col">
+      <!-- Rail collapse toggle. Small chevron button at the top of the
+           rail (or floating on the meal-cols side when collapsed). -->
+      <button
+        class="rail-collapse-btn"
+        on:click={toggleRail}
+        aria-label={_railCollapsed ? 'Expand right rail' : 'Collapse right rail'}
+        title={_railCollapsed ? 'Show widgets' : 'Hide widgets'}
+      >
+        <span class="material-symbols-rounded">{_railCollapsed ? 'chevron_left' : 'chevron_right'}</span>
+      </button>
       {#if $diaryRailShowSummary}
         <DaySummaryWidget
           eatenKcal={$_calTween}
@@ -2834,6 +2879,74 @@
        turns off railShowNotes, the bottom card returns naturally. */
     .diary-content.rail-notes-active .diary-main .diary-notes.card {
       display: none;
+    }
+
+    /* Rail collapse — user can hide the whole rail via the chevron
+       button at its top. Grid switches to a single column so meals
+       fill the viewport width. Only the collapse button stays
+       visible (floats at the right edge). */
+    .diary-content.rail-collapsed {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .diary-content.rail-collapsed .diary-right-col > *:not(.rail-collapse-btn) {
+      display: none;
+    }
+    .diary-content.rail-collapsed .diary-right-col {
+      position: absolute;
+      right: 12px;
+      top: 12px;
+    }
+
+    /* Collapse chevron. Sits in the rail's top area when expanded and
+       floats at the top-right when collapsed. */
+    .rail-collapse-btn {
+      align-self: flex-end;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-full);
+      width: 28px;
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-2);
+      cursor: pointer;
+      padding: 0;
+      transition: background 120ms ease, color 120ms ease;
+      margin-bottom: -4px;   /* pull first widget up close */
+    }
+    .rail-collapse-btn:hover { background: var(--surface-3); color: var(--text-1); }
+    .rail-collapse-btn .material-symbols-rounded { font-size: 16px; }
+
+    /* Day-swap loading skeleton — subtle shimmer on the meal-cols
+       block while the new day's data is in flight. The fade transition
+       covers fast loads; skeletons kick in visually if the load is
+       slow enough for the fade to complete first. */
+    .diary-content.day-loading .meal-cols > .meal-col > .meal-group {
+      position: relative;
+      overflow: hidden;
+    }
+    .diary-content.day-loading .meal-cols > .meal-col > .meal-group::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        90deg,
+        transparent,
+        color-mix(in srgb, var(--text-3) 6%, transparent) 50%,
+        transparent
+      );
+      animation: skeleton-shimmer 1.2s ease-in-out infinite;
+      pointer-events: none;
+    }
+    @keyframes skeleton-shimmer {
+      0%   { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .diary-content.day-loading .meal-cols > .meal-col > .meal-group::after {
+        animation: none;
+      }
     }
     /* The inline `style="padding-bottom:{contentPad}"` on .diary-content
        reserves height for the (now-hidden) bottom bar. Reclaim it at
