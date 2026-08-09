@@ -70,6 +70,18 @@ export function registerEditDiaryEntry(server, { userId }) {
           if (patch.quantity !== undefined) merged.quantity = patch.quantity;
           if (patch.notes    !== undefined) merged.notes    = patch.notes;
           if (patch.portion  !== undefined) {
+            // Recipe-split items store their real nutrition in _splitItems;
+            // Nutrition.calculate short-circuits to sum(_splitItems) and
+            // ignores the top-level `nutrition` field entirely. Patching
+            // portion + top-level nutrition would leave totals unchanged
+            // and mislead the caller. Refuse.
+            if (Array.isArray(original._splitItems) && original._splitItems.length > 0) {
+              throw new RangeError(
+                'Entry is a recipe-split with per-ingredient nutrition; portion patch ' +
+                'would not affect daily totals. Edit the recipe in the app, or delete + ' +
+                're-log with the desired portion.'
+              );
+            }
             const oldPortion = Number(original.portion) || null;
             if (!oldPortion) {
               throw new RangeError(

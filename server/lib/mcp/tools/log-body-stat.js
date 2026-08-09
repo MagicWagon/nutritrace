@@ -10,18 +10,15 @@
  * mirrors the client-side saveBodyStats() contract.
  */
 import { z } from 'zod';
-import db from '../../../db.js';
-import { DATE_RE, safeJson, todayLocal, toolResult, toolError } from '../_util.js';
+import { DATE_RE, todayLocal, toolResult, toolError } from '../_util.js';
 import { mutateDiaryDay, DiaryTombstonedError } from '../_diary-write.js';
 
 const LENGTH_KEYS = ['waist', 'hips', 'neck', 'chest', 'thighs', 'biceps', 'calves'];
 
-function _userUnitPref(userId, key, fallback) {
-  const row = db.prepare(
-    `SELECT value FROM user_settings
-      WHERE user_id = ? AND key = ? AND deleted_at IS NULL`
-  ).get(userId, key);
-  return safeJson(row?.value, fallback);
+// Module-scope sentinel so future refactors can import + rethrow it
+// from _diary-write.js (mirrors how DiaryTombstonedError is scoped).
+class LegacyBodyStatsError extends Error {
+  constructor(message) { super(message); this.name = 'LegacyBodyStatsError'; }
 }
 
 // Allowed body-stat keys with { min, max } sanity ranges. Keys match
@@ -105,7 +102,6 @@ export function registerLogBodyStat(server, { userId }) {
       //     attach unit tags, then MCP writes will preserve them.
       //  c) Row has no values of that kind: stamp 'kg'/'cm' and write
       //     canonical values directly.
-      class LegacyBodyStatsError extends Error {}
       let next;
       try {
         next = mutateDiaryDay(userId, day, cur => {

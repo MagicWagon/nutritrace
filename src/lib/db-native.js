@@ -393,6 +393,7 @@ const _DIARY_KEEP = new Set([
   'id', 'food_server_id', 'is_recipe',
   'name', 'brand', 'portion', 'unit', 'quantity',
   'nutrition', 'notes', 'imgUrl',
+  'source', 'source_meal_id',
 ]);
 function _shrinkDiaryItem(it) {
   if (!it || typeof it !== 'object') return it;

@@ -56,7 +56,11 @@ export function registerLogFood(server, { userId }) {
       // UI produces for the same numeric portion. Refuse the override —
       // the caller can log without a portion (uses 1× base nutrition per
       // quantity) instead.
-      const hasAltUnits = food.alt_units && food.alt_units !== 'null' && food.alt_units !== '[]';
+      //
+      // Parse the JSON properly and count entries; string-comparison
+      // against '[]' misses whitespace-padded shapes and empty '{}'.
+      const parsedAlt = food.alt_units ? safeJson(food.alt_units, null) : null;
+      const hasAltUnits = Array.isArray(parsedAlt) && parsedAlt.length > 0;
       if (Number.isFinite(portion) && hasAltUnits) {
         return toolError(
           `Food '${food.name}' has alt-units defined (custom per-unit conversions). ` +

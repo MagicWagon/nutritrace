@@ -12,6 +12,11 @@ import { mutateDiaryDay, DiaryTombstonedError } from '../_diary-write.js';
 
 const MAX_ML_PER_ENTRY = 5000;   // 5 L in one log = obvious agent bug or typo
 
+// Accept the two shapes the client emits: "9:15 AM" (12h) or "21:15" (24h).
+// Reject anything else so a hallucinated "morningish" doesn't land in the diary
+// where the water widget would render it as garbage.
+const TIME_RE = /^(1[0-2]|0?[1-9]):[0-5]\d\s?(AM|PM|am|pm)$|^([01]?\d|2[0-3]):[0-5]\d$/;
+
 function _formatTime(date, use24) {
   const hh = date.getHours();
   const mm = String(date.getMinutes()).padStart(2, '0');
@@ -38,6 +43,11 @@ export function registerLogWater(server, { userId }) {
     async ({ amount_ml, date, time }) => {
       const day = date || todayLocal();
       if (!DATE_RE.test(day)) return toolError(`Invalid date '${day}'; expected YYYY-MM-DD.`);
+      if (time && !TIME_RE.test(time)) {
+        return toolError(
+          `Invalid time '${time}'; expected "h:mm AM/PM" (e.g. "9:15 AM") or "HH:mm" (e.g. "21:15").`
+        );
+      }
 
       // Default time to now ONLY when the log is for today; backdated
       // entries default to noon to avoid a stamp that reads as "logged
