@@ -13,7 +13,7 @@
   import { onMount, tick } from 'svelte';
   import { push, querystring } from 'svelte-spa-router';
   import { _ } from 'svelte-i18n';
-  import { slide } from 'svelte/transition';
+  import { slide, fade } from 'svelte/transition';
 
   import { currentUser, userMgmtActive } from '../stores/auth.js';
   import { isNative, getServerUrl, resolveAssetUrl, apiUrl, getAuthToken } from '../lib/platform.js';
@@ -630,7 +630,16 @@
                card + short "pick a section" prompt) -->
       <div class="settings-pane">
         {#if currentSection && currentSection !== 'profile'}
-          <svelte:component this={SECTION_COMPONENTS[currentSection]} />
+          <!-- {#key currentSection} re-mounts the child on section
+               swap so its own onMount hooks + local state reset,
+               and gives us a clean anchor for the cross-fade
+               transition. Duration collapses under reduced-motion. -->
+          {#key currentSection}
+            <div class="settings-pane-fade"
+              in:fade={{ duration: $disableAnimations ? 0 : 140 }}>
+              <svelte:component this={SECTION_COMPONENTS[currentSection]} />
+            </div>
+          {/key}
         {:else}
           <!-- No section OR /settings/profile: both render the same
                welcome-hero view (profile card + expanded editor).
@@ -1051,7 +1060,8 @@
      width so justify-content:space-between pins them to the right. */
   :global(.setting-row > .select-wrap),
   :global(.setting-row > .seg-group),
-  :global(.setting-row > .env-lock-pill) {
+  :global(.setting-row > .env-lock-pill),
+  :global(.setting-row > .sr-control) {
     flex: 0 0 auto;
   }
   /* Reset for column-direction setting-rows. Children of a column-flex
