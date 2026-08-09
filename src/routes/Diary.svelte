@@ -1439,7 +1439,6 @@
     class="page-content diary-content"
     class:rail-notes-active={$diaryRailShowNotes && $diaryShowNotes}
     class:rail-hidden={_railMode === 'hidden'}
-    class:rail-overlay-open={_railMode === 'hidden' && _railOverlay}
     class:day-loading={_daySwapLoading}
     style="padding-bottom:{contentPad}"
   >
@@ -1831,9 +1830,14 @@
          are additive as later phases land (Phase 2 = just DaySummary,
          Phase 3 adds Water + Weight, etc.). -->
     <!-- Right-edge tab. Only visible when the rail is in 'hidden' mode
-         (on desktop). Clicking it toggles the overlay slide-in. -->
-    {#if _railMode === 'hidden'}
+         (on desktop). Portaled to document.body so position:fixed
+         resolves against the viewport, not against .page-transition
+         (which is itself position:fixed and the app's scroll
+         container — descendants of it don't get viewport-relative
+         fixed positioning cleanly). -->
+    {#if _railMode === 'hidden' && _wideViewport}
       <button
+        use:portal
         class="rail-edge-tab"
         on:click={railToggleOverlay}
         aria-label={_railOverlay ? 'Close widget panel' : 'Open widget panel'}
@@ -1845,7 +1849,7 @@
         </span>
       </button>
     {/if}
-    <aside class="diary-right-col">
+    {#snippet railWidgets()}
       <!-- Rail controls fallback chip. The pin/hide button lives
            INSIDE the DaySummaryWidget header when that widget is
            visible (aligns with meal-column top edge). Show this
@@ -1960,10 +1964,30 @@
           </div>
         </section>
       {/if}
-    </aside>
+    {/snippet}
+
+    <!-- PINNED mode: rail sits inside the desktop grid, sticky
+         below the week strip. Rendered only when in pinned mode so
+         we don't waste layout space when the rail is hidden. -->
+    {#if _railMode === 'pinned'}
+      <aside class="diary-right-col">
+        {@render railWidgets()}
+      </aside>
+    {/if}
 
   </div>
 </div>
+
+<!-- HIDDEN mode overlay: rail portaled to document.body so
+     position:fixed resolves against the viewport, not against
+     .page-transition (which is itself position:fixed + overflow-y
+     auto — the app's scroll container). Rendered only when the
+     overlay is actually open so widgets don't double-mount. -->
+{#if _railMode === 'hidden' && _railOverlay && _wideViewport}
+  <aside use:portal class="diary-right-col diary-right-col-overlay">
+    {@render railWidgets()}
+  </aside>
+{/if}
 
 <!-- Persistent bottom nutrition bar -->
 <div use:portal class="diary-bottom-bar" style="bottom:{barBottom}">
@@ -3100,8 +3124,15 @@
        right edge with its own scroll region. Sits above the page
        content, doesn't dim the background (widgets are additive, not
        a modal task). */
-    .diary-content.rail-overlay-open .diary-right-col {
+    /* Overlay panel — the portaled aside variant. Portal moves the
+       DOM to document.body; Svelte's scoped-class hashes still ride
+       along, so scoped styles apply. Fixed positioning resolves
+       against the viewport now that the aside is outside the
+       .page-transition scroll container. */
+    .diary-right-col-overlay {
       display: flex;
+      flex-direction: column;
+      gap: 12px;
       position: fixed;
       top: calc(var(--page-top, var(--safe-top)) + 60px + var(--hamburger-row, 0px));
       right: 12px;
@@ -3115,12 +3146,13 @@
       box-shadow: 0 20px 50px -20px rgba(0,0,0,0.35);
       padding: 12px;
       overflow-y: auto;
-      /* Reset sticky/pinned constraints so overlay uses its own
-         fixed dimensions, not the sticky-mode max-height. */
+      /* Reset any sticky-mode constraints inherited via the base
+         class; overlay has its own fixed dimensions. */
       max-height: none;
       align-self: auto;
       animation: rail-slide-in 200ms ease-out;
     }
+    .diary-right-col-overlay > * { flex-shrink: 0; }
     @keyframes rail-slide-in {
       from { transform: translateX(24px); opacity: 0; }
       to   { transform: translateX(0);    opacity: 1; }
