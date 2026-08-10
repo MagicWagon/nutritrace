@@ -3620,10 +3620,28 @@
        page-content padding to hit viewport edges), but inside the
        narrower .wl-main grid column they pull it PAST the column
        into the rails — so the tab pill row visually reads wider
-       than the metric grid below, breaking column alignment. */
+       than the metric grid below, breaking column alignment.
+       Also drop the pill-container 'box' look (background +
+       padding + border-radius on .tab-bar) so tabs read as inline
+       navigation instead of a card sitting above another card. */
     :global(html:not(.force-mobile-layout)) .wl-main :global(.tab-bar-wrap) {
       margin-left: 0;
       margin-right: 0;
+    }
+    :global(html:not(.force-mobile-layout)) .wl-main :global(.tab-bar) {
+      padding: 0;
+      background: transparent;
+      border-radius: 0;
+      gap: 4px;
+    }
+    /* Sliding pill indicator was inset 4px inside the container's
+       padding — with no padding now, inset it to 0 top/bottom so
+       it aligns with the button rows. */
+    :global(html:not(.force-mobile-layout)) .wl-main :global(.tab-pill) {
+      top: 0;
+      bottom: 0;
+      background: var(--accent-dim);
+      box-shadow: none;
     }
   }
 </style>
