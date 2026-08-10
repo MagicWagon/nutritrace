@@ -19,9 +19,9 @@ Second dev pre-release of the 1.2.0 minor, and a substantial one. Every major pa
 
 **Large-screen layouts (first pass, iterating)**
 
-- **Diary large-screen layout.** Two-column shell with a Day Summary widget that mirrors the full Nutrition Summary sheet, right rail carrying Water / Body Stats / Notes widgets, 7-day week strip with a hover preview, drag meals onto week-strip days to copy them forward, drag items between meals within the same day, per-widget rail visibility toggles.
+- **Diary large-screen layout.** Two-column shell with a Day Summary widget that mirrors the full Nutrition Summary sheet (same numbers, same layout, same % vs g toggle). Right rail carries Water, Body Stats (merged Weight + Measurements), Notes, and configurable per-widget visibility toggles. 7-day week strip anchors on the viewed date (not real-world "today") with a hover preview that respects your Date Format preference. Drag meals onto week-strip days to copy them forward. Drag items between meals within the same day. Nutrient widget in the rail excludes calories / protein / carbs / fat (those already live in the Day Summary). All configured Water containers render (not just the first three). A "Weekly trend" indicator sits on the Day Summary KPI strip (rolling 7 days vs previous 7).
 - **Foods large-screen layout.** Left filter rail, wider detail pane, adjusted grid, bottom-nav clearance, rail empty state.
-- **Settings large-screen layout.** Two-pane shell with an always-visible search bar. Sections are regrouped for scannability across Diary, Appearance, Regional/Foods, Statistics/Water/Nutrients/Sharing, Notifications/Backup/Import-Export, and Components. Profile becomes a first-class rail section that inline-expands in the welcome hero. Cross-fade between sections.
+- **Settings large-screen layout.** Two-pane shell with an always-visible search bar. Sections regrouped for scannability across Diary, Appearance, Regional/Foods, Statistics/Water/Nutrients/Sharing, Notifications/Backup/Import-Export, and Components. Profile becomes a first-class rail section that inline-expands in the welcome hero. Cross-fade between sections.
 - **Wellness, Statistics, and Goals large-screen layouts.** Each page gets a left rail (providers / metrics / your goals), a wider content area, and (where useful) a right rail (insights / detail / drill-in). Rails collapse cleanly on narrow screens.
 - **Editor two-column layout.** FoodEditor and MealEditor gain a sticky left column on wide screens plus a two-column nutrition grid; Show All Nutrients now slides open.
 - **Force Mobile Layout toggle.** New Settings option turns every large-screen layout above off entirely and falls back to the single-column mobile view app-wide.
@@ -29,7 +29,7 @@ Second dev pre-release of the 1.2.0 minor, and a substantial one. Every major pa
 **Statistics deep-linking + polish**
 
 - **Deep-link into Statistics from anywhere.** Diary's Day Summary, every Wellness metric card, and every Goals row now have a "View trend" affordance that jumps to Statistics with the right metric and range preselected.
-- **Statistics polish pass.** Left rail is searchable and scrollable, charts are clickable to drill into a specific date, timelines auto-group by month past 60 days, an empty state suggests what to log next, CSV export is available on every chart, and a weekly trend indicator sits on the KPI strip.
+- **Statistics polish pass.** Left rail is searchable and scrollable, charts are clickable to drill into a specific date, timelines auto-group by month past 60 days, an empty state suggests what to log next, and CSV export is available on every chart.
 
 **Server + AI**
 
@@ -40,19 +40,11 @@ Second dev pre-release of the 1.2.0 minor, and a substantial one. Every major pa
 
 - **AI Assistant custom model didn't persist** ([#151](https://github.com/TraceApps/nutritrace/issues/151), thanks @pliddle). Typing a model ID into the Custom field on any provider now saves on every keystroke instead of reverting to the last preset the next time you opened Settings. NutriTrace-only bug; the same code path was already correct in LiftTrace and CookTrace.
 - **Android pull-to-refresh fired mid-page.** Scrolling downward anywhere on a page could trigger the sync spinner because the gesture recognizer accepted any downward swipe. It now only fires at true top-of-scroll, matching Android's standard SwipeRefreshLayout behavior.
-- **Diary week strip stayed anchored to the current calendar week** even when you were viewing a historical date. It now recomputes around the viewed day so scrolling back weeks or months lines up with what the diary is actually showing. Future days in the current week render dimmed and without a progress bar.
-- **Diary Water rail widget only showed the first three configured containers.** All configured containers now render.
-- **Diary week-strip hover popover ignored the date-format preference.** Now uses the format set in Settings → Date Format.
-- **Whole-app remount on every navigation.** The app shell was keying `<main>` on the full URL, which force-remounted on every intra-app link (flashing content, losing transient state). Now keys on the top-level route segment so same-shell nav stays live.
-- **Sticky columns in the Food and Meal editors clipped their own children.** The Show All Nutrients slide animation now expands correctly and photo-remove sits where it does on the food side.
+- **Whole-app remount on every navigation.** The app shell was keying `<main>` on the full URL, which force-remounted on every intra-app link (flashing content, losing transient state on the incoming view). Now keys on the top-level route segment so same-shell nav stays live.
 
 ### Changed
 
 - **Refreshed AI model presets.** Google Gemini added 3.5 Flash Lite / 3.6 Flash / 3.1 Pro to the top of the dropdown; OpenAI added GPT-5.6 Luna / Terra / full. Previous-generation entries (Gemini 2.5, GPT-4o, Claude Opus 4.8) remain in the dropdown labeled "(previous)" and continue to work unchanged. Defaults for new installs bumped to Gemini 3.6 Flash and GPT-5.6 Luna.
-- **Weight and Measurements merged into a single Body Stats widget** on the Diary right rail; Water widget picks up an Open button.
-- **Diary Day Summary widget matches the full Nutrition Summary sheet exactly**: same numbers, same layout, same % vs g toggle.
-- **Nutrient widget in the Diary rail** no longer duplicates calories / protein / carbs / fat (those already live in the Day Summary).
-- **Weekly trend indicator label** on the Diary Day Summary is now "Weekly trend" (was "Trend (7d vs prev)"). Underlying comparison unchanged: rolling 7 days vs previous 7.
 
 ### Infrastructure
 
