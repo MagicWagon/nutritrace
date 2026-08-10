@@ -797,7 +797,11 @@
   }
 
   $: { activeTab; if (activeTab === 'heart') _readinessLoaded = false; }
-  $: if (activeTab === 'heart' && !_readinessLoaded) loadReadiness();
+  // Load readiness whenever it's stale so the always-on right-rail
+  // strip (visible across ALL tabs on desktop) has data — not just
+  // when the Heart tab is active. Cheap to fetch; already cached by
+  // _readinessLoaded so we don't spam the endpoint.
+  $: if (!_readinessLoaded && (fitbitAvailable || garminAvailable)) loadReadiness();
 
   // ── Readiness insight text ─────────────────────────────────────────────────
   // Generate a band-driven lead + sub-score-driven driver line. Sub-scores
@@ -2136,10 +2140,78 @@
 
         <!-- ── Right rail: tab-contextual insight cards (desktop only) ── -->
         <aside class="wl-right-rail">
+          <!-- Always-on Readiness strip — the single universal
+               daily indicator, visible across every tab so users
+               get "how am I today?" at a glance regardless of
+               which tab they're browsing. Compact form of the
+               full Readiness card; tap-through opens the Heart
+               tab where the full card lives. -->
+          {#if readiness != null && !readiness.calibrating && readiness.score != null}
+            <button type="button" class="wl-readiness-strip"
+              on:click={() => activeTab = 'heart'}
+              title="Daily Readiness — how recovered and prepared your body is for today. Tap for details.">
+              <div class="wl-rs-icon" style="background:{readiness.color || 'var(--accent)'}22;color:{readiness.color || 'var(--accent)'}">
+                <span class="material-symbols-rounded">bolt</span>
+              </div>
+              <div class="wl-rs-copy">
+                <span class="wl-rs-label">Today's Readiness</span>
+                <span class="wl-rs-band">{readiness.band || ''}</span>
+              </div>
+              <span class="wl-rs-score" style="color:{readiness.color || 'var(--accent)'}">{Math.round(readiness.score)}</span>
+            </button>
+          {/if}
+
           <div class="wl-rail-heading">Insights</div>
 
           {#if activeTab === 'activity'}
-            <!-- activity rail: TBD -->
+            <!-- Activity rail: derived weekly aggregates from the
+                 7-day sparkline series. Non-invasive — uses the
+                 same _sparklineData that already drives the metric-
+                 card sparklines, so nothing new is fetched. -->
+            {@const _stepSeries = _sparklineData['steps'] || []}
+            {@const _amSeries   = _sparklineData['active_minutes'] || []}
+            {@const _calSeries  = _sparklineData['calories_out'] || []}
+            {@const _stepsTotal = _stepSeries.reduce((a,v) => a + (Number(v) || 0), 0)}
+            {@const _stepsAvg   = _stepSeries.filter(v => v != null).length ? Math.round(_stepsTotal / _stepSeries.filter(v => v != null).length) : 0}
+            {@const _amTotal    = _amSeries.reduce((a,v) => a + (Number(v) || 0), 0)}
+            {@const _calTotal   = _calSeries.reduce((a,v) => a + (Number(v) || 0), 0)}
+            {@const _goalHits   = _stepSeries.filter(v => (Number(v) || 0) >= 10000).length}
+            {#if _stepSeries.some(v => v != null) || _amSeries.some(v => v != null)}
+              <div class="wl-rail-only">
+                <div class="card sleep-insight-card" style="margin-bottom:10px" title="7-day activity totals from your synced data.">
+                  <div class="si-header">
+                    <span class="material-symbols-rounded si-icon">calendar_view_week</span>
+                    <div class="si-title-wrap">
+                      <span class="si-title">This Week</span>
+                      <span class="si-sub">Last 7 days</span>
+                    </div>
+                  </div>
+                  <div class="wl-rail-stat-grid">
+                    <div class="wl-rail-stat">
+                      <span class="wl-rail-stat-val">{_stepsTotal.toLocaleString()}</span>
+                      <span class="wl-rail-stat-lbl">Total steps</span>
+                    </div>
+                    <div class="wl-rail-stat">
+                      <span class="wl-rail-stat-val">{_stepsAvg.toLocaleString()}</span>
+                      <span class="wl-rail-stat-lbl">Daily avg</span>
+                    </div>
+                    <div class="wl-rail-stat">
+                      <span class="wl-rail-stat-val">{_goalHits}/7</span>
+                      <span class="wl-rail-stat-lbl">≥ 10k days</span>
+                    </div>
+                    <div class="wl-rail-stat">
+                      <span class="wl-rail-stat-val">{Math.round(_amTotal).toLocaleString()}</span>
+                      <span class="wl-rail-stat-lbl">Active min</span>
+                    </div>
+                  </div>
+                  {#if _calTotal > 0}
+                    <p class="si-desc" style="margin-top:8px">
+                      Burned <strong>{Math.round(_calTotal).toLocaleString()} kcal</strong> total this week.
+                    </p>
+                  {/if}
+                </div>
+              </div>
+            {/if}
           {:else if activeTab === 'sleep'}
             <!-- Sleep Debt (rail duplicate) -->
             {#if sleepDebt != null}
@@ -3218,6 +3290,67 @@
     font-size: 11px; font-weight: 700; letter-spacing: 0.8px;
     text-transform: uppercase; color: var(--text-3);
     padding: 2px 4px 10px;
+  }
+
+  /* Always-on Readiness strip — compact daily indicator at the
+     very top of the right rail, visible across every tab. Tapping
+     jumps to the Heart tab for the full card + drivers. */
+  .wl-readiness-strip {
+    display: flex; align-items: center; gap: 12px;
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    margin-bottom: 12px;
+    cursor: pointer;
+    text-align: left;
+    transition: background 120ms ease, border-color 120ms ease;
+  }
+  .wl-readiness-strip:hover {
+    background: var(--surface-3);
+    border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  }
+  .wl-rs-icon {
+    width: 34px; height: 34px;
+    border-radius: 10px;
+    display: inline-flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .wl-rs-icon .material-symbols-rounded { font-size: 20px; }
+  .wl-rs-copy { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+  .wl-rs-label { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+  .wl-rs-band { font-size: 13px; font-weight: 600; color: var(--text-1); }
+  .wl-rs-score { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+
+  /* Activity rail — 2x2 stat grid inside the "This Week" card. */
+  .wl-rail-stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 4px;
+  }
+  .wl-rail-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 10px;
+    background: var(--surface-2);
+    border-radius: var(--radius-sm);
+  }
+  .wl-rail-stat-val {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-1);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+  .wl-rail-stat-lbl {
+    font-size: 10px;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
   }
   .wl-provider-row {
     display: flex; align-items: center; gap: 8px;
