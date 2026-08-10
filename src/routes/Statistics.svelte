@@ -45,6 +45,12 @@
   let loading = false;
   let summary = null; // { avg, min, max, total, daysWithData }
   let _loadVer = 0;   // cancel stale concurrent loadData calls
+  // Desktop-only rail + timeline UI state. All gated by the same
+  // :global(html:not(.force-mobile-layout)) block below in <style>, so
+  // mobile behavior is untouched even if these vars change.
+  let _railQuery = '';                          // #2 left-rail filter
+  let _timelineExpandedMonths = new Set();      // #4 collapsible months
+  let _compareMetric = '';                      // #5 compare mode (deferred)
 
   // Cumulative metrics accumulate throughout the day (calories, steps, water, etc.).
   // Excluded from charts by default until the day is complete to avoid trend distortion.
@@ -493,6 +499,22 @@
         responsive: true,
         maintainAspectRatio: false,
         interaction: { mode: 'index', intersect: false },
+        // Chart click drill-through (#3). Labels array is display-format
+        // (Aug 9) so we can't parse an ISO date back out of it —
+        // displayData in the enclosing closure still carries .date, so
+        // we index into that directly and hand it to _drillIntoDate,
+        // which routes wellness metrics to /wellness and everything else
+        // to /diary on that day.
+        onClick: (_evt, activeEls) => {
+          if (!activeEls?.length) return;
+          const idx = activeEls[0].index;
+          const row = displayData[idx];
+          if (row?.date) _drillIntoDate(row.date);
+        },
+        onHover: (evt, activeEls) => {
+          const t = evt?.native?.target;
+          if (t && t.style) t.style.cursor = activeEls?.length ? 'pointer' : 'default';
+        },
         plugins: {
           legend: { display: datasets.length > 1, labels: { color: textColor, boxHeight: 2, usePointStyle: true } },
           tooltip: {
@@ -626,6 +648,96 @@
   })();
   $: _goalDelta = (summary?.avg != null && _goalValReactive) ? Math.round((summary.avg - _goalValReactive) / _goalValReactive * 100) : null;
 
+  // Group the timeline by month once the visible span crosses 60 days
+  // — a flat list of 100+ rows scrolls forever. #4. Most-recent month
+  // auto-expands on data change so the user still sees rows without a
+  // click; older months collapse to header-only entries.
+  $: _rangeIsLong = data.length > 60;
+  $: _timelineMonths = (() => {
+    if (!_rangeIsLong) return [];
+    const map = new Map();
+    for (const row of data) {
+      if (!Number.isFinite(row.val)) continue;
+      const key = row.date.slice(0, 7); // YYYY-MM
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(row);
+    }
+    const arr = [...map.entries()].map(([key, entries]) => {
+      const dt = new Date(key + '-01T12:00:00');
+      const label = dt.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+      return { key, label, count: entries.length, entries: entries.slice().reverse() };
+    });
+    arr.sort((a, b) => b.key.localeCompare(a.key));
+    return arr;
+  })();
+  // Seed most-recent expanded when the month list changes and the
+  // current expanded set no longer intersects (e.g. metric switched,
+  // range moved, first load). Assigning a new Set triggers Svelte
+  // reactivity — mutating in-place would not.
+  $: if (_timelineMonths.length) {
+    const stale = ![..._timelineExpandedMonths].some(k => _timelineMonths.find(m => m.key === k));
+    if (stale) _timelineExpandedMonths = new Set([_timelineMonths[0].key]);
+  }
+  function _toggleMonth(key) {
+    const s = new Set(_timelineExpandedMonths);
+    if (s.has(key)) s.delete(key); else s.add(key);
+    _timelineExpandedMonths = s;
+  }
+
+  // 7-vs-previous-7-day trend delta (#6). Hidden when the range holds
+  // fewer than 14 logged days — otherwise the comparison is meaningless
+  // (e.g. 3-day range shows a 100% "trend" off noise). Direction goodness
+  // reuses the goal-direction convention: if the goal is a floor, up is
+  // good; else lower is good; no goal → neutral.
+  $: _trendDelta = (() => {
+    if (data.length < 14) return null;
+    const withVal = data.filter(d => Number.isFinite(d.val));
+    if (withVal.length < 14) return null;
+    const last7 = withVal.slice(-7);
+    const prev7 = withVal.slice(-14, -7);
+    if (!last7.length || !prev7.length) return null;
+    const avg = arr => arr.reduce((s, r) => s + r.val, 0) / arr.length;
+    const a = avg(last7), b = avg(prev7);
+    if (b === 0) return null;
+    return Math.round((a - b) / Math.abs(b) * 100);
+  })();
+
+  // Empty-state alternatives (#7). Best-guess list — we can't verify
+  // "has data" without loading each series (a full extra pipeline pass
+  // per metric). Keeping it to metrics the user has enabled makes the
+  // suggestion honest for the vast majority of setups.
+  $: _emptyAlternatives = (() => {
+    if (data.length > 0) return [];
+    const cands = ['calories', 'weight', 'wl_steps'];
+    return cands
+      .filter(c => c !== metric)
+      .filter(c => METRICS.find(m => (m.value ?? m.id) === c))
+      .slice(0, 3);
+  })();
+  function _altLabel(key) {
+    const m = METRICS.find(x => (x.value ?? x.id) === key);
+    return m ? m.label : key;
+  }
+
+  // CSV export (#8). Uses the same rows Chart.js is looking at, not
+  // the raw pre-filter set, so what the user sees is what they get.
+  function _exportCsv() {
+    if (!data.length) return;
+    const lines = ['Date,Value'];
+    for (const row of data) {
+      if (Number.isFinite(row.val)) lines.push(`${row.date},${row.val}`);
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${metric}-${range}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
   // Deep-link support (#: ?metric=X&range=Y). Wellness/Diary/Goals
   // linking to Statistics for a specific metric+range lands here; if the
   // metric isn't currently visible the existing METRICS-snap reactive
@@ -732,14 +844,18 @@
        horizontal metric-scroll below still owns metric selection there. -->
   <aside class="stats-left-rail">
     <div class="stats-rail-heading">Metrics</div>
+    <input class="stats-rail-search" type="search" placeholder="Filter metrics…" bind:value={_railQuery} />
     {#each groupedMetrics as g}
-      <p class="stats-rail-group">{g.label}</p>
-      {#each g.metrics as m}
-        <button class="stats-rail-metric" class:active={metric === m._key}
-          on:click={() => metric = m._key}>
-          {m.label}
-        </button>
-      {/each}
+      {@const _filtered = g.metrics.filter(m => !_railQuery || m.label.toLowerCase().includes(_railQuery.toLowerCase()))}
+      {#if _filtered.length}
+        <p class="stats-rail-group">{g.label}</p>
+        {#each _filtered as m}
+          <button class="stats-rail-metric" class:active={metric === m._key}
+            on:click={() => metric = m._key}>
+            {m.label}
+          </button>
+        {/each}
+      {/if}
     {/each}
   </aside>
   <div class="stats-content stats-main">
@@ -855,6 +971,19 @@
                 {$_('statistics_page.empty.hint_other')}
               {/if}
             </div>
+            {#if _emptyAlternatives.length}
+              <!-- #7 Nudge toward metrics likely to have data instead of
+                   leaving the user staring at an empty chart. Click swaps
+                   the current metric — the loader re-runs via the metric
+                   reactive at line ~647. -->
+              <div class="stats-empty-alts text-3 text-sm">
+                Try
+                {#each _emptyAlternatives as alt, i}
+                  <button class="stats-empty-alt-link" type="button" on:click={() => metric = alt}>{_altLabel(alt)}</button>{#if i < _emptyAlternatives.length - 2}, {:else if i === _emptyAlternatives.length - 2} or {/if}
+                {/each}
+                . You may have data there.
+              </div>
+            {/if}
           </div>
         </div>
       {/if}
@@ -868,26 +997,61 @@
       <div class="timeline-section">
         <div class="section-title">{$_('statistics_page.history_heading')}</div>
         <div class="timeline-list card">
-          {#each [...data].reverse() as row}
-            {#if Number.isFinite(row.val)}
-              <div class="timeline-row">
-                <button class="timeline-date-link" type="button"
-                  on:click={() => _drillIntoDate(row.date)}
-                  title={metric.startsWith('wl_') ? 'Open this day in Wellness' : 'Open this day in Diary'}
-                  aria-label={metric.startsWith('wl_') ? `Open Wellness for ${row.date}` : `Open Diary for ${row.date}`}>
-                  {(() => {
-                    const dt = new Date(row.date + 'T12:00:00');
-                    const fmt = $dateFormat || 'ISO';
-                    if (fmt === 'US') { const m=String(dt.getMonth()+1).padStart(2,'0'),d=String(dt.getDate()).padStart(2,'0'); return m+'/'+d+'/'+dt.getFullYear(); }
-                    if (fmt === 'EU') { const m=String(dt.getMonth()+1).padStart(2,'0'),d=String(dt.getDate()).padStart(2,'0'); return d+'/'+m+'/'+dt.getFullYear(); }
-                    if (fmt === 'natural') return dt.toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'});
-                    return row.date;
-                  })()}
-                </button>
-                <span class="timeline-val accent-text">{row.val.toLocaleString()} {_metricUnit}</span>
-              </div>
-            {/if}
-          {/each}
+          {#if _rangeIsLong}
+            <!-- #4 Long-range view: month headers with collapsible bodies.
+                 Most-recent month auto-expanded; older months click to open.
+                 Falls back to the flat list for ≤60-day ranges (else branch). -->
+            {#each _timelineMonths as m (m.key)}
+              <button class="stats-tl-month" type="button"
+                on:click={() => _toggleMonth(m.key)}
+                aria-expanded={_timelineExpandedMonths.has(m.key)}>
+                <span class="stats-tl-month-label">{m.label}</span>
+                <span class="stats-tl-month-count">{m.count}</span>
+                <span class="material-symbols-rounded stats-tl-chevron" class:open={_timelineExpandedMonths.has(m.key)}>expand_more</span>
+              </button>
+              {#if _timelineExpandedMonths.has(m.key)}
+                {#each m.entries as row}
+                  <div class="timeline-row">
+                    <button class="timeline-date-link" type="button"
+                      on:click={() => _drillIntoDate(row.date)}
+                      title={metric.startsWith('wl_') ? 'Open this day in Wellness' : 'Open this day in Diary'}
+                      aria-label={metric.startsWith('wl_') ? `Open Wellness for ${row.date}` : `Open Diary for ${row.date}`}>
+                      {(() => {
+                        const dt = new Date(row.date + 'T12:00:00');
+                        const fmt = $dateFormat || 'ISO';
+                        if (fmt === 'US') { const mm=String(dt.getMonth()+1).padStart(2,'0'),dd=String(dt.getDate()).padStart(2,'0'); return mm+'/'+dd+'/'+dt.getFullYear(); }
+                        if (fmt === 'EU') { const mm=String(dt.getMonth()+1).padStart(2,'0'),dd=String(dt.getDate()).padStart(2,'0'); return dd+'/'+mm+'/'+dt.getFullYear(); }
+                        if (fmt === 'natural') return dt.toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'});
+                        return row.date;
+                      })()}
+                    </button>
+                    <span class="timeline-val accent-text">{row.val.toLocaleString()} {_metricUnit}</span>
+                  </div>
+                {/each}
+              {/if}
+            {/each}
+          {:else}
+            {#each [...data].reverse() as row}
+              {#if Number.isFinite(row.val)}
+                <div class="timeline-row">
+                  <button class="timeline-date-link" type="button"
+                    on:click={() => _drillIntoDate(row.date)}
+                    title={metric.startsWith('wl_') ? 'Open this day in Wellness' : 'Open this day in Diary'}
+                    aria-label={metric.startsWith('wl_') ? `Open Wellness for ${row.date}` : `Open Diary for ${row.date}`}>
+                    {(() => {
+                      const dt = new Date(row.date + 'T12:00:00');
+                      const fmt = $dateFormat || 'ISO';
+                      if (fmt === 'US') { const m=String(dt.getMonth()+1).padStart(2,'0'),d=String(dt.getDate()).padStart(2,'0'); return m+'/'+d+'/'+dt.getFullYear(); }
+                      if (fmt === 'EU') { const m=String(dt.getMonth()+1).padStart(2,'0'),d=String(dt.getDate()).padStart(2,'0'); return d+'/'+m+'/'+dt.getFullYear(); }
+                      if (fmt === 'natural') return dt.toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'});
+                      return row.date;
+                    })()}
+                  </button>
+                  <span class="timeline-val accent-text">{row.val.toLocaleString()} {_metricUnit}</span>
+                </div>
+              {/if}
+            {/each}
+          {/if}
         </div>
       </div>
     {/if}
@@ -927,6 +1091,27 @@
         <span class="stats-rail-kpi-lbl">{$_('statistics_page.summary.logged')}</span>
         <span class="stats-rail-kpi-val">{summary.daysWithData.toLocaleString()} <span class="stats-rail-kpi-unit">{$_('statistics_page.summary.days_unit')}</span></span>
       </div>
+      {#if _trendDelta != null}
+        <!-- #6 7-vs-previous-7-day trend. Hidden for <14-day ranges.
+             Direction goodness mirrors _goalDelta's convention: floor
+             goals (goal.min only) → up is good; else lower is good. -->
+        {@const _tGood = _goalValReactive == null ? null : (_goalIsMin ? _trendDelta >= 0 : _trendDelta <= 0)}
+        <div class="stats-rail-kpi">
+          <span class="stats-rail-kpi-lbl">Trend (7d vs prev)</span>
+          <span class="stats-rail-kpi-val">
+            <span class="stats-rail-delta"
+              class:good={_tGood === true}
+              class:bad={_tGood === false}
+              class:neutral={_tGood === null}>
+              {_trendDelta > 0 ? '↑' : _trendDelta < 0 ? '↓' : '·'} {Math.abs(_trendDelta)}%
+            </span>
+          </span>
+        </div>
+      {/if}
+      <button class="stats-rail-csv" type="button" on:click={_exportCsv} title="Export CSV">
+        <span class="material-symbols-rounded" style="font-size:14px">download</span>
+        CSV
+      </button>
     {:else}
       <p class="stats-rail-empty text-3 text-sm">{$_('statistics_page.empty.no_data')}</p>
     {/if}
@@ -947,6 +1132,12 @@
         on:change={(e) => statsTrendLine.set(e.currentTarget.checked)} />
       <span>Trend</span>
     </label>
+    <!-- TODO: compare mode (#5) — needs loader refactor to accept a
+         metric argument (loadSeries(metricId) → { labels, values }).
+         The current loadData() closes over the module-level `metric`
+         var across ~200 lines of wellness/body/nutrient branches;
+         extracting it cleanly is a bigger diff than this pass allows,
+         so the compare select is deferred. -->
   </aside>
   </div>
 </div>
@@ -1270,6 +1461,20 @@
       border-radius: var(--radius-lg);
       padding: 12px;
     }
+    /* #2 Rail becomes scrollable on desktop — long metric lists (all
+       body stats + wellness enabled) overflow a 900px viewport otherwise.
+       Same thin-scrollbar treatment as the Settings + Foods rails so
+       the whole app reads as one system. */
+    :global(html:not(.force-mobile-layout)) .stats-left-rail {
+      max-height: calc(100vh - var(--page-top, var(--safe-top)) - 100px - var(--hamburger-row, 0px) - var(--nav-h, 0px) - var(--safe-bottom, 0px));
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+    :global(html:not(.force-mobile-layout)) .stats-left-rail::-webkit-scrollbar { width: 6px; }
+    :global(html:not(.force-mobile-layout)) .stats-left-rail::-webkit-scrollbar-track { background: transparent; }
+    :global(html:not(.force-mobile-layout)) .stats-left-rail::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    :global(html:not(.force-mobile-layout)) .stats-left-rail::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
     :global(html:not(.force-mobile-layout)) .stats-rail-only { display: block; }
     :global(html:not(.force-mobile-layout)) .stats-center-only { display: none; }
     /* Horizontal pill scroller replaced by the rail on desktop */
@@ -1404,5 +1609,110 @@
     height: 16px;
     accent-color: var(--accent);
     cursor: pointer;
+  }
+
+  /* ── Phase-C polish additions (desktop-only, gated inline where needed) ── */
+  /* #2 Rail filter input */
+  .stats-rail-search {
+    width: 100%;
+    padding: 6px 10px;
+    margin: 0 0 6px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-1);
+    font-size: 12px;
+    font-family: inherit;
+    box-sizing: border-box;
+    transition: border-color var(--dur-fast), background var(--dur-fast);
+  }
+  .stats-rail-search:focus {
+    outline: none;
+    border-color: var(--accent);
+    background: var(--surface-1);
+  }
+  .stats-rail-search::placeholder { color: var(--text-3); }
+
+  /* #4 Timeline month header */
+  .stats-tl-month {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--surface-2);
+    border: none;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    font: inherit;
+    color: var(--text-1);
+    text-align: left;
+    transition: background var(--dur-fast);
+  }
+  .stats-tl-month:hover { background: var(--surface-3); }
+  .stats-tl-month-label { flex: 1; font-weight: 600; font-size: 13px; }
+  .stats-tl-month-count {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-3);
+    background: var(--surface-1);
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+  }
+  .stats-tl-chevron {
+    font-size: 18px;
+    color: var(--text-3);
+    transition: transform var(--dur-fast);
+  }
+  .stats-tl-chevron.open { transform: rotate(180deg); }
+
+  /* #7 Empty-state alternatives */
+  .stats-empty-alts {
+    margin-top: 10px;
+    line-height: 1.6;
+  }
+  .stats-empty-alt-link {
+    background: none;
+    border: none;
+    padding: 2px 4px;
+    margin: 0 1px;
+    font: inherit;
+    font-weight: 600;
+    color: var(--accent);
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background var(--dur-fast);
+  }
+  .stats-empty-alt-link:hover {
+    background: color-mix(in srgb, var(--accent) 15%, transparent);
+    text-decoration: underline;
+  }
+
+  /* #6 Neutral trend chip (goal-less metrics) */
+  .stats-rail-delta.neutral {
+    background: var(--surface-2);
+    color: var(--text-2);
+  }
+
+  /* #8 CSV export button */
+  .stats-rail-csv {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 10px;
+    padding: 6px 10px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-2);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--dur-fast), color var(--dur-fast), border-color var(--dur-fast);
+  }
+  .stats-rail-csv:hover {
+    background: var(--accent-dim);
+    color: var(--accent);
+    border-color: transparent;
   }
 </style>

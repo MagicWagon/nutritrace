@@ -1432,6 +1432,7 @@
       carbGoal={carbGoal}
       fatGoal={fatGoal}
       onOpenSummary={() => diaryShowNutritionSummary.set(true)}
+      onOpenTrends={() => push('#/statistics?metric=calories&range=1M')}
     />
   {/if}
   {#if $diaryRailShowWater && _waterShowInDiary}

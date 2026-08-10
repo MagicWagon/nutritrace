@@ -32,6 +32,10 @@
 
   // Interactive
   export let onOpenSummary    = () => {};
+  // Optional trend drill-in. When provided, a small trending_up button
+  // appears in the header next to open_in_full and routes to Statistics
+  // for whichever metric the caller wires up (calories by default).
+  export let onOpenTrends     = null;
 </script>
 
 <section class="day-summary-widget card">
@@ -44,6 +48,11 @@
       <span class="dsw-lt-opt" class:dsw-lt-active={$macroLegendMode === 'percent'}>%</span>
       <span class="dsw-lt-opt" class:dsw-lt-active={$macroLegendMode === 'grams'}>g</span>
     </button>
+    {#if onOpenTrends}
+      <button class="dsw-open dsw-trend" on:click={onOpenTrends} title="View trend">
+        <span class="material-symbols-rounded">trending_up</span>
+      </button>
+    {/if}
     <button class="dsw-open" on:click={onOpenSummary} title="Open full nutrition summary">
       <span class="material-symbols-rounded">open_in_full</span>
     </button>
@@ -141,6 +150,11 @@
   }
   .dsw-open:hover { color: var(--text-1); background: var(--surface-2); }
   .dsw-open .material-symbols-rounded { font-size: 16px; }
+  /* Trend affordance sits next to open_in_full but softer by default so
+     it doesn't compete with the primary open action. */
+  .dsw-trend { opacity: 0.5; }
+  .dsw-trend:hover { opacity: 1; }
+  .dsw-trend .material-symbols-rounded { font-size: 20px; }
 
   /* MacroRing centers itself + renders its percent legend below the
      ring when in %-mode. Block layout here lets both flow correctly. */

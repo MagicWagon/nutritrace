@@ -1,6 +1,7 @@
 <script>
   import { onMount, onDestroy, tick } from 'svelte';
   import { _ } from 'svelte-i18n';
+  import { push } from 'svelte-spa-router';
   import DatePicker from '../components/ui/DatePicker.svelte';
   import { wellnessMetrics, wellnessSyncRange, distUnit, tempUnit, pageBanners, bannerStyle, dateFormat, withingsSyncRange as withingsSyncRangeSetting, fitbitEnabled, withingsEnabled, garminEnabled, googleHealthEnabled, fitbitFamilyEnabled, garminSyncRange as garminSyncRangeSetting, weightUnit, goals, goalCelebrations, disableAnimations,
     fitbitSyncMode, withingsSyncMode, garminSyncMode, healthConnectSyncMode, timeFormat } from '../stores/settings.js';
@@ -80,6 +81,28 @@
   function isVisible(metricId) {
     const vis = $wellnessMetrics;
     return vis == null || vis.includes(metricId);
+  }
+
+  /**
+   * Wellness metric id → Statistics `wl_*` metric id. Statistics
+   * receives `?metric=X&range=Y` via onMount, so a matching id opens
+   * the chart for that exact wellness series. Only the metrics
+   * Statistics currently plots are mapped — anything else (Cardio
+   * Fitness, sleep stages, body composition, etc.) returns null so
+   * the trend button is suppressed on that card.
+   */
+  const _STATS_METRIC_MAP = {
+    steps:              'wl_steps',
+    active_minutes:     'wl_active',
+    sleep_duration_min: 'wl_sleep',
+    resting_hr:         'wl_rhr',
+    hrv_daily_rmssd:    'wl_hrv',
+    spo2_avg:           'wl_spo2',
+  };
+  function _statsMetricFor(id) { return _STATS_METRIC_MAP[id] || null; }
+  function _openStatsFor(id) {
+    const key = _statsMetricFor(id);
+    if (key) push('#/statistics?metric=' + key + '&range=1M');
   }
 
   function toggleMetric(id) {
@@ -1691,7 +1714,14 @@
               {#each ALL_METRICS.filter(m => m.group === 'activity' && isVisible(m.id) && isSourceEnabled(m)) as m}
                 {@const fmt = fmtMetric(m, displayData[m.id])}
                 {@const spark = sparklinePath(_sparklineData[m.id] ?? [])}
+                {@const _statsKey = _statsMetricFor(m.id)}
                 <div class="metric-card" class:no-data={fmt == null && !loadingData} class:celebrating={_celebratingMetrics.has(m.id)} title={m.desc}>
+                  {#if _statsKey && fmt}
+                    <button class="metric-trend" title="View trend" aria-label="View trend in Statistics"
+                      on:click|stopPropagation={() => _openStatsFor(m.id)}>
+                      <span class="material-symbols-rounded">trending_up</span>
+                    </button>
+                  {/if}
                   <div class="metric-icon-wrap">
                     <span class="material-symbols-rounded metric-icon">{m.icon}</span>
                   </div>
@@ -1821,7 +1851,14 @@
               {#each ALL_METRICS.filter(m => m.group === 'sleep' && isVisible(m.id) && isSourceEnabled(m)) as m}
                 {@const fmt = fmtMetric(m, displayData[m.id])}
                 {@const spark = sparklinePath(_sparklineData[m.id] ?? [])}
+                {@const _statsKey = _statsMetricFor(m.id)}
                 <div class="metric-card" class:no-data={fmt == null && !loadingData} class:celebrating={_celebratingMetrics.has(m.id)} title={m.desc}>
+                  {#if _statsKey && fmt}
+                    <button class="metric-trend" title="View trend" aria-label="View trend in Statistics"
+                      on:click|stopPropagation={() => _openStatsFor(m.id)}>
+                      <span class="material-symbols-rounded">trending_up</span>
+                    </button>
+                  {/if}
                   <div class="metric-icon-wrap">
                     <span class="material-symbols-rounded metric-icon">{m.icon}</span>
                   </div>
@@ -1941,7 +1978,14 @@
               {#each ALL_METRICS.filter(m => m.group === 'heart' && isVisible(m.id) && isSourceEnabled(m)) as m}
                 {@const fmt = fmtMetric(m, displayData[m.id])}
                 {@const spark = sparklinePath(_sparklineData[m.id] ?? [])}
+                {@const _statsKey = _statsMetricFor(m.id)}
                 <div class="metric-card" class:no-data={fmt == null && !loadingData} class:celebrating={_celebratingMetrics.has(m.id)} title={m.desc}>
+                  {#if _statsKey && fmt}
+                    <button class="metric-trend" title="View trend" aria-label="View trend in Statistics"
+                      on:click|stopPropagation={() => _openStatsFor(m.id)}>
+                      <span class="material-symbols-rounded">trending_up</span>
+                    </button>
+                  {/if}
                   <div class="metric-icon-wrap">
                     <span class="material-symbols-rounded metric-icon" style="color:#ef4444">{m.icon}</span>
                   </div>
@@ -2923,8 +2967,30 @@
     flex-direction: column;
     gap: 10px;
     transition: opacity var(--dur-fast);
+    position: relative;
   }
   .metric-card.no-data { opacity: 0.5; }
+  /* Trend affordance — subtle top-right chevron that routes to the
+     Statistics chart for this metric. Half-opacity by default so it
+     doesn't compete with the metric value; brightens on hover. */
+  .metric-trend {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    background: transparent;
+    border: none;
+    color: var(--text-3);
+    cursor: pointer;
+    padding: 2px;
+    border-radius: var(--radius-sm);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.5;
+    transition: opacity 120ms ease, background 120ms ease, color 120ms ease;
+  }
+  .metric-trend:hover { opacity: 1; color: var(--text-1); background: var(--surface-2); }
+  .metric-trend .material-symbols-rounded { font-size: 16px; }
   .metric-card.celebrating { animation: goal-pulse 1.2s ease-out; }
   @keyframes goal-pulse {
     0%   { filter: brightness(1); }

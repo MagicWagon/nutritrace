@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { slide } from 'svelte/transition';
   import { _ } from 'svelte-i18n';
+  import { push } from 'svelte-spa-router';
   import { DB, localDateStr } from '../lib/db.js';
   import { NtApi } from '../lib/api.js';
   import { portal } from '../lib/portal.js';
@@ -305,6 +306,37 @@
   // switches or independent edits. #146.
   function _goalStorageId(statId) {
     return statId === 'kilojoules' ? 'calories' : statId;
+  }
+
+  /**
+   * Map a goal-row stat to the Statistics page's metric id, so the
+   * trending-icon affordance lands on the right chart. Nutrients and
+   * body stats already share an id with Statistics; wellness ids need
+   * the `wl_*` prefix Statistics uses. Returns null when there's no
+   * matching Statistics metric (button gets suppressed).
+   */
+  const _WL_STATS_MAP = {
+    steps:              'wl_steps',
+    active_minutes:     'wl_active',
+    sleep_duration_min: 'wl_sleep',
+    resting_hr:         'wl_rhr',
+    hrv_daily_rmssd:    'wl_hrv',
+    spo2_avg:           'wl_spo2',
+    muscle_mass_kg:     'wl_muscle',
+  };
+  const _STATS_BODY_STAT_IDS = new Set([
+    'weight','neck','waist','hips','chest','thighs','biceps','calves','body_fat','body_water',
+  ]);
+  function _statsIdForGoal(stat) {
+    if (!stat || !stat.id) return null;
+    if (stat.isWellness) return _WL_STATS_MAP[stat.id] || null;
+    if (_STATS_BODY_STAT_IDS.has(stat.id)) return stat.id;
+    if (NUTRIMENTS.some(n => n.id === stat.id)) return stat.id;
+    return null;
+  }
+  function _openStatsForGoal(stat) {
+    const id = _statsIdForGoal(stat);
+    if (id) push('#/statistics?metric=' + id + '&range=1M');
   }
   function openEdit(stat) {
     editStat = stat;
@@ -818,6 +850,12 @@
                     <span class="text-3 text-sm">{$_('goals_page.row.not_set')}</span>
                   {/if}
                 </div>
+                {#if _statsIdForGoal(stat)}
+                  <span class="goal-trend material-symbols-rounded" role="button" tabindex="0"
+                    title="View trend" aria-label="View trend in Statistics"
+                    on:click|stopPropagation={() => _openStatsForGoal(stat)}
+                    on:keydown|stopPropagation={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); _openStatsForGoal(stat); } }}>trending_up</span>
+                {/if}
                 <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
               </button>
             {/each}
@@ -853,6 +891,12 @@
                     <span class="text-3 text-sm">{$_('goals_page.row.not_set')}</span>
                   {/if}
                 </div>
+                {#if _statsIdForGoal(stat)}
+                  <span class="goal-trend material-symbols-rounded" role="button" tabindex="0"
+                    title="View trend" aria-label="View trend in Statistics"
+                    on:click|stopPropagation={() => _openStatsForGoal(stat)}
+                    on:keydown|stopPropagation={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); _openStatsForGoal(stat); } }}>trending_up</span>
+                {/if}
                 <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
               </button>
             {/each}
@@ -872,6 +916,10 @@
             </div>
             <span class="text-3 text-sm">{waterTodayDisplay.toLocaleString()} / {waterGoalDisplay.toLocaleString()} {$waterUnit}</span>
           </div>
+          <span class="goal-trend material-symbols-rounded" role="button" tabindex="0"
+            title="View trend" aria-label="View trend in Statistics"
+            on:click|stopPropagation={() => push('#/statistics?metric=water&range=1M')}
+            on:keydown|stopPropagation={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); push('#/statistics?metric=water&range=1M'); } }}>trending_up</span>
           <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
         </button>
       </div>
@@ -896,6 +944,12 @@
                   <span class="text-3 text-sm">{$_('goals_page.row.not_set')}</span>
                 {/if}
               </div>
+              {#if _statsIdForGoal(stat)}
+                <span class="goal-trend material-symbols-rounded" role="button" tabindex="0"
+                  title="View trend" aria-label="View trend in Statistics"
+                  on:click|stopPropagation={() => _openStatsForGoal(stat)}
+                  on:keydown|stopPropagation={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); _openStatsForGoal(stat); } }}>trending_up</span>
+              {/if}
               <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
             </button>
           {/each}
@@ -935,6 +989,12 @@
                 <span class="text-3 text-sm" style="opacity:0.4">{$_('goals_page.row.no_goal')}</span>
               {/if}
             </div>
+            {#if _statsIdForGoal(stat)}
+              <span class="goal-trend material-symbols-rounded" role="button" tabindex="0"
+                title="View trend" aria-label="View trend in Statistics"
+                on:click|stopPropagation={() => _openStatsForGoal(stat)}
+                on:keydown|stopPropagation={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); _openStatsForGoal(stat); } }}>trending_up</span>
+            {/if}
             <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
           </button>
         {/each}
@@ -960,6 +1020,12 @@
                 <span class="text-3 text-sm" style="opacity:0.4">{$_('goals_page.row.no_goal')}</span>
               {/if}
             </div>
+            {#if _statsIdForGoal(stat)}
+              <span class="goal-trend material-symbols-rounded" role="button" tabindex="0"
+                title="View trend" aria-label="View trend in Statistics"
+                on:click|stopPropagation={() => _openStatsForGoal(stat)}
+                on:keydown|stopPropagation={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); _openStatsForGoal(stat); } }}>trending_up</span>
+            {/if}
             <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
           </button>
         {/each}
@@ -976,6 +1042,10 @@
             </div>
             <span class="text-3 text-sm">{waterTodayDisplay.toLocaleString()} / {waterGoalDisplay.toLocaleString()} {$waterUnit}</span>
           </div>
+          <span class="goal-trend material-symbols-rounded" role="button" tabindex="0"
+            title="View trend" aria-label="View trend in Statistics"
+            on:click|stopPropagation={() => push('#/statistics?metric=water&range=1M')}
+            on:keydown|stopPropagation={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); push('#/statistics?metric=water&range=1M'); } }}>trending_up</span>
           <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
         </button>
       </div>
@@ -1005,6 +1075,12 @@
                   <span class="text-3 text-sm" style="opacity:0.4">{$_('goals_page.row.no_goal')}</span>
                 {/if}
               </div>
+              {#if _statsIdForGoal(stat)}
+                <span class="goal-trend material-symbols-rounded" role="button" tabindex="0"
+                  title="View trend" aria-label="View trend in Statistics"
+                  on:click|stopPropagation={() => _openStatsForGoal(stat)}
+                  on:keydown|stopPropagation={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); _openStatsForGoal(stat); } }}>trending_up</span>
+              {/if}
               <span class="material-symbols-rounded text-3" style="font-size:18px">chevron_right</span>
             </button>
           {/each}
@@ -1368,6 +1444,24 @@
     transition: width var(--dur-base) var(--ease-inout);
   }
   .goal-progress-fill.over { background: var(--red, #f44336); }
+  /* Trend affordance in the goal-row rail — sits just before the
+     chevron, subtle at rest, brightens on hover. stopPropagation on
+     the click handler keeps the outer goal-row's openEdit from firing
+     when the trend icon is tapped. */
+  .goal-row .goal-trend {
+    color: var(--text-3);
+    opacity: 0.5;
+    font-size: 18px;
+    padding: 2px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: opacity 120ms ease, background 120ms ease, color 120ms ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .goal-row .goal-trend:hover,
+  .goal-row .goal-trend:focus { opacity: 1; color: var(--text-1); background: var(--surface-2); outline: none; }
   /* Subtle staleness indicator next to a body-stat value (Weight, Body Fat,
      measurements) when the displayed reading is from a previous day, not
      today. Lives under the value line so users know the number is a
