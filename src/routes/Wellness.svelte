@@ -140,6 +140,51 @@
   let garminSyncing    = false;
   let hcSyncing        = false;
   let garminConnecting = false;
+
+  // Last-synced timestamp for the desktop left-rail footer.
+  // Written by _markSynced() at the end of every successful sync
+  // handler (Fitbit / Withings / Garmin / Health Connect / server-
+  // side Google Health polling). Persisted to localStorage so it
+  // survives reload; picked up on mount so users see the last sync
+  // from a previous session too.
+  let _lastSyncedAt = 0;         // ms since epoch (0 = never in this session)
+  let _lastSyncedProvider = '';  // human label, e.g. 'Fitbit'
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const raw = localStorage.getItem('nt:wellnessLastSync') || '';
+      if (raw) {
+        const [ts, prov] = raw.split('|');
+        _lastSyncedAt = Number(ts) || 0;
+        _lastSyncedProvider = prov || '';
+      }
+    }
+  } catch { /* ignore */ }
+  function _markSynced(provider) {
+    _lastSyncedAt = Date.now();
+    _lastSyncedProvider = provider;
+    try {
+      localStorage.setItem('nt:wellnessLastSync', `${_lastSyncedAt}|${provider}`);
+    } catch { /* ignore */ }
+  }
+  // Reactive tick — bumps every 30s so the "Xm ago" label updates
+  // without user interaction. Wired in onMount below.
+  let _lastSyncedTick = 0;
+  // Format helper: rounds to the nicest unit ("just now", "3m ago",
+  // "2h ago", "yesterday", or a full date for anything older).
+  function _fmtRelative(ms, _tick) {
+    if (!ms) return '';
+    const s = Math.floor((Date.now() - ms) / 1000);
+    if (s < 30) return 'just now';
+    if (s < 60) return `${s}s ago`;
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    const d = Math.floor(h / 24);
+    if (d === 1) return 'yesterday';
+    if (d < 7) return `${d}d ago`;
+    return new Date(ms).toLocaleDateString();
+  }
   // ── Unit helpers ───────────────────────────────────────────────────────────
   $: du = $distUnit || 'km';
 
@@ -285,6 +330,7 @@
       }
       _checkWellnessGoals(data, withingsData);
       withingsLastSync = new Date();
+      _markSynced('Withings');
       if (!silent) showSuccess(`Synced ${result.dates} day${result.dates === 1 ? '' : 's'} from Withings`);
     } catch(e) {
       if (!silent) {
@@ -365,6 +411,7 @@
       } else {
         await loadGarminData();
       }
+      _markSynced('Garmin');
       if (!silent) showSuccess(`Synced ${result.synced ?? 0} day${result.synced === 1 ? '' : 's'} from Garmin`);
     } catch(e) {
       if (!silent) {
@@ -452,6 +499,7 @@
       if (isNative) await loadLocalWellnessData();
       console.log('[wellness] HC sync done, data keys:', Object.keys(data), '_hasLocalData:', _hasLocalData, 'displayData keys:', Object.keys(displayData));
       showSuccess('Health Connect synced');
+      _markSynced('Health Connect');
       // Check step + wellness goals after HC sync (works in local mode too)
       if (dateStr === localDateStr()) {
         try {
@@ -1190,6 +1238,7 @@
         localStorage.setItem(`wl_wellness_lastSync_${dateStr}`, String(Date.now()));
         if (!silent) showSuccess('Synced');
       }
+      _markSynced('Fitbit');
     } catch (e) {
       if (!silent) {
         if (e.message?.includes('revoked') || e.message?.includes('Not connected') || e.status === 401) {
@@ -1285,8 +1334,16 @@
   });
 
   let _syncCompleteHandler = null;
+  let _lastSyncTickTimer = null;
+  onMount(() => {
+    // 30s tick to keep the 'Xm ago' label in the left rail fresh
+    // without user interaction. Uses setInterval; cleared in
+    // onDestroy below.
+    _lastSyncTickTimer = setInterval(() => { _lastSyncedTick++; }, 30_000);
+  });
   onDestroy(() => {
     if (_syncCompleteHandler) window.removeEventListener('nt:sync-complete', _syncCompleteHandler);
+    if (_lastSyncTickTimer) clearInterval(_lastSyncTickTimer);
   });
 
   // ── Goal celebrations ─────────────────────────────────────────────────────
@@ -1526,7 +1583,22 @@
               Sync All
             </button>
           {/if}
-          <!-- last-sync timestamp: TODO wire once persisted -->
+          <!-- Last-synced footer. _lastSyncedAt is bumped by
+               _markSynced() at the end of every successful sync
+               (Fitbit / Withings / Garmin / Health Connect).
+               _lastSyncedTick is a 30s reactive nudge so the
+               'Xm ago' relative label updates without user
+               interaction. Reference _lastSyncedTick in the call
+               to keep Svelte's reactive graph alive. -->
+          {#if _lastSyncedAt > 0}
+            <div class="wl-last-synced">
+              <span class="material-symbols-rounded">history</span>
+              <span>
+                {_lastSyncedProvider || 'Synced'}
+                <span class="wl-last-synced-time">{_fmtRelative(_lastSyncedAt, _lastSyncedTick)}</span>
+              </span>
+            </div>
+          {/if}
         </aside>
 
         <div class="wl-main">
@@ -1628,8 +1700,14 @@
               {/each}
             </div>
 
-            <!-- ── Workouts section (within Activity tab) ── -->
+            <!-- ── Workouts section (within Activity tab) ──
+                 .wl-center-only so the full-detail card list only
+                 renders in the center on mobile. On desktop the
+                 same workouts are shown compactly in the right
+                 rail below the This Week card (see Insights rail
+                 activity branch). -->
             {#if $workoutsEnabled && _workouts.length > 0}
+              <div class="wl-center-only" style="display:contents">
               <div class="section-title" style="margin-top:20px">
                 <span class="material-symbols-rounded" style="font-size:18px;vertical-align:middle;margin-right:4px">fitness_center</span>
                 Today's Workouts
@@ -1666,6 +1744,7 @@
                   </button>
                 {/each}
               </div>
+              </div><!-- /.wl-center-only workouts wrapper -->
             {:else if $workoutsEnabled && !loadingData && _workoutsLoaded}
               <!-- No workouts today — show subtle hint -->
             {/if}
@@ -2208,6 +2287,44 @@
                       Burned <strong>{Math.round(_calTotal).toLocaleString()} kcal</strong> total this week.
                     </p>
                   {/if}
+                </div>
+              </div>
+            {/if}
+            <!-- Compact workouts list in the rail — one-line rows
+                 instead of the full detail cards. Same click handler
+                 opens the workout detail overlay so users don't
+                 lose any info, just presented denser. -->
+            {#if $workoutsEnabled && _workouts.length > 0}
+              <div class="wl-rail-only">
+                <div class="card sleep-insight-card">
+                  <div class="si-header">
+                    <span class="material-symbols-rounded si-icon">fitness_center</span>
+                    <div class="si-title-wrap">
+                      <span class="si-title">Today's Workouts</span>
+                      <span class="si-sub">{_workouts.length} {_workouts.length === 1 ? 'session' : 'sessions'}</span>
+                    </div>
+                  </div>
+                  <div class="wl-rail-workouts">
+                    {#each _workouts as w}
+                      <button type="button" class="wl-rail-workout-row" on:click={() => _openWorkout(w)}>
+                        <span class="material-symbols-rounded">{_workoutIcon(w.activity_name)}</span>
+                        <div class="wl-rail-workout-copy">
+                          <span class="wl-rail-workout-name">{w.activity_name}</span>
+                          <span class="wl-rail-workout-meta">
+                            {_fmtDuration(w.duration_ms)}
+                            {#if w.distance_km != null} · {_fmtWorkoutDist(w.distance_km)}{/if}
+                            {#if w.calories}
+                              {@const _rwE = Nutrition.displayEnergy(w.calories, $energyUnit)}
+                              · {_rwE.value.toLocaleString()} {_rwE.unit}
+                            {/if}
+                          </span>
+                        </div>
+                        {#if w.has_gps}
+                          <span class="material-symbols-rounded wl-rail-workout-gps" title="GPS route available">map</span>
+                        {/if}
+                      </button>
+                    {/each}
+                  </div>
                 </div>
               </div>
             {/if}
@@ -3351,6 +3468,67 @@
     letter-spacing: 0.05em;
     font-weight: 600;
   }
+
+  /* Compact workout rows in the Activity rail — replaces the tall
+     detail cards on desktop so the center pane isn't dominated by
+     Today's Workouts. One-line row: icon + name + meta + optional
+     GPS marker. Click routes to the same _openWorkout handler as
+     the full card. */
+  .wl-rail-workouts {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 6px;
+  }
+  .wl-rail-workout-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 10px;
+    background: var(--surface-2);
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    text-align: left;
+    transition: background 120ms ease, border-color 120ms ease;
+  }
+  .wl-rail-workout-row:hover {
+    background: var(--surface-3);
+    border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+  .wl-rail-workout-row > .material-symbols-rounded {
+    font-size: 20px;
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+  .wl-rail-workout-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    flex: 1;
+    min-width: 0;
+  }
+  .wl-rail-workout-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-1);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .wl-rail-workout-meta {
+    font-size: 11px;
+    color: var(--text-3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .wl-rail-workout-gps {
+    font-size: 16px;
+    color: var(--accent);
+    flex-shrink: 0;
+  }
   .wl-provider-row {
     display: flex; align-items: center; gap: 8px;
     padding: 8px 6px; border-radius: 10px;
@@ -3388,6 +3566,25 @@
     display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   }
   .wl-sync-all-btn .material-symbols-rounded { font-size: 18px; }
+  /* Last-synced footer — sits below Sync All in the left rail. */
+  .wl-last-synced {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+    padding: 2px 6px;
+    font-size: 11px;
+    color: var(--text-3);
+  }
+  .wl-last-synced .material-symbols-rounded {
+    font-size: 14px;
+    opacity: 0.7;
+  }
+  .wl-last-synced-time {
+    color: var(--text-2);
+    font-weight: 600;
+    margin-left: 4px;
+  }
 
   /* Desktop-only activation (≥1280px, non-force-mobile) */
   @media (min-width: 1280px) {
