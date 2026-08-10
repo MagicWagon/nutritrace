@@ -1097,7 +1097,7 @@
              goals (goal.min only) → up is good; else lower is good. -->
         {@const _tGood = _goalValReactive == null ? null : (_goalIsMin ? _trendDelta >= 0 : _trendDelta <= 0)}
         <div class="stats-rail-kpi">
-          <span class="stats-rail-kpi-lbl">Trend (7d vs prev)</span>
+          <span class="stats-rail-kpi-lbl" title="Last 7-day average vs the previous 7 days. Deep trend analysis lives on the chart itself — this is the quick pulse.">Weekly trend</span>
           <span class="stats-rail-kpi-val">
             <span class="stats-rail-delta"
               class:good={_tGood === true}

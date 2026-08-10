@@ -85,13 +85,28 @@
   let loading = true;
   let hoveredIso = null;
 
-  // Build the 7-day array — last 6 days + today, always same order.
+  // Build the 7-day array — the CALENDAR WEEK containing the
+  // currently-viewed date (Sunday through Saturday). Previously
+  // this was always "last 6 days + today" which made the strip
+  // stuck on the current real-world week even when the user
+  // navigated back to a diary from weeks ago — disorienting
+  // because the strip is supposed to anchor 'where am I in time'
+  // relative to the diary I'm viewing, not to real-life today.
   $: today = localDateStr();
   $: strip = (() => {
+    // Parse currentDate as a Date at local noon (avoids TZ edge
+    // where an ISO 'YYYY-MM-DD' parses as UTC midnight and
+    // getDay() flips a day for anyone west of UTC).
+    const anchor = currentDate
+      ? new Date(currentDate + 'T12:00:00')
+      : new Date();
+    // Sunday of the anchor's week. getDay(): 0 = Sunday.
+    const sunday = new Date(anchor);
+    sunday.setDate(anchor.getDate() - anchor.getDay());
     const out = [];
-    for (let i = 6; i >= 0; i--) {
-      const dt = new Date();
-      dt.setDate(dt.getDate() - i);
+    for (let i = 0; i < 7; i++) {
+      const dt = new Date(sunday);
+      dt.setDate(sunday.getDate() + i);
       const iso = localDateStr(dt);
       const stats = byDate.get(iso);
       const kcal = stats?.kcal ?? 0;
@@ -105,12 +120,17 @@
         hasData: !!stats && kcal > 0,
         isToday: iso === today,
         isSelected: iso === currentDate,
+        // Future dates carry no meaningful goal-hit color — grey
+        // them out and skip the fill bar rendering downstream via
+        // status === 'future' in the button markup.
+        isFuture: iso > today,
         // Goal-hit status colour for the dot:
         //  - green:  ±10% of goal (on-track)
         //  - amber:  <90% (under-eaten)
         //  - red:    >110% (over-eaten)
         //  - grey:   no data
-        status: !stats || kcal === 0 ? 'none'
+        status: iso > today ? 'future'
+              : !stats || kcal === 0 ? 'none'
               : kcal > calorieGoal * 1.10 ? 'over'
               : kcal < calorieGoal * 0.90 ? 'under'
               : 'on',
@@ -124,10 +144,15 @@
     loading = true;
     try {
       const all = await NtApi.getAllDiary().catch(() => []);
-      const cutoff = (() => { const dt = new Date(); dt.setDate(dt.getDate() - 7); return localDateStr(dt); })();
+      // Previously filtered to a fixed 7-days-back cutoff, which
+      // silently returned zeros when the strip anchored on any
+      // historical week. Load every entry into the map now —
+      // getAllDiary returns the same payload regardless, so this
+      // is a cheaper filter (memory only) that lets any week the
+      // user navigates to render with real numbers.
       const map = new Map();
       for (const entry of all || []) {
-        if (!entry?.date || entry.date < cutoff || entry.date > today) continue;
+        if (!entry?.date) continue;
         const items = entry.items || [];
         const nutrArr = items.map(it => Nutrition.calculate(it));
         const totals = Nutrition.sum(nutrArr);
@@ -153,13 +178,14 @@
   $: if (refreshKey >= 0) { /* reactive trigger */ loadWeek(); }
 </script>
 
-<nav class="week-strip" aria-label="Last 7 days">
+<nav class="week-strip" aria-label="Week strip">
   {#each strip as day (day.iso)}
     <button
       class="ws-day"
       class:selected={day.isSelected}
       class:today={day.isToday}
       class:no-data={!day.hasData}
+      class:is-future={day.isFuture}
       class:drag-over={dragOverIso === day.iso}
       on:click={() => onSelectDate(day.iso)}
       on:mouseenter={() => hoveredIso = day.iso}
@@ -292,7 +318,9 @@
   .ws-bar-fill.ws-status-on    { background: #34c47d; }
   .ws-bar-fill.ws-status-under { background: #e5b03e; }
   .ws-bar-fill.ws-status-over  { background: #e05a6e; }
-  .ws-bar-fill.ws-status-none  { background: transparent; }
+  .ws-bar-fill.ws-status-none   { background: transparent; }
+  .ws-bar-fill.ws-status-future { background: transparent; }
+  .ws-day.is-future { opacity: 0.45; }
 
   /* Hover preview */
   .ws-popover {
