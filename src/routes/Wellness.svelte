@@ -1705,9 +1705,10 @@
                  renders in the center on mobile. On desktop the
                  same workouts are shown compactly in the right
                  rail below the This Week card (see Insights rail
-                 activity branch). -->
+                 activity branch). NO inline display: — CSS class
+                 handles show/hide by viewport. -->
             {#if $workoutsEnabled && _workouts.length > 0}
-              <div class="wl-center-only" style="display:contents">
+              <div class="wl-center-only wl-center-workouts">
               <div class="section-title" style="margin-top:20px">
                 <span class="material-symbols-rounded" style="font-size:18px;vertical-align:middle;margin-right:4px">fitness_center</span>
                 Today's Workouts
