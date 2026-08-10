@@ -749,6 +749,15 @@
       <div class="photo-preview-wrap">
         {#if photoPreviewUrl}
           <img src={photoPreviewUrl} alt="food" class="photo-preview-img" />
+          <!-- × in the top-right corner replaces the separate trash
+               button in the actions row — matches the FoodEditor
+               pattern so the two editors clear photos the same way. -->
+          <button class="photo-remove-btn btn-icon"
+            on:click={() => photoPreviewUrl = ''}
+            aria-label="Remove photo"
+            title="Remove photo">
+            <span class="material-symbols-rounded" style="font-size:18px">close</span>
+          </button>
         {:else}
           <div class="photo-placeholder">
             <span class="material-symbols-rounded" style="font-size:40px;opacity:0.2">photo_camera</span>
@@ -769,12 +778,6 @@
           <span class="material-symbols-rounded" style="font-size:18px">link</span>
           URL
         </button>
-        {#if photoPreviewUrl}
-          <button class="btn btn-ghost photo-btn" style="color:var(--text-3)"
-            on:click={() => photoPreviewUrl = ''}>
-            <span class="material-symbols-rounded" style="font-size:18px">delete</span>
-          </button>
-        {/if}
       </div>
       {#if showUrlInput}
         <div class="photo-url-row">
@@ -1209,6 +1212,17 @@
       gap: 12px;
       min-width: 0;
     }
+    /* Sticky left column — matches the FoodEditor pattern so the
+       photo + name + servings + notes stay visible while scrolling
+       the tall Ingredients list on the right. No max-height /
+       internal scroll: if the left stack exceeds viewport, sticky
+       un-sticks against .editor-content's bottom and the whole
+       column is still reachable via page scroll. */
+    :global(html:not(.force-mobile-layout)) .editor-left-col {
+      position: sticky;
+      top: calc(var(--safe-top, 0px) + 76px);
+      align-self: start;
+    }
   }
   .readonly-banner {
     display: flex; align-items: center; gap: 12px;
@@ -1230,8 +1244,18 @@
     border: 2px dashed var(--border);
     background: var(--surface-2);
     display: flex; align-items: center; justify-content: center;
+    position: relative;   /* anchor for the top-right .photo-remove-btn */
   }
   .photo-preview-img { width: 100%; height: 100%; object-fit: cover; display: block; background: var(--surface-2); }
+  .photo-remove-btn {
+    position: absolute;
+    top: 8px; right: 8px;
+    background: rgba(0,0,0,0.55);
+    color: #fff;
+    border-radius: 50%;
+    width: 32px; height: 32px;
+  }
+  .photo-remove-btn:hover { background: rgba(0,0,0,0.75); }
   .photo-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
   .photo-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
   .photo-btn { display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; font-size: 13px; }

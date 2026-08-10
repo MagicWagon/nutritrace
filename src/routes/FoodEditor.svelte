@@ -1221,28 +1221,17 @@
       gap: 12px;
       min-width: 0;
     }
-    /* Sticky left column — keeps photo + basic info + categories +
-       notes visible while the user scrolls the tall Nutrition card
-       on the right. Own scroll region if the left stack ever grows
-       taller than viewport (unlikely, but safe fallback). Top
-       offset aligns with the bottom of the sticky .editor-header:
-       safe-top + header padding + content height + bottom padding
-       + small gap. */
+    /* Sticky left column — keeps photo + basic info visible while
+       scrolling the tall Nutrition card on the right. No max-height
+       or internal scroll: if the left stack ever exceeds viewport
+       height, sticky just unsticks against .editor-content's bottom
+       so the whole column is still reachable via page scroll. Users
+       don't have to hunt for an internal scrollbar to see cards at
+       the bottom of the left column. */
     :global(html:not(.force-mobile-layout)) .editor-left-col {
       position: sticky;
       top: calc(var(--safe-top, 0px) + 76px);
-      max-height: calc(100vh
-        - var(--safe-top, 0px)
-        - 80px
-        - var(--nav-h, 0px)
-        - var(--safe-bottom, 0px));
-      overflow-y: auto;
-      /* Thin scrollbar so it doesn't dominate the compact column. */
-      scrollbar-width: thin;
-      scrollbar-color: var(--border) transparent;
-      /* Small padding-right so the scrollbar sits inside the
-         column instead of hard against the card borders. */
-      padding-right: 4px;
+      align-self: start;
     }
     /* Left column is only ~340px wide on desktop — the shared
        .form-row (used by 'View on OFF' + 'Refresh from OFF' etc.)
