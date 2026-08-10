@@ -579,6 +579,71 @@
     return m ? (m.unit || '') : '';
   })();
 
+  // Desktop rail — partition the (already filtered + ordered) METRICS
+  // array into semantic groups so the left rail can render category
+  // headings instead of one flat pill scroller. Membership inferred from
+  // source-array shape: NUTRIMENTS items carry `.id` (no `.value`), body
+  // stats use `.value` present in BODY_STATS, water is the literal
+  // 'water' key, wellness values are prefixed `wl_`.
+  $: groupedMetrics = (() => {
+    const bodyValues = new Set(BODY_STATS.map(s => s.value));
+    const buckets = { nutrient: [], body: [], water: [], wellness: [] };
+    for (const m of METRICS) {
+      const key = _metricKey(m);
+      let bucket;
+      if (typeof key === 'string' && key.startsWith('wl_')) bucket = 'wellness';
+      else if (key === 'water') bucket = 'water';
+      else if (bodyValues.has(key)) bucket = 'body';
+      else bucket = 'nutrient';
+      buckets[bucket].push({ ...m, _key: key });
+    }
+    const groups = [];
+    if (buckets.nutrient.length) groups.push({ label: 'Nutrition', metrics: buckets.nutrient });
+    if (buckets.body.length)     groups.push({ label: 'Body',      metrics: buckets.body });
+    if (buckets.water.length)    groups.push({ label: 'Water',     metrics: buckets.water });
+    if (buckets.wellness.length) groups.push({ label: 'Wellness',  metrics: buckets.wellness });
+    return groups;
+  })();
+
+  // Goal value + delta for the right-rail KPI stack. Mirrors the goal
+  // computation inside renderChart() (lines ~436-446); kept reactive here
+  // so the "vs goal" chip stays in sync with metric / energyUnit changes
+  // without re-running the chart pipeline.
+  $: _goalValReactive = (() => {
+    const g = $goals && $goals[metric];
+    let gv = g ? (g.max ?? g.min ?? null) : null;
+    if (gv != null && g?.isPercent) {
+      const density = {fat:9,'saturated-fat':9,carbohydrates:4,sugars:4,proteins:4}[metric];
+      const calGoal = $goals.calories?.max ?? $goals.calories?.min ?? 2000;
+      if (density) gv = Math.round(calGoal * gv / 100 / density);
+    }
+    if (gv != null && metric === 'calories' && $energyUnit === 'kJ') gv = Math.round(Nutrition.kcalToKj(gv));
+    return gv;
+  })();
+  $: _goalIsMin = (() => {
+    const g = $goals && $goals[metric];
+    return !!(g && g.min != null && g.max == null);
+  })();
+  $: _goalDelta = (summary?.avg != null && _goalValReactive) ? Math.round((summary.avg - _goalValReactive) / _goalValReactive * 100) : null;
+
+  // Deep-link support (#: ?metric=X&range=Y). Wellness/Diary/Goals
+  // linking to Statistics for a specific metric+range lands here; if the
+  // metric isn't currently visible the existing METRICS-snap reactive
+  // (line ~120) resets it to the first visible metric on the next tick,
+  // so an unknown key silently no-ops rather than throwing.
+  onMount(() => {
+    try {
+      const hash = window.location.hash || '';
+      const qi = hash.indexOf('?');
+      if (qi < 0) return;
+      const params = new URLSearchParams(hash.slice(qi + 1));
+      const mp = params.get('metric');
+      const rp = params.get('range');
+      if (mp) metric = mp;
+      if (rp && RANGES.some(r => r.value === rp)) range = rp;
+    } catch {}
+  });
+
   $: { metric; range; customStart; customEnd; $statsIncludeToday; $statsShowEmptyDays; $statsChartType; $statsYZero; $statsAvgLine; $statsGoalLine; $statsTrendLine;
        if (canvasEl) loadData(); }
 
@@ -662,7 +727,22 @@
     <h1>{$_('routes.statistics.title')}</h1>
   </header>
 
-  <div class="stats-content">
+  <div class="stats-body">
+  <!-- Desktop left rail: grouped metric picker. Hidden on mobile; the
+       horizontal metric-scroll below still owns metric selection there. -->
+  <aside class="stats-left-rail">
+    <div class="stats-rail-heading">Metrics</div>
+    {#each groupedMetrics as g}
+      <p class="stats-rail-group">{g.label}</p>
+      {#each g.metrics as m}
+        <button class="stats-rail-metric" class:active={metric === m._key}
+          on:click={() => metric = m._key}>
+          {m.label}
+        </button>
+      {/each}
+    {/each}
+  </aside>
+  <div class="stats-content stats-main">
     <!-- Metric selector (scrollable) -->
     <div class="metric-scroll" use:dragScroll>
       {#each METRICS as m}
@@ -724,8 +804,10 @@
       </div>
     {/if}
 
-    <!-- Summary stats (above chart) -->
+    <!-- Summary stats (above chart) — mobile owns this; desktop shows the
+         same numbers in the right rail (.stats-rail-only) instead. -->
     {#if summary}
+      <div class="stats-center-only">
       <div class="summary-card card">
         <div class="summary-grid">
           <div class="summary-item">
@@ -749,6 +831,7 @@
             <span class="summary-lbl">{$_('statistics_page.summary.logged')}</span>
           </div>
         </div>
+      </div>
       </div>
     {/if}
 
@@ -814,6 +897,57 @@
     {/if}
 
     <div style="height:16px"></div>
+  </div>
+  <!-- Desktop right rail: KPI stack + overlay toggles. Hidden on mobile. -->
+  <aside class="stats-right-rail">
+    <div class="stats-rail-heading">Summary</div>
+    {#if summary}
+      <div class="stats-rail-kpi">
+        <span class="stats-rail-kpi-lbl">{$_('statistics_page.summary.average')}</span>
+        <span class="stats-rail-kpi-val">
+          {summary.avg.toLocaleString()}
+          <span class="stats-rail-kpi-unit">{_metricUnit}</span>
+          {#if _goalDelta != null}
+            {@const good = _goalIsMin ? _goalDelta >= 0 : _goalDelta <= 0}
+            <span class="stats-rail-delta" class:good class:bad={!good}>
+              {_goalDelta > 0 ? '+' : ''}{_goalDelta}%
+            </span>
+          {/if}
+        </span>
+      </div>
+      <div class="stats-rail-kpi">
+        <span class="stats-rail-kpi-lbl">{$_('statistics_page.summary.min')}</span>
+        <span class="stats-rail-kpi-val">{summary.min.toLocaleString()} <span class="stats-rail-kpi-unit">{_metricUnit}</span></span>
+      </div>
+      <div class="stats-rail-kpi">
+        <span class="stats-rail-kpi-lbl">{$_('statistics_page.summary.max')}</span>
+        <span class="stats-rail-kpi-val">{summary.max.toLocaleString()} <span class="stats-rail-kpi-unit">{_metricUnit}</span></span>
+      </div>
+      <div class="stats-rail-kpi">
+        <span class="stats-rail-kpi-lbl">{$_('statistics_page.summary.logged')}</span>
+        <span class="stats-rail-kpi-val">{summary.daysWithData.toLocaleString()} <span class="stats-rail-kpi-unit">{$_('statistics_page.summary.days_unit')}</span></span>
+      </div>
+    {:else}
+      <p class="stats-rail-empty text-3 text-sm">{$_('statistics_page.empty.no_data')}</p>
+    {/if}
+
+    <div class="stats-rail-heading" style="margin-top:16px">Overlays</div>
+    <label class="stats-rail-check">
+      <input type="checkbox" checked={$statsAvgLine}
+        on:change={(e) => statsAvgLine.set(e.currentTarget.checked)} />
+      <span>Average</span>
+    </label>
+    <label class="stats-rail-check">
+      <input type="checkbox" checked={$statsGoalLine}
+        on:change={(e) => statsGoalLine.set(e.currentTarget.checked)} />
+      <span>Goal</span>
+    </label>
+    <label class="stats-rail-check">
+      <input type="checkbox" checked={$statsTrendLine}
+        on:change={(e) => statsTrendLine.set(e.currentTarget.checked)} />
+      <span>Trend</span>
+    </label>
+  </aside>
   </div>
 </div>
 
@@ -1100,4 +1234,175 @@
 
   :global(.spin) { animation: spin 1s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ─── Desktop three-pane layout ─────────────────────────────────────────
+     Mobile defaults keep the single-column stack; rails + duplicate KPIs
+     hidden. Desktop grid + rail visibility gated inside a
+     :global(html:not(.force-mobile-layout)) media query below so a user
+     with "Force mobile layout" ON stays on the mobile presentation. */
+  .stats-body { display: block; }
+  .stats-left-rail,
+  .stats-right-rail,
+  .stats-rail-only { display: none; }
+  .stats-center-only { display: block; }
+
+  :global(html:not(.force-mobile-layout)) .stats-body { /* mobile placeholder */ }
+
+  @media (min-width: 1280px) {
+    :global(html:not(.force-mobile-layout)) .stats-body {
+      display: grid;
+      grid-template-columns: 240px minmax(0, 1fr) 320px;
+      column-gap: 20px;
+      align-items: start;
+      padding: 12px var(--page-px, 16px);
+    }
+    :global(html:not(.force-mobile-layout)) .stats-content.stats-main {
+      padding: 0;
+    }
+    :global(html:not(.force-mobile-layout)) .stats-left-rail,
+    :global(html:not(.force-mobile-layout)) .stats-right-rail {
+      display: block;
+      position: sticky;
+      top: calc(var(--page-top, var(--safe-top)) + 72px + var(--hamburger-row, 0px));
+      align-self: start;
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 12px;
+    }
+    :global(html:not(.force-mobile-layout)) .stats-rail-only { display: block; }
+    :global(html:not(.force-mobile-layout)) .stats-center-only { display: none; }
+    /* Horizontal pill scroller replaced by the rail on desktop */
+    :global(html:not(.force-mobile-layout)) .metric-scroll { display: none; }
+    /* Chart grows to fill the vertical rhythm the rails set */
+    :global(html:not(.force-mobile-layout)) .chart-wrap {
+      height: clamp(300px, 45vh, 520px);
+    }
+
+    /* Calendar sheet becomes a centered popover on desktop instead of a
+       bottom-sheet slide-up (Phase D). Backdrop centers its child; sheet
+       drops the mobile-only bottom-flush border-radius. */
+    :global(html:not(.force-mobile-layout)) .stat-backdrop {
+      align-items: center;
+      justify-content: center;
+    }
+    :global(html:not(.force-mobile-layout)) .stat-cal-sheet {
+      border-radius: var(--radius-xl);
+      max-height: 90vh;
+      overflow-y: auto;
+      padding-bottom: 8px;
+    }
+  }
+
+  /* Left rail chrome — mimics the Settings rail's section-toggle look. */
+  .stats-rail-heading {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-3);
+    margin: 0 0 8px;
+  }
+  .stats-rail-group {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin: 10px 0 4px;
+    padding: 0 6px;
+  }
+  .stats-rail-metric {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 8px 10px;
+    margin: 2px 0;
+    border-radius: var(--radius-md);
+    background: transparent;
+    border: none;
+    color: var(--text-2);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background var(--dur-fast), color var(--dur-fast);
+  }
+  .stats-rail-metric:hover {
+    background: var(--surface-2);
+    color: var(--text-1);
+  }
+  .stats-rail-metric.active {
+    background: var(--accent-dim);
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  /* Right rail KPI stack */
+  .stats-rail-kpi {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  .stats-rail-kpi:last-of-type { border-bottom: none; }
+  .stats-rail-kpi-lbl {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-3);
+  }
+  .stats-rail-kpi-val {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--accent);
+    letter-spacing: -0.02em;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .stats-rail-kpi-unit {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+    opacity: 0.6;
+  }
+  .stats-rail-delta {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: var(--radius-full);
+    letter-spacing: 0;
+  }
+  .stats-rail-delta.good {
+    background: color-mix(in srgb, #22c55e 22%, transparent);
+    color: #16a34a;
+  }
+  .stats-rail-delta.bad {
+    background: color-mix(in srgb, #ef4444 22%, transparent);
+    color: #dc2626;
+  }
+  :global([data-theme="dark"]) .stats-rail-delta.good { color: #4ade80; }
+  :global([data-theme="dark"]) .stats-rail-delta.bad  { color: #f87171; }
+  .stats-rail-empty { margin: 4px 0 8px; }
+
+  /* Overlay checkbox rows */
+  .stats-rail-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 4px;
+    font-size: 13px;
+    color: var(--text-1);
+    cursor: pointer;
+    user-select: none;
+  }
+  .stats-rail-check input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
 </style>
