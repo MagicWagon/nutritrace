@@ -761,6 +761,13 @@
   {/if}
 
   <div class="page-content editor-content" class:readonly-content={_readOnly} inert={_readOnly || null}>
+    <!-- Left column (desktop ≥1024px): identity + metadata.
+         Photo, Basic Info, Categories, Notes all stack here.
+         Below 1024px this wrapper is display:contents so cards
+         fall back to the single-column flex flow that used to
+         live on .editor-content directly. -->
+    <div class="editor-left-col">
+
     <!-- Photo -->
     <div class="card editor-card photo-card">
       <div class="editor-card-title">{$_('food_editor.card_photo')}</div>
@@ -1042,6 +1049,13 @@
       </div>
     {/if}
 
+    </div><!-- /.editor-left-col -->
+
+    <!-- Right column (desktop ≥1024px): the primary work area —
+         Nutrition. On mobile this wrapper is display:contents so
+         the card flows naturally under the left-column cards. -->
+    <div class="editor-right-col">
+
     <!-- Nutrition -->
     <div class="card editor-card">
       <div class="editor-card-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
@@ -1088,6 +1102,7 @@
     </div>
 
     <div style="height:16px"></div>
+    </div><!-- /.editor-right-col -->
   </div>
 </div>
 
@@ -1159,6 +1174,42 @@
   .fav-btn.on { color: var(--macro-protein, #ec4899); }
   .editor-content { display: flex; flex-direction: column; gap: 12px; padding-top: 16px; padding-bottom: 32px; }
   .readonly-content { opacity: 0.78; pointer-events: none; }
+
+  /* Mobile default: column wrappers are display:contents so the
+     cards fall through into the parent's flex-column flow, exactly
+     as before the desktop split was introduced. */
+  .editor-left-col,
+  .editor-right-col { display: contents; }
+
+  /* Desktop ≥1024px: two-column form layout.
+     Left column (340px) — identity / metadata: Photo, Basic Info,
+     Categories, Notes. Compact fields that don't need width.
+     Right column (fills) — Nutrition. The primary work area; needs
+     the wider column so each field row (label + value + unit) sits
+     on one line without wrapping.
+     Gated by :global(html:not(.force-mobile-layout)) so the Force
+     Mobile Layout toggle collapses the editor back to a single
+     column at every viewport. */
+  @media (min-width: 1024px) {
+    :global(html:not(.force-mobile-layout)) .editor-content {
+      display: grid;
+      grid-template-columns: 340px minmax(0, 1fr);
+      column-gap: 16px;
+      row-gap: 0;
+      align-items: start;
+    }
+    :global(html:not(.force-mobile-layout)) .editor-left-col,
+    :global(html:not(.force-mobile-layout)) .editor-right-col {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-width: 0;
+    }
+    /* Right column's Nutrition card can be very tall — keep it
+       aligned with the top of the left column so users don't see
+       the shorter left column sitting mid-height next to a huge
+       right one. align-items:start on the grid handles this. */
+  }
   .readonly-banner {
     display: flex; align-items: center; gap: 12px;
     padding: 12px var(--page-px);

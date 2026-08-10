@@ -737,6 +737,11 @@
   {/if}
 
   <div class="page-content editor-content" class:readonly-content={_readOnly} inert={_readOnly || null}>
+    <!-- Left column (desktop ≥1024px): identity + metadata.
+         Photo, Name, Servings, Categories, Notes stack here.
+         display:contents on mobile so cards fall through to the
+         normal single-column flow. -->
+    <div class="editor-left-col">
 
     <!-- Photo -->
     <div class="card editor-card">
@@ -842,6 +847,13 @@
       </div>
     {/if}
 
+    </div><!-- /.editor-left-col -->
+
+    <!-- Right column (desktop ≥1024px): primary work — Ingredients
+         list + Nutrition Totals summary. display:contents on mobile
+         so both cards flow inline as before. -->
+    <div class="editor-right-col">
+
     <!-- Ingredients -->
     <div class="card editor-card">
       <div style="display:flex;align-items:center;justify-content:space-between">
@@ -935,6 +947,7 @@
     {/if}
 
     <div style="height:16px"></div>
+    </div><!-- /.editor-right-col -->
   </div>
 </div>
 
@@ -1169,6 +1182,34 @@
   .fav-btn.on { color: var(--macro-protein, #ec4899); }
   .editor-content { display: flex; flex-direction: column; gap: 12px; padding-top: 16px; padding-bottom: 32px; }
   .readonly-content { opacity: 0.78; pointer-events: none; }
+
+  /* Mobile default: column wrappers are display:contents so the
+     cards fall through to the parent's flex-column flow, as before
+     the desktop split existed. */
+  .editor-left-col,
+  .editor-right-col { display: contents; }
+
+  /* Desktop ≥1024px: two-column form layout.
+     Left column (340px) — Photo, Name, Servings, Categories, Notes.
+     Right column (fills) — Ingredients + Nutrition Totals summary.
+     Ingredients is where meal/recipe editing spends its time, so
+     it gets the wider column. Gated by force-mobile-layout. */
+  @media (min-width: 1024px) {
+    :global(html:not(.force-mobile-layout)) .editor-content {
+      display: grid;
+      grid-template-columns: 340px minmax(0, 1fr);
+      column-gap: 16px;
+      row-gap: 0;
+      align-items: start;
+    }
+    :global(html:not(.force-mobile-layout)) .editor-left-col,
+    :global(html:not(.force-mobile-layout)) .editor-right-col {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-width: 0;
+    }
+  }
   .readonly-banner {
     display: flex; align-items: center; gap: 12px;
     padding: 12px var(--page-px);
