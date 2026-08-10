@@ -521,6 +521,26 @@
     keto:           { p: 25, c:  5, f: 70 },
     'high-protein': { p: 40, c: 30, f: 30 },
   };
+  const MACRO_PRESET_LABELS = {
+    balanced:       'Balanced',
+    keto:           'Keto',
+    'high-protein': 'High-Protein',
+  };
+  // Match the CURRENT P/C/F percentages against known presets so
+  // the Macros card can show 'Currently: Balanced' / 'Currently:
+  // Custom'. Tolerance ±2% per macro so tiny rounding drift
+  // (grams → % → grams) doesn't kick the label to Custom.
+  $: _currentPreset = (() => {
+    if (!_macroPct.p && !_macroPct.c && !_macroPct.f) return null;
+    for (const [key, ratio] of Object.entries(MACRO_PRESETS)) {
+      if (Math.abs(_macroPct.p - ratio.p) <= 2 &&
+          Math.abs(_macroPct.c - ratio.c) <= 2 &&
+          Math.abs(_macroPct.f - ratio.f) <= 2) {
+        return MACRO_PRESET_LABELS[key];
+      }
+    }
+    return 'Custom';
+  })();
   function applyMacroPreset(name) {
     const preset = MACRO_PRESETS[name];
     if (!preset) return;
@@ -753,9 +773,14 @@
           </button>
         </div>
         <div class="goals-macro-presets">
-          <button class="chip" on:click={() => applyMacroPreset('balanced')}>Balanced 30/40/30</button>
-          <button class="chip" on:click={() => applyMacroPreset('keto')}>Keto 25/5/70</button>
-          <button class="chip" on:click={() => applyMacroPreset('high-protein')}>High-Protein 40/30/30</button>
+          <button class="chip" class:chip-active={_currentPreset === 'Balanced'} on:click={() => applyMacroPreset('balanced')}>Balanced 30/40/30</button>
+          <button class="chip" class:chip-active={_currentPreset === 'Keto'} on:click={() => applyMacroPreset('keto')}>Keto 25/5/70</button>
+          <button class="chip" class:chip-active={_currentPreset === 'High-Protein'} on:click={() => applyMacroPreset('high-protein')}>High-Protein 40/30/30</button>
+          {#if _currentPreset}
+            <span class="goals-macro-current" title="Ratio matches this preset (±2% tolerance)">
+              Currently: <strong>{_currentPreset}</strong>
+            </span>
+          {/if}
         </div>
       </div>
 
@@ -891,7 +916,7 @@
       <div class="card goals-all-card">
         {#each bodyStatsWithUnit.filter(_matchesQuery) as stat, i}
           {#if i > 0}<div class="divider"></div>{/if}
-          <button class="goal-row" on:click={() => openEdit(stat)}>
+          <button class="goal-row" class:goal-row-set={getTarget(stat) != null} on:click={() => openEdit(stat)}>
             <div class="goal-info">
               <span class="font-medium">{stat.label}</span>
               {#if $goals[_goalStorageId(stat.id)]}
@@ -920,7 +945,7 @@
       <div class="card goals-all-card">
         {#each allNutrients.filter(_matchesQuery) as stat, i}
           {#if i > 0}<div class="divider"></div>{/if}
-          <button class="goal-row" on:click={() => openEdit(stat)}>
+          <button class="goal-row" class:goal-row-set={getTarget(stat) != null} on:click={() => openEdit(stat)}>
             <div class="goal-info">
               <span class="font-medium">{stat.label}</span>
               {#if $goals[_goalStorageId(stat.id)]}
@@ -963,7 +988,7 @@
             {@const _kjMode = stat.id === 'calories_out' && $energyUnit === 'kJ'}
             {@const _statUnit = _kjMode ? 'kJ' : stat.unit}
             {#if i > 0}<div class="divider"></div>{/if}
-            <button class="goal-row" on:click={() => openEdit(stat)}>
+            <button class="goal-row" class:goal-row-set={getTarget(stat) != null} on:click={() => openEdit(stat)}>
               <div class="goal-info">
                 <span class="font-medium">{stat.label}</span>
                 {#if $goals[_goalStorageId(stat.id)]}
@@ -1006,10 +1031,27 @@
         <div class="card">
           {#each $goalTemplates as tpl, i}
             {#if i > 0}<div class="divider"></div>{/if}
+            <!-- Template preview: calorie target + P/C/F chip row
+                 so users know what they're applying BEFORE
+                 hitting Apply. {@const}s must be direct children
+                 of the {#each}, so they're hoisted here even
+                 though they're only referenced deeper below. -->
+            {@const _tKcal = tpl.goals?.calories?.max ?? tpl.goals?.calories?.min}
+            {@const _tP    = tpl.goals?.proteins?.max ?? tpl.goals?.proteins?.min}
+            {@const _tC    = tpl.goals?.carbohydrates?.max ?? tpl.goals?.carbohydrates?.min}
+            {@const _tF    = tpl.goals?.fat?.max ?? tpl.goals?.fat?.min}
             <div class="tpl-row">
               <div class="tpl-info">
                 <span class="font-medium">{tpl.name}</span>
                 <span class="text-3 text-sm">{formatDate(tpl.createdAt)} · {$_('goals_page.templates.goals_count', { values: { count: tpl.goalCount || Object.keys(tpl.goals).filter(k => tpl.goals[k]?.min != null || tpl.goals[k]?.max != null).length + (tpl.waterGoalMl > 0 ? 1 : 0) } })}</span>
+                {#if _tKcal || _tP || _tC || _tF}
+                  <div class="tpl-preview-chips">
+                    {#if _tKcal}<span class="tpl-chip">{_tKcal.toLocaleString()} kcal</span>{/if}
+                    {#if _tP}<span class="tpl-chip tpl-chip-p">P {_tP}g</span>{/if}
+                    {#if _tC}<span class="tpl-chip tpl-chip-c">C {_tC}g</span>{/if}
+                    {#if _tF}<span class="tpl-chip tpl-chip-f">F {_tF}g</span>{/if}
+                  </div>
+                {/if}
               </div>
               <div class="tpl-actions">
                 <button class="btn btn-ghost tpl-btn" on:click={() => showApplyConfirm = tpl}>
@@ -1303,6 +1345,14 @@
   }
   .goal-row:active { background: var(--surface-2); }
   .goal-row .material-symbols-rounded { color: var(--accent); }
+  /* Rows in All Fields tab where the user has actually customized
+     a value get a subtle accent-tinted left border so 'set vs not
+     set' reads at a glance among the alphabetical dump. Only visible
+     when the class is applied (Your Goals rows are all set by
+     definition — no distinction there). */
+  .goal-row.goal-row-set {
+    border-left: 2px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  }
   .goal-info { flex: 1; display: flex; flex-direction: column; gap: 4px; }
   .divider { height: 1px; background: var(--border); margin: 0 16px; }
 
@@ -1346,6 +1396,28 @@
   .tpl-info { flex: 1; display: flex; flex-direction: column; gap: 3px; }
   .tpl-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
   .tpl-btn { height: 32px; padding: 0 12px; font-size: 13px; color: var(--accent); }
+  /* Template preview chips — small pill row under the name/meta
+     so users see what they're applying before hitting Apply. */
+  .tpl-preview-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+  }
+  .tpl-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+    background: var(--surface-2);
+    color: var(--text-2);
+    font-size: 11px;
+    font-weight: 600;
+    border: 1px solid var(--border);
+  }
+  .tpl-chip-p { color: var(--macro-protein, #ec4899); border-color: color-mix(in srgb, var(--macro-protein, #ec4899) 40%, transparent); }
+  .tpl-chip-c { color: var(--macro-carbs,   #22c55e); border-color: color-mix(in srgb, var(--macro-carbs,   #22c55e) 40%, transparent); }
+  .tpl-chip-f { color: var(--macro-fat,     #f59e0b); border-color: color-mix(in srgb, var(--macro-fat,     #f59e0b) 40%, transparent); }
 
   /* Sheet */
   .sheet-backdrop {
@@ -1600,6 +1672,27 @@
     background: var(--accent-dim, color-mix(in srgb, var(--accent) 14%, transparent));
     color: var(--accent);
     border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  }
+  /* Active preset — current P/C/F ratios match this one within
+     ±2%. Same accent-dim treatment as hover but sticky. */
+  .goals-macro-presets .chip.chip-active {
+    background: var(--accent-dim, color-mix(in srgb, var(--accent) 14%, transparent));
+    color: var(--accent);
+    border-color: color-mix(in srgb, var(--accent) 60%, var(--border));
+    font-weight: 600;
+  }
+  .goals-macro-current {
+    display: inline-flex;
+    align-items: center;
+    font-size: 11px;
+    color: var(--text-3);
+    margin-left: 4px;
+    white-space: nowrap;
+  }
+  .goals-macro-current strong {
+    color: var(--text-2);
+    font-weight: 600;
+    margin-left: 3px;
   }
 
   /* ─── All-Fields filter input (desktop only; hidden on mobile) ─────── */
