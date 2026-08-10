@@ -11,20 +11,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [1.2.0-dev02] - 2026-08-10 (pre-release)
 
-Second dev pre-release of the 1.2.0 minor, and a substantial one. Every major page (Diary, Foods, Settings, Wellness, Statistics, Goals) now has a proper desktop layout with rails, wider content areas, and page-specific extras like drag-to-copy meals and click-to-drill charts. Editors get a two-column layout. Deep-links wire the whole app to Statistics. A handful of bugs are fixed, notably an Android pull-to-refresh that fired mid-page. AI model presets are refreshed to current generations. Opt-in trace-level request diagnostics arrive server-side.
+Second dev pre-release of the 1.2.0 minor, and a substantial one. Every major page (Diary, Foods, Settings, Wellness, Statistics, Goals) now has a proper large-screen layout with rails, wider content areas, and page-specific extras like drag-to-copy meals and click-to-drill charts. Editors get a two-column layout. Deep-links wire the whole app to Statistics. A handful of bugs are fixed, notably an Android pull-to-refresh that fired mid-page. AI model presets are refreshed to current generations. Opt-in trace-level request diagnostics arrive server-side.
 
-> **Note on the desktop redesign.** This is a first pass. Every page listed under "Desktop layouts" below is expected to change further as feedback comes in and as I keep using it myself. If a widget placement, rail behavior, or interaction feels off, please open a Discussion or an issue with a screenshot; nothing here is locked in.
+> **Note on the large-screen redesign.** This is a first pass. Every page listed under "Large-screen layouts" below is expected to change further as feedback comes in and as I keep using it myself. If a widget placement, rail behavior, or interaction feels off, please open a Discussion or an issue with a screenshot; nothing here is locked in.
 
 ### Added
 
-**Desktop layouts (first pass, iterating)**
+**Large-screen layouts (first pass, iterating)**
 
-- **Diary desktop layout.** Two-column shell with a Day Summary widget that mirrors the full Nutrition Summary sheet, right rail carrying Water / Body Stats / Notes widgets, 7-day week strip with a hover preview, drag meals onto week-strip days to copy them forward, drag items between meals within the same day, per-widget rail visibility toggles.
-- **Foods desktop layout.** Left filter rail, wider detail pane, adjusted grid, bottom-nav clearance, rail empty state.
-- **Settings desktop layout.** Two-pane shell with an always-visible search bar. Sections are regrouped for scannability across Diary, Appearance, Regional/Foods, Statistics/Water/Nutrients/Sharing, Notifications/Backup/Import-Export, and Components. Profile becomes a first-class rail section that inline-expands in the welcome hero. Cross-fade between sections.
-- **Wellness, Statistics, and Goals desktop layouts.** Each page gets a left rail (providers / metrics / your goals), a wider content area, and (where useful) a right rail (insights / detail / drill-in). Rails collapse cleanly on narrow screens.
+- **Diary large-screen layout.** Two-column shell with a Day Summary widget that mirrors the full Nutrition Summary sheet, right rail carrying Water / Body Stats / Notes widgets, 7-day week strip with a hover preview, drag meals onto week-strip days to copy them forward, drag items between meals within the same day, per-widget rail visibility toggles.
+- **Foods large-screen layout.** Left filter rail, wider detail pane, adjusted grid, bottom-nav clearance, rail empty state.
+- **Settings large-screen layout.** Two-pane shell with an always-visible search bar. Sections are regrouped for scannability across Diary, Appearance, Regional/Foods, Statistics/Water/Nutrients/Sharing, Notifications/Backup/Import-Export, and Components. Profile becomes a first-class rail section that inline-expands in the welcome hero. Cross-fade between sections.
+- **Wellness, Statistics, and Goals large-screen layouts.** Each page gets a left rail (providers / metrics / your goals), a wider content area, and (where useful) a right rail (insights / detail / drill-in). Rails collapse cleanly on narrow screens.
 - **Editor two-column layout.** FoodEditor and MealEditor gain a sticky left column on wide screens plus a two-column nutrition grid; Show All Nutrients now slides open.
-- **Force Mobile Layout toggle.** New Settings option turns every desktop layout above off entirely and falls back to the single-column mobile view app-wide.
+- **Force Mobile Layout toggle.** New Settings option turns every large-screen layout above off entirely and falls back to the single-column mobile view app-wide.
 
 **Statistics deep-linking + polish**
 
