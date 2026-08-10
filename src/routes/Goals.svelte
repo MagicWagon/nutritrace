@@ -73,6 +73,14 @@
   // for Calories in kJ mode, so its storage key is 'calories'. Reading
   // $goals[s.id] raw for a kilojoules stat always misses the migrated goal.
   $: configuredNutrients = allNutrients.filter(s => $goals[_goalStorageId(s.id)]);
+  // Your Goals tab strips P/C/F from Nutrients because they're
+  // owned by the Macros card above — otherwise the same field
+  // appears twice with the same value + separate edit tap. The
+  // Macros card is the single source of truth for macro editing;
+  // All Fields tab still lists them for completeness.
+  $: yourGoalsNutrients = configuredNutrients.filter(s =>
+    s.id !== 'proteins' && s.id !== 'carbohydrates' && s.id !== 'fat'
+  );
   $: configuredWellness  = wellnessFields.filter(s => $goals[s.id]);
   $: hasAnyGoal = configuredBodyStats.length > 0 || configuredNutrients.length > 0 || configuredWellness.length > 0;
 
@@ -428,6 +436,19 @@
     return `as of ${label}`;
   }
 
+  // Row progress formatter — 'CUR / TGT UNIT' when there's a
+   // current value, just 'TGT UNIT' when cur is null. Replaces
+   // scattered '{cur ? … : "—"} / {tgt} {unit}' templates so a
+   // missing value doesn't render a lonely dash that reads as
+   // 'data missing' on the goal-setting page.
+  function _fmtProgress(cur, tgt, unit) {
+    const t = (tgt ?? 0).toLocaleString();
+    const u = unit || '';
+    if (cur == null) return u ? `${t} ${u}` : t;
+    const c = (Math.round(cur * 10) / 10).toLocaleString();
+    return u ? `${c} / ${t} ${u}` : `${c} / ${t}`;
+  }
+
   function getTarget(stat) {
     const storageId = _goalStorageId(stat.id);
     const g = $goals[storageId];
@@ -712,7 +733,6 @@
         <div class="goals-macro-head">
           <div>
             <div class="font-medium">Macros</div>
-            <div class="text-3 text-sm">Split your calorie goal across protein, carbs, fat</div>
           </div>
         </div>
         <div class="goals-macro-grid">
@@ -748,7 +768,7 @@
       {:else}
         {#if configuredBodyStats.length > 0}
           <p class="section-title">{$_('goals_page.sections.body_stats')}</p>
-          <div class="card">
+          <div class="card goals-yours-card">
             {#each configuredBodyStats as stat, i}
               {#if i > 0}<div class="divider"></div>{/if}
               <button class="goal-row" on:click={() => openEdit(stat)}>
@@ -765,7 +785,7 @@
                       <div class="goal-progress-fill" class:over={bad} style="width:{pct}%"></div>
                     </div>
                     <span class="text-3 text-sm">
-                      {cur != null ? (Math.round(cur*10)/10).toLocaleString() : '—'} / {tgt.toLocaleString()} {stat.unit || ''}
+                      {_fmtProgress(cur, tgt, stat.unit || '')}
                       {#if isMin}<span style="opacity:0.6">{$_('goals_page.row.min')}</span>{/if}
                       {#if stale}<span class="goal-stale" title={$_('goals_page.row.stale_tip')}>· {stale}</span>{/if}
                     </span>
@@ -779,10 +799,10 @@
           </div>
         {/if}
 
-        {#if configuredNutrients.length > 0}
+        {#if yourGoalsNutrients.length > 0}
           <p class="section-title">{$_('goals_page.sections.nutrients')}</p>
-          <div class="card">
-            {#each configuredNutrients as stat, i}
+          <div class="card goals-yours-card">
+            {#each yourGoalsNutrients as stat, i}
               {#if i > 0}<div class="divider"></div>{/if}
               <button class="goal-row" on:click={() => openEdit(stat)}>
                 <div class="goal-info">
@@ -801,7 +821,7 @@
                       <div class="goal-progress-fill" class:over={bad} style="width:{pct}%"></div>
                     </div>
                     <span class="text-3 text-sm">
-                      {cur != null ? (Math.round(cur*10)/10).toLocaleString() : '—'} / {tgt.toLocaleString()} {stat.unit || ''}
+                      {_fmtProgress(cur, tgt, stat.unit || '')}
                       {#if isMin}<span style="opacity:0.6">{$_('goals_page.row.min')}</span>{/if}
                     </span>
                   {:else}
@@ -818,7 +838,7 @@
 
       <!-- Water Goal — alphabetically before Wellness -->
       <p class="section-title">{$_('goals_page.sections.water')}</p>
-      <div class="card">
+      <div class="card goals-yours-card">
         <button class="goal-row" on:click={openEditWater}>
           <div class="goal-info">
             <span class="font-medium">{$_('goals_page.row.daily_water_goal')}</span>
@@ -833,7 +853,7 @@
 
       {#if configuredWellness.length > 0}
         <p class="section-title">{$_('goals_page.sections.wellness')}</p>
-        <div class="card">
+        <div class="card goals-yours-card">
           {#each configuredWellness as stat, i}
             {#if i > 0}<div class="divider"></div>{/if}
             <button class="goal-row" on:click={() => openEdit(stat)}>
@@ -846,7 +866,7 @@
                   <div class="goal-progress-bar">
                     <div class="goal-progress-fill" style="width:{pct}%"></div>
                   </div>
-                  <span class="text-3 text-sm">{cur != null ? (Math.round(cur*10)/10).toLocaleString() : '—'} / {tgt.toLocaleString()} {stat.unit}</span>
+                  <span class="text-3 text-sm">{_fmtProgress(cur, tgt, stat.unit)}</span>
                 {:else}
                   <span class="text-3 text-sm">{$_('goals_page.row.not_set')}</span>
                 {/if}
@@ -883,7 +903,7 @@
                   <div class="goal-progress-fill" style="width:{pct}%"></div>
                 </div>
                 <span class="text-3 text-sm">
-                  {cur != null ? (Math.round(cur*10)/10).toLocaleString() : '—'} / {tgt.toLocaleString()} {stat.unit}
+                  {_fmtProgress(cur, tgt, stat.unit)}
                   {#if stale}<span class="goal-stale" title={$_('goals_page.row.stale_tip')}>· {stale}</span>{/if}
                 </span>
               {:else}
@@ -910,7 +930,7 @@
                 <div class="goal-progress-bar">
                   <div class="goal-progress-fill" style="width:{pct}%"></div>
                 </div>
-                <span class="text-3 text-sm">{cur != null ? (Math.round(cur*10)/10).toLocaleString() : '—'} / {tgt.toLocaleString()} {stat.unit}</span>
+                <span class="text-3 text-sm">{_fmtProgress(cur, tgt, stat.unit)}</span>
               {:else}
                 <span class="text-3 text-sm" style="opacity:0.4">{$_('goals_page.row.no_goal')}</span>
               {/if}
@@ -955,7 +975,7 @@
                   <div class="goal-progress-bar">
                     <div class="goal-progress-fill" style="width:{pct}%"></div>
                   </div>
-                  <span class="text-3 text-sm">{cur != null ? (Math.round(cur*10)/10).toLocaleString() : '—'} / {tgt.toLocaleString()} {_statUnit}</span>
+                  <span class="text-3 text-sm">{_fmtProgress(cur, tgt, _statUnit)}</span>
                 {:else}
                   <span class="text-3 text-sm" style="opacity:0.4">{$_('goals_page.row.no_goal')}</span>
                 {/if}
@@ -1642,6 +1662,26 @@
       grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
       gap: 0;
       padding: 4px;
+    }
+    /* Your Goals cards get the same 2-col treatment on wider
+       viewports (≥1440) so goal rows don't render as a tall single
+       column with lots of whitespace to the right. At 1280-1439
+       the middle column is too tight for 2-col, so single-col
+       there (rely on auto-fill's own minimum). */
+    @media (min-width: 1440px) {
+      :global(html:not(.force-mobile-layout)) .goals-yours-card {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 0;
+        padding: 4px;
+      }
+      :global(html:not(.force-mobile-layout)) .goals-yours-card :global(.divider) {
+        display: none;
+      }
+      :global(html:not(.force-mobile-layout)) .goals-yours-card :global(.goal-row) {
+        border-bottom: 1px solid var(--border);
+        padding: 12px 14px;
+      }
     }
     :global(html:not(.force-mobile-layout)) .goals-all-card :global(.divider) {
       display: none;
