@@ -963,6 +963,11 @@
   // isNative); the web just reflects whatever the user enabled there.
   $: healthConnectAvailable = $healthConnectEnabled;
   $: anyAvailable      = fitbitAvailable || withingsAvailable || garminAvailable || healthConnectAvailable;
+  // Count the number of enabled providers so the left-rail can
+  // hide its 'Providers' heading when there's only one — no need
+  // for a section caption above a single lonely row.
+  $: _providerCount = [fitbitAvailable, withingsAvailable, garminAvailable, healthConnectAvailable]
+    .filter(Boolean).length;
 
   // Sliding pill: ordered list of visible tabs + active index
   // Garmin contributes to activity/sleep/heart tabs alongside Fitbit
@@ -1511,7 +1516,9 @@
 
         <!-- ── Left rail: providers list + Sync All (desktop only; replaces .wl-topbar-actions) ── -->
         <aside class="wl-left-rail">
-          <div class="wl-rail-heading">Providers</div>
+          {#if _providerCount > 1}
+            <div class="wl-rail-heading">Providers</div>
+          {/if}
 
           {#if $healthConnectEnabled && isNative}
             <div class="wl-provider-row">
@@ -1599,6 +1606,13 @@
               </span>
             </div>
           {/if}
+          <!-- Quality-of-life link to advanced provider config —
+               previously users had to leave Wellness via the
+               sidebar to reach Settings → Wellness. -->
+          <a class="wl-manage-link" href="#/settings/wellness">
+            <span class="material-symbols-rounded">tune</span>
+            Manage Providers
+          </a>
         </aside>
 
         <div class="wl-main">
@@ -3615,6 +3629,42 @@
     :global(html:not(.force-mobile-layout)) .wl-body :global(.metric-grid) {
       grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
     }
+    /* 1. First-run connect card capped + centered on desktop so
+       it doesn't stretch full-width and read as lost in the void
+       when nothing is connected yet. Same instinct as the
+       Settings welcome-hero cap. */
+    :global(html:not(.force-mobile-layout)) .wl-content > :global(.connect-card) {
+      max-width: 640px;
+      margin: 24px auto 0;
+    }
+    /* 3. Manage Providers link — small text link at the bottom of
+       the left rail so users don't have to navigate out via the
+       sidebar to open Settings → Wellness. */
+    :global(html:not(.force-mobile-layout)) .wl-manage-link {
+      display: none;
+    }
+    /* Above rule is the mobile default (rail hidden). Desktop
+       override below inside the same @media makes it visible. */
+
+    /* 4. Rail scrollbar — thin variant matching the Settings +
+       Diary rails so scroll UI is consistent across the app. */
+    :global(html:not(.force-mobile-layout)) .wl-left-rail,
+    :global(html:not(.force-mobile-layout)) .wl-right-rail {
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+    :global(html:not(.force-mobile-layout)) .wl-left-rail::-webkit-scrollbar,
+    :global(html:not(.force-mobile-layout)) .wl-right-rail::-webkit-scrollbar { width: 8px; }
+    :global(html:not(.force-mobile-layout)) .wl-left-rail::-webkit-scrollbar-track,
+    :global(html:not(.force-mobile-layout)) .wl-right-rail::-webkit-scrollbar-track { background: transparent; }
+    :global(html:not(.force-mobile-layout)) .wl-left-rail::-webkit-scrollbar-thumb,
+    :global(html:not(.force-mobile-layout)) .wl-right-rail::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: var(--radius-full);
+    }
+    :global(html:not(.force-mobile-layout)) .wl-left-rail::-webkit-scrollbar-thumb:hover,
+    :global(html:not(.force-mobile-layout)) .wl-right-rail::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+
     /* Zero the tab-bar's negative L/R margins on desktop. They
        give it the mobile full-bleed look (extending past the
        page-content padding to hit viewport edges), but inside the
@@ -3642,6 +3692,42 @@
       bottom: 0;
       background: var(--accent-dim);
       box-shadow: none;
+    }
+    /* 6. Rail sticky top offset — was 130, but the sticky tab-
+       bar's bottom edge lives at ~172px (safe-top + 60 date-bar
+       top + 52 date-bar height + ~60 tab-bar height). Rails were
+       tucking under the tab bar on scroll. Bump to 190 so the
+       rail top clears the tab bar with a small visual gap. */
+    :global(html:not(.force-mobile-layout)) .wl-left-rail,
+    :global(html:not(.force-mobile-layout)) .wl-right-rail {
+      top: calc(var(--page-top, var(--safe-top)) + 190px + var(--hamburger-row, 0px));
+      max-height: calc(100vh
+        - var(--page-top, var(--safe-top))
+        - 210px
+        - var(--hamburger-row, 0px)
+        - var(--nav-h, 0px)
+        - var(--safe-bottom, 0px));
+    }
+    /* 3 (cont.): show the Manage Providers link on desktop. */
+    :global(html:not(.force-mobile-layout)) .wl-manage-link {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      justify-content: center;
+      margin-top: 10px;
+      padding: 6px 10px;
+      font-size: 12px;
+      color: var(--text-3);
+      text-decoration: none;
+      border-radius: var(--radius-sm);
+      transition: background 120ms ease, color 120ms ease;
+    }
+    :global(html:not(.force-mobile-layout)) .wl-manage-link:hover {
+      background: var(--surface-2);
+      color: var(--text-1);
+    }
+    :global(html:not(.force-mobile-layout)) .wl-manage-link .material-symbols-rounded {
+      font-size: 14px;
     }
   }
 </style>
