@@ -1446,6 +1446,87 @@
     {:else}
       <!-- ── At least one integration configured — main UI ── -->
 
+      <!-- ── Desktop three-pane wrapper (≥1280px). On mobile .wl-body is a plain block and the rails are display:none. ── -->
+      <div class="wl-body">
+
+        <!-- ── Left rail: providers list + Sync All (desktop only; replaces .wl-topbar-actions) ── -->
+        <aside class="wl-left-rail">
+          <div class="wl-rail-heading">Providers</div>
+
+          {#if $healthConnectEnabled && isNative}
+            <div class="wl-provider-row">
+              <span class="wl-brand-icon wl-provider-icon"><HealthConnectIcon /></span>
+              <span class="wl-provider-name">Health Connect</span>
+              <span class="wl-status-pill" class:pill-syncing={hcSyncing} class:pill-connected={!hcSyncing}>
+                {hcSyncing ? 'Syncing…' : 'Connected'}
+              </span>
+              <button class="wl-rail-sync-btn" on:click={syncHealthConnectManual} disabled={hcSyncing}
+                title={$_('wellness_page.sync.health_connect')} aria-label={$_('wellness_page.sync.health_connect')}>
+                <span class="material-symbols-rounded" class:wl-spin-icon={hcSyncing}>autorenew</span>
+              </button>
+            </div>
+          {/if}
+          {#if status?.connected}
+            <div class="wl-provider-row">
+              <span class="wl-brand-icon wl-provider-icon"><FitbitIcon /></span>
+              <span class="wl-provider-name">Fitbit</span>
+              <span class="wl-status-pill" class:pill-syncing={syncing} class:pill-connected={!syncing}>
+                {syncing ? 'Syncing…' : 'Connected'}
+              </span>
+              <button class="wl-rail-sync-btn" on:click={() => sync()} disabled={syncing}
+                title={status.fitbitUserId ? $_('wellness_page.sync.fitbit_with_user', { values: { user: status.fitbitUserId } }) : $_('wellness_page.sync.fitbit')}
+                aria-label={$_('wellness_page.sync.fitbit')}>
+                <span class="material-symbols-rounded" class:wl-spin-icon={syncing}>autorenew</span>
+              </button>
+            </div>
+          {/if}
+          {#if garminStatus?.connected}
+            <div class="wl-provider-row">
+              <span class="wl-brand-icon wl-provider-icon"><GarminIcon /></span>
+              <span class="wl-provider-name">Garmin</span>
+              <span class="wl-status-pill" class:pill-syncing={garminSyncing} class:pill-connected={!garminSyncing}>
+                {garminSyncing ? 'Syncing…' : 'Connected'}
+              </span>
+              <button class="wl-rail-sync-btn" on:click={() => syncGarmin()} disabled={garminSyncing}
+                title={garminStatus.garminUserId ? $_('wellness_page.sync.garmin_with_user', { values: { user: garminStatus.garminUserId } }) : $_('wellness_page.sync.garmin')}
+                aria-label={$_('wellness_page.sync.garmin')}>
+                <span class="material-symbols-rounded" class:wl-spin-icon={garminSyncing}>autorenew</span>
+              </button>
+            </div>
+          {/if}
+          {#if withingsStatus?.connected}
+            <div class="wl-provider-row">
+              <span class="wl-brand-icon wl-provider-icon"><WithingsIcon /></span>
+              <span class="wl-provider-name">Withings</span>
+              <span class="wl-status-pill" class:pill-syncing={withingsSyncing} class:pill-connected={!withingsSyncing}>
+                {withingsSyncing ? 'Syncing…' : 'Connected'}
+              </span>
+              <button class="wl-rail-sync-btn" on:click={() => syncWithings()} disabled={withingsSyncing}
+                title={withingsStatus.withingsUserId ? $_('wellness_page.sync.withings_with_user', { values: { user: withingsStatus.withingsUserId } }) : $_('wellness_page.sync.withings')}
+                aria-label={$_('wellness_page.sync.withings')}>
+                <span class="material-symbols-rounded" class:wl-spin-icon={withingsSyncing}>autorenew</span>
+              </button>
+            </div>
+          {/if}
+
+          <!-- Sync All: fire every connected provider's sync in sequence. -->
+          {#if ($healthConnectEnabled && isNative) || status?.connected || garminStatus?.connected || withingsStatus?.connected}
+            <button class="btn btn-primary wl-sync-all-btn"
+              on:click={async () => {
+                if ($healthConnectEnabled && isNative && !hcSyncing) await syncHealthConnectManual();
+                if (status?.connected && !syncing) await sync();
+                if (garminStatus?.connected && !garminSyncing) await syncGarmin();
+                if (withingsStatus?.connected && !withingsSyncing) await syncWithings();
+              }}
+              disabled={syncing || garminSyncing || withingsSyncing || hcSyncing}>
+              <span class="material-symbols-rounded" class:wl-spin-icon={syncing || garminSyncing || withingsSyncing || hcSyncing}>autorenew</span>
+              Sync All
+            </button>
+          {/if}
+          <!-- last-sync timestamp: TODO wire once persisted -->
+        </aside>
+
+        <div class="wl-main">
       <!-- Tab bar — only tabs for configured integrations -->
       <div class="tab-bar-wrap">
       <div class="tab-bar" bind:this={_tabBarEl}>
@@ -1709,7 +1790,7 @@
 
             <!-- Sleep Debt card -->
             {#if sleepDebt != null}
-              <div class="card sleep-insight-card" style="margin-bottom:10px" title="Sleep Debt — the total sleep you've missed relative to your goal over the selected window. Calculated as a rolling total from today backwards — always reflects the most recent nights, not the date you're viewing."  >
+              <div class="card sleep-insight-card wl-center-only" style="margin-bottom:10px" title="Sleep Debt — the total sleep you've missed relative to your goal over the selected window. Calculated as a rolling total from today backwards — always reflects the most recent nights, not the date you're viewing."  >
                 <div class="si-header">
                   <span class="material-symbols-rounded si-icon">battery_low</span>
                   <div class="si-title-wrap">
@@ -1738,7 +1819,7 @@
 
             <!-- Chronotype card -->
             {#if chronotype != null}
-              <div class="card sleep-insight-card" title="Chronotype — your natural sleep timing preference, derived from your average sleep midpoint over all available nights. This is a long-term trait that updates as more nights are synced — it always reflects your full history, not the specific date you're viewing."  >
+              <div class="card sleep-insight-card wl-center-only" title="Chronotype — your natural sleep timing preference, derived from your average sleep midpoint over all available nights. This is a long-term trait that updates as more nights are synced — it always reflects your full history, not the specific date you're viewing."  >
                 <div class="si-header">
                   <span class="si-emoji">{chronotype.emoji ?? '⏳'}</span>
                   <div class="si-title-wrap">
@@ -1813,7 +1894,7 @@
 
             <!-- Daily Readiness card -->
             {#if readiness != null}
-              <div class="card sleep-insight-card readiness-card" style="margin-top:10px" title="Daily Readiness — how recovered and prepared your body is for today, scored 1–100. Calculated from today's HRV and RHR compared to your 30-day personal baseline, plus last night's sleep score. Always reflects today's data — not the date you're viewing."  >
+              <div class="card sleep-insight-card readiness-card wl-center-only" style="margin-top:10px" title="Daily Readiness — how recovered and prepared your body is for today, scored 1–100. Calculated from today's HRV and RHR compared to your 30-day personal baseline, plus last night's sleep score. Always reflects today's data — not the date you're viewing."  >
                 {#if readiness.calibrating}
                   <div class="si-header">
                     <span class="material-symbols-rounded si-icon">battery_charging_full</span>
@@ -1885,7 +1966,7 @@
                                   : _resCatLabel === 'Low' ? "Your body is asking for a bit more rest today. Taking it easier is a kind way to help yourself recharge."
                                   : null}
             {#if _resCatLabel}
-              <div class="card sleep-insight-card readiness-card" style="margin-top:10px" title="Resilience — how your body is handling daily stress, classified as Optimal, Balanced, or Low. Combines physical calmness (HRV + resting heart rate), activity balance (step + active-minute target adherence), and sleep patterns (last night plus 7-day reservoir).">
+              <div class="card sleep-insight-card readiness-card wl-center-only" style="margin-top:10px" title="Resilience — how your body is handling daily stress, classified as Optimal, Balanced, or Low. Combines physical calmness (HRV + resting heart rate), activity balance (step + active-minute target adherence), and sleep patterns (last night plus 7-day reservoir).">
                 <div class="readiness-header">
                   <div class="readiness-header-left">
                     <span class="material-symbols-rounded si-icon">self_improvement</span>
@@ -1953,7 +2034,7 @@
           </div>
 
           {#if BODY_SCORE_METRICS.filter(m => isVisible(m.id)).some(m => (withingsData[m.id] ?? data[m.id]) != null)}
-            <div class="card" style="margin-top:12px;padding:16px">
+            <div class="card wl-center-only" style="margin-top:12px;padding:16px">
               <div class="sleep-stages-header" style="margin-bottom:12px">
                 <span class="material-symbols-rounded" style="color:var(--accent)">biotech</span>
                 <span class="sleep-stages-title">{$_('wellness_deep.body_scan_scores')}</span>
@@ -2050,6 +2131,208 @@
         {/if}
 
       {/if}
+
+        </div><!-- /.wl-main -->
+
+        <!-- ── Right rail: tab-contextual insight cards (desktop only) ── -->
+        <aside class="wl-right-rail">
+          <div class="wl-rail-heading">Insights</div>
+
+          {#if activeTab === 'activity'}
+            <!-- activity rail: TBD -->
+          {:else if activeTab === 'sleep'}
+            <!-- Sleep Debt (rail duplicate) -->
+            {#if sleepDebt != null}
+              <div class="wl-rail-only">
+                <div class="card sleep-insight-card" style="margin-bottom:10px" title="Sleep Debt — the total sleep you've missed relative to your goal over the selected window. Calculated as a rolling total from today backwards — always reflects the most recent nights, not the date you're viewing.">
+                  <div class="si-header">
+                    <span class="material-symbols-rounded si-icon">battery_low</span>
+                    <div class="si-title-wrap">
+                      <span class="si-title">{$_('wellness_page.metric_group.sleep_debt')}</span>
+                      <span class="si-sub">Last {sleepDebt.nights} nights</span>
+                    </div>
+                    <span class="si-value {sleepDebt.debtMin === 0 ? 'si-good' : sleepDebt.debtMin < 120 ? 'si-warn' : 'si-bad'}">
+                      {sleepDebt.debtMin === 0 ? 'On track' : fmtSleepStr(sleepDebt.debtMin)}
+                    </span>
+                  </div>
+                  {#if sleepDebt.debtMin > 0}
+                    <p class="si-desc">
+                      You're {fmtSleepStr(sleepDebt.debtMin)} short of your {fmtSleepStr(sleepDebt.goalMin)} sleep goal across the last {sleepDebt.nights} nights.
+                      {#if sleepDebt.debtMin >= 120}Prioritize early bedtimes this week to recover.{:else}A consistent schedule should close the gap quickly.{/if}
+                    </p>
+                  {:else}
+                    <p class="si-desc">You're meeting your sleep goal. Keep it up!</p>
+                  {/if}
+                  <div class="si-range-chips">
+                    {#each [7, 14, 30] as n}
+                      <button class="chip" class:chip-active={sleepInsightsRange === n} on:click={() => sleepInsightsRange = n}>{n}d</button>
+                    {/each}
+                  </div>
+                </div>
+              </div>
+            {/if}
+            <!-- Chronotype (rail duplicate) -->
+            {#if chronotype != null}
+              <div class="wl-rail-only">
+                <div class="card sleep-insight-card" title="Chronotype — your natural sleep timing preference, derived from your average sleep midpoint over all available nights. This is a long-term trait that updates as more nights are synced — it always reflects your full history, not the specific date you're viewing.">
+                  <div class="si-header">
+                    <span class="si-emoji">{chronotype.emoji ?? '⏳'}</span>
+                    <div class="si-title-wrap">
+                      <span class="si-title">{chronotype.label ?? 'Building Profile…'}</span>
+                      <span class="si-sub">
+                        {#if chronotype.label}Avg sleep midpoint: {fmtTimeMin(chronotype.midpointMin)} · {chronotype.nights} nights
+                        {:else}{chronotype.nights}/{chronotype.needed} nights collected{/if}
+                      </span>
+                    </div>
+                  </div>
+                  {#if chronotype.label}
+                    <p class="si-desc">{chronotype.desc}</p>
+                  {:else}
+                    <p class="si-desc">Syncing more nights will unlock your chronotype. Once {chronotype.needed} nights of sleep timing are available your profile will appear here.</p>
+                  {/if}
+                </div>
+              </div>
+            {/if}
+          {:else if activeTab === 'heart'}
+            <!-- Daily Readiness (rail duplicate) -->
+            {#if readiness != null}
+              <div class="wl-rail-only">
+                <div class="card sleep-insight-card readiness-card" style="margin-top:0" title="Daily Readiness — how recovered and prepared your body is for today, scored 1–100. Calculated from today's HRV and RHR compared to your 30-day personal baseline, plus last night's sleep score. Always reflects today's data — not the date you're viewing.">
+                  {#if readiness.calibrating}
+                    <div class="si-header">
+                      <span class="material-symbols-rounded si-icon">battery_charging_full</span>
+                      <div class="si-title-wrap">
+                        <span class="si-title">{$_('wellness_deep.daily_readiness')}</span>
+                        <span class="si-sub">Calibrating… {readiness.data_days}/{readiness.needed} nights with HRV data</span>
+                      </div>
+                    </div>
+                    <p class="si-desc">Needs {readiness.needed} nights where your device recorded HRV during sleep. Fitbit only captures HRV on nights with a clean optical reading — wearing the device snugly helps.</p>
+                  {:else}
+                    <div class="readiness-header">
+                      <div class="readiness-header-left">
+                        <span class="material-symbols-rounded si-icon">battery_charging_full</span>
+                        <div class="si-title-wrap">
+                          <span class="si-title">{$_('wellness_deep.daily_readiness')}</span>
+                          <span class="si-sub">
+                            HRV baseline {readiness.hrv_baseline} ms{readiness.rhr_baseline != null ? ` · RHR baseline ${readiness.rhr_baseline} bpm` : ''} · {readiness.data_days} days
+                          </span>
+                        </div>
+                      </div>
+                      <div class="readiness-score-wrap">
+                        <span class="readiness-score" style="color:{readiness.color}">{readiness.score}</span>
+                        <span class="readiness-label" style="color:{readiness.color}">{readiness.label}</span>
+                      </div>
+                    </div>
+                    <div class="readiness-drivers">
+                      <div class="readiness-driver">
+                        <span class="rd-label">HRV</span>
+                        <span class="rd-val" style="color:{readiness.hrv_score >= 65 ? 'var(--accent)' : readiness.hrv_score >= 50 ? '#f59e0b' : '#ef4444'}">{readiness.hrv_score}</span>
+                      </div>
+                      <div class="readiness-driver">
+                        <span class="rd-label">{$_('wellness_deep.resting_hr')}</span>
+                        <span class="rd-val" style="color:{readiness.rhr_score >= 65 ? 'var(--accent)' : readiness.rhr_score >= 50 ? '#f59e0b' : '#ef4444'}">{readiness.rhr_score}</span>
+                      </div>
+                      <div class="readiness-driver">
+                        <span class="rd-label">{$_('wellness_deep.sleep')}</span>
+                        <span class="rd-val" style="color:{readiness.sleep_score_used >= 65 ? 'var(--accent)' : readiness.sleep_score_used >= 50 ? '#f59e0b' : '#ef4444'}">{readiness.sleep_score_used}</span>
+                      </div>
+                      <div class="readiness-driver">
+                        <span class="rd-label">{$_('wellness_deep.penalties')}</span>
+                        <span class="rd-val" class:rd-penalty={(readiness.activity_penalty + readiness.interaction_penalty) > 0}>
+                          {(readiness.activity_penalty + readiness.interaction_penalty) > 0 ? `−${readiness.activity_penalty + readiness.interaction_penalty}` : '—'}
+                        </span>
+                      </div>
+                    </div>
+                    {@const _rIns = _readinessInsight(readiness)}
+                    {#if _rIns}
+                      <div class="readiness-insight">
+                        <p class="ri-lead">{_rIns.lead}</p>
+                        <p class="ri-driver">{_rIns.driver}</p>
+                      </div>
+                    {/if}
+                    {#if readiness.data_days < 30}
+                      <div class="si-calibration-note">
+                        <span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">info</span>
+                        Based on {readiness.data_days} days — accuracy improves as more data is collected.
+                      </div>
+                    {/if}
+                  {/if}
+                </div>
+              </div>
+            {/if}
+            <!-- Resilience (rail duplicate) -->
+            {@const _resCatR      = displayData.resilience_category}
+            {@const _resCatLabelR = _resCatR === 3 ? 'Optimal' : _resCatR === 2 ? 'Balanced' : _resCatR === 1 ? 'Low' : null}
+            {@const _resColorR    = _resCatLabelR === 'Optimal' ? 'var(--accent)' : _resCatLabelR === 'Balanced' ? '#f59e0b' : _resCatLabelR === 'Low' ? '#ef4444' : 'var(--text-3)'}
+            {@const _resTextR     = _resCatLabelR === 'Optimal' ? "Your body is showing strong signs of recovery and balance. A great day to take on what matters to you."
+                                  : _resCatLabelR === 'Balanced' ? "Your body is in a steady state today. A good day to maintain your routine and stay consistent."
+                                  : _resCatLabelR === 'Low' ? "Your body is asking for a bit more rest today. Taking it easier is a kind way to help yourself recharge."
+                                  : null}
+            {#if _resCatLabelR}
+              <div class="wl-rail-only">
+                <div class="card sleep-insight-card readiness-card" style="margin-top:10px" title="Resilience — how your body is handling daily stress, classified as Optimal, Balanced, or Low. Combines physical calmness (HRV + resting heart rate), activity balance (step + active-minute target adherence), and sleep patterns (last night plus 7-day reservoir).">
+                  <div class="readiness-header">
+                    <div class="readiness-header-left">
+                      <span class="material-symbols-rounded si-icon">self_improvement</span>
+                      <div class="si-title-wrap">
+                        <span class="si-title">{$_('wellness_deep.resilience')}</span>
+                        <span class="si-sub">Score: {Math.round(displayData.resilience_score ?? 0)} / 100</span>
+                      </div>
+                    </div>
+                    <div class="readiness-score-wrap">
+                      <span class="readiness-label" style="color:{_resColorR};font-size:22px;font-weight:700">{_resCatLabelR}</span>
+                    </div>
+                  </div>
+                  <p class="resilience-text">{_resTextR}</p>
+                  <div class="readiness-drivers">
+                    <div class="readiness-driver">
+                      <span class="rd-label">{$_('wellness_deep.physical_calmness')}</span>
+                      <span class="rd-val">{Math.round(displayData.resilience_calmness ?? 0)}<span style="font-size:11px;font-weight:500;color:var(--text-3)"> / 30</span></span>
+                    </div>
+                    <div class="readiness-driver">
+                      <span class="rd-label">{$_('wellness_deep.activity_balance')}</span>
+                      <span class="rd-val">{Math.round(displayData.resilience_activity ?? 0)}<span style="font-size:11px;font-weight:500;color:var(--text-3)"> / 40</span></span>
+                    </div>
+                    <div class="readiness-driver">
+                      <span class="rd-label">{$_('wellness_deep.sleep_patterns')}</span>
+                      <span class="rd-val">{Math.round(displayData.resilience_sleep ?? 0)}<span style="font-size:11px;font-weight:500;color:var(--text-3)"> / 30</span></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            {/if}
+          {:else if activeTab === 'body'}
+            <!-- Body Scan Scores (rail duplicate) -->
+            {#if (withingsStatus.connected || $fitbitFamilyEnabled || (isNative && _hasLocalData)) && BODY_SCORE_METRICS.filter(m => isVisible(m.id)).some(m => (withingsData[m.id] ?? data[m.id]) != null)}
+              <div class="wl-rail-only">
+                <div class="card" style="padding:16px">
+                  <div class="sleep-stages-header" style="margin-bottom:12px">
+                    <span class="material-symbols-rounded" style="color:var(--accent)">biotech</span>
+                    <span class="sleep-stages-title">{$_('wellness_deep.body_scan_scores')}</span>
+                  </div>
+                  <div class="metric-grid">
+                    {#each BODY_SCORE_METRICS.filter(m => isVisible(m.id)) as m}
+                      {@const raw = withingsData[m.id] ?? data[m.id] ?? null}
+                      {#if raw != null}
+                        <div class="metric-card" title={m.desc}>
+                          <div class="metric-icon-wrap">
+                            <span class="material-symbols-rounded metric-icon">{m.icon}</span>
+                          </div>
+                          <div class="metric-body">
+                            <span class="metric-label">{m.label}</span>
+                            <span class="metric-value">{m.fmt(raw)}<span class="metric-unit">{m.unit}</span></span>
+                          </div>
+                        </div>
+                      {/if}
+                    {/each}
+                  </div>
+                </div>
+              </div>
+            {/if}
+          {/if}
+        </aside>
+
+      </div><!-- /.wl-body -->
 
     {/if}
 
@@ -2915,5 +3198,92 @@
     .workout-stats-grid { grid-template-columns: repeat(3, 1fr); }
     .workout-map { height: 220px; }
     .workout-detail { padding: 14px; }
+  }
+
+  /* ────────────────────────────────────────────────────────────────────
+     Desktop three-pane layout (Wellness redesign)
+     Default (mobile / force-mobile-layout): .wl-body is a plain block,
+     rails hidden, center-original cards visible. At ≥1280px on non-mobile
+     builds the layout becomes a grid with sticky rails, and cards duplicated
+     into the right rail replace the center originals.
+     ──────────────────────────────────────────────────────────────────── */
+  .wl-body { display: block; }
+  .wl-left-rail, .wl-right-rail { display: none; }
+  .wl-rail-only { display: none; }
+  .wl-center-only { display: block; }
+
+  /* Left rail row styling — shared with mobile in case we ever expose it,
+     but visually only used at ≥1280px. */
+  .wl-rail-heading {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.8px;
+    text-transform: uppercase; color: var(--text-3);
+    padding: 2px 4px 10px;
+  }
+  .wl-provider-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 6px; border-radius: 10px;
+    margin-bottom: 4px;
+  }
+  .wl-provider-row:hover { background: var(--surface-2); }
+  .wl-provider-icon { font-size: 18px; flex: 0 0 auto; color: var(--accent); }
+  .wl-provider-name { flex: 1 1 auto; font-size: 13px; font-weight: 500; color: var(--text-1); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wl-status-pill {
+    font-size: 10px; font-weight: 600; padding: 2px 6px;
+    border-radius: 999px; letter-spacing: 0.3px;
+    background: var(--surface-2); color: var(--text-3);
+    white-space: nowrap;
+  }
+  .wl-status-pill.pill-connected { background: rgba(34,197,94,0.14); color: rgb(21,128,61); }
+  .wl-status-pill.pill-syncing   { background: rgba(245,158,11,0.16); color: rgb(180,83,9); }
+  .wl-status-pill.pill-error     { background: rgba(239,68,68,0.14); color: rgb(185,28,28); }
+  :global(html[data-theme="dark"]) .wl-status-pill.pill-connected,
+  :global(:root[data-theme="dark"]) .wl-status-pill.pill-connected { color: rgb(134,239,172); }
+  :global(html[data-theme="dark"]) .wl-status-pill.pill-syncing,
+  :global(:root[data-theme="dark"]) .wl-status-pill.pill-syncing { color: rgb(251,191,36); }
+  :global(html[data-theme="dark"]) .wl-status-pill.pill-error,
+  :global(:root[data-theme="dark"]) .wl-status-pill.pill-error { color: rgb(248,113,113); }
+  .wl-rail-sync-btn {
+    flex: 0 0 auto; width: 28px; height: 28px; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 8px; border: 1px solid var(--border);
+    background: var(--surface-2); color: var(--text-2); cursor: pointer;
+  }
+  .wl-rail-sync-btn:hover:not(:disabled) { background: var(--surface-3); color: var(--text-1); }
+  .wl-rail-sync-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+  .wl-rail-sync-btn .material-symbols-rounded { font-size: 18px; }
+  .wl-sync-all-btn {
+    margin-top: 10px; width: 100%;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .wl-sync-all-btn .material-symbols-rounded { font-size: 18px; }
+
+  /* Desktop-only activation (≥1280px, non-force-mobile) */
+  @media (min-width: 1280px) {
+    :global(html:not(.force-mobile-layout)) .wl-body {
+      display: grid;
+      grid-template-columns: 240px minmax(0, 1fr) 340px;
+      column-gap: 20px;
+      align-items: start;
+    }
+    :global(html:not(.force-mobile-layout)) .wl-left-rail,
+    :global(html:not(.force-mobile-layout)) .wl-right-rail {
+      display: block;
+      position: sticky;
+      top: calc(var(--page-top, var(--safe-top)) + 130px + var(--hamburger-row, 0px));
+      max-height: calc(100vh - var(--page-top, var(--safe-top)) - 150px - var(--hamburger-row, 0px) - var(--nav-h, 0px) - var(--safe-bottom, 0px));
+      overflow-y: auto;
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 12px;
+    }
+    :global(html:not(.force-mobile-layout)) .wl-rail-only { display: block; }
+    :global(html:not(.force-mobile-layout)) .wl-center-only { display: none; }
+    /* The mobile portalled sync cluster is redundant on desktop — the rail replaces it. */
+    :global(html:not(.force-mobile-layout)) :global(.wl-topbar-actions) { display: none; }
+    /* Bigger metric cards on desktop so a wide viewport doesn't fan them into 10 skinny columns. */
+    :global(html:not(.force-mobile-layout)) .wl-body :global(.metric-grid) {
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    }
   }
 </style>
