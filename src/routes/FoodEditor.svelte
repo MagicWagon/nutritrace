@@ -1074,6 +1074,13 @@
       <!-- Hidden file input for the web Scan Label flow. On native we go
            through @capacitor/camera directly. -->
       <input bind:this={scanLabelFileInput} type="file" accept="image/*" capture="environment" style="display:none" />
+      <!-- Nutrition fields grid. Single column on mobile / narrow
+           so labels + inputs stack full-width. At ≥1024px (desktop
+           editor pane) it becomes a 2-column grid so pairs like
+           Fat / Saturated Fat + Carbs / Fiber sit side-by-side —
+           each input capped to a sensible width instead of one
+           number stretching across the ~1500px right column. -->
+      <div class="nutrition-fields">
       {#each displayFields as n}
         {@const _kjMode = n.id === 'calories' && $energyUnit === 'kJ'}
         <div class="form-group" class:nutrient-sub={n.subOf}>
@@ -1095,6 +1102,7 @@
           {/if}
         </div>
       {/each}
+      </div><!-- /.nutrition-fields -->
       <button class="btn btn-ghost w-full" style="margin-top:8px"
         on:click={() => showAllNutrients = !showAllNutrients}>
         {showAllNutrients ? 'Show Less' : 'Show All Nutrients'}
@@ -1205,10 +1213,49 @@
       gap: 12px;
       min-width: 0;
     }
-    /* Right column's Nutrition card can be very tall — keep it
-       aligned with the top of the left column so users don't see
-       the shorter left column sitting mid-height next to a huge
-       right one. align-items:start on the grid handles this. */
+    /* Left column is only ~340px wide on desktop — the shared
+       .form-row (used by 'View on OFF' + 'Refresh from OFF' etc.)
+       assumes width for two side-by-side buttons and clips long
+       labels at this width. Force full-width buttons via
+       flex-basis 100% on any .btn inside a left-col .form-row so
+       button pairs stack vertically. Compact side-by-side inputs
+       like Serving Size (input) + Unit (select) still fit because
+       they aren't .btn elements. */
+    :global(html:not(.force-mobile-layout)) .editor-left-col :global(.form-row) {
+      flex-wrap: wrap;
+    }
+    :global(html:not(.force-mobile-layout)) .editor-left-col :global(.form-row) :global(> .btn) {
+      flex: 1 1 100%;
+    }
+    /* Nutrition fields inside the right column: 2-column grid at
+       ≥1024px so pairs of related fields sit side-by-side instead
+       of every number spanning the full column width. */
+    :global(html:not(.force-mobile-layout)) .nutrition-fields {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      column-gap: 16px;
+      row-gap: 12px;
+    }
+    /* Sub-nutrients (Saturated Fat, Trans Fat, etc.) sit under
+       their parent macro — in the 2-col grid they'd otherwise
+       flow into the second column, breaking the visual grouping.
+       Force them onto their own row with a narrow indent. */
+    :global(html:not(.force-mobile-layout)) .nutrition-fields :global(.nutrient-sub) {
+      grid-column: 1 / -1;
+      padding-left: 16px;
+    }
+  }
+  /* Three columns on ultrawide so short number fields don't span
+     an entire ~700px half-column. Kicks in at ≥1600 so it only
+     applies when there's genuinely room. */
+  @media (min-width: 1600px) {
+    :global(html:not(.force-mobile-layout)) .nutrition-fields {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+    }
+    :global(html:not(.force-mobile-layout)) .nutrition-fields :global(.nutrient-sub) {
+      grid-column: auto;
+      padding-left: 8px;
+    }
   }
   .readonly-banner {
     display: flex; align-items: center; gap: 12px;
