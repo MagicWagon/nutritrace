@@ -295,7 +295,7 @@
             <span class="setting-label">{$_('settings_trace.labels.custom_model_id')}</span>
             <input class="input" style="width:220px;text-align:right"
               placeholder={aiProviderVal === 'gemini' ? 'gemini-3.5-flash' : aiProviderVal === 'claude' ? 'claude-sonnet-5' : 'gpt-4o'}
-              bind:value={aiCustomModelVal} disabled={envLocks.ai} />
+              bind:value={aiCustomModelVal} on:input={_syncModelFromSelect} disabled={envLocks.ai} />
           </div>
           <div style="padding:8px 16px 12px;display:flex;gap:8px;align-items:flex-start">
             <span class="material-symbols-rounded" style="font-size:16px;color:var(--muted);flex-shrink:0;margin-top:2px">info</span>

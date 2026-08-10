@@ -7,10 +7,57 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [1.2.0-dev02] - 2026-08-10 (pre-release)
+
+Second dev pre-release of the 1.2.0 minor, and a substantial one. Every major page (Diary, Foods, Settings, Wellness, Statistics, Goals) now has a proper desktop layout with rails, wider content areas, and page-specific extras like drag-to-copy meals and click-to-drill charts. Editors get a two-column layout. Deep-links wire the whole app to Statistics. A handful of bugs are fixed, notably an Android pull-to-refresh that fired mid-page. AI model presets are refreshed to current generations. Opt-in trace-level request diagnostics arrive server-side.
+
+> **Note on the desktop redesign.** This is a first pass. Every page listed under "Desktop layouts" below is expected to change further as feedback comes in and as I keep using it myself. If a widget placement, rail behavior, or interaction feels off, please open a Discussion or an issue with a screenshot; nothing here is locked in.
+
 ### Added
 
-- **Opt-in trace-level request diagnostics.** `LOG_LEVEL=trace` adds the most verbose server level while request bodies require the separate `TRACE_REQUEST_BODIES=1` switch. Minimal pre-parser instrumentation counts observed bytes and catches aborted/oversized requests without trusting `Content-Length`; post-parser tracing emits bounded, credential-redacted contents for selected routes, including sync pushes. API calls carry `X-Request-ID` across app and server logs, 413s emit one structured warning, static/upload traffic stays out of INFO logs, invalid logging configuration fails at startup, and the server startup line now includes its resolved NutriTrace version.
-- **Model Context Protocol (MCP) server** ([#103](https://github.com/TraceApps/nutritrace/issues/103)). Your NutriTrace server can now expose your food catalog, diary, and goals to AI agents (Claude Desktop, Cursor, Codex, VS Code, or any MCP-compatible client) via the standard MCP Streamable HTTP transport. Off by default; opt in with `MCP_ENABLED=1` in your server env. Auth reuses the existing API token system with three new scopes, each gated by its own env flag so admins can dial the surface area precisely: `mcp:read` (5 read tools; always on when MCP is enabled), `mcp:write` (4 additive log tools, needs `MCP_WRITE_ENABLED=1`), `mcp:destroy` (3 destructive tools, needs `MCP_DESTROY_ENABLED=1` PLUS every call carrying `confirm: true`). Read tools: `list_diary_entries`, `get_daily_totals`, `get_goals`, `search_foods`, `get_recent_foods`. Write tools: `log_food`, `log_water`, `log_meal`, `log_body_stat`. Destructive tools: `delete_diary_entry`, `edit_diary_entry`, `create_food`. Tombstoned diary days are protected — writes refuse rather than silently resurrect. Rate-limited per token. Full setup guide at [docs/nutritrace/mcp/](https://traceapps.github.io/docs/nutritrace/mcp/). Thanks to @javydekoning for the feature request.
+**Desktop layouts (first pass, iterating)**
+
+- **Diary desktop layout.** Two-column shell with a Day Summary widget that mirrors the full Nutrition Summary sheet, right rail carrying Water / Body Stats / Notes widgets, 7-day week strip with a hover preview, drag meals onto week-strip days to copy them forward, drag items between meals within the same day, per-widget rail visibility toggles.
+- **Foods desktop layout.** Left filter rail, wider detail pane, adjusted grid, bottom-nav clearance, rail empty state.
+- **Settings desktop layout.** Two-pane shell with an always-visible search bar. Sections are regrouped for scannability across Diary, Appearance, Regional/Foods, Statistics/Water/Nutrients/Sharing, Notifications/Backup/Import-Export, and Components. Profile becomes a first-class rail section that inline-expands in the welcome hero. Cross-fade between sections.
+- **Wellness, Statistics, and Goals desktop layouts.** Each page gets a left rail (providers / metrics / your goals), a wider content area, and (where useful) a right rail (insights / detail / drill-in). Rails collapse cleanly on narrow screens.
+- **Editor two-column layout.** FoodEditor and MealEditor gain a sticky left column on wide screens plus a two-column nutrition grid; Show All Nutrients now slides open.
+- **Force Mobile Layout toggle.** New Settings option turns every desktop layout above off entirely and falls back to the single-column mobile view app-wide.
+
+**Statistics deep-linking + polish**
+
+- **Deep-link into Statistics from anywhere.** Diary's Day Summary, every Wellness metric card, and every Goals row now have a "View trend" affordance that jumps to Statistics with the right metric and range preselected.
+- **Statistics polish pass.** Left rail is searchable and scrollable, charts are clickable to drill into a specific date, timelines auto-group by month past 60 days, an empty state suggests what to log next, CSV export is available on every chart, and a weekly trend indicator sits on the KPI strip.
+
+**Server + AI**
+
+- **Opt-in trace-level request diagnostics.** `LOG_LEVEL=trace` adds the most verbose server level, while request bodies require the separate `TRACE_REQUEST_BODIES=1` switch. Pre-parser instrumentation counts observed bytes and catches aborted or oversized requests without trusting `Content-Length`. Post-parser tracing emits bounded, credential-redacted contents for selected routes including sync pushes. API calls carry `X-Request-ID` across app and server logs, 413s emit one structured warning, static and upload traffic stays out of INFO logs, invalid logging configuration fails at startup, and the server startup line now includes its resolved NutriTrace version. Thanks to @librarian (PR #150).
+- **Model Context Protocol (MCP) server** ([#103](https://github.com/TraceApps/nutritrace/issues/103), thanks @javydekoning). *(promoted from dev01 for release-notes visibility)* 12 tools across three tiers, each gated by its own env flag AND its own token scope. Read tools (5) enabled with `MCP_ENABLED=1` and `mcp:read`. Write tools (4) add `MCP_WRITE_ENABLED=1` and `mcp:write`; everything lands as normal editable diary entries. Destructive tools (3) add `MCP_DESTROY_ENABLED=1`, `mcp:destroy`, AND every call must include `confirm: true`. Tombstoned diary days refuse writes rather than silently resurrect. Every tool query is scoped on `user_id`. Full setup + Claude Desktop config at [docs/nutritrace/mcp/](https://traceapps.github.io/docs/nutritrace/mcp/).
+
+### Fixed
+
+- **AI Assistant custom model didn't persist** ([#151](https://github.com/TraceApps/nutritrace/issues/151), thanks @pliddle). Typing a model ID into the Custom field on any provider now saves on every keystroke instead of reverting to the last preset the next time you opened Settings. NutriTrace-only bug; the same code path was already correct in LiftTrace and CookTrace.
+- **Android pull-to-refresh fired mid-page.** Scrolling downward anywhere on a page could trigger the sync spinner because the gesture recognizer accepted any downward swipe. It now only fires at true top-of-scroll, matching Android's standard SwipeRefreshLayout behavior.
+- **Diary week strip stayed anchored to the current calendar week** even when you were viewing a historical date. It now recomputes around the viewed day so scrolling back weeks or months lines up with what the diary is actually showing. Future days in the current week render dimmed and without a progress bar.
+- **Diary Water rail widget only showed the first three configured containers.** All configured containers now render.
+- **Diary week-strip hover popover ignored the date-format preference.** Now uses the format set in Settings → Date Format.
+- **Whole-app remount on every navigation.** The app shell was keying `<main>` on the full URL, which force-remounted on every intra-app link (flashing content, losing transient state). Now keys on the top-level route segment so same-shell nav stays live.
+- **Sticky columns in the Food and Meal editors clipped their own children.** The Show All Nutrients slide animation now expands correctly and photo-remove sits where it does on the food side.
+
+### Changed
+
+- **Refreshed AI model presets.** Google Gemini added 3.5 Flash Lite / 3.6 Flash / 3.1 Pro to the top of the dropdown; OpenAI added GPT-5.6 Luna / Terra / full. Previous-generation entries (Gemini 2.5, GPT-4o, Claude Opus 4.8) remain in the dropdown labeled "(previous)" and continue to work unchanged. Defaults for new installs bumped to Gemini 3.6 Flash and GPT-5.6 Luna.
+- **Weight and Measurements merged into a single Body Stats widget** on the Diary right rail; Water widget picks up an Open button.
+- **Diary Day Summary widget matches the full Nutrition Summary sheet exactly**: same numbers, same layout, same % vs g toggle.
+- **Nutrient widget in the Diary rail** no longer duplicates calories / protein / carbs / fat (those already live in the Day Summary).
+- **Weekly trend indicator label** on the Diary Day Summary is now "Weekly trend" (was "Trend (7d vs prev)"). Underlying comparison unchanged: rolling 7 days vs previous 7.
+
+### Infrastructure
+
+- **i18n CI check ported from LiftTrace.** GitHub Actions now enforces no-duplicate keys across ARB files, and every code-referenced translation key must resolve.
+- **Docs:** roadmap updated to reflect the current API token scope set (adds `write:workouts` and `mcp:*`).
 
 ---
 
