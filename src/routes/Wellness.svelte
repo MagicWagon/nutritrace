@@ -3613,9 +3613,14 @@
     :global(html:not(.force-mobile-layout)) .wl-right-rail {
       display: block;
       position: sticky;
-      top: calc(var(--page-top, var(--safe-top)) + 130px + var(--hamburger-row, 0px));
-      max-height: calc(100vh - var(--page-top, var(--safe-top)) - 150px - var(--hamburger-row, 0px) - var(--nav-h, 0px) - var(--safe-bottom, 0px));
-      overflow-y: auto;
+      /* Sticky top is set further below (#6 fix) after tab-bar
+         height, so this initial block just declares layout +
+         chrome. No max-height / overflow: same fix as the
+         FoodEditor left col — sticky un-sticks against .wl-body's
+         bottom if the rail is taller than viewport, so users see
+         everything via normal page scroll rather than a hidden
+         internal scrollbar. */
+      align-self: start;
       background: var(--surface-1);
       border: 1px solid var(--border);
       border-radius: var(--radius-lg);
@@ -3646,24 +3651,8 @@
     /* Above rule is the mobile default (rail hidden). Desktop
        override below inside the same @media makes it visible. */
 
-    /* 4. Rail scrollbar — thin variant matching the Settings +
-       Diary rails so scroll UI is consistent across the app. */
-    :global(html:not(.force-mobile-layout)) .wl-left-rail,
-    :global(html:not(.force-mobile-layout)) .wl-right-rail {
-      scrollbar-width: thin;
-      scrollbar-color: var(--border) transparent;
-    }
-    :global(html:not(.force-mobile-layout)) .wl-left-rail::-webkit-scrollbar,
-    :global(html:not(.force-mobile-layout)) .wl-right-rail::-webkit-scrollbar { width: 8px; }
-    :global(html:not(.force-mobile-layout)) .wl-left-rail::-webkit-scrollbar-track,
-    :global(html:not(.force-mobile-layout)) .wl-right-rail::-webkit-scrollbar-track { background: transparent; }
-    :global(html:not(.force-mobile-layout)) .wl-left-rail::-webkit-scrollbar-thumb,
-    :global(html:not(.force-mobile-layout)) .wl-right-rail::-webkit-scrollbar-thumb {
-      background: var(--border);
-      border-radius: var(--radius-full);
-    }
-    :global(html:not(.force-mobile-layout)) .wl-left-rail::-webkit-scrollbar-thumb:hover,
-    :global(html:not(.force-mobile-layout)) .wl-right-rail::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+    /* Rail scrollbar rules dropped — no more max-height / overflow
+       on the rails, so there's nothing to style a scrollbar for. */
 
     /* Zero the tab-bar's negative L/R margins on desktop. They
        give it the mobile full-bleed look (extending past the
@@ -3677,6 +3666,17 @@
     :global(html:not(.force-mobile-layout)) .wl-main :global(.tab-bar-wrap) {
       margin-left: 0;
       margin-right: 0;
+      /* Also drop the wrap's glass background + backdrop blur +
+         bottom border on desktop. Those give the mobile sticky
+         header its full-bleed card look; on desktop inside the
+         .wl-main column they add a visible box behind the pills
+         even though I already stripped .tab-bar's own bg. */
+      background: transparent;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      border-bottom: none;
+      padding-top: 0;
+      padding-bottom: 8px;
     }
     :global(html:not(.force-mobile-layout)) .wl-main :global(.tab-bar) {
       padding: 0;
@@ -3701,12 +3701,6 @@
     :global(html:not(.force-mobile-layout)) .wl-left-rail,
     :global(html:not(.force-mobile-layout)) .wl-right-rail {
       top: calc(var(--page-top, var(--safe-top)) + 190px + var(--hamburger-row, 0px));
-      max-height: calc(100vh
-        - var(--page-top, var(--safe-top))
-        - 210px
-        - var(--hamburger-row, 0px)
-        - var(--nav-h, 0px)
-        - var(--safe-bottom, 0px));
     }
     /* 3 (cont.): show the Manage Providers link on desktop. */
     :global(html:not(.force-mobile-layout)) .wl-manage-link {
