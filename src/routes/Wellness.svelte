@@ -3615,5 +3615,15 @@
     :global(html:not(.force-mobile-layout)) .wl-body :global(.metric-grid) {
       grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
     }
+    /* Zero the tab-bar's negative L/R margins on desktop. They
+       give it the mobile full-bleed look (extending past the
+       page-content padding to hit viewport edges), but inside the
+       narrower .wl-main grid column they pull it PAST the column
+       into the rails — so the tab pill row visually reads wider
+       than the metric grid below, breaking column alignment. */
+    :global(html:not(.force-mobile-layout)) .wl-main :global(.tab-bar-wrap) {
+      margin-left: 0;
+      margin-right: 0;
+    }
   }
 </style>
