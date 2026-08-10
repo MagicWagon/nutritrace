@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte';
+  import { slide } from 'svelte/transition';
   import { _ } from 'svelte-i18n';
 
   import { portal } from '../lib/portal.js';
@@ -13,7 +14,7 @@
   import { takePhoto } from '../lib/camera.js';
   import { isNative } from '../lib/platform.js';
   import BarcodeScanner from '../components/foods/BarcodeScanner.svelte';
-  import { foodsShowCategories, foodsShowLabels, foodsShowNotes, foodCategories, visibleNutriments, nutrimentsOrder, customNutriments, cropPhotos, offUsername, offPassword, offUploadCountry, aiEffectivelyEnabled, envLocks, aiProvider, aiApiKey, aiModel, aiBaseUrl, energyUnit, showUnitMetadata, warnUnitMismatch, catName as _catName, catDisplay as _catDisplay } from '../stores/settings.js';
+  import { foodsShowCategories, foodsShowLabels, foodsShowNotes, foodCategories, visibleNutriments, nutrimentsOrder, customNutriments, cropPhotos, offUsername, offPassword, offUploadCountry, aiEffectivelyEnabled, envLocks, aiProvider, aiApiKey, aiModel, aiBaseUrl, energyUnit, showUnitMetadata, warnUnitMismatch, catName as _catName, catDisplay as _catDisplay, disableAnimations } from '../stores/settings.js';
   import { callAI, callAIProxy } from '../lib/aiChat.js';
   import { fitImageDataUrl } from '../lib/image-fit.js';
 
@@ -1081,9 +1082,16 @@
            each input capped to a sensible width instead of one
            number stretching across the ~1500px right column. -->
       <div class="nutrition-fields">
-      {#each displayFields as n}
+      {#each displayFields as n (n.id)}
         {@const _kjMode = n.id === 'calories' && $energyUnit === 'kJ'}
-        <div class="form-group" class:nutrient-sub={n.subOf}>
+        <!-- Keyed by n.id so toggling 'Show All Nutrients' only
+             animates the fields that actually get added/removed
+             — visible fields don't jitter. slide|local scopes the
+             transition to this each's mount/unmount inside the
+             persistent nutrition-fields container. -->
+        <div class="form-group nutrient-cell" class:nutrient-sub={n.subOf}
+          in:slide|local={{ duration: $disableAnimations ? 0 : 180 }}
+          out:slide|local={{ duration: $disableAnimations ? 0 : 140 }}>
           <label class="form-label">
             {_kjMode ? 'Energy' : n.label} ({_kjMode ? 'kJ' : n.unit})
             {#if (n.id === 'sodium' || n.id === 'salt') && food._derived && food._derived[n.id]}
@@ -1212,6 +1220,29 @@
       flex-direction: column;
       gap: 12px;
       min-width: 0;
+    }
+    /* Sticky left column — keeps photo + basic info + categories +
+       notes visible while the user scrolls the tall Nutrition card
+       on the right. Own scroll region if the left stack ever grows
+       taller than viewport (unlikely, but safe fallback). Top
+       offset aligns with the bottom of the sticky .editor-header:
+       safe-top + header padding + content height + bottom padding
+       + small gap. */
+    :global(html:not(.force-mobile-layout)) .editor-left-col {
+      position: sticky;
+      top: calc(var(--safe-top, 0px) + 76px);
+      max-height: calc(100vh
+        - var(--safe-top, 0px)
+        - 80px
+        - var(--nav-h, 0px)
+        - var(--safe-bottom, 0px));
+      overflow-y: auto;
+      /* Thin scrollbar so it doesn't dominate the compact column. */
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+      /* Small padding-right so the scrollbar sits inside the
+         column instead of hard against the card borders. */
+      padding-right: 4px;
     }
     /* Left column is only ~340px wide on desktop — the shared
        .form-row (used by 'View on OFF' + 'Refresh from OFF' etc.)
