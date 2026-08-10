@@ -3677,6 +3677,10 @@
       border-bottom: none;
       padding-top: 0;
       padding-bottom: 8px;
+      /* Push tab bar down so there's clear breathing room between
+         the date bar (sticky at 60+52=112) and the pills. Also
+         becomes the alignment reference for the rails below. */
+      margin-top: 20px;
     }
     :global(html:not(.force-mobile-layout)) .wl-main :global(.tab-bar) {
       padding: 0;
@@ -3700,7 +3704,12 @@
        rail top clears the tab bar with a small visual gap. */
     :global(html:not(.force-mobile-layout)) .wl-left-rail,
     :global(html:not(.force-mobile-layout)) .wl-right-rail {
-      top: calc(var(--page-top, var(--safe-top)) + 190px + var(--hamburger-row, 0px));
+      /* Sticky top aligns with the tab-bar-wrap's own top so on
+         first paint the rail cards start at the SAME y as the
+         Activity/Sleep/Heart/Body pills. Rails don't sit below
+         the tabs — they sit next to them in the same top band. */
+      top: calc(var(--page-top, var(--safe-top)) + 132px + var(--hamburger-row, 0px));
+      margin-top: 20px;
     }
     /* 3 (cont.): show the Manage Providers link on desktop. */
     :global(html:not(.force-mobile-layout)) .wl-manage-link {

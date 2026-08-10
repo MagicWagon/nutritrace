@@ -1611,7 +1611,12 @@
     :global(html:not(.force-mobile-layout)) .goals-right-rail {
       display: block;
       position: sticky;
-      top: calc(var(--page-top, var(--safe-top)) + 130px + var(--hamburger-row, 0px));
+      /* Aligned with the top of .goals-main so the rail cards
+         start at the SAME y as the first center card (Macros)
+         on first paint. Goals has no sticky date bar or tab bar
+         between the page-header and content, so sticky top is
+         just page-header height + a little breathing room. */
+      top: calc(var(--page-top, var(--safe-top)) + 72px + var(--hamburger-row, 0px));
       align-self: start;
       background: var(--surface-1);
       border: 1px solid var(--border);
