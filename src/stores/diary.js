@@ -88,7 +88,8 @@ function _stripCachedPaths(items) {
 // re-attach the safe-to-refresh fields (imgUrl already lived under
 // this pattern via freshenItemImages).
 const _KEEP_FIELDS = [
-  'meal', 'addedAt', 'type',                        // routing + display + branch
+  'uuid',                                           // Option C stable per-item identity for merge
+  'meal', 'addedAt', 'updatedAt', 'type',           // routing + display + branch
   'id', 'food_server_id', 'is_recipe',              // hydration keys
   'name', 'brand', 'portion', 'unit', 'quantity',   // history-protected snapshot
   'nutrition', 'notes',                             // history-protected snapshot
@@ -108,12 +109,39 @@ function _toReferenceShape(items) {
   });
 }
 
+// Option C — stable per-item identity generator. Every new diary item
+// and every new water entry needs a uuid so the server-side merge can
+// tell "add this new one" from "update the existing one". crypto.randomUUID
+// is available on all modern browsers and Node ≥14. Safe fallback for
+// ancient WebViews via _uuidFallback below.
+export function _newUuid() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return _uuidFallback();
+}
+function _uuidFallback() {
+  // Not crypto-strength; only used on WebViews that predate randomUUID.
+  // The uuid is a sync identifier, not a security token, so this is fine.
+  const rnd = () => Math.floor((1 + Math.random()) * 0x10000).toString(16).slice(1);
+  return `${rnd()}${rnd()}-${rnd()}-${rnd()}-${rnd()}-${rnd()}${rnd()}${rnd()}`;
+}
+
 function _toApi(entry) {
+  const pd = entry._pendingDeletions || {};
   return {
     items:      _toReferenceShape(_stripCachedPaths(entry.items || [])),
     body_stats: entry.bodyStats  || entry.body_stats || {},
     water:      entry.water      || [],
     notes:      entry.notes      || '',
+    // Option C: explicit per-uuid deletions. The server preserves any
+    // item/water entry it holds that isn't mentioned by the client AND
+    // isn't listed here, so this list is what turns "item disappeared
+    // from the client's list" from a wipe into a genuine delete.
+    deleted_uuids: {
+      items: Array.isArray(pd.items) ? pd.items.slice() : [],
+      water: Array.isArray(pd.water) ? pd.water.slice() : [],
+    },
   };
 }
 
@@ -121,12 +149,16 @@ function _toApi(entry) {
  *  water log write, and replace flow) that bypass _save(). Applies the same
  *  reference-shape trim + cached-path scrub, so no future raw NtApi.saveDiaryDate
  *  call can silently reintroduce the recipe-inlining bloat that #125 traced to. */
-export function buildDiaryWritePayload({ items, body_stats, bodyStats, water, notes } = {}) {
+export function buildDiaryWritePayload({ items, body_stats, bodyStats, water, notes, deleted_uuids } = {}) {
   return {
     items:      _toReferenceShape(_stripCachedPaths(items || [])),
     body_stats: bodyStats || body_stats || {},
     water:      water || [],
     notes:      typeof notes === 'string' ? notes : '',
+    deleted_uuids: {
+      items: Array.isArray(deleted_uuids?.items) ? deleted_uuids.items.slice() : [],
+      water: Array.isArray(deleted_uuids?.water) ? deleted_uuids.water.slice() : [],
+    },
   };
 }
 
@@ -197,6 +229,10 @@ async function _refetchAndSave(targetDate, mutator) {
 async function _save(entry) {
   const saved = await NtApi.saveDiaryDate(entry.date, _toApi(entry));
   const result = _fromApi(saved);
+  // Option C: pending tombstones only exist locally until a successful
+  // save. Clear them once the server has acknowledged so a subsequent
+  // save doesn't re-send the same delete list.
+  if (result) result._pendingDeletions = { items: [], water: [] };
 
   // Check goals after every save (only for today)
   const today = new Date().toLocaleDateString('sv-SE');
@@ -238,6 +274,7 @@ export async function addDiaryItem(foodItem, meal, date) {
     : (typeof foodItem.id === 'number' ? foodItem.id : null);
   const item = {
     ...foodItem,
+    uuid: _newUuid(),
     meal: meal != null ? Number(meal) : 0,
     addedAt: new Date().toISOString(),
     food_server_id,
@@ -309,7 +346,16 @@ export async function removeDiaryItem(index) {
   let entry = null;
   currentEntry.subscribe(v => entry = v)();
   if (!entry) return;
-  const updated = { ...entry, items: entry.items.filter((_, i) => i !== index) };
+  const removed = entry.items?.[index];
+  const prior = entry._pendingDeletions || { items: [], water: [] };
+  const updated = {
+    ...entry,
+    items: entry.items.filter((_, i) => i !== index),
+    _pendingDeletions: {
+      items: removed?.uuid ? [...(prior.items || []), removed.uuid] : (prior.items || []),
+      water: prior.water || [],
+    },
+  };
   currentEntry.set(await _save(updated));
 }
 
@@ -317,7 +363,12 @@ export async function updateDiaryItem(index, changes) {
   let entry = null;
   currentEntry.subscribe(v => entry = v)();
   if (!entry) return;
-  const updated = { ...entry, items: entry.items.map((item, i) => i === index ? { ...item, ...changes } : item) };
+  const updated = {
+    ...entry,
+    items: entry.items.map((item, i) => i === index
+      ? { ...item, ...changes, updatedAt: new Date().toISOString() }
+      : item),
+  };
   currentEntry.set(await _save(updated));
 }
 
@@ -560,7 +611,11 @@ export async function addWaterLog(amountMl, date) {
   const targetDate = date || viewDate || todayStr();
 
   const use24 = DB.getSetting('timeFormat', '12h') === '24h';
-  const log = { amount: Math.round(amountMl), time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: !use24 }) };
+  const log = {
+    uuid: _newUuid(),
+    amount: Math.round(amountMl),
+    time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: !use24 }),
+  };
 
   await _refetchAndSave(targetDate, (entry) => ({
     ...entry,

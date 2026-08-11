@@ -33,7 +33,8 @@
     copyMealItems, moveMealItems, clearMealItems, copyMealToDate, saveDiaryNote,
     splitRecipeItem, removeSplitChild, updateSplitChild,
     diaryShowNutritionSummary, diaryShowBodyStats, diaryLoadError,
-    buildDiaryWritePayload
+    buildDiaryWritePayload,
+    _newUuid as _diaryUuid
   } from '../stores/diary.js';
   import { mealNames, goals, energyUnit, weightUnit, lengthUnit, navStyle,
            diaryShowBrands, diaryShowThumbnails,
@@ -984,8 +985,18 @@
     let ent = null;
     currentEntry.subscribe(v => ent = v)();
     if (!ent) return;
+    // Option C: collect uuids of the items being removed so the server
+    // merge sees an explicit tombstone rather than inferring the deletion
+    // from absence (which under merge semantics is preserved by default).
+    const removedUuids = (ent.items || [])
+      .filter((_, i) => toDelete.has(i))
+      .map(it => it?.uuid)
+      .filter(Boolean);
     const updated = { ...ent, items: ent.items.filter((_, i) => !toDelete.has(i)) };
-    await NtApi.saveDiaryDate($currentDate, buildDiaryWritePayload(updated));
+    await NtApi.saveDiaryDate($currentDate, buildDiaryWritePayload({
+      ...updated,
+      deleted_uuids: { items: removedUuids, water: [] },
+    }));
     await loadEntry($currentDate);
     showSuccess(`${count} item${count !== 1 ? 's' : ''} removed`);
     exitSelectMode();
@@ -1224,7 +1235,11 @@
     let ent = null;
     currentEntry.subscribe(v => ent = v)();
     const _use24 = $timeFormat === '24h';
-    const log = { amount: ml, time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: !_use24 }) };
+    const log = {
+      uuid: _diaryUuid(),
+      amount: ml,
+      time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: !_use24 }),
+    };
     const updated = { ...ent, water: [...(ent?.water || []), log] };
     await NtApi.saveDiaryDate($currentDate, buildDiaryWritePayload(updated));
     await loadEntry($currentDate);
@@ -1252,8 +1267,16 @@
     let ent = null;
     currentEntry.subscribe(v => ent = v)();
     if (!ent) return;
+    const removed = (ent.water || [])[index];
     const water = (ent.water || []).filter((_, i) => i !== index);
-    await NtApi.saveDiaryDate($currentDate, buildDiaryWritePayload({ ...ent, water }));
+    // Option C: send the water uuid as an explicit tombstone so the
+    // server-side merge doesn't just preserve the missing entry (which
+    // is now its safe default for anything not addressed).
+    await NtApi.saveDiaryDate($currentDate, buildDiaryWritePayload({
+      ...ent,
+      water,
+      deleted_uuids: { items: [], water: removed?.uuid ? [removed.uuid] : [] },
+    }));
     await loadEntry($currentDate);
   }
 
@@ -1279,7 +1302,11 @@
     let ent = null;
     currentEntry.subscribe(v => ent = v)();
     if (!ent) return;
-    const water = (ent.water || []).map((l, idx) => idx === i ? { ...l, amount: ml } : l);
+    // Option C: bump updatedAt on the edited entry so the server merge picks
+    // this copy over a stale server-side one.
+    const water = (ent.water || []).map((l, idx) => idx === i
+      ? { ...l, amount: ml, updatedAt: new Date().toISOString() }
+      : l);
     await NtApi.saveDiaryDate($currentDate, buildDiaryWritePayload({ ...ent, water }));
     _waterEditIndex = -1;
     await loadEntry($currentDate);
@@ -1327,8 +1354,13 @@
         const { index } = JSON.parse(replaceData);
         const entry = $currentEntry;
         if (entry && entry.items && index < entry.items.length) {
+          // Option C: tombstone the removed item explicitly.
+          const removedUuid = entry.items[index]?.uuid;
           const updated = { ...entry, items: entry.items.filter((_, i) => i !== index) };
-          await NtApi.saveDiaryDate($currentDate, buildDiaryWritePayload(updated));
+          await NtApi.saveDiaryDate($currentDate, buildDiaryWritePayload({
+            ...updated,
+            deleted_uuids: { items: removedUuid ? [removedUuid] : [], water: [] },
+          }));
           await loadEntry($currentDate);
           showSuccess('Item replaced');
         }

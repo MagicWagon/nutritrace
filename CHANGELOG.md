@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Diary items and water are now merged per-entry across devices instead of replaced wholesale.** Every diary item and water log carries a stable identifier, and deletions travel as explicit tombstones. If a client's local copy of a day is stale, its next write can no longer overwrite items or water that the server holds; the merge preserves anything the client didn't address. Existing rows get identifiers assigned automatically on the first server start after upgrade. No user-visible change under normal use; the safety kicks in when two devices race, when a mobile local cache thins out, or when an offline delete is synced later.
+
 ---
 
 ## [1.2.0-dev02] - 2026-08-10 (pre-release)

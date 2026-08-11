@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import { randomUUID } from 'crypto';
 
 const dbPath = process.env.DB_PATH || './nutritrace.db';
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
@@ -65,6 +66,24 @@ db.exec(`
     updated_at TEXT DEFAULT (datetime('now')),
     UNIQUE(date, user_id)
   );
+
+  -- Per-item deletion tombstones for the diary. Any client PUT that omits
+  -- an item is normally treated as "preserve, client is stale". Explicit
+  -- deletions land here so other clients pulling this day drop the item
+  -- locally too. kind='item' | 'water'. Composite PK keeps re-adds of the
+  -- same uuid idempotent (INSERT OR IGNORE).
+  CREATE TABLE IF NOT EXISTS diary_tombstones (
+    user_id     INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    date        TEXT NOT NULL,
+    kind        TEXT NOT NULL,
+    uuid        TEXT NOT NULL,
+    deleted_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (user_id, date, kind, uuid)
+  );
+  CREATE INDEX IF NOT EXISTS idx_diary_tombstones_user_date
+    ON diary_tombstones(user_id, date);
+  CREATE INDEX IF NOT EXISTS idx_diary_tombstones_deleted
+    ON diary_tombstones(deleted_at);
 
   CREATE TABLE IF NOT EXISTS user_settings (
     user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -746,7 +765,8 @@ try {
 // class of bug the dbUpsertDiaryFromServer guard in db-native.js
 // exists to defend against).
 const _DIARY_KEEP = new Set([
-  'meal', 'addedAt', 'type',
+  'uuid',
+  'meal', 'addedAt', 'updatedAt', 'type',
   'id', 'food_server_id', 'is_recipe',
   'name', 'brand', 'portion', 'unit', 'quantity',
   'nutrition', 'notes', 'imgUrl',
@@ -788,6 +808,53 @@ try {
   }
 } catch (e) {
   console.warn('[db] diary items shrink migration failed:', e.message || e);
+}
+
+// ── Diary uuid backfill (Option C — per-item identity) ────────────────────
+// Every diary item and every water entry gets a stable uuid. New writes
+// carry a client-generated uuid; this one-shot pass fills in uuids on
+// items/water logged before uuids existed, so merge semantics have
+// something to match against.
+//
+// CRITICAL (same as the shrink migration above): rewrite in place WITHOUT
+// bumping updated_at, so differential /sync/pull doesn't see every row as
+// changed and clobber unpushed local edits on Android.
+try {
+  const done = db.prepare(`SELECT value FROM app_config WHERE key = 'diary_uuid_backfill_v1'`).get();
+  if (!done) {
+    const rows = db.prepare(`SELECT id, items, water FROM diary WHERE deleted_at IS NULL`).all();
+    const update = db.prepare(`UPDATE diary SET items = ?, water = ? WHERE id = ?`);
+    let changedRows = 0, addedItemIds = 0, addedWaterIds = 0;
+    db.transaction(() => {
+      for (const row of rows) {
+        let items, water;
+        try { items = JSON.parse(row.items || '[]'); } catch { items = []; }
+        try { water = JSON.parse(row.water || '[]'); } catch { water = []; }
+        let changed = false;
+        if (Array.isArray(items)) {
+          for (const it of items) {
+            if (it && typeof it === 'object' && !it.uuid) { it.uuid = randomUUID(); addedItemIds++; changed = true; }
+          }
+        }
+        if (Array.isArray(water)) {
+          for (const w of water) {
+            if (w && typeof w === 'object' && !w.uuid) { w.uuid = randomUUID(); addedWaterIds++; changed = true; }
+          }
+        }
+        if (changed) {
+          update.run(JSON.stringify(items), JSON.stringify(water), row.id);
+          changedRows++;
+        }
+      }
+      db.prepare(`INSERT OR REPLACE INTO app_config (key, value) VALUES ('diary_uuid_backfill_v1', ?)`)
+        .run(new Date().toISOString());
+    })();
+    if (changedRows > 0) {
+      console.log(`[db] diary uuid backfill: ${changedRows} rows updated (${addedItemIds} items + ${addedWaterIds} water entries)`);
+    }
+  }
+} catch (e) {
+  console.warn('[db] diary uuid backfill failed:', e.message || e);
 }
 
 export default db;
