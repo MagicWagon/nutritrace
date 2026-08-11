@@ -16,6 +16,9 @@ import { registerListDiary } from './list-diary.js';
 import { registerDailyTotals } from './daily-totals.js';
 import { registerSearchFoods } from './search-foods.js';
 import { registerRecentFoods } from './recent-foods.js';
+import { registerSearchMeals } from './search-meals.js';
+import { registerRecentMeals } from './recent-meals.js';
+import { registerGetMealDetails } from './get-meal-details.js';
 import { registerLogFood } from './log-food.js';
 import { registerLogWater } from './log-water.js';
 import { registerLogMeal } from './log-meal.js';
@@ -30,6 +33,9 @@ export function registerReadTools(server, ctx) {
   registerDailyTotals(server, ctx);
   registerSearchFoods(server, ctx);
   registerRecentFoods(server, ctx);
+  registerSearchMeals(server, ctx);
+  registerRecentMeals(server, ctx);
+  registerGetMealDetails(server, ctx);
 }
 
 export function registerWriteTools(server, ctx) {

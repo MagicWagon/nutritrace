@@ -204,6 +204,68 @@ test('log_meal REFUSES recipes', async () => {
   assert.match(_text(r), /is a recipe/i);
 });
 
+test('search_meals returns the seeded meal and excludes recipes by default', async () => {
+  const r = await server.call('search_meals', { query: 'break' });
+  const sc = _json(r);
+  assert.equal(sc.count, 1);
+  assert.equal(sc.items[0].id, breakfastMealId);
+  assert.equal(sc.items[0].name, 'Standard Breakfast');
+  assert.equal(sc.items[0].is_recipe, false);
+});
+
+test('search_meals with include_recipes=true also returns recipes', async () => {
+  const r = await server.call('search_meals', { query: 'oat', include_recipes: true });
+  const sc = _json(r);
+  const found = sc.items.find(m => m.id === breakfastRecipeId);
+  assert.ok(found, 'Overnight Oats recipe should be returned when include_recipes:true');
+  assert.equal(found.is_recipe, true);
+});
+
+test('search_meals honors LIKE escape so % is not a wildcard', async () => {
+  const r = await server.call('search_meals', { query: '%' });
+  assert.equal(_json(r).count, 0);
+});
+
+test('search_meals rejects empty query', async () => {
+  const r = await server.call('search_meals', { query: '   ' });
+  assert.equal(r.isError, true);
+  assert.match(_text(r), /required/i);
+});
+
+test('get_meal_details returns the meal + item_count + nutrition', async () => {
+  const r = await server.call('get_meal_details', { meal_id: breakfastMealId });
+  const d = _json(r);
+  assert.equal(d.id, breakfastMealId);
+  assert.equal(d.is_recipe, false);
+  assert.equal(d.item_count, 2);
+  assert.equal(d.items.length, 2);
+  const banana = d.items.find(it => it.name === 'Banana');
+  assert.equal(banana.food_server_id, bananaId);
+  assert.equal(banana.nutrition.calories, 89);
+});
+
+test('get_meal_details returns tool error for unknown meal_id', async () => {
+  const r = await server.call('get_meal_details', { meal_id: 999_999 });
+  assert.equal(r.isError, true);
+  assert.match(_text(r), /not found/i);
+});
+
+test('get_recent_meals excludes meals never logged (last_used_at NULL)', async () => {
+  const r = await server.call('get_recent_meals', {});
+  // Neither seed meal has last_used_at set yet, so nothing surfaces.
+  assert.equal(_json(r).count, 0);
+});
+
+test('get_recent_meals surfaces a meal after last_used_at is set', async () => {
+  db.prepare(`UPDATE meals SET last_used_at = datetime('now'), usage_count = usage_count + 1 WHERE id = ?`)
+    .run(breakfastMealId);
+  const r = await server.call('get_recent_meals', {});
+  const sc = _json(r);
+  assert.equal(sc.count, 1);
+  assert.equal(sc.items[0].id, breakfastMealId);
+  assert.equal(sc.items[0].usage_count, 1);
+});
+
 test('log_body_stat tags weight with kg for a fresh row', async () => {
   const r = await server.call('log_body_stat', { stats: { weight: 75 }, date: '2026-08-06' });
   assert.equal(_json(r).ok, true);
