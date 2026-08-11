@@ -953,6 +953,14 @@
 
     <!-- Chart -->
     <div class="chart-card card">
+      {#if data.length > 0}
+        <!-- CSV export lives on the chart itself so mobile and large-screen
+             both get it. Was previously desktop-rail-only. -->
+        <button class="chart-csv" type="button" on:click={_exportCsv}
+          title="Export CSV" aria-label="Export CSV">
+          <span class="material-symbols-rounded">download</span>
+        </button>
+      {/if}
       {#if loading}
         <div class="chart-loading">
           <span class="material-symbols-rounded spin">refresh</span>
@@ -1108,10 +1116,6 @@
           </span>
         </div>
       {/if}
-      <button class="stats-rail-csv" type="button" on:click={_exportCsv} title="Export CSV">
-        <span class="material-symbols-rounded" style="font-size:14px">download</span>
-        CSV
-      </button>
     {:else}
       <p class="stats-rail-empty text-3 text-sm">{$_('statistics_page.empty.no_data')}</p>
     {/if}
@@ -1694,25 +1698,31 @@
     color: var(--text-2);
   }
 
-  /* #8 CSV export button */
-  .stats-rail-csv {
+  /* #8 CSV export button — sits in the chart-card corner on all viewports */
+  .chart-csv {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 2;
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    margin-top: 10px;
-    padding: 6px 10px;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
     background: var(--surface-2);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     color: var(--text-2);
-    font-size: 11px;
-    font-weight: 600;
     cursor: pointer;
     transition: background var(--dur-fast), color var(--dur-fast), border-color var(--dur-fast);
   }
-  .stats-rail-csv:hover {
+  .chart-csv .material-symbols-rounded { font-size: 18px; }
+  .chart-csv:hover,
+  .chart-csv:focus-visible {
     background: var(--accent-dim);
     color: var(--accent);
     border-color: transparent;
+    outline: none;
   }
 </style>
