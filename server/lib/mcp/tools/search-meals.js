@@ -11,7 +11,7 @@
  */
 import { z } from 'zod';
 import db from '../../../db.js';
-import { safeJson, toolResult, toolError } from '../_util.js';
+import { safeJson, toolResult } from '../_util.js';
 
 const MAX_LIMIT = 50;
 const DEFAULT_LIMIT = 20;
@@ -20,40 +20,54 @@ export function registerSearchMeals(server, { userId }) {
   server.registerTool(
     'search_meals',
     {
-      title: 'Search Saved Meals',
+      title: 'Search or List Saved Meals',
       description:
-        "Text-search the user's saved meals catalog by name. Returns id, name, " +
-        'is_recipe, servings, portion, unit, per-meal nutrition, favorite, ' +
-        'usage_count, and last_used_at for each match. Meals (is_recipe=0) can ' +
-        'be logged directly via log_meal; recipes (is_recipe=1) are excluded ' +
-        'by default because log_meal does not accept them. Default limit 20, ' +
-        'max 50.',
+        "Search the user's saved meals catalog by name, or list all saved " +
+        'meals when no query is given. Returns id, name, is_recipe, servings, ' +
+        'portion, unit, per-meal nutrition, favorite, usage_count, and ' +
+        'last_used_at for each match. Meals (is_recipe=0) can be logged ' +
+        'directly via log_meal; recipes (is_recipe=1) are excluded by default ' +
+        'because log_meal does not accept them. Default limit 20, max 50.',
       inputSchema: {
-        query: z.string().min(1),
+        query: z.string().optional(),
         limit: z.number().int().min(1).max(MAX_LIMIT).optional(),
         include_recipes: z.boolean().optional(),
       },
     },
     async ({ query, limit, include_recipes }) => {
       const q = String(query || '').trim();
-      if (!q) return toolError('query is required and cannot be empty.');
       const cap = Math.min(MAX_LIMIT, Math.max(1, Number(limit) || DEFAULT_LIMIT));
-      // Escape LIKE wildcards so a meal named "50% Reduced Fat" is searchable
-      // by "50%" without matching every row. Same convention as search_foods.
-      const escaped = q.replace(/[\\%_]/g, c => '\\' + c);
-      const like = `%${escaped}%`;
       const recipeClause = include_recipes ? '' : 'AND is_recipe = 0';
-      const rows = db.prepare(
-        `SELECT id, name, is_recipe, servings, portion, unit, nutrition,
-                favorite, usage_count, last_used_at
-           FROM meals
-          WHERE user_id = ?
-            AND deleted_at IS NULL
-            ${recipeClause}
-            AND name LIKE ? ESCAPE '\\'
-          ORDER BY favorite DESC, usage_count DESC, name COLLATE NOCASE ASC
-          LIMIT ?`
-      ).all(userId, like, cap);
+      let rows;
+      if (!q) {
+        // No query — browse all meals ordered by favorite / usage / name.
+        rows = db.prepare(
+          `SELECT id, name, is_recipe, servings, portion, unit, nutrition,
+                  favorite, usage_count, last_used_at
+             FROM meals
+            WHERE user_id = ?
+              AND deleted_at IS NULL
+              ${recipeClause}
+            ORDER BY favorite DESC, usage_count DESC, name COLLATE NOCASE ASC
+            LIMIT ?`
+        ).all(userId, cap);
+      } else {
+        // Escape LIKE wildcards so a meal named "50% Reduced Fat" is searchable
+        // by "50%" without matching every row. Same convention as search_foods.
+        const escaped = q.replace(/[\\%_]/g, c => '\\' + c);
+        const like = `%${escaped}%`;
+        rows = db.prepare(
+          `SELECT id, name, is_recipe, servings, portion, unit, nutrition,
+                  favorite, usage_count, last_used_at
+             FROM meals
+            WHERE user_id = ?
+              AND deleted_at IS NULL
+              ${recipeClause}
+              AND name LIKE ? ESCAPE '\\'
+            ORDER BY favorite DESC, usage_count DESC, name COLLATE NOCASE ASC
+            LIMIT ?`
+        ).all(userId, like, cap);
+      }
       const items = rows.map(r => ({
         id: r.id,
         name: r.name,
@@ -66,7 +80,7 @@ export function registerSearchMeals(server, { userId }) {
         usage_count: Number(r.usage_count) || 0,
         last_used_at: r.last_used_at || null,
       }));
-      return toolResult({ query: q, count: items.length, limit: cap, items });
+      return toolResult({ query: q || null, count: items.length, limit: cap, items });
     }
   );
 }

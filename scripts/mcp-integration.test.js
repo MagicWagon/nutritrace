@@ -226,10 +226,19 @@ test('search_meals honors LIKE escape so % is not a wildcard', async () => {
   assert.equal(_json(r).count, 0);
 });
 
-test('search_meals rejects empty query', async () => {
+test('search_meals with no query lists all meals (browse mode)', async () => {
+  const r = await server.call('search_meals', {});
+  const sc = _json(r);
+  assert.equal(sc.count, 1);            // only the meal; recipe excluded by default
+  assert.equal(sc.query, null);
+  assert.equal(sc.items[0].id, breakfastMealId);
+});
+
+test('search_meals with empty-string query behaves as browse mode', async () => {
   const r = await server.call('search_meals', { query: '   ' });
-  assert.equal(r.isError, true);
-  assert.match(_text(r), /required/i);
+  const sc = _json(r);
+  assert.equal(sc.count, 1);
+  assert.equal(sc.query, null);
 });
 
 test('get_meal_details returns the meal + item_count + nutrition', async () => {
