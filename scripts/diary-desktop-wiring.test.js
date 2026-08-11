@@ -18,12 +18,12 @@ const weekStripSrc = readFileSync(new URL('../src/components/diary/WeekStrip.sve
 const daySummarySrc = readFileSync(new URL('../src/components/diary/DaySummaryWidget.svelte', import.meta.url), 'utf8');
 
 // ── Widget imports (Phase 2-4, 6) ─────────────────────────────────────────
-test('Diary imports all six right-rail widgets', () => {
+test('Diary imports all right-rail widgets', () => {
+  // Weight + Measurements merged into BodyStatsWidget in v1.2.0-dev02.
   const widgets = [
     'DaySummaryWidget',
     'WaterWidget',
-    'WeightWidget',
-    'BodyMeasurementsWidget',
+    'BodyStatsWidget',
     'ActivityImpactWidget',
     'WeekStrip',
   ];
@@ -66,9 +66,11 @@ test('Diary uses .meal-cols container with display:contents on .meal-col below w
 
 // ── Bottom bar + top-right icons hidden at wide (Phase 4) ─────────────────
 test('Diary hides the mobile bottom bar + top-right actions at ≥1280px', () => {
-  // These live inside the min-width:1280px media query
-  assert.match(diarySrc, /:global\(\.diary-topbar-actions\)\s*\{\s*display:\s*none/);
-  assert.match(diarySrc, /:global\(\.diary-bottom-bar\)\s*\{\s*display:\s*none/);
+  // These live inside the min-width:1280px media query and are gated
+  // on :global(html:not(.force-mobile-layout) …) so the Force Mobile
+  // Layout toggle can turn the whole large-screen behavior off.
+  assert.match(diarySrc, /:global\(html:not\(\.force-mobile-layout\)\s+\.diary-topbar-actions\)\s*\{\s*display:\s*none/);
+  assert.match(diarySrc, /:global\(html:not\(\.force-mobile-layout\)\s+\.diary-bottom-bar\)\s*\{\s*display:\s*none/);
 });
 
 // ── Week strip + hover popover (Phase 6) ──────────────────────────────────
