@@ -131,8 +131,8 @@
     </SettingRow>
   </div>
 
-  <!-- Group: Desktop Rail Widgets — ≥1280px only -->
-  <p class="settings-group-heading">Desktop Rail Widgets</p>
+  <!-- Group: Rail Widgets — ≥1280px only -->
+  <p class="settings-group-heading">Rail Widgets</p>
   <p class="settings-group-sub">Widgets in the right column on wide screens (≥1280px). Hidden widgets don't render at all; they don't take space.</p>
   <div class="card settings-card">
     <SettingRow label="Day Summary" desc="Calorie ring + macro cards." divider={false}>

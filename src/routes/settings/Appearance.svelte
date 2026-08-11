@@ -227,7 +227,7 @@
     <div class="setting-row">
       <div>
         <span class="setting-label">Force Mobile Layout</span>
-        <div class="setting-desc">For users who prefer the compact phone-style layout on desktop. When on, the desktop breakpoints (Diary right rail, Settings two-pane, week strip) are all disabled at every viewport width, and drag-to-copy meals is turned off. Keep this off to use the full desktop experience.</div>
+        <div class="setting-desc">For users who prefer the compact phone-style layout on large screens. When on, the large-screen breakpoints (Diary right rail, Settings two-pane, week strip) are all disabled at every viewport width, and drag-to-copy meals is turned off. Keep this off to use the full large-screen experience.</div>
       </div>
       <Toggle checked={$forceMobileLayout} on:change={e => forceMobileLayout.set(e.detail)} />
     </div>

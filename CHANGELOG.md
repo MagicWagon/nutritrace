@@ -9,6 +9,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.2.0-dev04] - 2026-08-11 (pre-release)
+
+Fourth dev pre-release of the 1.2.0 minor. MCP gets meal-side read tools (thanks to feedback from @javydekoning on #103), an Android hydration bug that made recipe-only days render as ghost placeholders is fixed, and a couple of Settings labels are tidied up.
+
+### Added
+
+- **MCP: three new read tools for saved meals** ([#103](https://github.com/TraceApps/nutritrace/issues/103)). Agents connecting via MCP can now search, list, and inspect saved meals without the numeric `meal_id` up front.
+  - **`search_meals`** — text search over saved meals by name. Query is **optional**: with no query, browses the whole catalog (covers the `list_meals` ask). Recipes excluded by default; `include_recipes: true` opts them in.
+  - **`get_recent_meals`** — most-recently-used saved meals, ordered by `last_used_at`.
+  - **`get_meal_details`** — full contents of one saved meal or recipe (items[] + per-item nutrition + meta).
+  - All three sit under the existing `mcp:read` scope; no new env flag or token change needed. Docs: [/reference/mcp-tools/](https://traceapps.github.io/docs/reference/mcp-tools/).
+
+### Fixed
+
+- **Recipes added as the first item of a day on Android no longer render as a 100g placeholder with no image or nutrition** (PR #153, thanks @librarian). Recipe-only days took a hydration shortcut that returned unresolved Promises instead of actual items; downstream image + nutrition passes read undefined fields and rendered a ghost row. The shortcut now awaits its children properly.
+- **Recipe logging on Android no longer bumps the wrong "recently used" counter** (PR #153, thanks @librarian). `addDiaryItem` was routing every usage bump to `markFoodUsed`, so logging a recipe silently incremented `usage_count` on whatever random food happened to share the recipe's numeric id. It now routes recipe items to `markMealUsed` instead.
+
+### Changed
+
+- **Settings copy: "desktop" terminology aligned with the large-screen redesign.** The Force Mobile Layout description now says "large screens" (the trigger is a viewport-width breakpoint, so Android tablets and foldables get the layout too), and the Diary settings group heading is now "Rail Widgets" (the subtext already clarified the ≥1280px threshold).
+
+---
+
 ## [1.2.0-dev03] - 2026-08-11 (pre-release)
 
 Third dev pre-release of the 1.2.0 minor. Data-safety upgrade to how diary items and water round-trip between clients and the server.
