@@ -31,6 +31,7 @@ const TOKEN_BYTES = 32;  // 256-bit secret
 export const SCOPE_DESCRIPTIONS = {
   'read:foods':      "Read the token owner's foods library. Used by CookTrace federation.",
   'write:workouts':  "Post workouts into the token owner's wellness history. Used by LiftTrace federation.",
+  'write:activity':  "Log manual activity entries into the diary Activity section. Used by external trackers and headless integrations (issue #154).",
   'mcp:read':        'MCP: read the diary, goals, daily totals, and foods catalog (5 tools).',
   'mcp:write':       'MCP: log food / water / meals / body stats (4 additive tools). Requires MCP_WRITE_ENABLED=1 on the server.',
   'mcp:destroy':     'MCP: delete or edit diary entries, create catalog foods (3 tools). Requires MCP_DESTROY_ENABLED=1 AND every call to include confirm=true.',
@@ -42,6 +43,14 @@ export const KNOWN_SCOPES = new Set([
   // log completed-workout calorie burns into the user's wellness data so
   // the dynamic-TDEE calc has the additional energy expenditure.
   'write:workouts',
+  // write:activity unlocks POST /api/v1/activity — for external
+  // trackers pushing manual activity entries (cardio from a map app,
+  // TCX pipelines from Dropbox, headless Node-RED / HA rules, etc.)
+  // straight into the diary's Activity section. Writes to activity_log
+  // the same way the in-app "Add Activity" sheet does. Distinct from
+  // write:workouts, which targets the workouts table + wellness_data
+  // rollup for the dynamic-TDEE calorie-goal path. See issue #154.
+  'write:activity',
   // write:body-measurements unlocks POST /api/v1/body-measurements —
   // for Home Assistant / Node-RED / Gadgetbridge and other headless
   // integrations pushing smart-scale readings straight to the server
