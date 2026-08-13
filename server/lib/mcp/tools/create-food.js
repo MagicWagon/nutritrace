@@ -16,20 +16,33 @@
 import { z } from 'zod';
 import db from '../../../db.js';
 import { toolResult, toolError } from '../_util.js';
+import { NUTRIMENTS } from '../../../../src/lib/nutrition.js';
 
-const NUTRIMENT_KEYS = new Set([
-  'calories', 'kilojoules',
-  'fat', 'saturated-fat', 'trans-fat', 'polyunsaturated-fat', 'monounsaturated-fat',
-  'cholesterol', 'sodium', 'salt',
-  'carbohydrates', 'fiber', 'sugars', 'added-sugars',
-  'protein',
-  'vitamin-a', 'vitamin-c', 'vitamin-d', 'vitamin-e', 'vitamin-k',
-  'vitamin-b1', 'vitamin-b2', 'vitamin-b3', 'vitamin-b5', 'vitamin-b6',
-  'vitamin-b7', 'vitamin-b9', 'vitamin-b12',
-  'calcium', 'iron', 'magnesium', 'phosphorus', 'potassium', 'zinc',
-  'copper', 'manganese', 'selenium', 'chromium', 'molybdenum', 'iodine',
-  'caffeine', 'alcohol',
-]);
+// Derived from the canonical NUTRIMENTS registry so this tool can never
+// drift from what the rest of the app actually sums, filters, and
+// displays. Prior versions hand-maintained a copy that had subtle
+// mismatches — most notably `protein` (this tool) vs `proteins` (rest
+// of app), which meant every food created via MCP with `protein: X`
+// silently didn't count toward daily protein totals (#103 followup
+// report from @javydekoning, 2026-08-13). Also fixes vitamin-b* keys:
+// canonical uses bare `b1`, `b2`, ... not `vitamin-b*`.
+const NUTRIMENT_KEYS = new Set(NUTRIMENTS.map(n => n.id));
+
+// Common bad-key rename map: keys agents might reach for that map to
+// a real canonical id. Applied silently at input time so a "protein"
+// arg becomes a "proteins" write with no rejection noise. Keeps the
+// tool forgiving without giving up canonical storage.
+const KEY_ALIASES = {
+  protein:        'proteins',
+  carbs:          'carbohydrates',
+  carb:           'carbohydrates',
+  'vitamin-b1':   'b1',
+  'vitamin-b2':   'b2',
+  'vitamin-b3':   'b3',
+  'vitamin-b6':   'b6',
+  'vitamin-b9':   'b9',
+  'vitamin-b12':  'b12',
+};
 
 export function registerCreateFood(server, { userId }) {
   server.registerTool(
@@ -41,8 +54,10 @@ export function registerCreateFood(server, { userId }) {
         "food's stated portion (not per 100 g by convention). Requires confirm=true. " +
         'Refuses to insert if a food with the same name + brand already exists — ' +
         "call search_foods first if you're not sure. Rejects unknown nutriment keys " +
-        'to keep the catalog clean; use canonical ids like "calories", "protein", ' +
-        '"carbohydrates", "vitamin-d", "vitamin-b12" (see Nutrition Facts label ids).',
+        'to keep the catalog clean; use canonical ids like "calories", "proteins" ' +
+        '(plural), "carbohydrates", "fat", "fiber", "sugars", "vitamin-d", "b12" ' +
+        '(bare, not "vitamin-b12"). Common aliases (protein, carb, carbs, vitamin-b*) ' +
+        'are silently mapped to the canonical id.',
       inputSchema: {
         confirm:   z.boolean(),
         name:      z.string().min(1).max(200),
@@ -75,17 +90,24 @@ export function registerCreateFood(server, { userId }) {
       const MAX_NUT_VALUE = 100000;
       const clean = {};
       const rejected = [];
-      for (const [k, v] of Object.entries(nutrition || {})) {
-        if (!NUTRIMENT_KEYS.has(k))  { rejected.push(`${k} (unknown key)`); continue; }
-        if (!Number.isFinite(v))     { rejected.push(`${k} (not a number)`); continue; }
-        if (v < 0)                   { rejected.push(`${k} (negative)`); continue; }
-        if (v > MAX_NUT_VALUE)       { rejected.push(`${k} (${v} exceeds ${MAX_NUT_VALUE} cap)`); continue; }
+      const aliased = [];
+      for (const [rawKey, v] of Object.entries(nutrition || {})) {
+        // Map common aliases to canonical ids before validating so the
+        // caller's `protein` / `carbs` / `vitamin-b12` land under the
+        // key the rest of the app sums (`proteins` / `carbohydrates` /
+        // `b12`). Note the alias mapping so the response is honest.
+        const k = KEY_ALIASES[rawKey] || rawKey;
+        if (k !== rawKey) aliased.push(`${rawKey} → ${k}`);
+        if (!NUTRIMENT_KEYS.has(k))  { rejected.push(`${rawKey} (unknown key)`); continue; }
+        if (!Number.isFinite(v))     { rejected.push(`${rawKey} (not a number)`); continue; }
+        if (v < 0)                   { rejected.push(`${rawKey} (negative)`); continue; }
+        if (v > MAX_NUT_VALUE)       { rejected.push(`${rawKey} (${v} exceeds ${MAX_NUT_VALUE} cap)`); continue; }
         clean[k] = Math.round(v * 100) / 100;
       }
       if (Object.keys(clean).length === 0) {
         return toolError(
           `nutrition must include at least one valid nutriment. Rejected: ${rejected.join('; ') || '(none)'}. ` +
-          `Canonical keys: calories, protein, carbohydrates, fat, ...`
+          `Canonical keys: calories, proteins, carbohydrates, fat, ...`
         );
       }
 
@@ -135,6 +157,7 @@ export function registerCreateFood(server, { userId }) {
           barcode: barcode || null,
         },
         rejected_nutriments: rejected.length ? rejected : undefined,
+        aliased_nutriments: aliased.length ? aliased : undefined,
       });
     }
   );

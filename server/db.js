@@ -857,4 +857,64 @@ try {
   console.warn('[db] diary uuid backfill failed:', e.message || e);
 }
 
+// ── Foods nutriment-key canonicalization (issue #103 followup) ────────────
+// The MCP create_food tool used to accept non-canonical nutriment keys
+// (`protein` instead of `proteins`, `vitamin-b12` instead of `b12`) that
+// the rest of the app then failed to sum. Any food row written before
+// the tool was fixed now needs those keys renamed to canonical so daily
+// totals include them. Idempotent: keys already at canonical are
+// untouched; rows without any of the wrong keys skip the write.
+//
+// CRITICAL (same as the other backfills above): rewrite in place
+// WITHOUT bumping updated_at, so Android /sync/pull doesn't see every
+// food row as changed and clobber unpushed local edits.
+try {
+  const done = db.prepare(`SELECT value FROM app_config WHERE key = 'foods_nutriment_key_canon_v1'`).get();
+  if (!done) {
+    const ALIASES = {
+      protein:        'proteins',
+      carbs:          'carbohydrates',
+      carb:           'carbohydrates',
+      'vitamin-b1':   'b1',
+      'vitamin-b2':   'b2',
+      'vitamin-b3':   'b3',
+      'vitamin-b6':   'b6',
+      'vitamin-b9':   'b9',
+      'vitamin-b12':  'b12',
+    };
+    const rows = db.prepare(`SELECT id, nutrition FROM foods WHERE nutrition IS NOT NULL AND deleted_at IS NULL`).all();
+    const update = db.prepare(`UPDATE foods SET nutrition = ? WHERE id = ?`);
+    let changed = 0;
+    db.transaction(() => {
+      for (const row of rows) {
+        let n;
+        try { n = JSON.parse(row.nutrition || '{}'); } catch { continue; }
+        if (!n || typeof n !== 'object') continue;
+        let rowChanged = false;
+        for (const [wrong, right] of Object.entries(ALIASES)) {
+          if (Object.prototype.hasOwnProperty.call(n, wrong)) {
+            // Only rename when the canonical key isn't already there;
+            // if both exist, prefer canonical and drop the alias to
+            // avoid double-counting.
+            if (!Object.prototype.hasOwnProperty.call(n, right)) {
+              n[right] = n[wrong];
+            }
+            delete n[wrong];
+            rowChanged = true;
+          }
+        }
+        if (rowChanged) {
+          update.run(JSON.stringify(n), row.id);
+          changed++;
+        }
+      }
+      db.prepare(`INSERT OR REPLACE INTO app_config (key, value) VALUES ('foods_nutriment_key_canon_v1', ?)`)
+        .run(new Date().toISOString());
+    })();
+    if (changed > 0) console.log(`[db] foods nutriment key canonicalization: ${changed} row(s) updated`);
+  }
+} catch (e) {
+  console.warn('[db] foods nutriment key canonicalization failed:', e?.message || e);
+}
+
 export default db;
