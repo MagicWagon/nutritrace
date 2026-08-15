@@ -544,7 +544,10 @@ export async function copyMealItems(fromMealIdx, toMealIdx) {
     if (!src.length) { copiedCount = 0; return null; }
     copiedCount = src.length;
     const now = new Date().toISOString();
-    const copies = src.map(it => ({ ...it, meal: Number(toMealIdx), addedAt: now }));
+    // Fresh uuid on every copy — see copyMealToDate for the full write-up.
+    // Without this the same-day copy showed as duplicated items in local
+    // UI while the server-side merge deduped by uuid.
+    const copies = src.map(it => ({ ...it, uuid: _newUuid(), meal: Number(toMealIdx), addedAt: now }));
     return { ...entry, items: [...(entry.items || []), ...copies] };
   });
   return copiedCount;
@@ -599,7 +602,13 @@ export async function copyMealToDate(fromMealIdx, targetDate, targetMealIdx) {
   const src = (srcEntry.items || []).filter(it => Number(it.meal ?? 0) === Number(fromMealIdx));
   if (!src.length) return 0;
   const now = new Date().toISOString();
-  const copies = src.map(it => ({ ...it, meal: Number(targetMealIdx), addedAt: now }));
+  // Fresh uuid on every copy: a "copy" is a NEW diary item, not a
+  // moved one. Reusing the source uuid meant a same-day copy (e.g.
+  // breakfast → breakfast) showed as duplicate items in the local
+  // UI (the wholesale local save appended both), while the server's
+  // Option C merge deduped by uuid so the two views drifted until
+  // the next reload. Also affected same-day cross-meal copies.
+  const copies = src.map(it => ({ ...it, uuid: _newUuid(), meal: Number(targetMealIdx), addedAt: now }));
 
   await _refetchAndSave(targetDate, (target) => ({
     ...target,
