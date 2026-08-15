@@ -17,6 +17,7 @@
   import { foodsShowCategories, foodsShowLabels, foodsShowNotes, foodCategories, visibleNutriments, nutrimentsOrder, customNutriments, cropPhotos, offUsername, offPassword, offUploadCountry, aiEffectivelyEnabled, envLocks, aiProvider, aiApiKey, aiModel, aiBaseUrl, energyUnit, showUnitMetadata, warnUnitMismatch, catName as _catName, catDisplay as _catDisplay, disableAnimations } from '../stores/settings.js';
   import { callAI, callAIProxy } from '../lib/aiChat.js';
   import { fitImageDataUrl } from '../lib/image-fit.js';
+  import { draftKey as _mkDraftKey, loadDraft, clearDraft, makeDebouncedPersist } from '../lib/editor-draft.js';
 
   // ── Photo capture / upload ─────────────────────────────────
   let fileInput;
@@ -200,6 +201,19 @@
   let _myFoods = [];
   let duplicateOf = null;
   $: isNewFood = !(params && params.id);
+
+  // ── Draft persistence (#157) ────────────────────────────────────────────
+  // Samsung camera-mode lmkd kills the WebView renderer, Chromium kills
+  // the host, Android cold-starts us into an empty form. Persisting the
+  // draft to localStorage lets the remount restore what the user had
+  // typed. See src/lib/editor-draft.js for the shared helper.
+  $: _draftKey = _mkDraftKey('food', params?.id);
+  let _draftReady = false;      // gate: don't persist before onMount overlays the draft
+  let _persistDraft = null;
+  $: if (_draftKey) _persistDraft = makeDebouncedPersist(_draftKey, 400);
+  // Fire on every food change once we're past mount. Debounced inside
+  // makeDebouncedPersist so rapid typing collapses into a single write.
+  $: if (_draftReady && _persistDraft) _persistDraft(food);
   $: hasBarcode = !!(food.barcode && food.barcode.trim());
 
   function _normBarcode(b) {
@@ -578,6 +592,25 @@
         food = { ...food, ...existing, ...flatNutrition };
       }
     }
+    // ── Restore any in-progress draft (#157) ──────────────────────────
+    // Overlays a fresh (<4h) draft on top of whatever we just loaded
+    // above. Silent restore: the common case is the app was just killed
+    // by Samsung's camera-mode lmkd and the user expects to find their
+    // form intact. Draft was written on every keystroke, so it captures
+    // whatever they typed up to the moment of crash. Clears on save
+    // (see save()); no clear on back-out, so a real back-tap-then-
+    // return within TTL also restores. Only fields present in the
+    // draft overlay: fields the draft doesn't mention keep their
+    // freshly-loaded value.
+    try {
+      const _draft = loadDraft(_draftKey);
+      if (_draft && typeof _draft === 'object') {
+        food = { ...food, ..._draft };
+      }
+    } catch { /* draft parse issues fall through to server-loaded state */ }
+    // Now that any draft has been overlaid, enable the reactive persist.
+    _draftReady = true;
+
     // Default `linked` to ON when editing an existing food (the user is
     // almost always rescaling, and they expect serving size to preserve
     // density). For NEW food entry where the form starts empty, leave it
@@ -674,6 +707,11 @@
         );
       }
       clearFoodEditorState();
+      // #157: draft persistence — clear the localStorage draft now that
+      // the form has landed successfully. Any subsequent process death
+      // shouldn't bring the pre-save state back.
+      _draftReady = false;
+      clearDraft(_draftKey);
       showSuccess(ctx ? $_('food_editor.added_to_diary') : $_('food_editor.saved'));
       if (ctx) {
         // Go back twice to return to diary

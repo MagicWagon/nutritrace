@@ -18,6 +18,7 @@
   import { Nutrition, NUTRIMENTS } from '../lib/nutrition.js';
   import { foodsShowCategories, foodsShowLabels, foodsShowNotes, foodCategories, cropPhotos, visibleNutriments, nutrimentsOrder, catName as _catName, catDisplay as _catDisplay, energyUnit, foodsSort, mealsSort, recipesSort, offEnabled, usdaEnabled, usdaApiKey } from '../stores/settings.js';
   import { fitImageDataUrl } from '../lib/image-fit.js';
+  import { draftKey as _mkDraftKey, loadDraft, clearDraft, makeDebouncedPersist } from '../lib/editor-draft.js';
 
   export let params = {};
 
@@ -52,6 +53,20 @@
   let recipeAmount = '';
   let recipeUnit = 'g';
   let recipeYields = 1;
+
+  // ── Draft persistence (#157) ────────────────────────────────────────
+  // Same pattern as FoodEditor: Samsung camera-mode lmkd kills the
+  // WebView + host and Android cold-starts us into an empty form.
+  // Mirror the meal state to localStorage on change and restore on
+  // mount if a fresh draft exists. Clears on successful save.
+  $: _draftKey = _mkDraftKey('meal', params?.id);
+  let _draftReady = false;
+  let _persistDraft = null;
+  $: if (_draftKey) _persistDraft = makeDebouncedPersist(_draftKey, 400);
+  // Bundle every field the user can mutate before save. Transient
+  // picker/camera UI state is deliberately NOT persisted.
+  $: _draftState = { meal, photoPreviewUrl, recipeAmount, recipeUnit, recipeYields, isRecipe };
+  $: if (_draftReady && _persistDraft) _persistDraft(_draftState);
 
   // Ingredient picker
   let showPicker = false;
@@ -126,6 +141,23 @@
       if (existing) meal = { ...meal, ...existing };
     }
     if (meal.imgUrl) photoPreviewUrl = meal.imgUrl;
+
+    // ── Restore any in-progress draft (#157) ────────────────────────
+    // Overlays a fresh (<4h) draft on top of what we just loaded so
+    // the user's typing survives a camera-triggered process death.
+    try {
+      const _draft = loadDraft(_draftKey);
+      if (_draft && typeof _draft === 'object') {
+        if (_draft.meal)                             meal = { ...meal, ..._draft.meal };
+        if (typeof _draft.photoPreviewUrl === 'string') photoPreviewUrl = _draft.photoPreviewUrl;
+        if (_draft.recipeAmount != null)             recipeAmount = _draft.recipeAmount;
+        if (_draft.recipeUnit)                       recipeUnit = _draft.recipeUnit;
+        if (_draft.recipeYields != null)             recipeYields = _draft.recipeYields;
+        if (typeof _draft.isRecipe === 'boolean')    isRecipe = _draft.isRecipe;
+      }
+    } catch { /* draft parse issues fall through to server-loaded state */ }
+    _draftReady = true;
+
     if (isRecipe) {
       // Three cases to display the yields field:
       //   - Brand new recipe: default to 1 (visible).
@@ -667,6 +699,10 @@
       if (meal.id) await NtApi.updateMeal(meal.id, item);
       else await NtApi.createMeal(item);
       clearMealEditorState();
+      // #157: draft persistence — clear the localStorage draft now
+      // that the meal has landed successfully.
+      _draftReady = false;
+      clearDraft(_draftKey);
       showSuccess($_('food_editor.saved'));
       pop();
     } catch(e) {
