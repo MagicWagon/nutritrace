@@ -38,9 +38,19 @@
   let range = '30';   // '7','14','30','90','180','365','all','custom'
   let customStart = '';
   let customEnd   = localDateStr(); // today
-  // Default energy metric matches the user's chosen energy unit so AU/NZ
-  // users see kJ out of the box instead of having to switch every time.
-  let metric = ($energyUnit === 'kJ') ? 'kilojoules' : 'calories';
+  // Default metric respects the user's Statistics category order (Settings →
+  // Statistics → Categories drag-reorder), skipping hidden ones. Falls back
+  // to the energy metric (calories / kilojoules by unit preference) when
+  // no explicit order is set. Fixes #155 where calories was hardcoded as
+  // the default regardless of the ordered list.
+  function _initialMetric() {
+    const order = ($statsMetricOrder && Array.isArray($statsMetricOrder)) ? $statsMetricOrder : [];
+    const hidden = new Set(($statsHiddenMetrics && Array.isArray($statsHiddenMetrics)) ? $statsHiddenMetrics : []);
+    const first = order.find(k => k && !hidden.has(k));
+    if (first) return first;
+    return ($energyUnit === 'kJ') ? 'kilojoules' : 'calories';
+  }
+  let metric = _initialMetric();
   let data   = [];    // [{ date, val }]
   let loading = false;
   let summary = null; // { avg, min, max, total, daysWithData }
