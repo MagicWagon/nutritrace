@@ -19,6 +19,7 @@
   import { foodsShowCategories, foodsShowLabels, foodsShowNotes, foodCategories, cropPhotos, visibleNutriments, nutrimentsOrder, catName as _catName, catDisplay as _catDisplay, energyUnit, foodsSort, mealsSort, recipesSort, offEnabled, usdaEnabled, usdaApiKey } from '../stores/settings.js';
   import { fitImageDataUrl } from '../lib/image-fit.js';
   import { draftKey as _mkDraftKey, loadDraft, clearDraft, makeDebouncedPersist } from '../lib/editor-draft.js';
+  import { decimalInput, parseDecimal } from '../lib/decimal-input.js';
 
   export let params = {};
 
@@ -415,9 +416,9 @@
     for (const item of multiPortionItems) {
       const origPortion = parseFloat(item.food.portion) || 100;
       const origUnit    = item.food.unit || 'g';
-      const newPortion  = parseFloat(item.portion) || origPortion;
+      const newPortion  = parseDecimal(item.portion) || origPortion;
       const newUnit     = item.unit || origUnit;
-      const newQty      = parseFloat(item.qty) || 1;
+      const newQty      = parseDecimal(item.qty) || 1;
       let scaledNutrition = item.food.nutrition;
       if (item.food.nutrition) {
         const factor = _unitScaleFactor(origPortion, origUnit, newPortion, newUnit, item.food) * newQty;
@@ -531,8 +532,8 @@
 
   function confirmPortion() {
     if (!portionFood) return;
-    const newPortion = parseFloat(portionAmount) || 100;
-    const newQty     = parseFloat(portionQty) || 1;
+    const newPortion = parseDecimal(portionAmount) || 100;
+    const newQty     = parseDecimal(portionQty) || 1;
     const newTotal   = newPortion * newQty;
 
     if (editingIndex !== null) {
@@ -680,7 +681,7 @@
         is_recipe: isRecipe,
       };
       if (isRecipe) {
-        const totalGrams = parseFloat(recipeAmount) || Math.round(meal.items.reduce((s,it)=>s+toGrams(it.portion,it.unit),0)) || 100;
+        const totalGrams = parseDecimal(recipeAmount) || Math.round(meal.items.reduce((s,it)=>s+toGrams(it.portion,it.unit),0)) || 100;
         const explicit = recipeYields !== '' && recipeYields != null && !Number.isNaN(parseInt(recipeYields));
         const yields = explicit ? Math.max(1, parseInt(recipeYields) || 1) : 1;
         // Store per-serving values. Adding "1" of this recipe to the diary
@@ -835,7 +836,7 @@
       <div class="card editor-card">
         <div class="editor-card-title">{$_('meal_editor.servings.title')}</div>
         <div style="display:flex;gap:10px;align-items:center">
-          <input class="input" type="number" min="0.1" step="any"
+          <input class="input" type="text" inputmode="decimal" use:decimalInput
             placeholder={$_('meal_editor.servings.amount_placeholder')} bind:value={recipeAmount} style="flex:1" />
           <div style="width:100px">
             <UnitPicker bind:value={recipeUnit} />
@@ -848,9 +849,9 @@
           <span class="text-3" style="font-size:13px;width:100px;text-align:center">{$_('meal_editor.servings.yields_unit')}</span>
         </div>
         <p class="text-3" style="font-size:12px;margin:0">{$_('meal_editor.servings.yields_hint')}</p>
-        {#if parseFloat(recipeAmount) > 0 && (parseInt(recipeYields) || 0) >= 1}
+        {#if parseDecimal(recipeAmount) > 0 && (parseInt(recipeYields) || 0) >= 1}
           {@const _y = Math.max(1, parseInt(recipeYields) || 1)}
-          {@const _g = Math.round((parseFloat(recipeAmount) / _y) * 10) / 10}
+          {@const _g = Math.round((parseDecimal(recipeAmount) / _y) * 10) / 10}
           {@const _perServE = Nutrition.displayEnergy((totals?.calories || 0) / _y, $energyUnit)}
           <div style="border-top:1px solid var(--border);margin-top:10px;padding-top:8px">
             <p style="margin:0;font-size:13px"><span class="text-3">{$_('meal_editor.servings.per_serving_label')}</span> <strong>{amountAndUnit(_g, recipeUnit)} · {_perServE.value} {_perServE.unit}</strong></p>
@@ -1099,7 +1100,7 @@
     <div style="display:flex;gap:12px">
       <div style="flex:1">
         <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:6px">{$_('meal_editor.field_serving_size')}</label>
-        <input class="input" type="number" min="0.1" step="0.1" bind:value={portionAmount}
+        <input class="input" type="text" inputmode="decimal" use:decimalInput bind:value={portionAmount}
           style="font-size:16px;width:100%" />
       </div>
       <div style="width:100px">
@@ -1109,12 +1110,12 @@
     </div>
     <div>
       <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:6px">{$_('meal_editor.field_quantity')}</label>
-      <input class="input" type="number" min="0.01" step="0.1" bind:value={portionQty}
+      <input class="input" type="text" inputmode="decimal" use:decimalInput bind:value={portionQty}
         style="font-size:16px;width:100%" />
     </div>
     <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface-2);border-radius:var(--radius-md)">
       <span style="font-size:13px;color:var(--text-3)">{$_('meal_editor_deep.total_amount')}</span>
-      <span style="font-size:14px;font-weight:500">{Math.round((parseFloat(portionAmount) || 100) * (parseFloat(portionQty) || 1) * 10) / 10}{portionUnit || 'g'}</span>
+      <span style="font-size:14px;font-weight:500">{Math.round((parseDecimal(portionAmount) || 100) * (parseDecimal(portionQty) || 1) * 10) / 10}{portionUnit || 'g'}</span>
     </div>
     <button class="btn btn-primary w-full" on:click={confirmPortion}>{editingIndex !== null ? $_('meal_editor.save_changes') : $_('meal_editor.add_ingredient')}</button>
   </div>
@@ -1130,7 +1131,7 @@
         <div style="display:flex;gap:10px">
           <div style="flex:1">
             <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:5px">{$_('meal_editor.field_serving_size')}</label>
-            <input class="input" type="number" min="0.1" step="0.1" bind:value={item.portion} style="width:100%;font-size:16px" />
+            <input class="input" type="text" inputmode="decimal" use:decimalInput bind:value={item.portion} style="width:100%;font-size:16px" />
           </div>
           <div style="width:100px">
             <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:5px">{$_('meal_editor.field_unit')}</label>
@@ -1138,7 +1139,7 @@
           </div>
           <div style="width:60px">
             <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:5px">Qty</label>
-            <input class="input" type="number" min="0.01" step="0.1" bind:value={item.qty} style="width:100%;font-size:16px" />
+            <input class="input" type="text" inputmode="decimal" use:decimalInput bind:value={item.qty} style="width:100%;font-size:16px" />
           </div>
         </div>
       </div>

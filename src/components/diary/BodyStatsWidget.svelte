@@ -12,6 +12,7 @@
    *   Log Stats CTA   — opens the full Body Stats sheet
    */
   import { slide } from 'svelte/transition';
+  import { decimalInput, parseDecimal } from '../../lib/decimal-input.js';
 
   export let currentWeight = null;
   export let weightUnit    = 'kg';
@@ -48,7 +49,7 @@
     inputEl?.select();
   }
   async function commitWeight() {
-    const val = parseFloat(inputVal);
+    const val = parseDecimal(inputVal);
     if (!Number.isFinite(val) || val <= 0) { cancelWeight(); return; }
     saving = true;
     try { await onSaveWeight(val); editing = false; }
@@ -91,9 +92,9 @@
           bind:this={inputEl}
           bind:value={inputVal}
           on:keydown={onKey}
-          type="number"
-          step="0.1"
+          type="text"
           inputmode="decimal"
+          use:decimalInput
           placeholder={weightUnit}
           class="input bs-edit-input"
           disabled={saving}

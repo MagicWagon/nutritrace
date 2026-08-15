@@ -12,6 +12,7 @@
    * Rendered only inside .diary-right-col which is ≥1280px only.
    */
   import { slide } from 'svelte/transition';
+  import { decimalInput, parseDecimal } from '../../lib/decimal-input.js';
 
   export let logs         = [];
   export let totalMl      = 0;
@@ -61,7 +62,7 @@
     customInput?.focus();
   }
   function commitCustom() {
-    const val = parseFloat(customAmt);
+    const val = parseDecimal(customAmt);
     if (!val || val <= 0) { customOpen = false; return; }
     // Convert display unit back to ml
     let ml = val;
@@ -113,8 +114,9 @@
         bind:this={customInput}
         bind:value={customAmt}
         on:keydown={customKeydown}
-        type="number"
+        type="text"
         inputmode="decimal"
+        use:decimalInput
         placeholder={unit === 'ml' ? 'ml' : unit === 'oz' ? 'fl oz' : unit}
         class="input ww-custom-input"
       />

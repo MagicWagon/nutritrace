@@ -19,6 +19,7 @@
   import { fitImageDataUrl } from '../lib/image-fit.js';
   import { draftKey as _mkDraftKey, loadDraft, clearDraft, makeDebouncedPersist } from '../lib/editor-draft.js';
   import { acquireScreenWakeLock } from '../lib/wake-lock.js';
+  import { decimalInput, parseDecimal } from '../lib/decimal-input.js';
 
   // ── Photo capture / upload ─────────────────────────────────
   let fileInput;
@@ -345,8 +346,8 @@
 
   function takeSnapshot() {
     const allNuts = [...NUTRIMENTS, ...($customNutriments || [])];
-    _snapshot = { portion: parseFloat(food.portion) || 0 };
-    for (const n of allNuts) _snapshot[n.id] = parseFloat(food[n.id]) || 0;
+    _snapshot = { portion: parseDecimal(food.portion) || 0 };
+    for (const n of allNuts) _snapshot[n.id] = parseDecimal(food[n.id]) || 0;
   }
 
   let _scaleTimer = null;
@@ -373,7 +374,7 @@
     _scaleTimer = setTimeout(() => { applyProportional(changedId, getVal()); }, 400);
   }
 
-  function onPortionInput() { scheduleScale('__portion__', () => parseFloat(food.portion) || 0); }
+  function onPortionInput() { scheduleScale('__portion__', () => parseDecimal(food.portion) || 0); }
   function onNutInput(id)   {
     // Per-nutrient typing does NOT trigger proportional scaling. The
     // link toggle is for "scale all nutrients to a new serving size",
@@ -394,7 +395,7 @@
     if (food._derived[changedId]) food._derived = { ...food._derived, [changedId]: false };
 
     const otherId = changedId === 'sodium' ? 'salt' : 'sodium';
-    const changedVal = parseFloat(food[changedId]);
+    const changedVal = parseDecimal(food[changedId]);
 
     // Last-edited-wins. Sodium and salt are the same datum in different
     // units, so any edit to either side should recompute the other —
@@ -684,8 +685,8 @@
       const _nutrition = {};
       for (const _n of NUTRIMENTS) {
         const _v = food[_n.id];
-        if (_v !== undefined && _v !== '' && _v !== null && !isNaN(parseFloat(_v))) {
-          _nutrition[_n.id] = parseFloat(_v) || 0;
+        if (_v !== undefined && _v !== '' && _v !== null && !isNaN(parseDecimal(_v))) {
+          _nutrition[_n.id] = parseDecimal(_v) || 0;
         }
       }
       // Persist the derived-flag map so the calculator icon survives reloads.
@@ -918,7 +919,7 @@
       <div class="form-row" style="align-items:flex-end">
         <div class="form-group" style="flex:1">
           <label class="form-label">{$_('food_editor.field_serving_size')}</label>
-          <input class="input" type="number" min="0" bind:value={food.portion}
+          <input class="input" type="text" inputmode="decimal" use:decimalInput bind:value={food.portion}
             on:input={onPortionInput} />
         </div>
         <div class="form-group" style="width:100px">
@@ -966,7 +967,7 @@
               <input class="input alt-unit-abbr" placeholder="e.g. slice"
                 bind:value={row.abbr} />
               <span class="alt-unit-eq">=</span>
-              <input class="input alt-unit-grams" type="number" min="0" step="0.1"
+              <input class="input alt-unit-grams" type="text" inputmode="decimal" use:decimalInput
                 placeholder="grams" bind:value={row.grams} />
               <span class="alt-unit-suffix">g</span>
               <button type="button" class="btn-icon alt-unit-del"
@@ -994,7 +995,7 @@
       <div class="form-group">
         <label class="form-label">Density (g/ml)</label>
         <div style="display:flex;align-items:center;gap:6px">
-          <input class="input" type="number" min="0" step="0.01"
+          <input class="input" type="text" inputmode="decimal" use:decimalInput
             placeholder={$_('food_editor.placeholder_optional')}
             value={food.density_g_ml ?? ''}
             on:input={e => food.density_g_ml = e.target.value === '' ? null : Number(e.target.value)} />
@@ -1144,11 +1145,11 @@
             {/if}
           </label>
           {#if _kjMode}
-            <input class="input" type="number" min="0" step="1" placeholder="0"
+            <input class="input" type="text" inputmode="decimal" use:decimalInput placeholder="0"
               value={food.calories ? Math.round(food.calories * 4.184) : ''}
-              on:input={(e) => { const v = parseFloat(e.target.value); food.calories = isNaN(v) ? '' : v / 4.184; onNutInput('calories'); }} />
+              on:input={(e) => { const v = parseDecimal(e.target.value); food.calories = isNaN(v) ? '' : v / 4.184; onNutInput('calories'); }} />
           {:else}
-            <input class="input" type="number" min="0" step="0.1" placeholder="0"
+            <input class="input" type="text" inputmode="decimal" use:decimalInput placeholder="0"
               bind:value={food[n.id]}
               on:input={() => onNutInput(n.id)} />
           {/if}
