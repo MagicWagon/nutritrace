@@ -39,14 +39,31 @@
   let customStart = '';
   let customEnd   = localDateStr(); // today
   // Default metric respects the user's Statistics category order (Settings →
-  // Statistics → Categories drag-reorder), skipping hidden ones. Falls back
-  // to the energy metric (calories / kilojoules by unit preference) when
-  // no explicit order is set. Fixes #155 where calories was hardcoded as
-  // the default regardless of the ordered list.
+  // Statistics → Categories drag-reorder), skipping hidden AND currently-
+  // unavailable ones. Falls back to the energy metric (calories /
+  // kilojoules by unit preference) when no valid ordered candidate exists.
+  // Fixes #155 where calories was hardcoded as the default regardless of
+  // the ordered list; the availability check also handles the corner
+  // where a user had e.g. wl_steps first, then disconnected their wearable
+  // — we skip it rather than paint an empty chart.
+  function _isCurrentlyAvailable(key) {
+    if (!key) return false;
+    if (key.startsWith('wl_')) {
+      const hasWellness = $fitbitFamilyEnabled || $garminEnabled;
+      if (key === 'wl_muscle') return hasWellness || $withingsEnabled;
+      return hasWellness;
+    }
+    if (key === 'water') return _waterShowInStats;
+    // Body-stat keys can be individually hidden via Settings → Body.
+    const isBody = ['weight','neck','waist','hips','chest','thighs','biceps','calves','body_fat','body_water'].includes(key);
+    if (isBody) return !($hiddenBodyStats || []).includes(key);
+    // Nutriments and anything else — always in the picker.
+    return true;
+  }
   function _initialMetric() {
-    const order = ($statsMetricOrder && Array.isArray($statsMetricOrder)) ? $statsMetricOrder : [];
-    const hidden = new Set(($statsHiddenMetrics && Array.isArray($statsHiddenMetrics)) ? $statsHiddenMetrics : []);
-    const first = order.find(k => k && !hidden.has(k));
+    const order = Array.isArray($statsMetricOrder) ? $statsMetricOrder : [];
+    const hidden = new Set(Array.isArray($statsHiddenMetrics) ? $statsHiddenMetrics : []);
+    const first = order.find(k => k && !hidden.has(k) && _isCurrentlyAvailable(k));
     if (first) return first;
     return ($energyUnit === 'kJ') ? 'kilojoules' : 'calories';
   }
