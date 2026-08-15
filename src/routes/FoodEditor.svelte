@@ -18,6 +18,7 @@
   import { callAI, callAIProxy } from '../lib/aiChat.js';
   import { fitImageDataUrl } from '../lib/image-fit.js';
   import { draftKey as _mkDraftKey, loadDraft, clearDraft, makeDebouncedPersist } from '../lib/editor-draft.js';
+  import { acquireScreenWakeLock } from '../lib/wake-lock.js';
 
   // ── Photo capture / upload ─────────────────────────────────
   let fileInput;
@@ -539,6 +540,10 @@
     const image = await _captureLabelPhoto();
     if (!image || !image.base64) return;
     scanningLabel = true;
+    // #158: hold a screen wake lock while the model reads the label.
+    // Slow self-hosted models can take a minute+; without this the
+    // screen times out and the WebView suspends, killing the fetch.
+    const _releaseWakeLock = await acquireScreenWakeLock();
     try {
       const provider = $aiProvider || 'claude';
       const messages = _buildLabelMessages(provider, image);
@@ -571,6 +576,7 @@
       showError($_('food_editor.toast.scan_failed', { values: { error: e?.message || $_('food_editor.toast.unknown_error') } }));
     } finally {
       scanningLabel = false;
+      try { await _releaseWakeLock(); } catch { /* noop */ }
     }
   }
 

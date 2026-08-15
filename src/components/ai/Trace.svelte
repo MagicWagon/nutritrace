@@ -28,6 +28,7 @@
   import SmartLogModal from '../diary/SmartLogModal.svelte';
   import { showError } from '../../stores/toast.js';
   import { isNative, getServerUrl, getAuthToken, apiUrl } from '../../lib/platform.js';
+  import { acquireScreenWakeLock } from '../../lib/wake-lock.js';
 
   // ── State ──────────────────────────────────────────────────────────────────
   let panelOpen  = false;
@@ -1701,6 +1702,11 @@ Diary logging streak: ${ctx.streakText || '(unknown)'}`
     input    = '';
     attachedImage = null;
     loading  = true;
+    // #158: hold a screen wake lock while the request is in-flight so
+    // the user doesn't have to keep tapping the screen when a slow
+    // self-hosted model is thinking. Released in the finally block.
+    // Safe no-op on browsers/WebViews that don't support Wake Lock API.
+    const _releaseWakeLock = await acquireScreenWakeLock();
     // Clear any COMMITTED-state proposal indicators when the user sends
     // a new message. The "Logged X kcal to Lunch" / "Saved to Foods"
     // indicators were sticking around past the turn that committed them,
@@ -1768,6 +1774,7 @@ Diary logging streak: ${ctx.streakText || '(unknown)'}`
     } finally {
       loading = false;
       _toolStatus = '';
+      try { await _releaseWakeLock(); } catch { /* noop */ }
       await tick();
       _scrollBottom();
     }
