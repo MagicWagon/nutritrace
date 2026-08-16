@@ -1143,7 +1143,7 @@
     hint={$_('food_editor.crop_hint')}
     confirmLabel={$_('meal_editor.use_this_crop')}
     cancelLabel={$_('food_editor.cancel')}
-    outputSize={300}
+    outputSize={512}
     on:confirm={(event) => {
       photoPreviewUrl = event.detail.dataUrl;
       cropOpen = false;

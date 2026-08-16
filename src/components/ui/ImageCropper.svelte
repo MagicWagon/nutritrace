@@ -176,11 +176,11 @@
     position: absolute;
     right: -2px;
     bottom: -2px;
-    width: 30px;
-    height: 30px;
+    width: 44px;
+    height: 44px;
     padding: 0;
     border: 0;
-    border-radius: 14px 0 0 0;
+    border-radius: 20px 0 0 0;
     background: var(--accent);
     cursor: nwse-resize;
     touch-action: none;
@@ -188,10 +188,10 @@
   .crop-resize-handle::before {
     content: '';
     position: absolute;
-    right: 6px;
-    bottom: 6px;
-    width: 10px;
-    height: 10px;
+    right: 10px;
+    bottom: 10px;
+    width: 12px;
+    height: 12px;
     border-right: 2px solid #fff;
     border-bottom: 2px solid #fff;
   }

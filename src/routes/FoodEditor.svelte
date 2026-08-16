@@ -837,6 +837,7 @@
         title={$_('food_editor.crop_photo')}
         hint={$_('food_editor.crop_hint')}
         cancelLabel={$_('food_editor.cancel')}
+        outputSize={512}
         on:confirm={(event) => {
           food.imgUrl = event.detail.dataUrl;
           showCrop = false;
