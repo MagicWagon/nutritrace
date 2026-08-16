@@ -460,6 +460,10 @@
   let showMultiPortionSheet = false;
   let multiPortionItems = [];         // [{ food, portion, unit, servings }]
   let multiAdding = false;
+  // Guards every add-to-diary path (single, direct-click, meal expand, copy).
+  // Without it, a mash-click during a slow write fires the add N times and
+  // the diary ends up with N duplicate rows. Issue #156.
+  let _addingToDiary = false;
 
   // Manage mode: multi-select for bulk delete of the current tab's local
   // items. Entered from the item action sheet on a local item. Mutually
@@ -970,25 +974,31 @@
   }
 
   async function _expandMealToDiary(meal) {
-    const { addDiaryItem } = await import('../stores/diary.js');
-    // Bump usage on the meal itself before expanding into individual food
-    // items. addDiaryItem only sees the foods it logs (and bumps those),
-    // so without this the saved meal's own counter would never move and
-    // "Most Used" on the Meals tab would stay at zero. Fire-and-forget;
-    // counter inaccuracy isn't worth blocking the user's add.
-    if (typeof meal.id === 'number') {
-      NtApi.markMealUsed(meal.id, pickDate || undefined).catch(() => {});
+    if (_addingToDiary) return;
+    _addingToDiary = true;
+    try {
+      const { addDiaryItem } = await import('../stores/diary.js');
+      // Bump usage on the meal itself before expanding into individual food
+      // items. addDiaryItem only sees the foods it logs (and bumps those),
+      // so without this the saved meal's own counter would never move and
+      // "Most Used" on the Meals tab would stay at zero. Fire-and-forget;
+      // counter inaccuracy isn't worth blocking the user's add.
+      if (typeof meal.id === 'number') {
+        NtApi.markMealUsed(meal.id, pickDate || undefined).catch(() => {});
+      }
+      for (const item of meal.items) {
+        await addDiaryItem(
+          { ...item, quantity: item.quantity || 1 },
+          Number(pickMeal) || 0,
+          pickDate || undefined
+        );
+      }
+      import('../stores/toast.js').then(m => m.showSuccess('Added to diary'));
+      editorState.lastMealAdded = Number(pickMeal) || 0;
+      history.back();
+    } finally {
+      _addingToDiary = false;
     }
-    for (const item of meal.items) {
-      await addDiaryItem(
-        { ...item, quantity: item.quantity || 1 },
-        Number(pickMeal) || 0,
-        pickDate || undefined
-      );
-    }
-    import('../stores/toast.js').then(m => m.showSuccess('Added to diary'));
-    editorState.lastMealAdded = Number(pickMeal) || 0;
-    history.back();
   }
 
   async function _addFoodToDiaryNoNav(food, qty) {
@@ -1009,10 +1019,16 @@
   }
 
   async function _addFoodToDiary(food, qty) {
-    await _addFoodToDiaryNoNav(food, qty);
-    import('../stores/toast.js').then(m => m.showSuccess('Added to diary'));
-    editorState.lastMealAdded = Number(pickMeal) || 0;
-    history.back();
+    if (_addingToDiary) return;
+    _addingToDiary = true;
+    try {
+      await _addFoodToDiaryNoNav(food, qty);
+      import('../stores/toast.js').then(m => m.showSuccess('Added to diary'));
+      editorState.lastMealAdded = Number(pickMeal) || 0;
+      history.back();
+    } finally {
+      _addingToDiary = false;
+    }
   }
 
   function toggleSelect(food) {
@@ -1083,7 +1099,7 @@
   }
 
   async function confirmQtyPrompt() {
-    if (!promptFood) return;
+    if (!promptFood || _addingToDiary) return;
     const origPortion = parseFloat(promptFood.portion) || 100;
     const origUnit    = promptFood.unit || 'g';
     const newPortion  = parseFloat(promptPortion) || origPortion;
@@ -2318,7 +2334,7 @@
         <span class="qty-macro-label">fat</span>
       </div>
     </div>
-    <button class="btn btn-primary w-full" on:click={confirmQtyPrompt}>{$_('foods.add_to_diary')}</button>
+    <button class="btn btn-primary w-full" on:click={confirmQtyPrompt} disabled={_addingToDiary}>{$_('foods.add_to_diary')}</button>
   </div>
 </Sheet>
 
