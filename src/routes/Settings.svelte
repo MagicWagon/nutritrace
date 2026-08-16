@@ -10,7 +10,7 @@
   // holds cross-section chrome (header, sticky search, drill-in nav,
   // deep-link scroll) and the shared CSS descendants need via :global.
 
-  import { onMount, tick } from 'svelte';
+  import { onMount, tick, afterUpdate, onDestroy } from 'svelte';
   import { push, querystring } from 'svelte-spa-router';
   import { _ } from 'svelte-i18n';
   import { slide, fade } from 'svelte/transition';
@@ -111,6 +111,38 @@
   // visible on land — matches the welcome-hero-view behavior, so
   // "Profile from rail" and "Profile as landing" look identical.
   $: if (currentSection === 'profile') _profileHeroExpanded = true;
+
+  // Rail active-pill: the moving highlight that slides between rail
+  // items on section change. Absolutely positioned inside the rail;
+  // we measure the active button's offsetTop/offsetHeight and drive
+  // CSS transform + height. First measurement is applied without a
+  // transition (via _pillReady flag) so it doesn't jump from 0 on
+  // initial mount. Ported from LiftTrace so both apps behave the same.
+  let _railEl;
+  let _pillY = 0;
+  let _pillH = 0;
+  let _pillVisible = false;
+  let _pillReady = false;
+  let _pillRO;
+  function _measurePill() {
+    if (!_railEl) return;
+    const btn = _railEl.querySelector('.section-toggle.active');
+    if (!btn) { _pillVisible = false; return; }
+    const y = btn.offsetTop;
+    const h = btn.offsetHeight;
+    if (_pillVisible && y === _pillY && h === _pillH) return;
+    _pillY = y;
+    _pillH = h;
+    _pillVisible = true;
+    if (!_pillReady) requestAnimationFrame(() => { _pillReady = true; });
+  }
+  afterUpdate(_measurePill);
+  onMount(() => {
+    if (typeof ResizeObserver === 'undefined' || !_railEl) return;
+    _pillRO = new ResizeObserver(_measurePill);
+    _pillRO.observe(_railEl);
+  });
+  onDestroy(() => { _pillRO?.disconnect(); });
 
   // Section metadata — slug → title i18n key + icon. Used by the sub-page
   // header to show the section name.
@@ -604,7 +636,16 @@
       <!-- Left rail (desktop only, ≥1024px). Always shows the full
            section list so users can jump between sections without
            going back to the index. Hidden on mobile via CSS. -->
-      <aside class="settings-nav-rail">
+      <aside class="settings-nav-rail" bind:this={_railEl}>
+        <!-- Sliding highlight pill (desktop rail). Absolutely
+             positioned; its translateY + height animate to the
+             active rail button on every section change. Behind
+             the button text (z-index: 0). Mirrors LiftTrace. -->
+        <div class="rail-active-pill"
+             class:visible={_pillVisible}
+             class:ready={_pillReady && !$disableAnimations}
+             style="transform: translateY({_pillY}px); height: {_pillH}px;"
+             aria-hidden="true"></div>
         {@render sectionButtons()}
         {#if _railNoMatches}
           <!-- Every section-toggle got .hidden'd by the query — show
@@ -1338,6 +1379,8 @@
       flex-direction: column;
       gap: 2px;
       position: sticky;
+      /* establishes containing block for the abs-positioned pill */
+      isolation: isolate;
       top: calc(var(--page-top, var(--safe-top)) + 130px + var(--hamburger-row, 0px));
       max-height: calc(100vh
         - var(--page-top, var(--safe-top))
@@ -1361,13 +1404,43 @@
       border-radius: var(--radius-md);
       font-size: 13px;
       gap: 10px;
+      /* Sit above the sliding pill (z-index:0) so text + icons render
+         on top of the highlight background. */
+      position: relative;
+      z-index: 1;
+      transition: color 160ms ease;
     }
     :global(html:not(.force-mobile-layout)) .settings-nav-rail :global(.section-toggle:hover) {
       background: var(--surface-2);
     }
     :global(html:not(.force-mobile-layout)) .settings-nav-rail :global(.section-toggle.active) {
-      background: var(--accent-dim);
+      /* Background comes from .rail-active-pill (slides in from prior
+         active item). Only the text/icon color flips here. */
+      background: transparent;
       color: var(--accent);
+    }
+    /* Sliding highlight pill — the shared background element that
+       animates its transform + height to the active rail button. */
+    :global(html:not(.force-mobile-layout)) .settings-nav-rail .rail-active-pill {
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      top: 0;
+      border-radius: var(--radius-md);
+      background: var(--accent-dim);
+      pointer-events: none;
+      opacity: 0;
+      z-index: 0;
+      will-change: transform, height;
+    }
+    :global(html:not(.force-mobile-layout)) .settings-nav-rail .rail-active-pill.visible {
+      opacity: 1;
+    }
+    :global(html:not(.force-mobile-layout)) .settings-nav-rail .rail-active-pill.ready {
+      transition:
+        transform 320ms cubic-bezier(0.32, 0.72, 0, 1),
+        height 260ms cubic-bezier(0.32, 0.72, 0, 1),
+        opacity 180ms ease;
     }
     /* Focus-visible ring for keyboard nav — makes Tab-through of
        the rail obvious without adding a mouse-hover ring. */
