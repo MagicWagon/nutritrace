@@ -5,6 +5,7 @@
   import { _ } from 'svelte-i18n';
   import TraceFace from './TraceFace.svelte';
   import { NtApi }     from '../../lib/api.js';
+  import { confirmDialog } from '../../stores/confirmDialog.js';
   import { DB, localDateStr } from '../../lib/db.js';
   import { Nutrition, NUTRIMENTS } from '../../lib/nutrition.js';
   // Comma-joined list of every NT-tracked nutriment ID — inlined into the
@@ -1838,7 +1839,13 @@ Diary logging streak: ${ctx.streakText || '(unknown)'}`
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
   }
 
-  function clearChat() {
+  async function clearChat() {
+    if (!await confirmDialog({
+      title: $_('trace.clear_confirm_title'),
+      message: $_('trace.clear_confirm_message'),
+      confirmText: $_('trace.clear_confirm_ok'),
+      dangerous: true,
+    })) return;
     messages = [];
     localStorage.removeItem('wl:aiChatHistory');
     NtApi.del('/api/ai/history').catch(() => {});
