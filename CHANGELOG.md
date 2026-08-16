@@ -9,6 +9,38 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.2.0-dev05] - 2026-08-16 (pre-release)
+
+Fifth dev pre-release of the 1.2.0 minor. Bug fixes from the community
+issue tracker plus a shared image cropper contributed by @librarian.
+
+### Added
+
+- **POST /api/v1/activity** ([#154](https://github.com/TraceApps/nutritrace/issues/154)). External services can log a manual activity entry via API using the new `write:activity` scope. Supports `external_id` for idempotent posts.
+- **MCP `create_food` accepts common nutriment aliases** ([#103](https://github.com/TraceApps/nutritrace/issues/103) followup). `protein`, `carbs`, `vitamin-b12` and other legacy keys are now mapped to the canonical NUTRIMENTS names. A one-time backfill also renames any prior rows written with the wrong keys.
+
+### Changed
+
+- **Comma decimal separator supported across numeric inputs** ([#160](https://github.com/TraceApps/nutritrace/issues/160)). Portion, quantity, nutrition per 100 g, weight, body measurements, water custom amount, Quick Calories, and recipe amount all accept either `,` or `.`. Comma-locale users can type "2,5" without fighting the form.
+- **Image cropper is now shared across Food/Meal/Recipe editors** ([#159](https://github.com/TraceApps/nutritrace/pull/159), thanks @librarian). One component, resize handle, and proper touch support. Meal editor used to be mouse-only and had a hardcoded 200 px box stuck near the top-left; now centered, resizable, and works on phones.
+- **Cropper output standardized at 512 px** and the resize handle grown to 44 px for comfortable tap targets.
+- **Stats default metric honors category order** ([#155](https://github.com/TraceApps/nutritrace/issues/155)). Opening the Statistics tab picks the first metric under Settings > Statistics category order, skipping wearables that aren't connected, body stats you've hidden, and water when it's turned off.
+- **Screen wake lock held during in-flight AI and Scan Label requests** ([#158](https://github.com/TraceApps/nutritrace/issues/158)). Slow-model calls no longer die on screen timeout mid-request.
+- **Editor drafts persist to localStorage** ([#157](https://github.com/TraceApps/nutritrace/issues/157)). If the OS kills the WebView while the camera is up (Samsung lmkd behavior on lower-RAM devices), the Food/Meal editor restores what you'd typed on the next open. 4-hour TTL.
+
+### Fixed
+
+- **Add-to-Diary button no longer duplicates entries under mash-click** ([#156](https://github.com/TraceApps/nutritrace/issues/156)). The button now disables the moment you tap it and stays disabled until the save completes, so extra taps during a slow write don't fire extra PUTs.
+- **Same-day copied diary items no longer look like duplicates on the local device.** Each copy gets a fresh uuid so the row keys are unique.
+- **Android diary photo hydration no longer full-scans the foods and meals tables on every diary read.** Queries are now targeted at the items actually on the day.
+- **Android external https images load directly** instead of being routed through `/api/proxy` (was slow and unnecessary on native).
+
+### Security
+
+- No new dependencies. `npm audit` reports 0 vulnerabilities.
+
+---
+
 ## [1.2.0-dev04] - 2026-08-11 (pre-release)
 
 Fourth dev pre-release of the 1.2.0 minor. MCP gets meal-side read tools (thanks to feedback from @javydekoning on #103), an Android hydration bug that made recipe-only days render as ghost placeholders is fixed, and a couple of Settings labels are tidied up.
