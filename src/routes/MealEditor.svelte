@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { pop } from 'svelte-spa-router';
   import { _ } from 'svelte-i18n';
   import { NtApi, API, USDA } from '../lib/api.js';
@@ -19,7 +19,7 @@
   import { Nutrition, NUTRIMENTS } from '../lib/nutrition.js';
   import { foodsShowCategories, foodsShowLabels, foodsShowNotes, foodCategories, cropPhotos, visibleNutriments, nutrimentsOrder, catName as _catName, catDisplay as _catDisplay, energyUnit, foodsSort, mealsSort, recipesSort, offEnabled, usdaEnabled, usdaApiKey } from '../stores/settings.js';
   import { fitImageDataUrl } from '../lib/image-fit.js';
-  import { draftKey as _mkDraftKey, loadDraft, clearDraft, makeDebouncedPersist } from '../lib/editor-draft.js';
+  import { draftKey as _mkDraftKey, loadDraft, loadDraftImg, clearDraft, makeDebouncedPersist } from '../lib/editor-draft.js';
   import { decimalInput, parseDecimal } from '../lib/decimal-input.js';
 
   export let params = {};
@@ -58,7 +58,13 @@
   // WebView + host and Android cold-starts us into an empty form.
   // Mirror the meal state to localStorage on change and restore on
   // mount if a fresh draft exists. Clears on successful save.
-  $: _draftKey = _mkDraftKey('meal', params?.id);
+  //
+  // Key must be tied to the meal's IDENTITY. /meal-editor is pushed
+  // with no :id for both new + edit; the identity lives on
+  // editorState.mealPrefill.id. Without this, editing meal A leaks
+  // into the next "add new meal" (same class of bug as FoodEditor,
+  // fixed together for Wildenhaus's #157 feedback).
+  $: _draftKey = _mkDraftKey('meal', params?.id ?? editorState.mealPrefill?.id ?? null);
   let _draftReady = false;
   let _persistDraft = null;
   $: if (_draftKey) _persistDraft = makeDebouncedPersist(_draftKey, 400);
@@ -66,6 +72,9 @@
   // picker/camera UI state is deliberately NOT persisted.
   $: _draftState = { meal, photoPreviewUrl, recipeAmount, recipeUnit, recipeYields, isRecipe };
   $: if (_draftReady && _persistDraft) _persistDraft(_draftState);
+  // Banner state so a restored draft is visible + dismissable.
+  let _draftRestored = false;
+  let _serverBaseline = null;
 
   // Ingredient picker
   let showPicker = false;
@@ -144,17 +153,36 @@
     // ── Restore any in-progress draft (#157) ────────────────────────
     // Overlays a fresh (<4h) draft on top of what we just loaded so
     // the user's typing survives a camera-triggered process death.
+    // Banner + Discard exposed to the user (Wildenhaus feedback on dev05).
+    _serverBaseline = {
+      meal: { ...meal },
+      photoPreviewUrl,
+      recipeAmount,
+      recipeUnit,
+      recipeYields,
+      isRecipe,
+    };
     try {
       const _draft = loadDraft(_draftKey);
-      if (_draft && typeof _draft === 'object') {
+      if (_draft && typeof _draft === 'object' && Object.keys(_draft).length > 0) {
         if (_draft.meal)                             meal = { ...meal, ..._draft.meal };
         if (typeof _draft.photoPreviewUrl === 'string') photoPreviewUrl = _draft.photoPreviewUrl;
         if (_draft.recipeAmount != null)             recipeAmount = _draft.recipeAmount;
         if (_draft.recipeUnit)                       recipeUnit = _draft.recipeUnit;
         if (_draft.recipeYields != null)             recipeYields = _draft.recipeYields;
         if (typeof _draft.isRecipe === 'boolean')    isRecipe = _draft.isRecipe;
+        _draftRestored = true;
       }
     } catch { /* draft parse issues fall through to server-loaded state */ }
+    // Photo lives in IndexedDB now (kept out of localStorage's tight
+    // quota). Async restore; if the user's already picked a fresher
+    // photo by the time it lands, don't clobber theirs.
+    loadDraftImg(_draftKey).then((_img) => {
+      if (_img && !photoPreviewUrl) {
+        photoPreviewUrl = _img;
+        _draftRestored = true;
+      }
+    }).catch(() => { /* IDB unavailable; text draft still works */ });
     _draftReady = true;
 
     if (isRecipe) {
@@ -174,6 +202,27 @@
     }
 
   });
+
+  // Discard restored draft (#157 followup, Wildenhaus). Resets each
+  // tracked field to what the server actually loaded (or empty for the
+  // add-new path) and wipes both text + photo from the draft store.
+  function _discardDraft() {
+    // Drop pending debounced write + suppress the reactive persist for
+    // the assignments that follow (see FoodEditor for the same pattern).
+    if (_persistDraft && typeof _persistDraft.cancel === 'function') _persistDraft.cancel();
+    _draftReady = false;
+    if (_serverBaseline) {
+      meal            = { ..._serverBaseline.meal };
+      photoPreviewUrl = _serverBaseline.photoPreviewUrl;
+      recipeAmount    = _serverBaseline.recipeAmount;
+      recipeUnit      = _serverBaseline.recipeUnit;
+      recipeYields    = _serverBaseline.recipeYields;
+      isRecipe        = _serverBaseline.isRecipe;
+    }
+    clearDraft(_draftKey);
+    _draftRestored = false;
+    tick().then(() => { _draftReady = true; });
+  }
 
   // ── Photo ──────────────────────────────────────────────────────────────────
   // The crop step is opt-in via Settings → Foods → "Crop photos on upload"
@@ -666,6 +715,7 @@
       // #157: draft persistence — clear the localStorage draft now
       // that the meal has landed successfully.
       _draftReady = false;
+      if (_persistDraft && typeof _persistDraft.cancel === 'function') _persistDraft.cancel();
       clearDraft(_draftKey);
       showSuccess($_('food_editor.saved'));
       pop();
@@ -742,6 +792,18 @@
          display:contents on mobile so cards fall through to the
          normal single-column flow. -->
     <div class="editor-left-col">
+
+    <!-- Restored-draft banner (#157 followup). Same treatment as
+         FoodEditor; sits above the first card. -->
+    {#if _draftRestored}
+      <div class="draft-restored-banner">
+        <span class="material-symbols-rounded">history</span>
+        <span class="draft-restored-text">{$_('meal_editor.draft_restored')}</span>
+        <button type="button" class="draft-restored-discard" on:click={_discardDraft}>
+          {$_('meal_editor.draft_discard')}
+        </button>
+      </div>
+    {/if}
 
     <!-- Photo -->
     <div class="card editor-card">
@@ -1223,6 +1285,29 @@
   .readonly-title { font-weight: 600; }
   .readonly-sub   { color: var(--text-3); font-size: 12px; margin-top: 2px; line-height: 1.4; }
   .editor-card { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  /* Restored-draft banner (#157 followup). Mirrors FoodEditor styles. */
+  .draft-restored-banner {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px;
+    background: var(--accent-dim, rgba(59,130,246,0.10));
+    border: 1px solid var(--accent, #3b82f6);
+    border-radius: var(--radius-md);
+    color: var(--text-1);
+    font-size: 13px;
+  }
+  .draft-restored-banner .material-symbols-rounded { font-size: 20px; color: var(--accent, #3b82f6); }
+  .draft-restored-text { flex: 1; }
+  .draft-restored-discard {
+    background: transparent;
+    border: 1px solid var(--accent, #3b82f6);
+    color: var(--accent, #3b82f6);
+    padding: 4px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .draft-restored-discard:hover { background: var(--accent, #3b82f6); color: #fff; }
   .editor-card-title { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); }
 
   /* Photo */

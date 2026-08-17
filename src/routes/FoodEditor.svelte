@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { slide } from 'svelte/transition';
   import { _ } from 'svelte-i18n';
 
@@ -18,7 +18,7 @@
   import { foodsShowCategories, foodsShowLabels, foodsShowNotes, foodCategories, visibleNutriments, nutrimentsOrder, customNutriments, cropPhotos, offUsername, offPassword, offUploadCountry, aiEffectivelyEnabled, envLocks, aiProvider, aiApiKey, aiModel, aiBaseUrl, energyUnit, showUnitMetadata, warnUnitMismatch, catName as _catName, catDisplay as _catDisplay, disableAnimations } from '../stores/settings.js';
   import { callAI, callAIProxy } from '../lib/aiChat.js';
   import { fitImageDataUrl } from '../lib/image-fit.js';
-  import { draftKey as _mkDraftKey, loadDraft, clearDraft, makeDebouncedPersist } from '../lib/editor-draft.js';
+  import { draftKey as _mkDraftKey, loadDraft, loadDraftImg, clearDraft, makeDebouncedPersist } from '../lib/editor-draft.js';
   import { acquireScreenWakeLock } from '../lib/wake-lock.js';
   import { decimalInput, parseDecimal } from '../lib/decimal-input.js';
 
@@ -164,13 +164,24 @@
   // the host, Android cold-starts us into an empty form. Persisting the
   // draft to localStorage lets the remount restore what the user had
   // typed. See src/lib/editor-draft.js for the shared helper.
-  $: _draftKey = _mkDraftKey('food', params?.id);
+  // Draft key must be tied to the food's IDENTITY, not the URL. Every
+  // food edit pushes /foods/edit with no :id, so params.id is undefined
+  // whether the user is adding new or editing existing. The identity
+  // lives on editorState.foodPrefill.id. Without this, every session
+  // shares one 'new' draft key and typing while editing food A leaks
+  // into a subsequent "add new food" (Wildenhaus, #157).
+  $: _draftKey = _mkDraftKey('food', params?.id ?? editorState.foodPrefill?.id ?? null);
   let _draftReady = false;      // gate: don't persist before onMount overlays the draft
   let _persistDraft = null;
   $: if (_draftKey) _persistDraft = makeDebouncedPersist(_draftKey, 400);
   // Fire on every food change once we're past mount. Debounced inside
   // makeDebouncedPersist so rapid typing collapses into a single write.
   $: if (_draftReady && _persistDraft) _persistDraft(food);
+  // Banner state: true once a draft has been overlaid, so the user can
+  // tell "restored from earlier" apart from "clean form". Discard button
+  // resets to the pre-overlay server baseline and clears the draft.
+  let _draftRestored = false;
+  let _serverBaseline = null;
   $: hasBarcode = !!(food.barcode && food.barcode.trim());
 
   function _normBarcode(b) {
@@ -556,20 +567,33 @@
     }
     // ── Restore any in-progress draft (#157) ──────────────────────────
     // Overlays a fresh (<4h) draft on top of whatever we just loaded
-    // above. Silent restore: the common case is the app was just killed
-    // by Samsung's camera-mode lmkd and the user expects to find their
-    // form intact. Draft was written on every keystroke, so it captures
-    // whatever they typed up to the moment of crash. Clears on save
-    // (see save()); no clear on back-out, so a real back-tap-then-
-    // return within TTL also restores. Only fields present in the
-    // draft overlay: fields the draft doesn't mention keep their
-    // freshly-loaded value.
+    // above. The user gets a banner + Discard button so a restored draft
+    // isn't invisible (Wildenhaus feedback on dev05). Draft was written
+    // on every keystroke, so it captures whatever they typed up to the
+    // moment of crash. Clears on save; no clear on back-out, so a real
+    // back-tap-then-return within TTL also restores.
+    //
+    // Capture the pre-overlay state so the banner's Discard button can
+    // reset the form to what actually came from the server (or empty,
+    // for the "add new" path).
+    _serverBaseline = { ...food };
     try {
       const _draft = loadDraft(_draftKey);
-      if (_draft && typeof _draft === 'object') {
+      if (_draft && typeof _draft === 'object' && Object.keys(_draft).length > 0) {
         food = { ...food, ..._draft };
+        _draftRestored = true;
       }
     } catch { /* draft parse issues fall through to server-loaded state */ }
+    // Photo lives in IndexedDB (see editor-draft.js). Async restore —
+    // don't gate _draftReady on it; typing should be persistable even
+    // if the photo restore is still in flight. If the photo lands after
+    // the user has already picked a different one, don't clobber theirs.
+    loadDraftImg(_draftKey).then((_img) => {
+      if (_img && !food.imgUrl) {
+        food = { ...food, imgUrl: _img };
+        _draftRestored = true;
+      }
+    }).catch(() => { /* IDB unavailable or read failed; text draft still works */ });
     // Now that any draft has been overlaid, enable the reactive persist.
     _draftReady = true;
 
@@ -673,6 +697,7 @@
       // the form has landed successfully. Any subsequent process death
       // shouldn't bring the pre-save state back.
       _draftReady = false;
+      if (_persistDraft && typeof _persistDraft.cancel === 'function') _persistDraft.cancel();
       clearDraft(_draftKey);
       showSuccess(ctx ? $_('food_editor.added_to_diary') : $_('food_editor.saved'));
       if (ctx) {
@@ -696,6 +721,23 @@
     } else {
       food.categories = [...food.categories, name];
     }
+  }
+
+  // Discard restored draft (#157 followup, Wildenhaus). Snaps form back
+  // to what the server actually loaded (or empty for the add-new path)
+  // and wipes both text + photo from the draft store. Banner disappears
+  // once the state is reset.
+  function _discardDraft() {
+    // Drop any in-flight debounced write so it doesn't fire 400ms later
+    // and re-save the pre-discard state back into the draft store.
+    if (_persistDraft && typeof _persistDraft.cancel === 'function') _persistDraft.cancel();
+    // Suppress the reactive persist for the assignment that follows,
+    // then re-enable after Svelte's tick has settled.
+    _draftReady = false;
+    if (_serverBaseline) food = { ..._serverBaseline };
+    clearDraft(_draftKey);
+    _draftRestored = false;
+    tick().then(() => { _draftReady = true; });
   }
 
   // Apply the user's custom nutriment order (set via drag-to-reorder in
@@ -845,6 +887,19 @@
         }}
         on:cancel={() => { showCrop = false; cropSrc = ''; }}
       />
+    {/if}
+
+    <!-- Restored-draft banner (#157 followup). Only visible when a
+         draft was overlaid at mount; Discard resets the form to the
+         server-loaded (or empty) baseline and clears the draft store. -->
+    {#if _draftRestored}
+      <div class="draft-restored-banner">
+        <span class="material-symbols-rounded">history</span>
+        <span class="draft-restored-text">{$_('food_editor.draft_restored')}</span>
+        <button type="button" class="draft-restored-discard" on:click={_discardDraft}>
+          {$_('food_editor.draft_discard')}
+        </button>
+      </div>
     {/if}
 
     <!-- Basic info -->
@@ -1275,6 +1330,32 @@
   .readonly-title { font-weight: 600; }
   .readonly-sub   { color: var(--text-3); font-size: 12px; margin-top: 2px; line-height: 1.4; }
   .editor-card { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  /* Restored-draft banner (#157 followup). Sits above the first form
+     card so the user knows their fields came from a prior session and
+     can wipe them via Discard. Accent-tinted to be noticeable without
+     alarming — this is informational, not an error. */
+  .draft-restored-banner {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px;
+    background: var(--accent-dim, rgba(59,130,246,0.10));
+    border: 1px solid var(--accent, #3b82f6);
+    border-radius: var(--radius-md);
+    color: var(--text-1);
+    font-size: 13px;
+  }
+  .draft-restored-banner .material-symbols-rounded { font-size: 20px; color: var(--accent, #3b82f6); }
+  .draft-restored-text { flex: 1; }
+  .draft-restored-discard {
+    background: transparent;
+    border: 1px solid var(--accent, #3b82f6);
+    color: var(--accent, #3b82f6);
+    padding: 4px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .draft-restored-discard:hover { background: var(--accent, #3b82f6); color: #fff; }
   .editor-card-title { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); margin-bottom: 4px; }
   .form-row { display: flex; gap: 12px; align-items: flex-end; }
   /* Issues #69 + #70: nutrition basis + alt-unit + density UI */
