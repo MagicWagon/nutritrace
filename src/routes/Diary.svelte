@@ -59,6 +59,7 @@
   import { portal } from '../lib/portal.js';
   import { Nutrition, NUTRIMENTS } from '../lib/nutrition.js';
   import { readBodyStat, tagBodyStats, LENGTH_KEYS } from '../lib/body-stats-unit.js';
+  import { decimalInput, parseDecimal } from '../lib/decimal-input.js';
 
   let addMealIdx = 0;
   let showAddAction = false;
@@ -169,7 +170,19 @@
     tick().then(() => weightInput?.focus());
   }
   async function saveBodyStatsLocal() {
-    const payload = tagBodyStats(bodyStatsData, $weightUnit || 'kg', $lengthUnit || 'in');
+    // Normalize each numeric field via parseDecimal so a comma survives
+    // to a period even in the rare case a paste bypasses the input action
+    // (#160 follow-up). Only touch fields that hold user-typed strings —
+    // weight_unit / lengths_unit tags stay as-is.
+    const _num = (v) => {
+      if (v == null || v === '') return v;
+      const n = parseDecimal(v);
+      return Number.isFinite(n) ? n : v;
+    };
+    const _numeric = ['weight', 'body_fat', 'body_water', ...LENGTH_KEYS];
+    const normalized = { ...bodyStatsData };
+    for (const k of _numeric) if (k in normalized) normalized[k] = _num(normalized[k]);
+    const payload = tagBodyStats(normalized, $weightUnit || 'kg', $lengthUnit || 'in');
     await saveBodyStats(payload);
     diaryShowBodyStats.set(false);
     showSuccess($_('diary.toast.body_stats_saved'));
@@ -2597,43 +2610,43 @@
         <div class="bs-grid">
           {#if !($hiddenBodyStats||[]).includes('weight')}
           <div><label class="form-label">Weight ({$weightUnit||'kg'})</label>
-            <input class="input" type="number" step="0.1" min="0" bind:value={bodyStatsData.weight} bind:this={weightInput} /></div>
+            <input class="input" type="text" inputmode="decimal" use:decimalInput bind:value={bodyStatsData.weight} bind:this={weightInput} /></div>
           {/if}
           {#if !($hiddenBodyStats||[]).includes('body_fat')}
           <div><label class="form-label">Body Fat %</label>
-            <input class="input" type="number" step="0.1" min="0" max="100" bind:value={bodyStatsData.body_fat} /></div>
+            <input class="input" type="text" inputmode="decimal" use:decimalInput max="100" bind:value={bodyStatsData.body_fat} /></div>
           {/if}
           {#if !($hiddenBodyStats||[]).includes('body_water')}
           <div><label class="form-label">Body Water %</label>
-            <input class="input" type="number" step="0.1" min="0" max="100" bind:value={bodyStatsData.body_water} /></div>
+            <input class="input" type="text" inputmode="decimal" use:decimalInput max="100" bind:value={bodyStatsData.body_water} /></div>
           {/if}
           {#if !($hiddenBodyStats||[]).includes('neck')}
           <div><label class="form-label">Neck ({$lengthUnit||'in'})</label>
-            <input class="input" type="number" step="0.1" min="0" bind:value={bodyStatsData.neck} /></div>
+            <input class="input" type="text" inputmode="decimal" use:decimalInput bind:value={bodyStatsData.neck} /></div>
           {/if}
           {#if !($hiddenBodyStats||[]).includes('waist')}
           <div><label class="form-label">Waist ({$lengthUnit||'in'})</label>
-            <input class="input" type="number" step="0.1" min="0" bind:value={bodyStatsData.waist} /></div>
+            <input class="input" type="text" inputmode="decimal" use:decimalInput bind:value={bodyStatsData.waist} /></div>
           {/if}
           {#if !($hiddenBodyStats||[]).includes('hips')}
           <div><label class="form-label">Hips ({$lengthUnit||'in'})</label>
-            <input class="input" type="number" step="0.1" min="0" bind:value={bodyStatsData.hips} /></div>
+            <input class="input" type="text" inputmode="decimal" use:decimalInput bind:value={bodyStatsData.hips} /></div>
           {/if}
           {#if !($hiddenBodyStats||[]).includes('chest')}
           <div><label class="form-label">Chest ({$lengthUnit||'in'})</label>
-            <input class="input" type="number" step="0.1" min="0" bind:value={bodyStatsData.chest} /></div>
+            <input class="input" type="text" inputmode="decimal" use:decimalInput bind:value={bodyStatsData.chest} /></div>
           {/if}
           {#if !($hiddenBodyStats||[]).includes('thighs')}
           <div><label class="form-label">Thighs ({$lengthUnit||'in'})</label>
-            <input class="input" type="number" step="0.1" min="0" bind:value={bodyStatsData.thighs} /></div>
+            <input class="input" type="text" inputmode="decimal" use:decimalInput bind:value={bodyStatsData.thighs} /></div>
           {/if}
           {#if !($hiddenBodyStats||[]).includes('biceps')}
           <div><label class="form-label">Biceps ({$lengthUnit||'in'})</label>
-            <input class="input" type="number" step="0.1" min="0" bind:value={bodyStatsData.biceps} /></div>
+            <input class="input" type="text" inputmode="decimal" use:decimalInput bind:value={bodyStatsData.biceps} /></div>
           {/if}
           {#if !($hiddenBodyStats||[]).includes('calves')}
           <div><label class="form-label">Calves ({$lengthUnit||'in'})</label>
-            <input class="input" type="number" step="0.1" min="0" bind:value={bodyStatsData.calves} /></div>
+            <input class="input" type="text" inputmode="decimal" use:decimalInput bind:value={bodyStatsData.calves} /></div>
           {/if}
         </div>
       </div>

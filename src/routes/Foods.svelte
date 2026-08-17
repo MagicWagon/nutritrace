@@ -12,6 +12,7 @@
   import FoodDetailSheet from '../components/ui/FoodDetailSheet.svelte';
   import UnitPicker  from '../components/ui/UnitPicker.svelte';
   import { portal } from '../lib/portal.js';
+  import { decimalInput, parseDecimal } from '../lib/decimal-input.js';
   import { scaleFactor as _unitScaleFactor, unitSystem as _unitSystem, amountAndUnit } from '../lib/units.js';
   import { diaryPromptQuantity, warnUnitMismatch, showUnitMetadata, forceMobileLayout } from '../stores/settings.js';
   import { showSuccess, showError } from '../stores/toast.js';
@@ -431,14 +432,14 @@
     if (!promptFood) return {};
     const origPortion = parseFloat(promptFood.portion) || 100;
     const origUnit    = promptFood.unit || 'g';
-    const newPortion  = parseFloat(promptPortion) || origPortion;
+    const newPortion  = parseDecimal(promptPortion) || origPortion;
     // Pass promptFood as the food so the scaler uses per-food alt_units and
     // density when set. Issues #69 + #70.
     const factor      = _unitScaleFactor(origPortion, origUnit, newPortion, promptUnit || origUnit, promptFood);
     const scaledNutrition = promptFood.nutrition
       ? Object.fromEntries(Object.entries(promptFood.nutrition).map(([k, v]) => [k, (parseFloat(v) || 0) * factor]))
       : promptFood.nutrition;
-    return Nutrition.calculate({ ...promptFood, nutrition: scaledNutrition, quantity: parseFloat(promptServings) || 1 });
+    return Nutrition.calculate({ ...promptFood, nutrition: scaledNutrition, quantity: parseDecimal(promptServings) || 1 });
   })();
   $: _qtyEnergy = Nutrition.displayEnergy(qtyCalc.calories || 0, $energyUnit);
   let activeCategoryFilter = ''; // '' = all
@@ -1084,13 +1085,13 @@
     for (const item of multiPortionItems) {
       const origPortion = parseFloat(item.food.portion) || 100;
       const origUnit    = item.food.unit || 'g';
-      const newPortion  = parseFloat(item.portion) || origPortion;
+      const newPortion  = parseDecimal(item.portion) || origPortion;
       const portionFactor = _unitScaleFactor(origPortion, origUnit, newPortion, item.unit || origUnit, item.food);
       const scaledNutrition = item.food.nutrition
         ? Object.fromEntries(Object.entries(item.food.nutrition).map(([k,v]) => [k, (parseFloat(v)||0) * portionFactor]))
         : item.food.nutrition;
       const food = { ...item.food, portion: newPortion, unit: item.unit, nutrition: scaledNutrition };
-      await _addFoodToDiaryNoNav(food, parseFloat(item.servings) || 1);
+      await _addFoodToDiaryNoNav(food, parseDecimal(item.servings) || 1);
     }
     showSuccess(`Added ${multiPortionItems.length} item${multiPortionItems.length > 1 ? 's' : ''} to diary`);
     editorState.lastMealAdded = Number(pickMeal) || 0;
@@ -1102,7 +1103,7 @@
     if (!promptFood || _addingToDiary) return;
     const origPortion = parseFloat(promptFood.portion) || 100;
     const origUnit    = promptFood.unit || 'g';
-    const newPortion  = parseFloat(promptPortion) || origPortion;
+    const newPortion  = parseDecimal(promptPortion) || origPortion;
     const newUnit     = promptUnit || origUnit;
 
     // Scale by mass when both units are mass-convertible (g/oz/lb/ml/etc.),
@@ -1120,7 +1121,7 @@
       unit: newUnit,
       nutrition: scaledNutrition
     };
-    await _addFoodToDiary(food, parseFloat(promptServings) || 1);
+    await _addFoodToDiary(food, parseDecimal(promptServings) || 1);
   }
 
   async function deleteItem(item) {
@@ -2209,7 +2210,7 @@
         <div style="display:flex;gap:10px">
           <div style="flex:1">
             <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:5px">{$_('foods_deep.serving_size')}</label>
-            <input class="input" type="number" min="0.1" step="0.1" bind:value={item.portion} style="font-size:16px;width:100%" />
+            <input class="input" type="text" inputmode="decimal" use:decimalInput bind:value={item.portion} style="font-size:16px;width:100%" />
           </div>
           <div style="width:100px">
             <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:5px">Unit</label>
@@ -2217,7 +2218,7 @@
           </div>
           <div style="width:72px">
             <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:5px">{$_('foods_deep.servings')}</label>
-            <input class="input" type="number" min="0.1" step="0.1" bind:value={item.servings} style="font-size:16px;width:100%" />
+            <input class="input" type="text" inputmode="decimal" use:decimalInput bind:value={item.servings} style="font-size:16px;width:100%" />
           </div>
         </div>
       </div>
@@ -2272,7 +2273,7 @@
       <div class="qty-quickpicks">
         {#each promptFood.alt_units as au}
           <button type="button" class="qty-quickpick"
-            class:active={promptUnit === au.abbr && parseFloat(promptPortion) === 1}
+            class:active={promptUnit === au.abbr && parseDecimal(promptPortion) === 1}
             on:click={() => { promptPortion = 1; promptUnit = au.abbr; }}>
             1 {au.abbr} <span class="qty-quickpick-g">({au.grams} g)</span>
           </button>
@@ -2282,7 +2283,7 @@
     <div style="display:flex;gap:12px">
       <div style="flex:1">
         <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:6px">{$_('foods_deep.serving_size')}</label>
-        <input class="input" type="number" min="0.1" step="0.1" bind:value={promptPortion}
+        <input class="input" type="text" inputmode="decimal" use:decimalInput bind:value={promptPortion}
           style="font-size:16px;width:100%" />
       </div>
       <div style="width:100px">
@@ -2306,12 +2307,12 @@
     {/if}
     <div>
       <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:6px">{$_('foods_deep.num_servings')}</label>
-      <input class="input" type="number" min="0.1" step="0.1" bind:value={promptServings}
+      <input class="input" type="text" inputmode="decimal" use:decimalInput bind:value={promptServings}
         style="font-size:16px;width:100%" />
     </div>
     <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface-2);border-radius:var(--radius-md)">
       <span style="font-size:13px;color:var(--text-3)">{$_('foods_deep.total_amount')}</span>
-      <span style="font-size:14px;font-weight:500">{Math.round((parseFloat(promptPortion) || 100) * (parseFloat(promptServings) || 1) * 10) / 10}{promptUnit || 'g'}</span>
+      <span style="font-size:14px;font-weight:500">{Math.round((parseDecimal(promptPortion) || 100) * (parseDecimal(promptServings) || 1) * 10) / 10}{promptUnit || 'g'}</span>
     </div>
     <!-- Live nutrition preview (#30) — recomputes with portion/unit/servings changes.
          Color scheme mirrors the Nutrition Summary sheet + diary totals so the
