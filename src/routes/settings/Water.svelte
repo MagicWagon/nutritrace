@@ -2,6 +2,7 @@
   import { _ } from 'svelte-i18n';
   import Toggle from '../../components/settings/Toggle.svelte';
   import { showError } from '../../stores/toast.js';
+  import { decimalInput, parseDecimal } from '../../lib/decimal-input.js';
   import {
     waterUnit, waterShowInDiary, waterShowInStats, waterContainers,
   } from '../../stores/settings.js';
@@ -25,7 +26,7 @@
   let _newContUnit   = 'ml';
   function addContainer() {
     const name = _newContName.trim();
-    const vol  = Number(_newContVolume);
+    const vol  = parseDecimal(_newContVolume);
     if (!name || !vol || vol <= 0) { showError('Enter a valid name and volume'); return; }
     waterContainers.set([...$waterContainers, { id: Date.now().toString(), name, volumeMl: _displayToMl(vol, _newContUnit) }]);
     _newContName = ''; _newContVolume = '';
@@ -90,7 +91,7 @@
       <input class="input" type="text" placeholder={$_('settings_main_deep.container_name_ph')}
         bind:value={_newContName} style="margin-bottom:8px" />
       <div style="display:flex;gap:8px;align-items:center">
-        <input class="input" type="number" min="0.1" step="0.1" placeholder={$_('settings_main_deep.volume_ph')}
+        <input class="input" type="text" inputmode="decimal" use:decimalInput placeholder={$_('settings_main_deep.volume_ph')}
           bind:value={_newContVolume} style="flex:1" />
         <select class="select sel-sm" bind:value={_newContUnit} style="width:86px">
           <option value="ml">ml</option>

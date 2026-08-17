@@ -9,6 +9,7 @@
   import { goals, goalTemplates, energyUnit, weightUnit, heightUnit, lengthUnit, visibleNutriments, hiddenBodyStats, waterGoalMl, waterUnit, pageBanners, bannerStyle, wellnessEnabled, fitbitEnabled, garminEnabled, googleHealthEnabled, healthConnectEnabled, fitbitFamilyEnabled, calorieGoalMode, calorieGoalFactor } from '../stores/settings.js';
   import { NUTRIMENTS, Nutrition } from '../lib/nutrition.js';
   import { readBodyStat } from '../lib/body-stats-unit.js';
+  import { decimalInput, parseDecimal } from '../lib/decimal-input.js';
   import { loadEntry } from '../stores/diary.js';
   import { showSuccess } from '../stores/toast.js';
   import MacroRing from '../components/diary/MacroRing.svelte';
@@ -262,7 +263,7 @@
     return Math.round(ml);
   }
   function displayToMl(val, unit) {
-    const n = parseFloat(val) || 0;
+    const n = parseDecimal(val) || 0;
     if (unit === 'oz') return Math.round(n * 29.5735);
     if (unit === 'L')  return Math.round(n * 1000);
     if (unit === 'G')  return Math.round(n * 3785.41);
@@ -375,10 +376,10 @@
     const kj = (editStat.id === 'kilojoules') ||
                (editStat.id === 'calories_out' && $energyUnit === 'kJ');
     const toStore = (n) => kj && n != null ? n / 4.184 : n;
-    const val = toStore(parseFloat(editVal0) || null);
+    const val = toStore(parseDecimal(editVal0) || null);
     const dayArr = editShared
       ? Array(7).fill(val)
-      : editDayVals.map(v => toStore(parseFloat(v) || null));
+      : editDayVals.map(v => toStore(parseDecimal(v) || null));
 
     const validDays = dayArr.filter(v => v != null && v > 0);
     const peakVal = validDays.length ? Math.max(...validDays) : null;
@@ -1287,12 +1288,12 @@
         <p class="goal-section-label">{editShared ? $_('goals_page.editor.target') : $_('goals_page.editor.targets_per_day')}</p>
         {#if editShared}
           <label class="form-label">{$_('goals_page.editor.value_label', { values: { unit: editIsPercent ? $_('goals_page.editor.value_percent_of_cal') : (_editUnit || '') } })}</label>
-          <input class="input" type="number" min="0" step="any"
+          <input class="input" type="text" inputmode="decimal" use:decimalInput
             placeholder="0" bind:value={editVal0} />
         {:else}
           {#each DAYS as day, i}
             <label class="form-label">{$_('goals_page.editor.value_label_day', { values: { day, unit: editIsPercent ? $_('goals_page.editor.value_percent_of_cal') : (_editUnit || '') } })}</label>
-            <input class="input" type="number" min="0" step="any"
+            <input class="input" type="text" inputmode="decimal" use:decimalInput
               placeholder="0" bind:value={editDayVals[i]} style="margin-bottom:8px" />
           {/each}
         {/if}
@@ -1318,7 +1319,7 @@
       <div class="sheet-header"><h3 class="sheet-title">{$_('goals_page.row.daily_water_goal')}</h3></div>
       <div class="sheet-body">
         <label class="form-label">{$_('goals_page.editor.water_sheet_label', { values: { unit: $waterUnit } })}</label>
-        <input class="input" type="number" min="0" step="0.1" bind:value={editWaterVal}
+        <input class="input" type="text" inputmode="decimal" use:decimalInput bind:value={editWaterVal}
           on:keydown={e => e.key === 'Enter' && saveWaterGoal()} />
         <button class="btn btn-primary w-full" style="margin-top:16px" on:click={saveWaterGoal}>{$_('common.save')}</button>
       </div>

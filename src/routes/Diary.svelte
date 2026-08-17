@@ -233,14 +233,14 @@
     // daily totals don't pick up zero-filled phantoms (same shape as
     // addQuickCalories in src/stores/diary.js).
     if (editItem.type === 'quick_calories') {
-      const raw = Number(editKcalDisplay);
+      const raw = parseDecimal(editKcalDisplay);
       if (!Number.isFinite(raw) || raw <= 0) {
         showError(`Enter a positive ${$energyUnit === 'kJ' ? 'kJ' : 'kcal'} value.`);
         return;
       }
       const kcal = $energyUnit === 'kJ' ? Math.round(raw / 4.184) : Math.round(raw);
       const _opt = v => {
-        const n = Number(v);
+        const n = parseDecimal(v);
         return Number.isFinite(n) && n > 0 ? Math.round(n * 10) / 10 : null;
       };
       const p = _opt(editProtein), c = _opt(editCarbs), f = _opt(editFat);
@@ -264,7 +264,7 @@
     }
     const origPortion = parseFloat(editItem.portion) || 100;
     const origUnit    = editItem.unit || 'g';
-    const newPortion  = parseFloat(editPortion)      || 100;
+    const newPortion  = parseDecimal(editPortion)      || 100;
     // Pass editItem as the food so the scaler can consult per-food alt_units
     // (slice/cookie/bottle = X g) and density for cross-system conversion.
     // Issues #69 + #70.
@@ -278,7 +278,7 @@
     const changes = {
       portion:   newPortion,
       unit:      editUnit,
-      quantity:  parseFloat(editQuantity) || 1,
+      quantity:  parseDecimal(editQuantity) || 1,
       nutrition: newNutrition,
     };
     if (_editChildContext) {
@@ -302,7 +302,7 @@
     if (!editItem) return {};
     const origPortion   = parseFloat(editItem.portion) || 100;
     const origUnit      = editItem.unit || 'g';
-    const newPortion    = parseFloat(editPortion)      || origPortion;
+    const newPortion    = parseDecimal(editPortion)      || origPortion;
     // editItem carries the food's nutrition_basis / alt_units / density_g_ml
     // via the addDiaryItem spread, so passing it gives accurate cross-system
     // conversion when those fields are set. Issues #69 + #70.
@@ -310,7 +310,7 @@
     const scaledNutrition = editItem.nutrition
       ? Object.fromEntries(Object.entries(editItem.nutrition).map(([k, v]) => [k, (parseFloat(v) || 0) * portionFactor]))
       : editItem.nutrition;
-    return Nutrition.calculate({ ...editItem, nutrition: scaledNutrition, quantity: parseFloat(editQuantity) || 1 });
+    return Nutrition.calculate({ ...editItem, nutrition: scaledNutrition, quantity: parseDecimal(editQuantity) || 1 });
   })();
   $: _editEnergy = Nutrition.displayEnergy(editCalc.calories || 0, $energyUnit);
   // Only use currentEntry if it belongs to the currently-displayed date;
@@ -1232,7 +1232,7 @@
   // always ml. Reported by cearum (#11) when in Imperial mode the input
   // was treated as ml regardless of the unit label.
   async function _addWaterCustom() {
-    const raw = Number(_waterCustomAmt);
+    const raw = parseDecimal(_waterCustomAmt);
     if (!raw || raw <= 0) return;
     let ml = raw;
     if      (_waterUnit === 'oz') ml = raw * 29.5735;
@@ -1304,7 +1304,7 @@
   }
 
   async function _saveWaterEdit(i) {
-    const val = parseFloat(_waterEditAmt);
+    const val = parseDecimal(_waterEditAmt);
     if (!val || val <= 0) { _waterEditIndex = -1; return; }
     // Convert display unit back to ml
     let ml = val;
@@ -2259,7 +2259,7 @@
 
     {#if _waterShowCustom}
       <div class="wc-custom-row" transition:slide={{ duration: 160 }}>
-        <input class="input" type="number" min="0" step={_waterUnit === 'ml' ? '1' : '0.01'}
+        <input class="input" type="text" inputmode="decimal" use:decimalInput
           placeholder={`Amount (${_waterUnit === 'oz' ? 'fl oz' : _waterUnit})`}
           bind:value={_waterCustomAmt} bind:this={_waterCustomInput}
           on:keydown={e => e.key === 'Enter' && _addWaterCustom()} />
@@ -2334,8 +2334,7 @@
                placeholder={$_('diary_deep.qce_name_ph')}
                bind:value={editName} />
         <div class="qce-kcal-pill" style="background:var(--macro-calories-dim);margin-top:12px">
-          <input class="qce-kcal-input" type="number" inputmode="numeric"
-                 min="1" step="1"
+          <input class="qce-kcal-input" type="text" inputmode="numeric" use:decimalInput
                  style="color:var(--macro-calories)"
                  bind:value={editKcalDisplay} />
           <span class="qce-kcal-unit" style="color:var(--macro-calories)">{_qcUnit.toUpperCase()}</span>
@@ -2344,8 +2343,8 @@
         <div class="qce-macros">
           <div class="qce-macro-pill" style="background:var(--macro-protein-dim)">
             <div class="qce-macro-val-row">
-              <input class="qce-macro-input" type="number" inputmode="decimal"
-                     min="0" step="0.1" placeholder="0"
+              <input class="qce-macro-input" type="text" inputmode="decimal" use:decimalInput
+                     placeholder="0"
                      style="color:var(--macro-protein); --qce-w:{Math.max(1, String(editProtein || '').length)}ch"
                      bind:value={editProtein} />
               <span class="qce-macro-unit" style="color:var(--macro-protein)">g</span>
@@ -2354,8 +2353,8 @@
           </div>
           <div class="qce-macro-pill" style="background:var(--macro-carbs-dim)">
             <div class="qce-macro-val-row">
-              <input class="qce-macro-input" type="number" inputmode="decimal"
-                     min="0" step="0.1" placeholder="0"
+              <input class="qce-macro-input" type="text" inputmode="decimal" use:decimalInput
+                     placeholder="0"
                      style="color:var(--macro-carbs); --qce-w:{Math.max(1, String(editCarbs || '').length)}ch"
                      bind:value={editCarbs} />
               <span class="qce-macro-unit" style="color:var(--macro-carbs)">g</span>
@@ -2364,8 +2363,8 @@
           </div>
           <div class="qce-macro-pill" style="background:var(--macro-fat-dim)">
             <div class="qce-macro-val-row">
-              <input class="qce-macro-input" type="number" inputmode="decimal"
-                     min="0" step="0.1" placeholder="0"
+              <input class="qce-macro-input" type="text" inputmode="decimal" use:decimalInput
+                     placeholder="0"
                      style="color:var(--macro-fat); --qce-w:{Math.max(1, String(editFat || '').length)}ch"
                      bind:value={editFat} />
               <span class="qce-macro-unit" style="color:var(--macro-fat)">g</span>
@@ -2384,7 +2383,7 @@
       <div style="display:flex;gap:12px;margin-bottom:16px">
         <div style="flex:1">
           <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:4px">{$_('diary_deep.serving_size')}</label>
-          <input class="input" type="number" min="0.1" step="0.1" bind:value={editPortion} style="width:100%" />
+          <input class="input" type="text" inputmode="decimal" use:decimalInput bind:value={editPortion} style="width:100%" />
         </div>
         <div style="width:100px">
           <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:4px">Unit</label>
@@ -2394,7 +2393,7 @@
       <div style="display:flex;gap:12px;margin-bottom:16px">
         <div style="flex:1">
           <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:4px">{$_('diary_deep.num_servings')}</label>
-          <input class="input" type="number" min="0.1" step="0.1" bind:value={editQuantity} style="width:100%" />
+          <input class="input" type="text" inputmode="decimal" use:decimalInput bind:value={editQuantity} style="width:100%" />
         </div>
         {#if !_editChildContext && $diaryShowTimestamps}
           <div style="width:130px">
@@ -2405,7 +2404,7 @@
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface-2);border-radius:var(--radius-md);margin-bottom:16px">
         <span style="font-size:13px;color:var(--text-3)">{$_('diary_deep.total_amount')}</span>
-        <span style="font-size:14px;font-weight:500">{Math.round((parseFloat(editPortion) || 100) * (parseFloat(editQuantity) || 1) * 10) / 10}{editUnit}</span>
+        <span style="font-size:14px;font-weight:500">{Math.round((parseDecimal(editPortion) || 100) * (parseDecimal(editQuantity) || 1) * 10) / 10}{editUnit}</span>
       </div>
       <div class="edit-macros">
         <div class="edit-macro-pill" style="background:var(--macro-calories-dim)">
