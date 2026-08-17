@@ -515,6 +515,13 @@
     // reflect a real sync — confusing for users who hit Wellness on web with
     // HC enabled in settings. Bail out before the toast for #68.
     if (!isNative) return;
+    // #161 (A3): syncHealthConnect(dateStr) writes today's HC reads into
+    // dateStr because readTodayData is hard-coded to today. Viewing a past
+    // day and tapping sync would overwrite that day's history with today's
+    // numbers. Refuse the sync on any non-today view — the button itself
+    // is also hidden below, but this is a defense-in-depth guard for the
+    // auto-on-nav callers at line 1136/1167 and the sync-all button.
+    if (!isToday) return;
     hcSyncing = true;
     try {
       const { syncHealthConnect } = await import('../lib/health-connect.js');
@@ -1447,7 +1454,7 @@
 
   <!-- Fixed sync buttons — portalled to body so position:fixed is viewport-relative -->
   <div class="wl-topbar-actions" use:portal>
-    {#if $healthConnectEnabled && isNative}
+    {#if $healthConnectEnabled && isNative && isToday}
       <button class="wl-sync-icon-btn" class:wl-syncing={hcSyncing}
         on:click={syncHealthConnectManual} disabled={hcSyncing}
         title={$_('wellness_page.sync.health_connect')}>
