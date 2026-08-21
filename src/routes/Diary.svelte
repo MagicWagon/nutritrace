@@ -169,6 +169,41 @@
     // sheet. Falls through silently if the user has hidden the weight row.
     tick().then(() => weightInput?.focus());
   }
+  // Rail body-stats widget derives its display straight from the entry so
+  // it stays in sync across refresh / tab-switch — bodyStatsData is only
+  // populated when the sheet opens, so binding the widget to it left the
+  // rail card blank until the sheet had been touched (#168). Values are
+  // converted into the user's current display unit via readBodyStat, same
+  // as openBodyStats does.
+  $: _widgetWeight = (() => {
+    const raw = entry?.bodyStats || {};
+    if (raw.weight == null || raw.weight === '') return null;
+    return readBodyStat(raw, 'weight', $weightUnit || 'kg', $lengthUnit || 'in');
+  })();
+  $: _widgetStats = (() => {
+    const raw = entry?.bodyStats || {};
+    const out = {};
+    for (const k of LENGTH_KEYS) {
+      if (raw[k] != null && raw[k] !== '') {
+        out[k] = readBodyStat(raw, k, $weightUnit || 'kg', $lengthUnit || 'in');
+      }
+    }
+    return out;
+  })();
+
+  // Widget's inline weight save goes straight to storage — merges a single
+  // {weight, weight_unit} pair into entry.bodyStats so other measurements
+  // aren't touched. val === null means the user cleared the field, which
+  // saveBodyStats propagates as weight=null; readBodyStat then filters it
+  // out on display so the rail card and sheet both show "Not logged" (#168).
+  async function _widgetSaveWeight(val) {
+    const stats = val == null
+      ? { weight: null }
+      : tagBodyStats({ weight: val }, $weightUnit || 'kg', $lengthUnit || 'in');
+    await saveBodyStats(stats);
+    showSuccess($_('diary.toast.body_stats_saved'));
+  }
+
   async function saveBodyStatsLocal() {
     // Normalize each numeric field via parseDecimal so a comma survives
     // to a period even in the rare case a paste bypasses the input action
@@ -1494,14 +1529,11 @@
   {/if}
   {#if $diaryRailShowBodyStats}
     <BodyStatsWidget
-      currentWeight={bodyStatsData.weight ?? null}
+      currentWeight={_widgetWeight}
       weightUnit={$weightUnit || 'kg'}
-      stats={bodyStatsData}
+      stats={_widgetStats}
       lengthUnit={$lengthUnit || 'in'}
-      onSaveWeight={async (val) => {
-        bodyStatsData = { ...bodyStatsData, weight: val };
-        await saveBodyStatsLocal();
-      }}
+      onSaveWeight={_widgetSaveWeight}
       onOpen={openBodyStats}
     />
   {/if}

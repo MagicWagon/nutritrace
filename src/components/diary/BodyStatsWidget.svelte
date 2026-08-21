@@ -49,10 +49,22 @@
     inputEl?.select();
   }
   async function commitWeight() {
-    const val = parseDecimal(inputVal);
-    if (!Number.isFinite(val) || val <= 0) { cancelWeight(); return; }
+    // Empty field or 0 = "clear the weight" — propagate as null so the
+    // parent can remove it. Previously this branch silently cancelled and
+    // there was no way to delete a weight via the widget (#168 B). Any
+    // other unparseable input (letters, etc.) still just cancels.
+    const trimmed = String(inputVal ?? '').trim();
+    let payload;
+    if (trimmed === '') {
+      payload = null;
+    } else {
+      const val = parseDecimal(trimmed);
+      if (!Number.isFinite(val)) { cancelWeight(); return; }
+      if (val <= 0) payload = null;
+      else          payload = val;
+    }
     saving = true;
-    try { await onSaveWeight(val); editing = false; }
+    try { await onSaveWeight(payload); editing = false; inputVal = ''; }
     finally { saving = false; }
   }
   function cancelWeight() { editing = false; inputVal = ''; }
