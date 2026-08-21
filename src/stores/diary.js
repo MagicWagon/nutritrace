@@ -581,10 +581,26 @@ export async function clearMealItems(mealIdx) {
   let removedCount = 0;
   await _refetchAndSave(viewDate, (entry) => {
     const before = entry.items?.length || 0;
-    const items = (entry.items || []).filter(it => Number(it.meal ?? 0) !== Number(mealIdx));
-    if (items.length === before) { removedCount = 0; return null; }
-    removedCount = before - items.length;
-    return { ...entry, items };
+    const kept    = (entry.items || []).filter(it => Number(it.meal ?? 0) !== Number(mealIdx));
+    const removed = (entry.items || []).filter(it => Number(it.meal ?? 0) === Number(mealIdx));
+    if (kept.length === before) { removedCount = 0; return null; }
+    removedCount = before - kept.length;
+    // Option C tombstones: server preserves any item not in the payload
+    // AND not in deleted_uuids, so a filtered-only clear was a no-op on
+    // the server side (#169). Emit a uuid tombstone for every removed
+    // item that has one; items without a uuid predate Option C and get
+    // dropped by omission alone (safe because the server still bases its
+    // "seen" set on uuid — non-uuid items were already best-effort).
+    const prior = entry._pendingDeletions || { items: [], water: [] };
+    const newTombstones = removed.map(it => it?.uuid).filter(Boolean);
+    return {
+      ...entry,
+      items: kept,
+      _pendingDeletions: {
+        items: [...(prior.items || []), ...newTombstones],
+        water: prior.water || [],
+      },
+    };
   });
   return removedCount;
 }
