@@ -3013,9 +3013,14 @@
          combined widget stack is taller than the remaining viewport,
          the rail becomes its own scroll region so all widgets stay
          reachable via the rail's own scrollbar. Offset matches the
-         week-strip sticky top plus its ~60px height + 12px gap. */
+         actual sum of the stuck ladder above so the rail sticks
+         from the first pixel of scroll instead of drifting ~15px
+         before locking in (#foldable-followup):
+           week-strip sticky-top 120 + strip height ~75 + .diary-content
+           padding-top 12 = ~207. Rounded to 210 to soak up antialias
+         and font-metric slack across DPIs. */
       position: sticky;
-      top: calc(var(--page-top, var(--safe-top)) + 190px + var(--hamburger-row, 0px));
+      top: calc(var(--page-top, var(--safe-top)) + 210px + var(--hamburger-row, 0px));
       align-self: start;
       /* Leave a small margin under the viewport bottom AND account
          for the persistent bottom nav (--nav-h + --safe-bottom) so
@@ -3023,7 +3028,7 @@
          nav bar. */
       max-height: calc(100vh
         - var(--page-top, var(--safe-top))
-        - 200px
+        - 220px
         - var(--hamburger-row, 0px)
         - var(--nav-h, 0px)
         - var(--safe-bottom, 0px));
@@ -3052,8 +3057,8 @@
     /* When the diary shows a banner (announcement), the sticky
        elements above shift down; keep the rail in sync. */
     :global(html:not(.force-mobile-layout)) .diary-content.has-banner .diary-right-col {
-      top: calc(var(--page-top, var(--safe-top)) + 252px + var(--hamburger-row, 0px));
-      max-height: calc(100vh - var(--page-top, var(--safe-top)) - 262px - var(--hamburger-row, 0px));
+      top: calc(var(--page-top, var(--safe-top)) + 272px + var(--hamburger-row, 0px));
+      max-height: calc(100vh - var(--page-top, var(--safe-top)) - 282px - var(--hamburger-row, 0px));
     }
 
     /* Two independent flex-columns. Each meal-col packs its own cards
