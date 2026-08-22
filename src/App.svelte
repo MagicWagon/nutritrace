@@ -343,7 +343,7 @@
       // isn't mounted — e.g. app was cold-started via the tap.
       import('./lib/notifications.js').then(({ registerUpdateTapListener }) => {
         registerUpdateTapListener(() => {
-          import('svelte-spa-router').then(({ push }) => push('/settings'));
+          import('svelte-spa-router').then(({ push }) => push('/settings/updates'));
         });
       }).catch(() => { /* ignore */ });
     } else {

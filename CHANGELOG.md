@@ -9,6 +9,50 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.2.0-dev07] - 2026-08-22 (pre-release)
+
+Seventh dev pre-release of the 1.2.0 minor. Two big themes: wide-screen
+layouts (rails now stay put on scroll) and a proper update-notification
+loop that finally tells you when a new version is out.
+
+### Added
+
+- **Updates: check-frequency picker** in Settings → Updates (Hourly /
+  Every 4 Hours / Every 12 Hours / Once a Day / Manual Only). Defaults
+  to every 4 hours. Persisted per-user across devices.
+- **Updates: red dot on the Settings nav icon** whenever a new version
+  is available and hasn't been dismissed. Clears the moment you tap
+  "Skip This Version" or the banner's dismiss button.
+
+### Changed
+
+- **Updates: PWA now actually notices new deploys.** The service worker
+  is prompt-based instead of silent-auto-update, so a fresh build no
+  longer swaps out from under you with no warning. A "Reload" banner
+  offers to apply the new bundle. Also polls for `sw.js` changes on the
+  same cadence you pick above, and on visibility change, so a long-lived
+  tab surfaces updates in minutes instead of the browser's default 24h.
+- **Updates: Android shows both an OS notification AND an in-app banner**
+  (previously it was either/or). Both respect the same "Skip This
+  Version" flag — one dismiss clears every surface for that version.
+- **Wide-screen layouts on Diary + Foods stay welded to the viewport.**
+  The Diary right rail (Body Stats / Water / Activity widgets) and the
+  Foods page's Sources sidebar + food preview no longer drift on
+  scroll or slip off near the bottom of the page. Fixed properly via
+  the portal-plus-position:fixed pattern instead of sticky.
+
+### Fixed
+
+- **Wellness page: `getLatestWellness` no longer crashes** — mentioned
+  it in dev06 notes but the fix relies on the proxy stub that also
+  landed in this cycle; both are now working together on Android.
+
+### Security
+
+- No new dependencies. `npm audit` reports 0 vulnerabilities.
+
+---
+
 ## [1.2.0-dev06] - 2026-08-21 (pre-release)
 
 Sixth dev pre-release of the 1.2.0 minor. Bug fixes across the community
