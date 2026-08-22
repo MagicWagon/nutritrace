@@ -1436,7 +1436,41 @@
   let _onVis = null;
   let _paneMq = null;
   let _paneMqHandler = null;
+  let _railMq = null;
+  let _railMqHandler = null;
+  let _foodsViewportRail = false; // ≥1280px, gates the Sources/Categories rail portal
+  $: _foodsRailMode = _foodsViewportRail && !$forceMobileLayout;
   let _onKeyGlobal = null;
+  let _foodsBodyEl = null;
+  // Same pattern as NT Diary's rail (see feedback_traceapps_fixed_positioning_in_scroll_wrapper):
+  // .page-transition scopes position:fixed via will-change:transform, so
+  // both asides are portaled to document.body and their geometry is fed
+  // via inline CSS custom properties (which don't cross a portal).
+  let _railTopPx  = 130, _railLeftPx  = 0,   _railWidthPx = 240;
+  let _paneTopPx  = 130, _paneLeftPx  = 0,   _paneWidthPx = 420;
+  let _foodsRailResizeObs = null;
+  function _measureFoodsRails() {
+    if (!_foodsBodyEl) return;
+    const rect = _foodsBodyEl.getBoundingClientRect();
+    const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
+    // Anchor top just below the sticky search bar. The existing sticky
+    // rail used +130px from safe-top; keep that so vertical alignment
+    // matches the pre-fix look.
+    const rootCS = getComputedStyle(document.documentElement);
+    const pageTop = parseFloat(rootCS.getPropertyValue('--page-top') || rootCS.getPropertyValue('--safe-top') || '0') || 0;
+    const hamRow  = parseFloat(rootCS.getPropertyValue('--hamburger-row') || '0') || 0;
+    // Use foods-body's actual top when possible so the rail lines up
+    // exactly with the list; fall back to the sticky-bar offset.
+    const bodyDocTop = rect.top + scrollY;
+    const anchorDocTop = Math.max(bodyDocTop, pageTop + 130 + hamRow);
+    const topPx = Math.max(0, Math.round(anchorDocTop - pageTop - hamRow));
+    if (topPx !== _railTopPx) _railTopPx = topPx;
+    if (topPx !== _paneTopPx) _paneTopPx = topPx;
+    const leftRail = Math.max(0, Math.round(rect.left));
+    const leftPane = Math.max(0, Math.round(rect.right - _paneWidthPx));
+    if (leftRail !== _railLeftPx) _railLeftPx = leftRail;
+    if (leftPane !== _paneLeftPx) _paneLeftPx = leftPane;
+  }
   onDestroy(() => {
     if (_onVis) document.removeEventListener('visibilitychange', _onVis);
     if (_paneMq && _paneMqHandler) {
@@ -1444,7 +1478,14 @@
         ? _paneMq.removeEventListener('change', _paneMqHandler)
         : _paneMq.removeListener(_paneMqHandler);
     }
+    if (_railMq && _railMqHandler) {
+      _railMq.removeEventListener
+        ? _railMq.removeEventListener('change', _railMqHandler)
+        : _railMq.removeListener(_railMqHandler);
+    }
     if (_onKeyGlobal) document.removeEventListener('keydown', _onKeyGlobal);
+    try { _foodsRailResizeObs?.disconnect(); } catch {}
+    if (typeof window !== 'undefined') window.removeEventListener('resize', _measureFoodsRails);
   });
 
   onMount(async () => {
@@ -1459,7 +1500,22 @@
       _paneMq.addEventListener
         ? _paneMq.addEventListener('change', _paneMqHandler)
         : _paneMq.addListener(_paneMqHandler);
+      // Second breakpoint gate: the Sources/Categories rail activates
+      // at ≥1280 (one step below the detail pane). Portal + measurement
+      // only run inside this window.
+      _railMq = window.matchMedia('(min-width: 1280px)');
+      _railMqHandler = () => { _foodsViewportRail = _railMq.matches; requestAnimationFrame(_measureFoodsRails); };
+      _foodsViewportRail = _railMq.matches;
+      _railMq.addEventListener
+        ? _railMq.addEventListener('change', _railMqHandler)
+        : _railMq.addListener(_railMqHandler);
     }
+    requestAnimationFrame(() => requestAnimationFrame(_measureFoodsRails));
+    try {
+      _foodsRailResizeObs = new ResizeObserver(_measureFoodsRails);
+      if (_foodsBodyEl) _foodsRailResizeObs.observe(_foodsBodyEl);
+    } catch { /* ResizeObserver unavailable — one-shot stands */ }
+    if (typeof window !== 'undefined') window.addEventListener('resize', _measureFoodsRails);
     // Global keyboard shortcut: '/' or ⌘K / Ctrl-K focuses the
     // search input from anywhere on the page, matching the muscle
     // memory of most desktop search UIs. Skipped when the user is
@@ -1693,8 +1749,13 @@
        1280px (or when force-mobile-layout is on) this collapses to
        a single main column and the .foods-mobile-chips above take
        over the filter surface. -->
-  <div class="foods-body">
-    <aside class="foods-filter-rail">
+  <div class="foods-body" bind:this={_foodsBodyEl}>
+    {#if _foodsRailMode}
+    <aside
+      use:portal
+      class="foods-filter-rail"
+      style="--foods-rail-top:{_railTopPx}px; --foods-rail-left:{_railLeftPx}px; --foods-rail-width:{_railWidthPx}px"
+    >
       {#if availableSources.length > 1}
         <!-- Sources heading + chips only make sense when there's
              more than one source to pick from. Meals/Recipes with
@@ -1717,6 +1778,7 @@
         <p class="foods-filter-empty">No filters available for this tab.</p>
       {/if}
     </aside>
+    {/if}
 
     <div class="foods-main">
 
@@ -2181,7 +2243,12 @@
          nutrition / actions markup renders in both places. Empty
          state prompts when nothing is selected. Only visible at
          ≥1440px via CSS; mobile continues to use the modal sheet. -->
-    <aside class="foods-detail-pane">
+    {#if _foodsPaneMode}
+    <aside
+      use:portal
+      class="foods-detail-pane"
+      style="--foods-pane-top:{_paneTopPx}px; --foods-pane-left:{_paneLeftPx}px; --foods-pane-width:{_paneWidthPx}px"
+    >
       <FoodDetailSheet
         embedded={true}
         food={_paneFood}
@@ -2191,6 +2258,7 @@
         on:deleted={() => { _paneFood = null; detailSheetFood = null; load(); }}
       />
     </aside>
+    {/if}
   </div><!-- /.foods-body -->
 </div>
 
@@ -3294,16 +3362,28 @@
     :global(html:not(.force-mobile-layout)) .foods-main :global(.page-content) {
       padding-top: 0;
     }
-    /* Rail — sticks below the sticky search bar. Its top offset
-       matches the sticky bar's bottom edge (search + tabs + safe
-       area). Own scroll if the filter list is very tall. */
+    /* Rail — position:fixed + portaled to document.body, same
+       pattern as NT Diary's right rail (see
+       feedback_traceapps_fixed_positioning_in_scroll_wrapper).
+       .page-transition's will-change:transform breaks the naive
+       position:fixed containing block, so JS drives left/top from
+       the .foods-body grid via inline CSS custom properties. */
     :global(html:not(.force-mobile-layout)) .foods-filter-rail {
       display: flex;
       flex-direction: column;
       gap: 4px;
-      position: sticky;
-      top: calc(var(--page-top, var(--safe-top)) + 130px + var(--hamburger-row, 0px));
-      max-height: calc(100vh - var(--page-top, var(--safe-top)) - 150px - var(--hamburger-row, 0px));
+      position: fixed;
+      top: calc(var(--page-top, var(--safe-top)) + var(--foods-rail-top, 130px) + var(--hamburger-row, 0px));
+      left: var(--foods-rail-left, auto);
+      width: var(--foods-rail-width, 240px);
+      z-index: 5;
+      max-height: calc(100vh
+        - var(--page-top, var(--safe-top))
+        - var(--foods-rail-top, 130px)
+        - 20px
+        - var(--hamburger-row, 0px)
+        - var(--nav-h, 0px)
+        - var(--safe-bottom, 0px));
       overflow-y: auto;
       padding: 12px 10px;
       background: var(--surface-1);
@@ -3412,8 +3492,14 @@
     }
     :global(html:not(.force-mobile-layout)) .foods-detail-pane {
       display: block;
-      position: sticky;
-      top: calc(var(--page-top, var(--safe-top)) + 130px + var(--hamburger-row, 0px));
+      /* Same portaled + position:fixed pattern as the filter rail
+         above. --foods-pane-* vars come from Foods.svelte's
+         _measureFoodsRails, updated on mount + resize. */
+      position: fixed;
+      top: calc(var(--page-top, var(--safe-top)) + var(--foods-pane-top, 130px) + var(--hamburger-row, 0px));
+      left: var(--foods-pane-left, auto);
+      width: var(--foods-pane-width, 420px);
+      z-index: 5;
       /* Subtract EVERYTHING between the pane's top and the viewport
          bottom: safe-top, sticky bar (130), hamburger row, bottom
          nav (var(--nav-h) + safe-bottom), and a small slack. Without
@@ -3421,7 +3507,8 @@
          Diary, Edit, Delete) got clipped by the bottom nav bar. */
       max-height: calc(100vh
         - var(--page-top, var(--safe-top))
-        - 150px
+        - var(--foods-pane-top, 130px)
+        - 20px
         - var(--hamburger-row, 0px)
         - var(--nav-h, 0px)
         - var(--safe-bottom, 0px));
