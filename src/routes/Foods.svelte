@@ -1453,21 +1453,25 @@
     if (!_foodsBodyEl) return;
     const rect = _foodsBodyEl.getBoundingClientRect();
     const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
-    // Anchor top just below the sticky search bar. The existing sticky
-    // rail used +130px from safe-top; keep that so vertical alignment
-    // matches the pre-fix look.
+    const cs = getComputedStyle(_foodsBodyEl);
+    const padTop  = parseFloat(cs.paddingTop  || '0') || 0;
+    const padLeft = parseFloat(cs.paddingLeft || '0') || 0;
+    // Grid + padding gives the actual position of the rail cell inside
+    // .foods-body. Including the top padding is what puts the small
+    // breathing gap between the sticky search bar and the rail (same
+    // "diary rail sits below week-strip with .diary-content padding"
+    // pattern from Diary.svelte).
     const rootCS = getComputedStyle(document.documentElement);
     const pageTop = parseFloat(rootCS.getPropertyValue('--page-top') || rootCS.getPropertyValue('--safe-top') || '0') || 0;
     const hamRow  = parseFloat(rootCS.getPropertyValue('--hamburger-row') || '0') || 0;
-    // Use foods-body's actual top when possible so the rail lines up
-    // exactly with the list; fall back to the sticky-bar offset.
-    const bodyDocTop = rect.top + scrollY;
-    const anchorDocTop = Math.max(bodyDocTop, pageTop + 130 + hamRow);
+    const anchorDocTop = rect.top + scrollY + padTop;
     const topPx = Math.max(0, Math.round(anchorDocTop - pageTop - hamRow));
     if (topPx !== _railTopPx) _railTopPx = topPx;
     if (topPx !== _paneTopPx) _paneTopPx = topPx;
-    const leftRail = Math.max(0, Math.round(rect.left));
-    const leftPane = Math.max(0, Math.round(rect.right - _paneWidthPx));
+    // Left offsets track the grid cell edges, honoring horizontal padding.
+    const leftRail = Math.max(0, Math.round(rect.left + padLeft));
+    const paneRightPad = parseFloat(cs.paddingRight || '0') || 0;
+    const leftPane = Math.max(0, Math.round(rect.right - paneRightPad - _paneWidthPx));
     if (leftRail !== _railLeftPx) _railLeftPx = leftRail;
     if (leftPane !== _paneLeftPx) _paneLeftPx = leftPane;
   }
@@ -3361,6 +3365,13 @@
        here to avoid doubling with the new .foods-body padding. */
     :global(html:not(.force-mobile-layout)) .foods-main :global(.page-content) {
       padding-top: 0;
+    }
+    /* Explicit column placement so .foods-main stays in the middle
+       track even when the rail + pane are portaled out (their asides
+       leave the grid, and without this, .foods-main falls into column
+       1 and the list gets squished into the 240px rail column). */
+    :global(html:not(.force-mobile-layout)) .foods-main {
+      grid-column: 2 / 3;
     }
     /* Rail — position:fixed + portaled to document.body, same
        pattern as NT Diary's right rail (see
