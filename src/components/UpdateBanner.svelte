@@ -25,45 +25,54 @@
   import { push } from 'svelte-spa-router';
   import { isNative } from '../lib/platform.js';
   import {
-    checkForUpdate, isUpdateAvailable, getAutoCheck,
-    getSkippedVersion, skipVersion,
+    checkForUpdate, getAutoCheck,
+    updateAvailable, dismissForVersion, refreshUpdateAvailableStore,
   } from '../lib/updates.js';
+  import { pwaUpdateReady, applyPwaUpdate } from '../lib/pwa-update.js';
   import {
     isUpdateNotificationPermissionGranted, showUpdateNotification,
   } from '../lib/notifications.js';
 
-  // Remembers which version we already posted the OS notification for so
-  // we don't re-post on every app open (the notification stays in the
-  // shade until dismissed; re-scheduling with the same ID replaces it
-  // and would reset the user's dismissal, defeating the point).
+  // Remembers which version we already posted the OS notification for
+  // so we don't re-post on every app open (re-posting with the same ID
+  // replaces the notification and resets the user's dismissal).
   const NOTIFIED_KEY = 'nt_updates_notified_version';
 
-  let latest      = null;
-  let visible     = false;
+  // Two triggers can raise the banner:
+  //  1. A GitHub-tag check found a newer release (native + PWA).
+  //  2. The service worker has a fresh bundle waiting (PWA only).
+  // Both funnel into `visible` via the reactive block below.
+  // The GitHub side is persistently dismissable via skipVersion (never
+  // returns for that version). The PWA-SW side has no version to skip,
+  // so a dismiss just hides it for this session — a full page reload
+  // will surface it again next time.
+  let _pwaSessionDismissed = false;
+  $: latest  = $updateAvailable.latest;
+  $: visible = $updateAvailable.available || ($pwaUpdateReady && !_pwaSessionDismissed);
 
   onMount(async () => {
-    if (!isNative) return; // PWA client-update comes from the service worker; server-update lives in Settings.
+    // Hydrate the store from any cached check first so the banner /
+    // Settings-nav dot can appear before the async check completes.
+    refreshUpdateAvailableStore();
     if (!getAutoCheck()) return;
     try {
-      latest = await checkForUpdate({ force: false });
-      if (!latest || !isUpdateAvailable(latest)) return;
-      const skipped = getSkippedVersion();
-      if (skipped === latest.version) return;
-
-      // Suppression: if the OS notification channel is available, post
-      // there instead of showing the banner. Users who granted permission
-      // get a proper, dismissible OS notification and a clean app UI.
-      // Users who denied permission still get the banner as fallback.
-      if (await isUpdateNotificationPermissionGranted()) {
-        const alreadyNotified = _getNotifiedVersion() === latest.version;
-        if (!alreadyNotified) {
-          const posted = await showUpdateNotification(latest);
-          if (posted) _setNotifiedVersion(latest.version);
-        }
-        return; // banner stays hidden
+      const found = await checkForUpdate({ force: false });
+      // On native, ALSO post a one-shot OS notification alongside the
+      // in-app banner (was previously EITHER banner OR notification).
+      // Both channels active means a user who backgrounds the app still
+      // sees the shade notification, and returns to a banner they can
+      // dismiss in one tap.
+      if (isNative && found && $updateAvailable.available) {
+        try {
+          if (await isUpdateNotificationPermissionGranted()) {
+            if (_getNotifiedVersion() !== found.version) {
+              const posted = await showUpdateNotification(found);
+              if (posted) _setNotifiedVersion(found.version);
+            }
+          }
+        } catch { /* notification is best-effort */ }
       }
-      visible = true;
-    } catch { /* silent — this is best-effort */ }
+    } catch { /* silent — banner still surfaces via a later check */ }
   });
 
   function _getNotifiedVersion() {
@@ -74,12 +83,18 @@
   }
 
   function goToUpdates() {
+    // PWA bundle refresh applies immediately — no need to deep-link to
+    // Settings. GitHub-release path routes to Settings → Updates.
+    if ($pwaUpdateReady) { applyPwaUpdate(); return; }
     push('/settings');
-    visible = false;
+    dismissForVersion(latest?.version);
   }
   function dismiss() {
-    if (latest?.version) skipVersion(latest.version);
-    visible = false;
+    // PWA bundle: no version to skip, just hide for this session; a
+    // page reload will resurface it. GitHub-release path: persist the
+    // skip so this version never nags again.
+    if ($pwaUpdateReady) { _pwaSessionDismissed = true; return; }
+    dismissForVersion(latest?.version);
   }
 </script>
 

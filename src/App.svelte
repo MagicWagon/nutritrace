@@ -346,6 +346,26 @@
           import('svelte-spa-router').then(({ push }) => push('/settings'));
         });
       }).catch(() => { /* ignore */ });
+    } else {
+      // PWA: register the service worker via virtual:pwa-register so we
+      // get onNeedRefresh callbacks. Without this, registerType:'prompt'
+      // downloads new bundles but never tells the app they're ready.
+      import('./lib/pwa-update.js').then(({ registerPwaSw }) => registerPwaSw()).catch(() => {});
+    }
+
+    // Visibility-change trigger for the GitHub-tag check. A user who
+    // leaves the tab open for hours / a laptop that resumes from sleep
+    // gets a re-check the moment the tab regains focus — respecting the
+    // per-user cadence setting (Settings → Updates). Zero-op inside
+    // the cadence window (checkForUpdate returns cached).
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState !== 'visible') return;
+        import('./lib/updates.js').then(({ checkForUpdate, getAutoCheck }) => {
+          if (!getAutoCheck()) return;
+          checkForUpdate({ force: false }).catch(() => {});
+        }).catch(() => {});
+      });
     }
 
     // Android back button: navigate back or confirm exit
