@@ -486,6 +486,51 @@
   // subscription below (each new entry increments the key once).
   let _weekStripRefreshKey = 0;
 
+  // Runtime-measured sticky-top for the desktop right rail. The static
+  // CSS calc guessed the week-strip height + .diary-content padding,
+  // which drifted a few px across font metrics + DPI + banner state, so
+  // the rail scrolled a smidge before locking. Measuring the aside's
+  // actual natural document top and setting sticky-top to match makes
+  // it stick from the first pixel of scroll on every viewport.
+  //
+  // Init to 0 so the CSS fallback keeps the aside below any sane
+  // sticky-top on first paint — that way `getBoundingClientRect` reads
+  // the true natural position instead of a stuck one. As soon as JS
+  // sets --diary-rail-top, sticky matches natural and there is no drift.
+  let _railStickyTopPx = 0;
+  let _diaryRightColEl = null;
+  let _diaryContentEl  = null;
+  function _measureRailStickyTop() {
+    if (!_diaryRightColEl || !_diaryContentEl) return;
+    // The aside's natural document-top when NOT stuck. If we're stuck
+    // this returns the stuck position (which already equals the previous
+    // sticky-top), so re-measuring is stable and doesn't chase itself.
+    const rect = _diaryRightColEl.getBoundingClientRect();
+    const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
+    const naturalDocTop = rect.top + scrollY;
+    // The CSS is: top = safe-top + --diary-rail-top + hamburger-row.
+    // Solve for --diary-rail-top so the calc equals naturalDocTop.
+    const rootCS = getComputedStyle(document.documentElement);
+    const pageTop = parseFloat(rootCS.getPropertyValue('--page-top') || rootCS.getPropertyValue('--safe-top') || '0') || 0;
+    const hamRow  = parseFloat(rootCS.getPropertyValue('--hamburger-row') || '0') || 0;
+    const next = Math.max(0, Math.round(naturalDocTop - pageTop - hamRow));
+    if (next !== _railStickyTopPx) _railStickyTopPx = next;
+  }
+  let _railResizeObs = null;
+  onMount(() => {
+    // rAF-double to let sticky-var flip to 0, layout settle, then measure.
+    requestAnimationFrame(() => requestAnimationFrame(_measureRailStickyTop));
+    try {
+      _railResizeObs = new ResizeObserver(_measureRailStickyTop);
+      if (_diaryContentEl) _railResizeObs.observe(_diaryContentEl);
+    } catch { /* ResizeObserver unavailable — one-shot measurement stands */ }
+    window.addEventListener('resize', _measureRailStickyTop);
+    return () => {
+      window.removeEventListener('resize', _measureRailStickyTop);
+      try { _railResizeObs?.disconnect(); } catch {}
+    };
+  });
+
   // Polish batch 4: right-rail mode. Two states:
   //   'pinned' — rail always visible in the desktop grid (default)
   //   'hidden' — rail folded out of the grid; a small chevron tab
@@ -1633,11 +1678,12 @@
   </div>
 
   <div
+    bind:this={_diaryContentEl}
     class="page-content diary-content"
     class:rail-notes-active={$diaryRailShowNotes && $diaryShowNotes}
     class:rail-hidden={_railMode === 'hidden'}
     class:day-loading={_daySwapLoading}
-    style="padding-bottom:{contentPad}"
+    style="padding-bottom:{contentPad}; --diary-rail-top:{_railStickyTopPx}px"
   >
     <!-- Main column: meal groups + activities + notes. On desktop
          (≥1280px) this sits inside a 2-col grid alongside the right
@@ -2055,7 +2101,7 @@
          overlay render below can resolve it — Svelte 5 snippets
          have block scope. -->
     {#if _railMode === 'pinned'}
-      <aside class="diary-right-col">
+      <aside class="diary-right-col" bind:this={_diaryRightColEl}>
         {@render railWidgets()}
       </aside>
     {/if}
@@ -3020,15 +3066,21 @@
            padding-top 12 = ~207. Rounded to 210 to soak up antialias
          and font-metric slack across DPIs. */
       position: sticky;
-      top: calc(var(--page-top, var(--safe-top)) + 210px + var(--hamburger-row, 0px));
+      /* --diary-rail-top is set by JS at runtime (see _measureRailStickyTop
+         in Diary.svelte) so the sticky-top matches the aside's actual
+         natural position regardless of font metrics, DPI, or banner state.
+         Fallback matches the static estimate for the pre-measurement
+         first paint (no visible drift because JS measures inside onMount). */
+      top: calc(var(--page-top, var(--safe-top)) + var(--diary-rail-top, 210px) + var(--hamburger-row, 0px));
       align-self: start;
       /* Leave a small margin under the viewport bottom AND account
          for the persistent bottom nav (--nav-h + --safe-bottom) so
          the last widget's action buttons don't get clipped by the
-         nav bar. */
+         nav bar. Offset tracks --diary-rail-top + 10px slack. */
       max-height: calc(100vh
         - var(--page-top, var(--safe-top))
-        - 220px
+        - var(--diary-rail-top, 210px)
+        - 10px
         - var(--hamburger-row, 0px)
         - var(--nav-h, 0px)
         - var(--safe-bottom, 0px));
