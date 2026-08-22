@@ -1696,7 +1696,7 @@
     class:rail-notes-active={$diaryRailShowNotes && $diaryShowNotes}
     class:rail-hidden={_railMode === 'hidden'}
     class:day-loading={_daySwapLoading}
-    style="padding-bottom:{contentPad}; --diary-rail-top:{_railStickyTopPx}px; --diary-rail-left:{_railFixedLeftPx}px; --diary-rail-width:{_railFixedWidthPx}px"
+    style="padding-bottom:{contentPad}"
   >
     <!-- Main column: meal groups + activities + notes. On desktop
          (≥1280px) this sits inside a 2-col grid alongside the right
@@ -2114,7 +2114,20 @@
          overlay render below can resolve it — Svelte 5 snippets
          have block scope. -->
     {#if _railMode === 'pinned'}
-      <aside class="diary-right-col" bind:this={_diaryRightColEl}>
+      <!-- Portaled to document.body so position:fixed resolves against
+           the viewport, not against .page-transition (which has
+           will-change:transform + is the app's scroll container, so
+           fixed children inside it don't stay put). JS keeps the aside
+           aligned to the grid column via --diary-rail-top /
+           --diary-rail-left set on the aside itself (custom properties
+           don't inherit across a portal). Grid still reserves the 360px
+           column because its track size is explicit. -->
+      <aside
+        use:portal
+        class="diary-right-col"
+        bind:this={_diaryRightColEl}
+        style="--diary-rail-top:{_railStickyTopPx}px; --diary-rail-left:{_railFixedLeftPx}px; --diary-rail-width:{_railFixedWidthPx}px"
+      >
         {@render railWidgets()}
       </aside>
     {/if}
