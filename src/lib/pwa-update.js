@@ -48,6 +48,17 @@ export function registerPwaSw() {
     });
 }
 
+/** Force the browser to re-fetch sw.js and check for a new bundle.
+ *  Without this, the browser only checks the SW file once per navigation
+ *  or every 24 hours (whichever comes first), so a long-lived tab would
+ *  never see a fresh deploy. Called on the same cadence as the GitHub-
+ *  tag check + on visibility change (see App.svelte). No-op if the SW
+ *  isn't registered yet (silent). */
+export function checkForPwaUpdate() {
+  if (!_updateSW || isNative) return;
+  try { _updateSW(); } catch (e) { console.warn('[pwa-update] check failed:', e?.message || e); }
+}
+
 /** Activate the waiting service worker and reload. Called by the banner
  *  when the user picks View/Update. No-op if nothing's waiting. */
 export function applyPwaUpdate() {
