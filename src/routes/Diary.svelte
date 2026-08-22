@@ -486,47 +486,60 @@
   // subscription below (each new entry increments the key once).
   let _weekStripRefreshKey = 0;
 
-  // Runtime-measured sticky-top for the desktop right rail. The static
-  // CSS calc guessed the week-strip height + .diary-content padding,
-  // which drifted a few px across font metrics + DPI + banner state, so
-  // the rail scrolled a smidge before locking. Measuring the aside's
-  // actual natural document top and setting sticky-top to match makes
-  // it stick from the first pixel of scroll on every viewport.
+  // Right rail is position:fixed in desktop mode. `sticky` unsticks
+  // when the containing block runs out of vertical room, which the user
+  // saw as "the rail moves near the end of the page". Fixed keeps it
+  // welded to the viewport regardless of scroll position.
   //
-  // Init to 0 so the CSS fallback keeps the aside below any sane
-  // sticky-top on first paint — that way `getBoundingClientRect` reads
-  // the true natural position instead of a stuck one. As soon as JS
-  // sets --diary-rail-top, sticky matches natural and there is no drift.
-  let _railStickyTopPx = 0;
+  // JS measures the rail's natural position + horizontal placement on
+  // mount + resize and pushes both into CSS custom properties. The
+  // grid still reserves the 360px column (explicit track size, not auto)
+  // so the meal content doesn't reflow when the aside leaves the flow.
+  let _railStickyTopPx = 0;   // exposed as --diary-rail-top
+  let _railFixedLeftPx = 0;   // exposed as --diary-rail-left
+  let _railFixedWidthPx = 360; // exposed as --diary-rail-width
   let _diaryRightColEl = null;
   let _diaryContentEl  = null;
-  function _measureRailStickyTop() {
-    if (!_diaryRightColEl || !_diaryContentEl) return;
-    // The aside's natural document-top when NOT stuck. If we're stuck
-    // this returns the stuck position (which already equals the previous
-    // sticky-top), so re-measuring is stable and doesn't chase itself.
-    const rect = _diaryRightColEl.getBoundingClientRect();
+  function _measureRail() {
+    if (!_diaryContentEl) return;
+    // Grid's right edge is where the 360px rail column ends. We anchor
+    // fixed-left there minus the column width so the fixed aside sits
+    // exactly on top of the reserved cell.
+    const gridRect = _diaryContentEl.getBoundingClientRect();
+    const colWidth = _railFixedWidthPx; // 360, the explicit grid track
+    const leftPx = Math.max(0, Math.round(gridRect.right - colWidth));
+
+    // Vertical anchor: the aside's natural top when NOT taken out of
+    // flow. Since we're already position:fixed, we can't read that
+    // directly — read the grid's top + its padding-top instead, which
+    // is where the aside's cell sits.
     const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
-    const naturalDocTop = rect.top + scrollY;
-    // The CSS is: top = safe-top + --diary-rail-top + hamburger-row.
-    // Solve for --diary-rail-top so the calc equals naturalDocTop.
+    const pad = parseFloat(getComputedStyle(_diaryContentEl).paddingTop || '0') || 0;
+    const naturalDocTop = gridRect.top + scrollY + pad;
     const rootCS = getComputedStyle(document.documentElement);
     const pageTop = parseFloat(rootCS.getPropertyValue('--page-top') || rootCS.getPropertyValue('--safe-top') || '0') || 0;
     const hamRow  = parseFloat(rootCS.getPropertyValue('--hamburger-row') || '0') || 0;
-    const next = Math.max(0, Math.round(naturalDocTop - pageTop - hamRow));
-    if (next !== _railStickyTopPx) _railStickyTopPx = next;
+    // We want the fixed aside pinned to the SAME viewport-Y as the
+    // grid's cell-top at scroll=0. Since gridRect.top + scrollY already
+    // gives the document position (constant), just subtract page-top +
+    // hamburger-row so the CSS calc reconstructs the correct viewport
+    // top. Do NOT subtract scrollY again — a fixed element's `top` is
+    // scroll-independent by definition.
+    const topPx = Math.max(0, Math.round(naturalDocTop - pageTop - hamRow));
+    // Only push updates when values change to avoid a reactive storm.
+    if (topPx  !== _railStickyTopPx)  _railStickyTopPx  = topPx;
+    if (leftPx !== _railFixedLeftPx)  _railFixedLeftPx  = leftPx;
   }
   let _railResizeObs = null;
   onMount(() => {
-    // rAF-double to let sticky-var flip to 0, layout settle, then measure.
-    requestAnimationFrame(() => requestAnimationFrame(_measureRailStickyTop));
+    requestAnimationFrame(() => requestAnimationFrame(_measureRail));
     try {
-      _railResizeObs = new ResizeObserver(_measureRailStickyTop);
+      _railResizeObs = new ResizeObserver(_measureRail);
       if (_diaryContentEl) _railResizeObs.observe(_diaryContentEl);
     } catch { /* ResizeObserver unavailable — one-shot measurement stands */ }
-    window.addEventListener('resize', _measureRailStickyTop);
+    window.addEventListener('resize', _measureRail);
     return () => {
-      window.removeEventListener('resize', _measureRailStickyTop);
+      window.removeEventListener('resize', _measureRail);
       try { _railResizeObs?.disconnect(); } catch {}
     };
   });
@@ -1683,7 +1696,7 @@
     class:rail-notes-active={$diaryRailShowNotes && $diaryShowNotes}
     class:rail-hidden={_railMode === 'hidden'}
     class:day-loading={_daySwapLoading}
-    style="padding-bottom:{contentPad}; --diary-rail-top:{_railStickyTopPx}px"
+    style="padding-bottom:{contentPad}; --diary-rail-top:{_railStickyTopPx}px; --diary-rail-left:{_railFixedLeftPx}px; --diary-rail-width:{_railFixedWidthPx}px"
   >
     <!-- Main column: meal groups + activities + notes. On desktop
          (≥1280px) this sits inside a 2-col grid alongside the right
@@ -3054,29 +3067,21 @@
       display: flex;
       flex-direction: column;
       gap: 12px;
-      /* Rail follows the scroll: sticky-positioned below the week
-         strip so widgets stay visible while scrolling meals. If the
-         combined widget stack is taller than the remaining viewport,
-         the rail becomes its own scroll region so all widgets stay
-         reachable via the rail's own scrollbar. Offset matches the
-         actual sum of the stuck ladder above so the rail sticks
-         from the first pixel of scroll instead of drifting ~15px
-         before locking in (#foldable-followup):
-           week-strip sticky-top 120 + strip height ~75 + .diary-content
-           padding-top 12 = ~207. Rounded to 210 to soak up antialias
-         and font-metric slack across DPIs. */
-      position: sticky;
-      /* --diary-rail-top is set by JS at runtime (see _measureRailStickyTop
-         in Diary.svelte) so the sticky-top matches the aside's actual
-         natural position regardless of font metrics, DPI, or banner state.
-         Fallback matches the static estimate for the pre-measurement
-         first paint (no visible drift because JS measures inside onMount). */
+      /* Rail is position:fixed so it stays put through the entire
+         scroll of the page, including near the bottom (where sticky
+         would previously unstick and drift up with the grid).
+         --diary-rail-top / --diary-rail-left / --diary-rail-width are
+         set by JS from the grid's live bounding rect on mount + resize
+         (see _measureRail in Diary.svelte). Grid still reserves the
+         360px column via its explicit track size, so the meal content
+         does not reflow when the aside leaves the flow. */
+      position: fixed;
       top: calc(var(--page-top, var(--safe-top)) + var(--diary-rail-top, 210px) + var(--hamburger-row, 0px));
-      align-self: start;
-      /* Leave a small margin under the viewport bottom AND account
-         for the persistent bottom nav (--nav-h + --safe-bottom) so
-         the last widget's action buttons don't get clipped by the
-         nav bar. Offset tracks --diary-rail-top + 10px slack. */
+      left: var(--diary-rail-left, auto);
+      width: var(--diary-rail-width, 360px);
+      z-index: 5;
+      /* Cap the rail height at the remaining viewport minus the bottom
+         nav so the widget stack scrolls internally if it exceeds that. */
       max-height: calc(100vh
         - var(--page-top, var(--safe-top))
         - var(--diary-rail-top, 210px)
@@ -3106,12 +3111,9 @@
        roots (WaterWidget, WeightWidget, etc.) don't carry Diary's
        scoping hash, so an un-globalized `> *` would fail to match. */
     :global(html:not(.force-mobile-layout)) .diary-right-col > :global(*) { flex-shrink: 0; }
-    /* When the diary shows a banner (announcement), the sticky
-       elements above shift down; keep the rail in sync. */
-    :global(html:not(.force-mobile-layout)) .diary-content.has-banner .diary-right-col {
-      top: calc(var(--page-top, var(--safe-top)) + 272px + var(--hamburger-row, 0px));
-      max-height: calc(100vh - var(--page-top, var(--safe-top)) - 282px - var(--hamburger-row, 0px));
-    }
+    /* Banner shift is handled automatically now: JS measures the grid's
+       live bounding rect and pushes it into --diary-rail-top, so
+       has-banner needs no manual offset override. */
 
     /* Two independent flex-columns. Each meal-col packs its own cards
        top-to-bottom; no cross-column row alignment. A tall breakfast
