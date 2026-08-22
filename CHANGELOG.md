@@ -7,9 +7,39 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [1.2.0-dev06] - 2026-08-21 (pre-release)
+
+Sixth dev pre-release of the 1.2.0 minor. Bug fixes across the community
+issue tracker plus follow-ups on the dev05 comma decimal work.
+
+### Changed
+
+- **AI Assistant: shorter, plain-text answers** ([#163](https://github.com/TraceApps/nutritrace/issues/163)). Default response length is now 2 to 4 sentences instead of paragraphs, and markdown is off so `**bold**` and `##headings` no longer show as literal characters.
+- **Fewer questions before logging** ([#163](https://github.com/TraceApps/nutritrace/issues/163)). A single substring hit in your local foods now auto-logs the same way an exact hit did. Previously it asked which one. The prior 6+ hits bug that silently discarded all local matches is also fixed.
+- **Manual estimate path in the AI Assistant** ([#163](https://github.com/TraceApps/nutritrace/issues/163)). Explicitly asking to skip the database ("don't search, just estimate") now routes to a review card with the estimated nutrition instead of running a catalog search.
+- **Confirmation before clearing the AI chat history.** A single tap used to wipe the whole conversation with no way back.
+- **Settings sidebar sliding highlight** on the desktop rail.
+
 ### Fixed
 
-- **Clearing the Trace chat now asks for confirmation.** A single tap on the header button previously wiped the entire conversation with no way back. Ports the same guard LiftTrace added in [TraceApps/lifttrace#50](https://github.com/TraceApps/lifttrace/pull/50) so behavior stays uniform across the three Trace apps. Also fixes a z-index bug where the confirm dialog opened behind the Trace panel.
+- **Add Activity sheet opens on Android again** ([#162](https://github.com/TraceApps/nutritrace/issues/162)). A missing method on the native backend was throwing before the sheet could render. Also fixed the underlying class of bug (the proxy now surfaces missing methods as a warning + rejected promise instead of a silent crash).
+- **Health Connect no longer overwrites past dates with today's data** ([#161](https://github.com/TraceApps/nutritrace/issues/161)). Viewing an old day and tapping Sync used to write today's steps and weight into that day. The sync now refuses on any non-today view, and the button is hidden there.
+- **Per-metric Health Connect read errors are logged to Diagnostic Logs** ([#161](https://github.com/TraceApps/nutritrace/issues/161)). Silent `catch {}` blocks on ten of the read paths now emit the actual error so wrong record type names surface instead of vanishing.
+- **Clear all items actually clears the meal** ([#169](https://github.com/TraceApps/nutritrace/issues/169)). The bulk clear was filtering items on the client but not telling the server they were deleted, so the server put them right back. Individual delete worked because it emits the tombstone.
+- **Body Stats widget on the diary rail** ([#168](https://github.com/TraceApps/nutritrace/issues/168)). Weight now shows immediately after refresh instead of only after opening the sheet, and clearing the field or entering 0 removes the weight (was silently ignored).
+- **Editor draft no longer leaks between different foods or meals** ([#157](https://github.com/TraceApps/nutritrace/issues/157) follow-up). Every session was writing to the same draft key, so typing while editing food A would appear as pre-filled data when adding a new food. Restored drafts now show a banner with a Discard button, and the photo persists too (moved to IndexedDB so it stops fighting localStorage quota).
+- **Comma decimal separator now works on the remaining number fields** ([#160](https://github.com/TraceApps/nutritrace/issues/160) follow-up). Body Stats sheet, Foods portion + servings prompt, Diary edit sheet, water custom amount, Onboarding wizard, Goals editor, Fasting custom hours, Water container settings, Activity duration and kcal. The dev05 pass missed these.
+
+### Translations
+
+- **Weblate is open for community translations** at [hosted.weblate.org/projects/nutritrace](https://hosted.weblate.org/projects/nutritrace). Contribute a locale (or improve an existing one) without a GitHub round-trip. Direct JSON pull requests still work too. See [CONTRIBUTING.md](CONTRIBUTING.md#translations) for the workflow.
+- Czech translation started via Weblate (early, most strings still fall back to English).
+
+### Security
+
+- No new dependencies. `npm audit` reports 0 vulnerabilities.
 
 ---
 
