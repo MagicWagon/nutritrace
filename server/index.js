@@ -233,8 +233,12 @@ router.get('/api/wellness/latest', (req, res) => {
          ORDER BY date DESC LIMIT 1`
       ).get(userId, metric)
     : db.prepare(
+        // Single-user mode stores wellness rows under two sentinels: the
+        // wearable pollers write 0, the Android sync writes NULL. Reading
+        // only NULL silently hid every poller-sourced metric. Mirrors the
+        // same both-sentinel read in routes/withings.js.
         `SELECT date, value, source FROM wellness_data
-         WHERE user_id IS NULL AND metric_type = ? AND value > 0
+         WHERE (user_id IS NULL OR user_id = 0) AND metric_type = ? AND value > 0
          ORDER BY date DESC LIMIT 1`
       ).get(metric);
   res.json(row || null);
@@ -376,8 +380,22 @@ process.on('uncaughtException', (err) => {
   process.exit(1);
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   logger.info(`NutriTrace ${APP_VERSION} running on port ${PORT}`);
+
+  // One-time repair for instances that enabled user management on a build
+  // where the handover was incomplete (TraceApps/docs#2). No-op once clean.
+  try {
+    const { repairOrphanedData } = await import('./lib/claim-anonymous-data.js');
+    const r = repairOrphanedData();
+    if (r.ambiguous) {
+      logger.warn(`[claim] ${r.rows} row(s) from single-user mode are unowned, but this instance has more than one account so they cannot be attributed automatically. See https://traceapps.github.io/docs/auth/local-users/`);
+    } else if (r.rows) {
+      logger.info(`[claim] adopted ${r.rows} row(s) left over from single-user mode into user ${r.repaired}`);
+    }
+  } catch (e) {
+    logger.warn(`[claim] orphan repair skipped: ${e.message}`);
+  }
 
   // Start the notification + sync scheduler
   import('./lib/scheduler.js').then(({ startScheduler }) => startScheduler()).catch(e => {

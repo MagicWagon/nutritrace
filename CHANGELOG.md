@@ -7,6 +7,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Enabling user management no longer strands data written in single-user mode** ([TraceApps/docs#2](https://github.com/TraceApps/docs/issues/2)). An instance running with no accounts writes every row under a placeholder owner. Registering the first account only re-parented foods, meals and the diary, so the Activity log, fasting sessions, Trace chat history, wearable data (wellness and workouts) and the Fitbit / Google Health / Withings / Garmin connections all became invisible to the new admin. All of them are now claimed, in one transaction. The same handover runs whether the first account is created with a password or by the first OIDC sign-in; both paths now share one implementation instead of keeping separate copies that drifted.
+- **Data left behind in single-user mode is adopted on upgrade.** Instances that already enabled user management on an earlier build had their unowned rows stranded for good, since the handover only ever ran while the first account was being created. Startup now adopts them, once, when exactly one account exists. Zero accounts is ordinary single-user mode and is left alone; two or more is reported in the log rather than guessed at.
+- **Deleting an account no longer leaves its wearable data and OAuth tokens in the database.** `wellness_data`, `workouts` and the Fitbit / Google Health / Withings / Garmin token rows carry no foreign key to `users`, so they survived both the admin delete-user action and self-service account deletion. Live refresh tokens for a deleted account stayed on disk. All four removal paths (self-delete, admin delete, disable user management, lockout recovery) now clear them. Genuinely unowned rows are untouched, since disabling returns the instance to single-user mode where they must stay readable.
+- **`/api/wellness/latest` no longer hides wearable metrics in single-user mode.** It read only the `NULL` owner while the pollers write `0`, so every Fitbit-sourced metric was invisible to that endpoint. Now reads both, matching the equivalent query in `routes/withings.js`. Wearable tables receive two different placeholder owners (the pollers write `0`, the Android sync writes `NULL`) and carry UNIQUE indexes on `user_id`, so the two sets are merged rather than colliding and aborting the registration. The same incomplete list existed a second time in the OIDC first-login bootstrap, so an instance whose first account arrives via SSO had the identical bug; both paths now share one implementation.
+
 ---
 
 ## [1.2.0] - 2026-08-23
