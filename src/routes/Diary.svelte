@@ -359,7 +359,28 @@
   // or item-nutrition changes so the strip's daily-totals cache stays
   // in sync with what the user just logged. `_weekStripSig` is a cheap
   // digest string that changes on any meaningful diary mutation.
-  $: _weekStripSig = `${$currentDate}|${(entry.items || []).length}|${(entry.water || []).length}`;
+  //
+  // Includes a running sum of per-item scaled calories so an EDIT
+  // (portion, quantity, unit swap) that leaves the item count the same
+  // still bumps the signature. Without this, changing a serving size
+  // updated the diary total instantly but left the week strip showing
+  // the pre-edit calorie ring for that day until reload / tab-switch
+  // (#168 followup on drekkym's report).
+  $: _weekStripSig = (() => {
+    const items = entry.items || [];
+    const water = entry.water || [];
+    let kcalSum = 0;
+    for (const it of items) {
+      const base = it.nutrition?.calories || 0;
+      const portion = it.portion || 100;
+      const basis  = it.portion_basis || 100;
+      const qty    = it.quantity || 1;
+      kcalSum += base * (portion / basis) * qty;
+    }
+    let mlSum = 0;
+    for (const w of water) mlSum += Number(w.amount) || 0;
+    return `${$currentDate}|${items.length}|${water.length}|${Math.round(kcalSum)}|${Math.round(mlSum)}`;
+  })();
   $: if (_weekStripSig) { _weekStripRefreshKey = (_weekStripRefreshKey + 1); }
 
   // Nutrition Summary drill-down: tap a nutrient row → show top contributing
