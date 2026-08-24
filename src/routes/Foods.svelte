@@ -1148,6 +1148,29 @@
     manageMode = false;
     manageSelected = new Set();
   }
+  // #175 (nomad64) — bulk-select helpers on the manage bar. Both target
+  // `filteredList` so they respect the user's current source / category /
+  // search filters, giving a scoped bulk-clean rather than a database
+  // nuke. Select None does NOT drop out of manage mode (the exit-on-empty
+  // auto-exit only fires from the per-item toggle path).
+  function selectAllVisible() {
+    if (!manageMode) return;
+    const next = new Set(manageSelected);
+    for (const f of (filteredList || [])) {
+      if (f?.id != null) next.add(f.id);
+    }
+    manageSelected = next;
+  }
+  function selectNoneVisible() {
+    if (!manageMode) return;
+    manageSelected = new Set();
+  }
+  // Reactive helpers for enabling / labelling the buttons.
+  $: _visibleManageableIds = (filteredList || [])
+    .filter(f => f?.id != null)
+    .map(f => f.id);
+  $: _allVisibleSelected = _visibleManageableIds.length > 0
+    && _visibleManageableIds.every(id => manageSelected.has(id));
   async function confirmBulkDelete() {
     if (bulkDeleting || manageSelected.size === 0) return;
     bulkDeleting = true;
@@ -1671,6 +1694,18 @@
     <div use:portal class="foods-topbar-actions">
       <button class="btn-icon" on:click={exitManageMode} aria-label="Cancel selection" title="Cancel">
         <span class="material-symbols-rounded">close</span>
+      </button>
+      <button class="btn-icon"
+        disabled={_visibleManageableIds.length === 0 || _allVisibleSelected || bulkDeleting}
+        on:click={selectAllVisible}
+        aria-label="Select all visible" title="Select all">
+        <span class="material-symbols-rounded">select_all</span>
+      </button>
+      <button class="btn-icon"
+        disabled={manageSelected.size === 0 || bulkDeleting}
+        on:click={selectNoneVisible}
+        aria-label="Select none" title="Select none">
+        <span class="material-symbols-rounded">deselect</span>
       </button>
       <button class="btn-icon" style="color:var(--danger)"
         disabled={manageSelected.size === 0 || bulkDeleting}
