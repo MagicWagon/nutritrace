@@ -2282,7 +2282,7 @@
          nutrition / actions markup renders in both places. Empty
          state prompts when nothing is selected. Only visible at
          ≥1440px via CSS; mobile continues to use the modal sheet. -->
-    {#if _foodsPaneMode}
+    {#if _foodsPaneMode && !manageMode}
     <aside
       use:portal
       class="foods-detail-pane"
@@ -3590,12 +3590,11 @@
   }
 
   /* Phase D — manage-mode top-right portaled action bar shifts
-     left on desktop to clear the detail pane (420 pane + 20 gap
-     + 12 right inset + a little slack). Below 1440 the pane isn't
-     rendered so the original right:12 anchor still works. */
-  @media (min-width: 1440px) {
-    :global(html:not(.force-mobile-layout)) :global(.foods-topbar-actions) {
-      right: 452px;
-    }
-  }
+     detail pane is now hidden entirely when manageMode is on (the
+     pane isn't interactive during selection anyway — tapping a food
+     toggles its checkbox, not the preview), so the manage-bar buttons
+     get the right edge to themselves at every viewport width. Prior
+     override that inset them 452px to clear the pane is no longer
+     needed and was making the buttons look adrift in the middle
+     of wide screens on the user's report. */
 </style>
