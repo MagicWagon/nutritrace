@@ -100,6 +100,22 @@
   let editUnit         = 'g';
   let editQuantity     = 1;     // number of servings — drives nutrition calc
   let showEditSheet    = false;
+  // Autofocus + Enter-submit for the edit-item sheet (#170). Same pattern
+  // as the qty-prompt sheet: on open, focus the first numeric input inside
+  // the sheet root, and any Enter (outside a textarea / select) commits
+  // the edit. Works for both the food branch (portion input first) and
+  // the quick_calories branch (kcal input first).
+  let _editSheetEl = null;
+  $: if (showEditSheet) tick().then(() => {
+    _editSheetEl?.querySelector('input[inputmode="numeric"], input[inputmode="decimal"]')?.focus();
+  });
+  function _onEditSheetKey(e) {
+    if (e.key !== 'Enter') return;
+    const t = e.target;
+    if (t && (t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return;
+    e.preventDefault();
+    saveEditItem();
+  }
   // Quick Calories edit fields. Mirror QuickCaloriesSheet's create flow so
   // the user can change kcal / name / optional macros after the entry is in
   // the diary. Serving Size / Number of Servings / Unit don't apply to
@@ -2446,7 +2462,7 @@
 <!-- Edit item sheet -->
 <Sheet bind:open={showEditSheet} title={editItem ? editItem.name : ''} on:close={() => showEditSheet = false}>
   {#if editItem}
-    <div class="edit-sheet-body">
+    <div class="edit-sheet-body" bind:this={_editSheetEl} on:keydown={_onEditSheetKey}>
       {#if editItem.type === 'quick_calories'}
         <!-- Quick Calories edit — mirrors the create sheet (kcal pill + 3-up
              macros + optional name). No Serving Size / Unit / Number of

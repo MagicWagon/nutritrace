@@ -402,6 +402,20 @@
   let showDeleteDialog = false;
   let scannerOpen = false;
   let showQtyPrompt = false;
+  let _qtyPromptPortionEl = null;
+  // Autofocus the portion input the moment the qty-prompt sheet opens
+  // so a user tapping "Add to Diary" on a food can start typing quantity
+  // immediately instead of tapping the field first. #170.
+  $: if (showQtyPrompt) tick().then(() => _qtyPromptPortionEl?.focus());
+  // Enter anywhere in the sheet submits (mirrors QuickCalories + water
+  // custom + activity flows). Guarded to not fire inside a select/textarea.
+  function _onQtyPromptKey(e) {
+    if (e.key !== 'Enter') return;
+    const t = e.target;
+    if (t && (t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return;
+    e.preventDefault();
+    if (!_addingToDiary) confirmQtyPrompt();
+  }
   let promptFood = null;
   let promptServings = 1;
   let promptPortion = 100;
@@ -460,6 +474,20 @@
   let selectedFoods = new Set();      // Set<food object reference>
   let showMultiPortionSheet = false;
   let multiPortionItems = [];         // [{ food, portion, unit, servings }]
+  let _multiPortionSheetEl = null;
+  // Same autofocus + Enter-submit treatment as the single qty prompt (#170).
+  // Query the first portion input inside the sheet root after mount so we
+  // don't have to bind ref per-item — cleaner with the {#each} loop.
+  $: if (showMultiPortionSheet) tick().then(() => {
+    _multiPortionSheetEl?.querySelector('input[type="text"][inputmode="decimal"]')?.focus();
+  });
+  function _onMultiPortionKey(e) {
+    if (e.key !== 'Enter') return;
+    const t = e.target;
+    if (t && (t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return;
+    e.preventDefault();
+    if (!multiAdding) confirmMultiPortionSheet();
+  }
   let multiAdding = false;
   // Guards every add-to-diary path (single, direct-click, meal expand, copy).
   // Without it, a mash-click during a slow write fires the add N times and
@@ -2303,7 +2331,7 @@
 
 <!-- Multi-item portion sheet -->
 <Sheet bind:open={showMultiPortionSheet} title={$_('foods.multi_portion_sheet', { values: { count: multiPortionItems.length } })}>
-  <div style="display:flex;flex-direction:column;gap:0;padding-top:4px">
+  <div bind:this={_multiPortionSheetEl} style="display:flex;flex-direction:column;gap:0;padding-top:4px" on:keydown={_onMultiPortionKey}>
     {#each multiPortionItems as item, i}
       {#if i > 0}<div style="height:1px;background:var(--border);margin:12px 0"></div>{/if}
       <div style="display:flex;flex-direction:column;gap:10px">
@@ -2356,7 +2384,7 @@
 
 <!-- Quantity prompt sheet -->
 <Sheet bind:open={showQtyPrompt} title={promptFood ? promptFood.name : 'Add to Diary'}>
-  <div style="display:flex;flex-direction:column;gap:16px;padding-top:8px">
+  <div style="display:flex;flex-direction:column;gap:16px;padding-top:8px" on:keydown={_onQtyPromptKey}>
     <!-- Issues #69 + #70: surface the OFF nutrition basis so users know
          whether values are per-100-g or per-100-ml at a glance. Gated on
          the showUnitMetadata opt-in (or the warn-about-conversions toggle
@@ -2390,7 +2418,8 @@
     <div style="display:flex;gap:12px">
       <div style="flex:1">
         <label class="form-label" style="font-size:11px;color:var(--text-3);display:block;margin-bottom:6px">{$_('foods_deep.serving_size')}</label>
-        <input class="input" type="text" inputmode="decimal" use:decimalInput bind:value={promptPortion}
+        <input class="input" type="text" inputmode="decimal" use:decimalInput
+          bind:value={promptPortion} bind:this={_qtyPromptPortionEl}
           style="font-size:16px;width:100%" />
       </div>
       <div style="width:100px">
