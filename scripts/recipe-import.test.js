@@ -1,10 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import http from 'node:http';
+import { readFileSync } from 'node:fs';
 
 import { parseIngredientLine } from '../server/lib/recipe-import/ingredient-line.js';
 import { extractJsonLdBlocks, parseRecipeJsonLd } from '../server/lib/recipe-import/jsonld.js';
-import { fetchRecipePage, isBlockedAddress, validateRecipeUrl } from '../server/lib/recipe-import/fetch-page.js';
+import { createPinnedLookup, fetchRecipePage, isBlockedAddress, requestPinned, validateRecipeUrl } from '../server/lib/recipe-import/fetch-page.js';
 import { resolveAmountFactor } from '../server/lib/recipe-import/amount.js';
+import { prepareRecipeImportDraft } from '../src/lib/recipe-import-draft.js';
 
 test('ingredient parser handles mixed fractions, ranges, packages, units, and notes', () => {
   assert.deepEqual(parseIngredientLine('1 1/2 cups all-purpose flour, sifted'), {
@@ -100,6 +103,56 @@ test('fetcher refuses a hostname when any DNS answer is private', async () => {
     { address: '127.0.0.1', family: 4 },
   ];
   await assert.rejects(fetchRecipePage('https://example.test', { resolver, requester: async () => assert.fail('request must not run') }), error => error.code === 'blocked_host');
+});
+
+test('pinned lookup supports scalar and all-address Node callback modes', async () => {
+  const lookup = createPinnedLookup({ address: '93.184.216.34', family: 4 });
+  const scalar = await new Promise((resolve, reject) => lookup('example.test', {}, (error, address, family) => error ? reject(error) : resolve({ address, family })));
+  const all = await new Promise((resolve, reject) => lookup('example.test', { all: true }, (error, addresses) => error ? reject(error) : resolve(addresses)));
+  assert.deepEqual(scalar, { address: '93.184.216.34', family: 4 });
+  assert.deepEqual(all, [{ address: '93.184.216.34', family: 4 }]);
+});
+
+test('pinned requester works with the active Node address-selection behavior', async t => {
+  const server = http.createServer((_request, response) => {
+    response.writeHead(200, { 'Content-Type': 'text/html' });
+    response.end('<!doctype html><html></html>');
+  });
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  t.after(() => new Promise(resolve => server.close(resolve)));
+
+  const { port } = server.address();
+  const response = await requestPinned(
+    new URL(`http://recipe.example:${port}/`),
+    { address: '127.0.0.1', family: 4 },
+    { timeoutMs: 2_000, maxCompressedBytes: 1_024 }
+  );
+  assert.equal(response.status, 200);
+  assert.match(response.body.toString('utf8'), /<!doctype html>/);
+});
+
+test('recipe import drafts validate recipes and clamp persisted selection', () => {
+  const recipe = { name: 'Mealie Soup', ingredients: [], instructions: [] };
+  const draft = { source: 'mealie', recipes: [recipe], warnings: [] };
+  assert.deepEqual(prepareRecipeImportDraft(draft, 99), { result: draft, selectedIndex: 0, recipe });
+  assert.equal(prepareRecipeImportDraft(draft, -3).selectedIndex, 0);
+  assert.equal(prepareRecipeImportDraft(null), null);
+  assert.equal(prepareRecipeImportDraft({ recipes: [] }), null);
+  assert.equal(prepareRecipeImportDraft({ recipes: [null] }), null);
+  assert.equal(prepareRecipeImportDraft({ recipes: [{ name: 'No image', ingredients: [] }] }).recipe.images, undefined);
+});
+
+test('recipe import UI restores drafts safely and Back always returns to Foods', () => {
+  const source = readFileSync(new URL('../src/routes/RecipeImport.svelte', import.meta.url), 'utf8');
+  assert.match(source, /const transientDraft = editorState\.recipeImportDraft/);
+  assert.match(source, /!transientDraft && Array\.isArray\(saved\?\.resolutions\)/);
+  assert.match(source, /restoringDraft/);
+  assert.match(source, /recipe\?\.images\?\.\[0\]/);
+  assert.match(source, /on:click=\{\(\) => push\('\/foods'\)\}/);
+  assert.doesNotMatch(source, /\bpop\(\)/);
 });
 
 test('amount resolution converts mass and food-aware volume/count without guessing', () => {

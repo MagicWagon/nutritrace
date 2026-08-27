@@ -72,7 +72,17 @@ function decodeBody(buffer, encoding, maxBytes) {
   }
 }
 
-function requestPinned(url, pinned, options) {
+export function createPinnedLookup(pinned) {
+  return function pinnedLookup(_hostname, lookupOptions, callback) {
+    if (lookupOptions?.all) {
+      callback(null, [{ address: pinned.address, family: pinned.family }]);
+      return;
+    }
+    callback(null, pinned.address, pinned.family);
+  };
+}
+
+export function requestPinned(url, pinned, options) {
   const transport = url.protocol === 'https:' ? https : http;
   return new Promise((resolve, reject) => {
     const request = transport.request(url, {
@@ -82,9 +92,9 @@ function requestPinned(url, pinned, options) {
         Accept: 'text/html,application/xhtml+xml;q=0.9',
         'Accept-Encoding': 'gzip, deflate, br',
       },
-      lookup(_hostname, _lookupOptions, callback) {
-        callback(null, pinned.address, pinned.family);
-      },
+      family: pinned.family,
+      autoSelectFamily: false,
+      lookup: createPinnedLookup(pinned),
       servername: url.hostname,
       timeout: options.timeoutMs,
     }, response => {

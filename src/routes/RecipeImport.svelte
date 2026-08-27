@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { push, pop } from 'svelte-spa-router';
+  import { push } from 'svelte-spa-router';
   import { _ } from 'svelte-i18n';
   import { NtApi, API, USDA } from '../lib/api.js';
   import { isNative, getServerUrl } from '../lib/platform.js';
@@ -8,6 +8,7 @@
   import { editorState } from '../stores/editorState.js';
   import { offEnabled, usdaEnabled, usdaApiKey } from '../stores/settings.js';
   import { unitToGrams, unitSystem } from '../lib/units.js';
+  import { prepareRecipeImportDraft } from '../lib/recipe-import-draft.js';
 
   let url = '';
   let loading = false;
@@ -17,23 +18,37 @@
   let foods = [];
   let resolutions = [];
   let conflict = null;
+  let restoringDraft = true;
   const DRAFT_KEY = 'nt:recipe-import-draft:v1';
   const serverRequired = isNative && !getServerUrl();
 
   onMount(async () => {
-    let pending = editorState.recipeImportDraft;
-    if (!pending) {
-      try { pending = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null')?.result || null; } catch {}
-    }
-    if (!pending) return;
-    result = pending;
-    editorState.recipeImportDraft = null;
-    foods = await NtApi.getFoods().catch(() => []);
+    const transientDraft = editorState.recipeImportDraft;
+    let pending = transientDraft;
     let saved = null;
     try { saved = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch {}
-    selectedIndex = Math.min(Number(saved?.selectedIndex) || 0, result.recipes.length - 1);
-    if (Array.isArray(saved?.resolutions) && saved.resolutions.length === result.recipes[selectedIndex]?.ingredients?.length) resolutions = saved.resolutions;
-    else initializeResolutions(result.recipes[selectedIndex]);
+    if (!pending) {
+      pending = saved?.result || null;
+    }
+    editorState.recipeImportDraft = null;
+    const prepared = prepareRecipeImportDraft(pending, transientDraft ? 0 : saved?.selectedIndex);
+    if (!prepared) {
+      if (pending) {
+        try { localStorage.removeItem(DRAFT_KEY); } catch {}
+      }
+      restoringDraft = false;
+      return;
+    }
+
+    foods = await NtApi.getFoods().catch(() => []);
+    selectedIndex = prepared.selectedIndex;
+    if (!transientDraft && Array.isArray(saved?.resolutions) && saved.resolutions.length === prepared.recipe.ingredients?.length) {
+      resolutions = saved.resolutions;
+    } else {
+      initializeResolutions(prepared.recipe);
+    }
+    result = prepared.result;
+    restoringDraft = false;
   });
 
   $: recipe = result?.recipes?.[selectedIndex] || null;
@@ -232,7 +247,7 @@
 
 <div class="page-shell recipe-import-page">
   <header class="page-header">
-    <button class="btn-icon" on:click={() => pop()} aria-label={$_('recipe_import.back')} title={$_('recipe_import.back')}>
+    <button class="btn-icon" on:click={() => push('/foods')} aria-label={$_('recipe_import.back')} title={$_('recipe_import.back')}>
       <span class="material-symbols-rounded">arrow_back</span>
     </button>
     <h1>{$_('recipe_import.title')}</h1>
@@ -247,7 +262,12 @@
         <p>{$_('recipe_import.server_body')}</p>
         <button class="btn btn-primary" on:click={() => push('/settings/serverConnection')}>{$_('recipe_import.server_action')}</button>
       </section>
-    {:else if !result}
+    {:else if restoringDraft}
+      <section class="card state-card">
+        <span class="material-symbols-rounded state-icon spin">refresh</span>
+        <p>{$_('recipe_import.reading')}</p>
+      </section>
+    {:else if !result || !recipe}
       <section class="card import-card">
         <h2>{$_('recipe_import.webpage')}</h2>
         <p class="text-3">{$_('recipe_import.webpage_help')}</p>
@@ -276,7 +296,7 @@
       {/if}
 
       <section class="card recipe-summary">
-        {#if recipe.images?.[0]}<img src={recipe.images[0]} alt="" on:error={event => event.currentTarget.style.display = 'none'} />{/if}
+        {#if recipe?.images?.[0]}<img src={recipe.images[0]} alt="" on:error={event => event.currentTarget.style.display = 'none'} />{/if}
         <div>
           <h2>{recipe.name}</h2>
           {#if recipe.author}<p>{$_('recipe_import.by', { values: { author: recipe.author } })}</p>{/if}
