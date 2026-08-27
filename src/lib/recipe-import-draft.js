@@ -1,3 +1,5 @@
+export const RECIPE_IMPORT_DRAFT_KEY = 'nt:recipe-import-draft:v1';
+
 export function prepareRecipeImportDraft(draft, savedIndex = 0) {
   if (!draft || !Array.isArray(draft.recipes)) return null;
 
@@ -10,4 +12,20 @@ export function prepareRecipeImportDraft(draft, savedIndex = 0) {
   const result = recipes.length === draft.recipes.length ? draft : { ...draft, recipes };
 
   return { result, selectedIndex, recipe: recipes[selectedIndex] };
+}
+
+export function persistRecipeImportDraft(storage, draft, selectedIndex = 0, resolutions = []) {
+  const prepared = prepareRecipeImportDraft(draft, selectedIndex);
+  if (!storage || !prepared) return false;
+
+  try {
+    storage.setItem(RECIPE_IMPORT_DRAFT_KEY, JSON.stringify({
+      result: prepared.result,
+      selectedIndex: prepared.selectedIndex,
+      resolutions: Array.isArray(resolutions) ? resolutions : [],
+    }));
+    return true;
+  } catch {
+    return false;
+  }
 }

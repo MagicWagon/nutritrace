@@ -7,7 +7,7 @@ import { parseIngredientLine } from '../server/lib/recipe-import/ingredient-line
 import { extractJsonLdBlocks, parseRecipeJsonLd } from '../server/lib/recipe-import/jsonld.js';
 import { createPinnedLookup, fetchRecipePage, isBlockedAddress, requestPinned, validateRecipeUrl } from '../server/lib/recipe-import/fetch-page.js';
 import { resolveAmountFactor } from '../server/lib/recipe-import/amount.js';
-import { prepareRecipeImportDraft } from '../src/lib/recipe-import-draft.js';
+import { persistRecipeImportDraft, prepareRecipeImportDraft, RECIPE_IMPORT_DRAFT_KEY } from '../src/lib/recipe-import-draft.js';
 
 test('ingredient parser handles mixed fractions, ranges, packages, units, and notes', () => {
   assert.deepEqual(parseIngredientLine('1 1/2 cups all-purpose flour, sifted'), {
@@ -143,6 +143,29 @@ test('recipe import drafts validate recipes and clamp persisted selection', () =
   assert.equal(prepareRecipeImportDraft({ recipes: [] }), null);
   assert.equal(prepareRecipeImportDraft({ recipes: [null] }), null);
   assert.equal(prepareRecipeImportDraft({ recipes: [{ name: 'No image', ingredients: [] }] }).recipe.images, undefined);
+});
+
+test('Mealie handoff persists a review draft before route navigation', () => {
+  const values = new Map();
+  const storage = {
+    setItem(key, value) { values.set(key, value); },
+    getItem(key) { return values.get(key) ?? null; },
+  };
+  const recipe = { name: 'Mealie Soup', ingredients: [], instructions: [] };
+  const draft = { source: 'mealie', recipes: [recipe], warnings: [] };
+
+  assert.equal(persistRecipeImportDraft(storage, draft), true);
+  assert.deepEqual(JSON.parse(storage.getItem(RECIPE_IMPORT_DRAFT_KEY)), {
+    result: draft,
+    selectedIndex: 0,
+    resolutions: [],
+  });
+  assert.equal(persistRecipeImportDraft(storage, { recipes: [] }), false);
+
+  const foodsSource = readFileSync(new URL('../src/routes/Foods.svelte', import.meta.url), 'utf8');
+  const persistAt = foodsSource.indexOf('persistRecipeImportDraft(localStorage, draft)');
+  const navigateAt = foodsSource.indexOf("push('/recipe-import')", persistAt);
+  assert.ok(persistAt >= 0 && navigateAt > persistAt);
 });
 
 test('recipe import UI restores drafts safely and Back always returns to Foods', () => {

@@ -22,6 +22,7 @@
   import { API, USDA, NtApi } from '../lib/api.js';
   import { Nutrition } from '../lib/nutrition.js';
   import { Mealie } from '../lib/mealieApi.js';
+  import { persistRecipeImportDraft } from '../lib/recipe-import-draft.js';
   import { resolveAssetUrl } from '../lib/platform.js';
   import { offCountryTagToFlag, offCountryTagToName } from '../lib/off-country-flag.js';
   import { foodsShowThumbnails, foodsShowCategories, foodsShowLabels, foodsShowNotes, foodsSort, mealsSort, recipesSort, foodCategories, foodsShowYesterdayMeals, foodsYesterdayCollapsed, foodsSavedCollapsed, mealNames, usdaEnabled, usdaApiKey, offEnabled, offSearchCountry, offSearchLanguage, foodsDefaultSource, catName as _catName, catDisplay as _catDisplay, pageBanners, bannerStyle, energyUnit } from '../stores/settings.js';
@@ -802,7 +803,11 @@
       const full = await Mealie.getRecipe(summary.slug);
       if (!full) { showError('Could not load recipe from Mealie'); return; }
       const mapped = await Mealie.normalizeRecipeTree(full);
-      editorState.recipeImportDraft = { source: 'mealie', source_url: mapped.source_url, recipes: [mapped], warnings: [] };
+      const draft = { source: 'mealie', source_url: mapped.source_url, recipes: [mapped], warnings: [] };
+      // Persist before changing routes. The in-memory handoff is the fast path,
+      // while storage keeps the review intact if routing remounts or reloads.
+      persistRecipeImportDraft(localStorage, draft);
+      editorState.recipeImportDraft = draft;
       push('/recipe-import');
     } catch(e) {
       showError('Failed to import from Mealie');

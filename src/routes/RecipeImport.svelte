@@ -8,7 +8,7 @@
   import { editorState } from '../stores/editorState.js';
   import { offEnabled, usdaEnabled, usdaApiKey } from '../stores/settings.js';
   import { unitToGrams, unitSystem } from '../lib/units.js';
-  import { prepareRecipeImportDraft } from '../lib/recipe-import-draft.js';
+  import { prepareRecipeImportDraft, persistRecipeImportDraft, RECIPE_IMPORT_DRAFT_KEY } from '../lib/recipe-import-draft.js';
 
   let url = '';
   let loading = false;
@@ -19,14 +19,13 @@
   let resolutions = [];
   let conflict = null;
   let restoringDraft = true;
-  const DRAFT_KEY = 'nt:recipe-import-draft:v1';
   const serverRequired = isNative && !getServerUrl();
 
   onMount(async () => {
     const transientDraft = editorState.recipeImportDraft;
     let pending = transientDraft;
     let saved = null;
-    try { saved = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch {}
+    try { saved = JSON.parse(localStorage.getItem(RECIPE_IMPORT_DRAFT_KEY) || 'null'); } catch {}
     if (!pending) {
       pending = saved?.result || null;
     }
@@ -34,7 +33,7 @@
     const prepared = prepareRecipeImportDraft(pending, transientDraft ? 0 : saved?.selectedIndex);
     if (!prepared) {
       if (pending) {
-        try { localStorage.removeItem(DRAFT_KEY); } catch {}
+        try { localStorage.removeItem(RECIPE_IMPORT_DRAFT_KEY); } catch {}
       }
       restoringDraft = false;
       return;
@@ -54,7 +53,7 @@
   $: recipe = result?.recipes?.[selectedIndex] || null;
   $: unresolvedReady = resolutions.every(row => (row.foodId != null && !conversionRequired(row)) || row.acknowledged);
   $: if (result && typeof localStorage !== 'undefined') {
-    try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ result, selectedIndex, resolutions })); } catch {}
+    persistRecipeImportDraft(localStorage, result, selectedIndex, resolutions);
   }
 
   function normalizeName(value) {
@@ -230,7 +229,7 @@
           },
         })),
       });
-      try { localStorage.removeItem(DRAFT_KEY); } catch {}
+      try { localStorage.removeItem(RECIPE_IMPORT_DRAFT_KEY); } catch {}
       showSuccess(mode === 'update' ? $_('recipe_import.updated') : $_('recipe_import.success'));
       editorState.foodsActiveTab = 2;
       editorState.mealIsRecipe = true;
