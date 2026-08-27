@@ -777,7 +777,15 @@ const _NtApiHttp = {
       cache: 'no-store',
       body: isUpload ? body : body != null ? JSON.stringify(body) : undefined,
     });
-    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `API error ${res.status}`); }
+    if (!res.ok) {
+      const payload = await res.json().catch(() => ({}));
+      const error = new Error(payload.error || `API error ${res.status}`);
+      error.status = res.status;
+      error.code = payload.code;
+      error.details = payload.details;
+      error.existingId = payload.existing_id;
+      throw error;
+    }
     return res.json();
   },
 
@@ -832,6 +840,11 @@ const _NtApiHttp = {
   shareMeal(id, visibility, user_ids) { return this.patch(`/api/meals/${id}/share`, { visibility, user_ids }); },
   async copyMeal(id)              { const r = await this.post(`/api/meals/${id}/copy`, {}); return this._mealFromApi(r); },
   markMealUsed(id, date)          { return this.post(`/api/meals/${id}/used`, { date }); },
+  previewRecipeUrl(url)           { return this.post('/api/recipes/import/preview', { url }); },
+  async commitRecipeImport(payload) {
+    const r = await this.post('/api/recipes/import/commit', payload);
+    return this._mealFromApi(r);
+  },
 
   // Users list for sharing picker (non-admin, returns peers only)
   getUsersList()                  { return this.get('/api/auth/users/list'); },

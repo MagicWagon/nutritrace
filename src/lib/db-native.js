@@ -42,6 +42,7 @@ const SCHEMA = `
     nutrition_basis TEXT DEFAULT NULL,
     alt_units       TEXT DEFAULT NULL,
     density_g_ml    REAL DEFAULT NULL,
+    external_refs   TEXT DEFAULT NULL,
     created_at      TEXT DEFAULT (datetime('now')),
     updated_at      TEXT DEFAULT (datetime('now')),
     deleted_at      TEXT DEFAULT NULL,
@@ -66,6 +67,8 @@ const SCHEMA = `
     favorite     INTEGER NOT NULL DEFAULT 0,
     usage_count  INTEGER NOT NULL DEFAULT 0,
     last_used_at TEXT DEFAULT NULL,
+    recipe_details TEXT DEFAULT NULL,
+    external_refs  TEXT DEFAULT NULL,
     created_at   TEXT DEFAULT (datetime('now')),
     updated_at   TEXT DEFAULT (datetime('now')),
     deleted_at   TEXT DEFAULT NULL,
@@ -284,8 +287,20 @@ async function _applySchema(db) {
     if (!cols.includes('density_g_ml')) {
       await db.execute(`ALTER TABLE foods ADD COLUMN density_g_ml REAL DEFAULT NULL`);
     }
+    if (!cols.includes('external_refs')) {
+      await db.execute(`ALTER TABLE foods ADD COLUMN external_refs TEXT DEFAULT NULL`);
+    }
   } catch (e) {
     console.debug('[db-native] foods OFF-units migration skipped:', e?.message);
+  }
+
+  try {
+    const info = await db.query(`PRAGMA table_info(meals)`);
+    const cols = (info?.values || []).map(r => r.name);
+    if (!cols.includes('recipe_details')) await db.execute(`ALTER TABLE meals ADD COLUMN recipe_details TEXT DEFAULT NULL`);
+    if (!cols.includes('external_refs')) await db.execute(`ALTER TABLE meals ADD COLUMN external_refs TEXT DEFAULT NULL`);
+  } catch (e) {
+    console.debug('[db-native] recipe metadata migration skipped:', e?.message);
   }
 
   // activity_log.met + is_template — issue #77 (2024 Compendium picker).
@@ -584,8 +599,8 @@ function _serializeAltUnits(v) {
 export async function dbCreateFood(data) {
   const db = await getDb();
   const r = await db.run(
-    `INSERT INTO foods (user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, nutrition_basis, alt_units, density_g_ml, updated_at, sync_status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+    `INSERT INTO foods (user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, nutrition_basis, alt_units, density_g_ml, external_refs, updated_at, sync_status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
     [
       LOCAL_USER_ID,
       data.name,
@@ -602,6 +617,7 @@ export async function dbCreateFood(data) {
       data.density_g_ml != null && Number.isFinite(Number(data.density_g_ml))
         ? Number(data.density_g_ml)
         : null,
+      data.external_refs ? JSON.stringify(data.external_refs) : null,
       _now(),
     ]
   );
@@ -611,7 +627,7 @@ export async function dbCreateFood(data) {
 export async function dbUpdateFood(id, data) {
   const db = await getDb();
   await db.run(
-    `UPDATE foods SET name=?, brand=?, nutrition=?, portion=?, unit=?, img_url=?, notes=?, category=?, barcode=?, nutrition_basis=?, alt_units=?, density_g_ml=?, updated_at=?, sync_status='pending'
+    `UPDATE foods SET name=?, brand=?, nutrition=?, portion=?, unit=?, img_url=?, notes=?, category=?, barcode=?, nutrition_basis=?, alt_units=?, density_g_ml=?, external_refs=?, updated_at=?, sync_status='pending'
      WHERE id=? AND user_id=?`,
     [
       data.name,
@@ -628,6 +644,7 @@ export async function dbUpdateFood(id, data) {
       data.density_g_ml != null && Number.isFinite(Number(data.density_g_ml))
         ? Number(data.density_g_ml)
         : null,
+      data.external_refs ? JSON.stringify(data.external_refs) : null,
       _now(),
       id,
       LOCAL_USER_ID,
@@ -678,6 +695,7 @@ function _parseFoodRow(row) {
     // Issues #69 + #70: parse alt_units JSON; basis + density pass through.
     // Defaults to [] so consumers can iterate without null-checking.
     alt_units: _parseJson(row.alt_units, []),
+    external_refs: _parseJson(row.external_refs, []),
   };
 }
 
@@ -702,8 +720,8 @@ export async function dbGetMeal(id) {
 export async function dbCreateMeal(data) {
   const db = await getDb();
   const r = await db.run(
-    `INSERT INTO meals (user_id, name, nutrition, items, img_url, notes, is_recipe, portion, unit, servings, updated_at, sync_status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+    `INSERT INTO meals (user_id, name, nutrition, items, img_url, notes, is_recipe, portion, unit, servings, recipe_details, external_refs, updated_at, sync_status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
     [
       LOCAL_USER_ID,
       data.name,
@@ -715,6 +733,8 @@ export async function dbCreateMeal(data) {
       data.portion ?? 100,
       data.unit || 'g',
       data.servings != null ? Math.max(1, parseInt(data.servings) || 1) : null,
+      data.recipe_details ? JSON.stringify(data.recipe_details) : null,
+      data.external_refs ? JSON.stringify(data.external_refs) : null,
       _now(),
     ]
   );
@@ -724,7 +744,7 @@ export async function dbCreateMeal(data) {
 export async function dbUpdateMeal(id, data) {
   const db = await getDb();
   await db.run(
-    `UPDATE meals SET name=?, nutrition=?, items=?, img_url=?, notes=?, is_recipe=?, portion=?, unit=?, servings=?, updated_at=?, sync_status='pending'
+    `UPDATE meals SET name=?, nutrition=?, items=?, img_url=?, notes=?, is_recipe=?, portion=?, unit=?, servings=?, recipe_details=?, external_refs=?, updated_at=?, sync_status='pending'
      WHERE id=? AND user_id=?`,
     [
       data.name,
@@ -736,6 +756,8 @@ export async function dbUpdateMeal(id, data) {
       data.portion ?? 100,
       data.unit || 'g',
       data.servings != null ? Math.max(1, parseInt(data.servings) || 1) : null,
+      data.recipe_details ? JSON.stringify(data.recipe_details) : null,
+      data.external_refs ? JSON.stringify(data.external_refs) : null,
       _now(),
       id,
       LOCAL_USER_ID,
@@ -775,6 +797,8 @@ function _parseMealRow(row) {
     ...row,
     nutrition: _parseJson(row.nutrition, {}),
     items:     _parseJson(row.items, []),
+    recipe_details: _parseJson(row.recipe_details, {}),
+    external_refs: _parseJson(row.external_refs, []),
     imgUrl: row.img_url || '',
   };
 }
@@ -1286,7 +1310,7 @@ export async function dbUpsertFromServer(table, serverRecord) {
     // rank by stale local-only counters.
     if (table === 'foods') {
       await db.run(
-        `UPDATE foods SET name=?, brand=?, nutrition=?, portion=?, unit=?, img_url=?, notes=?, category=?, barcode=?, favorite=?, usage_count=MAX(usage_count, ?), last_used_at=MAX(COALESCE(last_used_at, ''), COALESCE(?, '')), nutrition_basis=?, alt_units=?, density_g_ml=?, updated_at=?, sync_status='synced' WHERE server_id=?`,
+        `UPDATE foods SET name=?, brand=?, nutrition=?, portion=?, unit=?, img_url=?, notes=?, category=?, barcode=?, favorite=?, usage_count=MAX(usage_count, ?), last_used_at=MAX(COALESCE(last_used_at, ''), COALESCE(?, '')), nutrition_basis=?, alt_units=?, density_g_ml=?, external_refs=?, updated_at=?, sync_status='synced' WHERE server_id=?`,
         [data.name, data.brand, typeof data.nutrition === 'string' ? data.nutrition : JSON.stringify(data.nutrition || {}),
          data.portion ?? 100, data.unit || 'g', data.img_url, data.notes, data.category, data.barcode,
          data.favorite ? 1 : 0, data.usage_count || 0, data.last_used_at || null,
@@ -1295,16 +1319,19 @@ export async function dbUpsertFromServer(table, serverRecord) {
          data.density_g_ml != null && Number.isFinite(Number(data.density_g_ml))
            ? Number(data.density_g_ml)
            : null,
+         data.external_refs ? JSON.stringify(data.external_refs) : null,
          data.updated_at, serverId]
       );
     } else if (table === 'meals') {
       await db.run(
-        `UPDATE meals SET name=?, nutrition=?, items=?, img_url=?, notes=?, is_recipe=?, portion=?, unit=?, servings=?, favorite=?, usage_count=MAX(usage_count, ?), last_used_at=MAX(COALESCE(last_used_at, ''), COALESCE(?, '')), updated_at=?, sync_status='synced' WHERE server_id=?`,
+        `UPDATE meals SET name=?, nutrition=?, items=?, img_url=?, notes=?, is_recipe=?, portion=?, unit=?, servings=?, favorite=?, usage_count=MAX(usage_count, ?), last_used_at=MAX(COALESCE(last_used_at, ''), COALESCE(?, '')), recipe_details=?, external_refs=?, updated_at=?, sync_status='synced' WHERE server_id=?`,
         [data.name, typeof data.nutrition === 'string' ? data.nutrition : JSON.stringify(data.nutrition || {}),
          typeof data.items === 'string' ? data.items : JSON.stringify(data.items || []),
          data.img_url, data.notes, data.is_recipe ? 1 : 0, data.portion ?? 100, data.unit || 'g',
          data.servings != null ? Math.max(1, parseInt(data.servings) || 1) : null,
          data.favorite ? 1 : 0, data.usage_count || 0, data.last_used_at || null,
+         data.recipe_details ? (typeof data.recipe_details === 'string' ? data.recipe_details : JSON.stringify(data.recipe_details)) : null,
+         data.external_refs ? (typeof data.external_refs === 'string' ? data.external_refs : JSON.stringify(data.external_refs)) : null,
          data.updated_at, serverId]
       );
     }
@@ -1312,8 +1339,8 @@ export async function dbUpsertFromServer(table, serverRecord) {
     // New from server — insert locally
     if (table === 'foods') {
       await db.run(
-        `INSERT INTO foods (server_id, user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, favorite, usage_count, last_used_at, nutrition_basis, alt_units, density_g_ml, updated_at, sync_status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced')`,
+        `INSERT INTO foods (server_id, user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, favorite, usage_count, last_used_at, nutrition_basis, alt_units, density_g_ml, external_refs, updated_at, sync_status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced')`,
         [serverId, LOCAL_USER_ID, data.name, data.brand, typeof data.nutrition === 'string' ? data.nutrition : JSON.stringify(data.nutrition || {}),
          data.portion ?? 100, data.unit || 'g', data.img_url, data.notes, data.category, data.barcode,
          data.favorite ? 1 : 0, data.usage_count || 0, data.last_used_at || null,
@@ -1322,17 +1349,21 @@ export async function dbUpsertFromServer(table, serverRecord) {
          data.density_g_ml != null && Number.isFinite(Number(data.density_g_ml))
            ? Number(data.density_g_ml)
            : null,
+         data.external_refs ? JSON.stringify(data.external_refs) : null,
          data.updated_at]
       );
     } else if (table === 'meals') {
       await db.run(
-        `INSERT INTO meals (server_id, user_id, name, nutrition, items, img_url, notes, is_recipe, portion, unit, servings, favorite, usage_count, last_used_at, updated_at, sync_status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced')`,
+        `INSERT INTO meals (server_id, user_id, name, nutrition, items, img_url, notes, is_recipe, portion, unit, servings, favorite, usage_count, last_used_at, recipe_details, external_refs, updated_at, sync_status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced')`,
         [serverId, LOCAL_USER_ID, data.name, typeof data.nutrition === 'string' ? data.nutrition : JSON.stringify(data.nutrition || {}),
          typeof data.items === 'string' ? data.items : JSON.stringify(data.items || []),
          data.img_url, data.notes, data.is_recipe ? 1 : 0, data.portion ?? 100, data.unit || 'g',
          data.servings != null ? Math.max(1, parseInt(data.servings) || 1) : null,
-         data.favorite ? 1 : 0, data.usage_count || 0, data.last_used_at || null, data.updated_at]
+         data.favorite ? 1 : 0, data.usage_count || 0, data.last_used_at || null,
+         data.recipe_details ? (typeof data.recipe_details === 'string' ? data.recipe_details : JSON.stringify(data.recipe_details)) : null,
+         data.external_refs ? (typeof data.external_refs === 'string' ? data.external_refs : JSON.stringify(data.external_refs)) : null,
+         data.updated_at]
       );
     }
   }

@@ -15,6 +15,12 @@ function _cfg() {
   return { baseUrl, token };
 }
 
+async function _sha256Text(value) {
+  const bytes = new TextEncoder().encode(String(value));
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', bytes);
+  return `sha256:${[...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('')}`;
+}
+
 async function _proxy(path) {
   const { baseUrl, token } = _cfg();
   if (!baseUrl || !token) return null;
@@ -101,6 +107,21 @@ const Mealie = {
     return `${baseUrl}/api/media/recipes/${recipeId}/images/original.webp`;
   },
 
+  async instanceKey() {
+    const { baseUrl } = _cfg();
+    if (!baseUrl) return '';
+    let normalized = baseUrl;
+    try {
+      const parsed = new URL(baseUrl);
+      parsed.username = '';
+      parsed.password = '';
+      parsed.hash = '';
+      parsed.pathname = parsed.pathname.replace(/\/+$/, '');
+      normalized = parsed.href.replace(/\/$/, '').toLowerCase();
+    } catch {}
+    return _sha256Text(normalized);
+  },
+
   /**
    * Map a full Mealie recipe object to the app's food structure.
    * Nutrition is per-serving; portion=100, unit='serving' so diary qty = servings.
@@ -139,6 +160,99 @@ const Mealie = {
         'trans-fat':     pf(n.transFatContent),
       }),
     };
+  },
+
+  /** Normalize a Mealie recipe into the same review draft used by URL imports. */
+  normalizeRecipe(recipe) {
+    const { baseUrl } = _cfg();
+    const ingredientRows = recipe.recipeIngredient || recipe.recipeIngredients || [];
+    const ingredients = ingredientRows.map(row => {
+      const quantity = Number(row.quantity);
+      const unit = typeof row.unit === 'string' ? row.unit : (row.unit?.abbreviation || row.unit?.name || '');
+      const food = typeof row.food === 'string' ? row.food : (row.food?.name || '');
+      const original = row.display || row.originalText || row.original_text || [row.quantity, unit, food, row.note].filter(Boolean).join(' ');
+      return {
+        original_text: original || food || 'Unresolved ingredient',
+        quantity: Number.isFinite(quantity) ? quantity : null,
+        quantity_max: null,
+        unit: unit.toLowerCase() || null,
+        name: food || row.title || original || 'Unresolved ingredient',
+        note: row.note || '',
+        package_size: null,
+        parse_confidence: food ? 'high' : 'low',
+        source_food_id: row.food?.id || null,
+        reference_id: row.referenceId || row.reference_id || null,
+      };
+    });
+    const instructionRows = recipe.recipeInstructions || recipe.instructions || [];
+    const instructions = instructionRows.flatMap(section => {
+      if (typeof section === 'string') return [{ section: '', text: section }];
+      const title = section.title || section.name || '';
+      const steps = section.text || section.note ? [section] : (section.steps || section.itemListElement || []);
+      return steps.map(step => ({ section: title, text: typeof step === 'string' ? step : (step.text || step.note || step.title || '') })).filter(step => step.text);
+    });
+    const yieldValue = recipe.recipeYield || recipe.settings?.recipeYield || recipe.settings?.servings || recipe.servings;
+    return {
+      source: 'mealie',
+      // Keep the private Mealie origin out of persisted recipe provenance.
+      // The instance is represented separately by a SHA-256 key.
+      source_url: `mealie:recipe:${recipe.id || recipe.slug || ''}`,
+      source_id: recipe.id || recipe.slug || '',
+      name: recipe.name || 'Unnamed Recipe',
+      description: recipe.description || '',
+      author: recipe.user?.fullName || recipe.user?.username || '',
+      date_published: recipe.dateAdded || '',
+      yield_text: yieldValue ? String(yieldValue) : '',
+      categories: (recipe.recipeCategory || []).map(item => item.name || item).filter(Boolean),
+      cuisines: (recipe.recipeCuisine || []).map(item => item.name || item).filter(Boolean),
+      keywords: (recipe.tags || []).map(item => item.name || item).filter(Boolean),
+      prep_time: recipe.prepTime || '', cook_time: recipe.performTime || recipe.cookTime || '', total_time: recipe.totalTime || '',
+      // Private Mealie media requires the configured proxy/token and must
+      // not be copied into an import draft or persisted as a raw origin URL.
+      images: [],
+      ingredients,
+      instructions,
+      nutrition: recipe.nutrition || {},
+    };
+  },
+
+  async normalizeRecipeTree(recipe, seen = new Set(), depth = 0) {
+    const normalized = { ...this.normalizeRecipe(recipe), source_instance: await this.instanceKey() };
+    const identity = recipe.id || recipe.slug || normalized.name;
+    if (seen.has(identity) || depth > 5) return normalized;
+    const nextSeen = new Set(seen);
+    nextSeen.add(identity);
+    const rawRows = recipe.recipeIngredient || recipe.recipeIngredients || [];
+    const flattened = [];
+    for (let index = 0; index < rawRows.length; index++) {
+      const row = rawRows[index];
+      const reference = row?.referencedRecipe || row?.referenced_recipe;
+      if (!reference) {
+        flattened.push(normalized.ingredients[index]);
+        continue;
+      }
+      const referenceIdentity = typeof reference === 'string' ? reference : (reference.slug || reference.id);
+      if (!referenceIdentity || nextSeen.has(referenceIdentity)) {
+        flattened.push({ ...normalized.ingredients[index], parse_confidence: 'low', note: `${normalized.ingredients[index]?.note || ''} Nested recipe could not be expanded.`.trim() });
+        continue;
+      }
+      const full = Array.isArray(reference.recipeIngredient) ? reference : await this.getRecipe(reference.slug || reference.id || referenceIdentity);
+      if (!full) {
+        flattened.push(normalized.ingredients[index]);
+        continue;
+      }
+      const child = await this.normalizeRecipeTree(full, nextSeen, depth + 1);
+      const scale = Number(row.quantity) || 1;
+      for (const ingredient of child.ingredients) {
+        flattened.push({
+          ...ingredient,
+          quantity: ingredient.quantity != null ? ingredient.quantity * scale : ingredient.quantity,
+          quantity_max: ingredient.quantity_max != null ? ingredient.quantity_max * scale : ingredient.quantity_max,
+          group: [normalized.ingredients[index]?.name || full.name, ingredient.group].filter(Boolean).join(' > '),
+        });
+      }
+    }
+    return { ...normalized, ingredients: flattened.filter(Boolean) };
   },
 };
 

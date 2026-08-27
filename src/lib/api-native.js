@@ -52,6 +52,14 @@ function _mealToDb(meal) {
 
 export const NtApiNative = {
 
+  previewRecipeUrl() {
+    return Promise.reject(new Error('Connect to a NutriTrace server to import recipe webpages.'));
+  },
+
+  commitRecipeImport() {
+    return Promise.reject(new Error('Connect to a NutriTrace server to import recipe webpages.'));
+  },
+
   // ── Foods ─────────────────────────────────────────────────────────────
 
   async getFoods() {

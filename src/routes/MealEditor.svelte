@@ -640,6 +640,27 @@
     if (isRecipe) autoUpdateRecipeAmount();
   }
 
+  function updateRecipeDetail(key, value) {
+    meal = { ...meal, recipe_details: { ...(meal.recipe_details || {}), [key]: value } };
+  }
+
+  function updateInstruction(index, value) {
+    const details = meal.recipe_details || {};
+    const instructions = [...(details.instructions || [])];
+    instructions[index] = { ...instructions[index], text: value };
+    updateRecipeDetail('instructions', instructions);
+  }
+
+  function removeInstruction(index) {
+    const details = meal.recipe_details || {};
+    updateRecipeDetail('instructions', (details.instructions || []).filter((_, i) => i !== index));
+  }
+
+  function addInstruction() {
+    const details = meal.recipe_details || {};
+    updateRecipeDetail('instructions', [...(details.instructions || []), { section: '', text: '' }]);
+  }
+
   function autoUpdateRecipeAmount() {
     const grams = meal.items.reduce((s, it) => s + toGrams(it.portion, it.unit) * (it.quantity||1), 0);
     recipeAmount = grams > 0 ? String(Math.round(grams)) : '';
@@ -855,6 +876,37 @@
       <div class="editor-card-title">Name *</div>
       <input class="input" placeholder={isRecipe ? $_('meal_editor.recipe_name_placeholder') : $_('meal_editor.meal_name_placeholder')} bind:value={meal.name} />
     </div>
+
+    {#if isRecipe && meal.recipe_details && Object.keys(meal.recipe_details).length > 0}
+      <div class="card editor-card recipe-details-card">
+        <div class="editor-card-title">Imported Recipe Details</div>
+        {#if meal.recipe_details.source_url}
+          <a class="recipe-source-link" href={meal.recipe_details.source_url} target="_blank" rel="noopener noreferrer">
+            <span class="material-symbols-rounded" style="font-size:17px">open_in_new</span>
+            View source
+          </a>
+        {/if}
+        <label class="form-label" for="recipe-description">Description</label>
+        <textarea id="recipe-description" class="input" rows="3" value={meal.recipe_details.description || ''}
+          on:input={event => updateRecipeDetail('description', event.currentTarget.value)}></textarea>
+        <div class="instruction-heading">
+          <span class="form-label">Instructions</span>
+          <button class="btn btn-ghost" on:click={addInstruction}>Add step</button>
+        </div>
+        <div class="instruction-editor-list">
+          {#each meal.recipe_details.instructions || [] as step, index}
+            <div class="instruction-editor-row">
+              <span>{index + 1}</span>
+              <textarea class="input" rows="2" value={step.text || ''} aria-label="Instruction {index + 1}"
+                on:input={event => updateInstruction(index, event.currentTarget.value)}></textarea>
+              <button class="btn-icon" on:click={() => removeInstruction(index)} aria-label="Remove instruction" title="Remove instruction">
+                <span class="material-symbols-rounded">close</span>
+              </button>
+            </div>
+          {/each}
+        </div>
+      </div>
+    {/if}
 
     <!-- Recipe servings: total weight + yields -->
     {#if isRecipe}
@@ -1328,6 +1380,13 @@
     border-radius: 50%;
     width: 32px; height: 32px;
   }
+  .recipe-details-card { gap: 10px; }
+  .recipe-source-link { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); text-decoration: none; font-size: 13px; font-weight: 600; }
+  .instruction-heading { display: flex; align-items: center; justify-content: space-between; }
+  .instruction-heading .form-label { margin: 0; }
+  .instruction-editor-list { display: flex; flex-direction: column; gap: 8px; }
+  .instruction-editor-row { display: grid; grid-template-columns: 24px 1fr 32px; align-items: start; gap: 7px; }
+  .instruction-editor-row > span { padding-top: 10px; color: var(--text-3); text-align: center; font-size: 12px; }
   .photo-remove-btn:hover { background: rgba(0,0,0,0.75); }
   .photo-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
   .photo-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }

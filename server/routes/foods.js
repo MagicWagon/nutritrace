@@ -79,7 +79,7 @@ function _normalizeDensity(v) {
 
 // ── POST / ────────────────────────────────────────────────────────────────
 router.post('/', wrap(async (req, res) => {
-  const { name, brand, nutrition, portion, unit, img_url, notes, category, barcode, visibility, source_id,
+  const { name, brand, nutrition, portion, unit, img_url, notes, category, barcode, visibility, source_id, external_refs,
     nutrition_basis, alt_units, density_g_ml } = req.body;
   if (!name) return res.status(400).json({ error: 'Name required' });
   const u = uid(req);
@@ -100,13 +100,14 @@ router.post('/', wrap(async (req, res) => {
   // Download external images to /uploads/ for self-hosting
   const localImg = isExternalUrl(img_url) ? await localizeImage(img_url) : (img_url || null);
   const result = db.prepare(
-    `INSERT INTO foods (user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, visibility, source_id, nutrition_basis, alt_units, density_g_ml, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+    `INSERT INTO foods (user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, visibility, source_id, nutrition_basis, alt_units, density_g_ml, external_refs, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
   ).run(u, name, brand || null, JSON.stringify(nutrition || {}), portion ?? 100, unit || 'g',
     localImg, notes || null, category || null, barcode || null, vis, source_id || null,
     nutrition_basis || null,
     _serializeAltUnitsForFood(alt_units),
-    _normalizeDensity(density_g_ml));
+    _normalizeDensity(density_g_ml),
+    external_refs ? JSON.stringify(external_refs) : null);
   res.status(201).json(parse(db.prepare('SELECT * FROM foods WHERE id = ?').get(result.lastInsertRowid)));
 }));
 
@@ -116,7 +117,7 @@ router.put('/:id', wrap(async (req, res) => {
   const existing = db.prepare('SELECT * FROM foods WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Not found' });
   if (u != null && existing.user_id !== u) return res.status(403).json({ error: 'Forbidden' });
-  const { name, brand, nutrition, portion, unit, img_url, notes, category, barcode, visibility, favorite,
+  const { name, brand, nutrition, portion, unit, img_url, notes, category, barcode, visibility, favorite, external_refs,
     nutrition_basis, alt_units, density_g_ml } = req.body;
   // For img_url: undefined → keep existing, null/'' → explicit clear,
   // any other value → localize-if-external-or-data-URL-then-store. Without
@@ -137,12 +138,14 @@ router.put('/:id', wrap(async (req, res) => {
   const au = alt_units === undefined ? existing.alt_units : _serializeAltUnitsForFood(alt_units);
   const dg = density_g_ml === undefined ? existing.density_g_ml : _normalizeDensity(density_g_ml);
   db.prepare(
-    `UPDATE foods SET name=?, brand=?, nutrition=?, portion=?, unit=?, img_url=?, notes=?, category=?, barcode=?, visibility=?, favorite=?, nutrition_basis=?, alt_units=?, density_g_ml=?, updated_at=datetime('now') WHERE id=?`
+    `UPDATE foods SET name=?, brand=?, nutrition=?, portion=?, unit=?, img_url=?, notes=?, category=?, barcode=?, visibility=?, favorite=?, nutrition_basis=?, alt_units=?, density_g_ml=?, external_refs=?, updated_at=datetime('now') WHERE id=?`
   ).run(name ?? existing.name, brand ?? existing.brand,
     JSON.stringify(nutrition ?? JSON.parse(existing.nutrition || '{}')),
     portion ?? existing.portion, unit ?? existing.unit, localImg,
     notes ?? existing.notes, category ?? existing.category, barcode ?? existing.barcode,
-    visibility ?? existing.visibility, fav, nb, au, dg, req.params.id);
+    visibility ?? existing.visibility, fav, nb, au, dg,
+    external_refs === undefined ? existing.external_refs : (external_refs ? JSON.stringify(external_refs) : null),
+    req.params.id);
   res.json(parse(db.prepare('SELECT * FROM foods WHERE id = ?').get(req.params.id)));
 }));
 
@@ -317,6 +320,7 @@ function parse(row) {
     ...row,
     nutrition: JSON.parse(row.nutrition || '{}'),
     alt_units: altUnits,
+    external_refs: (() => { try { return typeof row.external_refs === 'string' ? JSON.parse(row.external_refs) : (row.external_refs || []); } catch { return []; } })(),
     _specific_users: row._specific_users || undefined,
   };
 }

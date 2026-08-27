@@ -13,6 +13,7 @@ import {
   dbGetFoods, dbGetFood, dbCreateFood, dbUpdateFood, dbDeleteFood, dbCopyFood, dbBumpFoodUsage,
   dbGetMeals, dbGetMeal, dbCreateMeal, dbUpdateMeal, dbDeleteMeal, dbCopyMeal, dbBumpMealUsage,
   dbGetDiaryDate, dbSaveDiaryDate, dbGetAllDiary,
+  dbUpsertFromServer,
 } from './db-native.js';
 import { getServerUrl, getAuthToken, resolveAssetUrl, apiUrl } from './platform.js';
 import { schedulePush } from './sync.js';
@@ -33,7 +34,14 @@ async function _serverFetch(method, path, body, timeoutMs = 3000) {
     body: body != null ? JSON.stringify(body) : undefined,
     signal: AbortSignal.timeout(timeoutMs),
   });
-  if (!res.ok) throw new Error(`API error ${res.status}`);
+  if (!res.ok) {
+    const payload = await res.json().catch(() => ({}));
+    const error = new Error(payload.error || `API error ${res.status}`);
+    error.status = res.status;
+    error.code = payload.code;
+    error.existingId = payload.existing_id;
+    throw error;
+  }
   return res.json();
 }
 
@@ -251,6 +259,16 @@ export const NtApiCached = {
     const serverId = meal?.server_id || id;
     _serverFetch('POST', `/api/meals/${serverId}/used`, { date }).catch(() => schedulePush());
     return { ok: true };
+  },
+
+  previewRecipeUrl(url) {
+    return _serverFetch('POST', '/api/recipes/import/preview', { url }, 15_000);
+  },
+
+  async commitRecipeImport(payload) {
+    const serverMeal = await _serverFetch('POST', '/api/recipes/import/commit', payload, 20_000);
+    await dbUpsertFromServer('meals', serverMeal);
+    return _mealFromApi(serverMeal);
   },
 
   // ── Diary — always local-first ────────────────────────────────────────

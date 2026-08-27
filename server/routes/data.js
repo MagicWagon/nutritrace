@@ -48,13 +48,13 @@ router.post('/import', wrap((req, res) => {
   const insFood = db.prepare(
     `INSERT OR IGNORE INTO foods (user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode,
                                   visibility, source_id, favorite, usage_count, last_used_at,
-                                  nutrition_basis, alt_units, density_g_ml, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+                                  nutrition_basis, alt_units, density_g_ml, external_refs, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
   );
   const insMeal = db.prepare(
     `INSERT OR IGNORE INTO meals (user_id, name, nutrition, items, img_url, notes, is_recipe, portion, unit, servings,
-                                  visibility, source_id, favorite, usage_count, last_used_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+                                  visibility, source_id, favorite, usage_count, last_used_at, recipe_details, external_refs, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
   );
   // updated_at must be set explicitly on every insert: differential sync
   // filters with `updated_at >= ?` and NULL never matches. Even tables that
@@ -91,7 +91,8 @@ router.post('/import', wrap((req, res) => {
         f.last_used_at || null,
         f.nutrition_basis || null,
         f.alt_units ? (typeof f.alt_units === 'string' ? f.alt_units : JSON.stringify(f.alt_units)) : null,
-        f.density_g_ml != null ? Number(f.density_g_ml) : null
+        f.density_g_ml != null ? Number(f.density_g_ml) : null,
+        f.external_refs ? JSON.stringify(f.external_refs) : null
       );
     }
     for (const m of [...meals, ...recipes]) {
@@ -107,7 +108,9 @@ router.post('/import', wrap((req, res) => {
         m.source_id ?? null,
         m.favorite ? 1 : 0,
         Math.max(0, parseInt(m.usage_count) || 0),
-        m.last_used_at || null
+        m.last_used_at || null,
+        m.recipe_details ? JSON.stringify(m.recipe_details) : null,
+        m.external_refs ? JSON.stringify(m.external_refs) : null
       );
     }
     for (const e of diary) {

@@ -56,28 +56,28 @@ router.get('/:id', wrap((req, res) => {
 
 // ── POST / ────────────────────────────────────────────────────────────────
 router.post('/', wrap(async (req, res) => {
-  const { name, nutrition, items, img_url, notes, is_recipe, portion, unit, servings, visibility, source_id } = req.body;
+  const { name, nutrition, items, img_url, notes, is_recipe, portion, unit, servings, visibility, source_id, recipe_details, external_refs } = req.body;
   if (!name) return res.status(400).json({ error: 'Name required' });
   const u = uid(req);
   const vis = visibility || 'private';
   const localImg = isExternalUrl(img_url) ? await localizeImage(img_url) : (img_url || null);
   const result = db.prepare(
-    `INSERT INTO meals (user_id, name, nutrition, items, img_url, notes, is_recipe, portion, unit, servings, visibility, source_id, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+    `INSERT INTO meals (user_id, name, nutrition, items, img_url, notes, is_recipe, portion, unit, servings, visibility, source_id, recipe_details, external_refs, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
   ).run(u, name, JSON.stringify(nutrition || {}), JSON.stringify(items || []),
     localImg, notes || null, is_recipe ? 1 : 0, portion ?? 100, unit || 'g',
     servings != null ? Math.max(1, parseInt(servings) || 1) : null,
-    vis, source_id || null);
+    vis, source_id || null, _jsonText(recipe_details), _jsonText(external_refs));
   res.status(201).json(parse(db.prepare('SELECT * FROM meals WHERE id = ?').get(result.lastInsertRowid)));
 }));
 
 // ── PUT /:id ──────────────────────────────────────────────────────────────
-router.put('/:id', wrap((req, res) => {
+router.put('/:id', wrap(async (req, res) => {
   const u = uid(req);
   const existing = db.prepare('SELECT * FROM meals WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Not found' });
   if (u != null && existing.user_id !== u) return res.status(403).json({ error: 'Forbidden' });
-  const { name, nutrition, items, img_url, notes, is_recipe, portion, unit, servings, visibility, favorite } = req.body;
+  const { name, nutrition, items, img_url, notes, is_recipe, portion, unit, servings, visibility, favorite, recipe_details, external_refs } = req.body;
   const fav = favorite != null ? (favorite ? 1 : 0) : existing.favorite;
   // Body explicitly set servings → take it (null clears, number clamps to >=1).
   // Body omitted servings entirely → preserve the existing row value (null stays null).
@@ -91,14 +91,19 @@ router.put('/:id', wrap((req, res) => {
   // PUT fix for kilkalabs's report on #74 follow-up. Note: external-URL /
   // data-URL localization on this route is a separate parity gap with the
   // POST handler (line ~61) — out of scope for this fix.
-  const img = 'img_url' in req.body ? (img_url || null) : existing.img_url;
+  const img = 'img_url' in req.body
+    ? ((img_url && isExternalUrl(img_url)) ? await localizeImage(img_url) : (img_url || null))
+    : existing.img_url;
   db.prepare(
-    `UPDATE meals SET name=?, nutrition=?, items=?, img_url=?, notes=?, is_recipe=?, portion=?, unit=?, servings=?, visibility=?, favorite=?, updated_at=datetime('now') WHERE id=?`
+    `UPDATE meals SET name=?, nutrition=?, items=?, img_url=?, notes=?, is_recipe=?, portion=?, unit=?, servings=?, visibility=?, favorite=?, recipe_details=?, external_refs=?, updated_at=datetime('now') WHERE id=?`
   ).run(name ?? existing.name, JSON.stringify(nutrition ?? JSON.parse(existing.nutrition || '{}')),
     JSON.stringify(items ?? JSON.parse(existing.items || '[]')), img,
     notes ?? existing.notes, is_recipe != null ? (is_recipe ? 1 : 0) : existing.is_recipe,
     portion ?? existing.portion, unit ?? existing.unit, srv,
-    visibility ?? existing.visibility, fav, req.params.id);
+    visibility ?? existing.visibility, fav,
+    recipe_details === undefined ? existing.recipe_details : _jsonText(recipe_details),
+    external_refs === undefined ? existing.external_refs : _jsonText(external_refs),
+    req.params.id);
   res.json(parse(db.prepare('SELECT * FROM meals WHERE id = ?').get(req.params.id)));
 }));
 
@@ -203,10 +208,10 @@ router.post('/:id/copy', wrap((req, res) => {
   }
 
   const result = db.prepare(
-    `INSERT INTO meals (user_id, name, nutrition, items, img_url, notes, is_recipe, portion, unit, visibility, source_id, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'private', ?, datetime('now'))`
+    `INSERT INTO meals (user_id, name, nutrition, items, img_url, notes, is_recipe, portion, unit, visibility, source_id, recipe_details, external_refs, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'private', ?, ?, ?, datetime('now'))`
   ).run(u, meal.name, meal.nutrition, meal.items, meal.img_url, meal.notes,
-    meal.is_recipe, meal.portion, meal.unit, meal.id);
+    meal.is_recipe, meal.portion, meal.unit, meal.id, meal.recipe_details, meal.external_refs);
   res.status(201).json(parse(db.prepare('SELECT * FROM meals WHERE id = ?').get(result.lastInsertRowid)));
 }));
 
@@ -216,8 +221,21 @@ function parse(row) {
     nutrition: JSON.parse(row.nutrition || '{}'),
     items: JSON.parse(row.items || '[]'),
     is_recipe: row.is_recipe === 1,
+    recipe_details: _jsonValue(row.recipe_details, {}),
+    external_refs: _jsonValue(row.external_refs, []),
     _specific_users: row._specific_users || undefined,
   };
+}
+
+function _jsonValue(value, fallback) {
+  if (value == null || value === '') return fallback;
+  if (typeof value === 'object') return value;
+  try { return JSON.parse(value); } catch { return fallback; }
+}
+
+function _jsonText(value) {
+  if (value == null || value === '') return null;
+  return typeof value === 'string' ? value : JSON.stringify(value);
 }
 
 export default router;

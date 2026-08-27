@@ -32,6 +32,7 @@ import mcpRoutes        from './routes/mcp.js';
 import nutritionImportRoutes from './routes/nutrition-import.js';
 import offLocalRoutes from './routes/off-local.js';
 import updatesRoutes  from './routes/updates.js';
+import recipeImportRoutes from './routes/recipe-import.js';
 import { logger }   from './logger.js';
 import { authenticate, userMgmtActive } from './middleware/auth.js';
 import { csrfProtect } from './middleware/csrf.js';
@@ -201,6 +202,7 @@ router.use('/api/settings',  settingsRoutes);
 router.use('/api/app-config',  appConfigRoutes);
 router.use('/api/off-local',   offLocalRoutes);
 router.use('/api/updates',     updatesRoutes);
+router.use('/api/recipes/import', recipeImportRoutes);
 router.use('/api/ai',          aiRoutes);
 router.use('/api/full-backup',        fullBackupRoutes);
 // Per-IP rate limit on OAuth callbacks — these run unauthenticated and trigger

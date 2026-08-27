@@ -801,8 +801,9 @@
     try {
       const full = await Mealie.getRecipe(summary.slug);
       if (!full) { showError('Could not load recipe from Mealie'); return; }
-      const mapped = Mealie.mapRecipe(full);
-      openEditor(mapped, 'foodList');
+      const mapped = await Mealie.normalizeRecipeTree(full);
+      editorState.recipeImportDraft = { source: 'mealie', source_url: mapped.source_url, recipes: [mapped], warnings: [] };
+      push('/recipe-import');
     } catch(e) {
       showError('Failed to import from Mealie');
     }
@@ -962,12 +963,16 @@
       await _expandMealToDiary(food);
       return;
     }
+    // A split-child swap always needs the portion sheet so an incompatible
+    // replacement cannot silently fall back to its normal serving.
+    let splitSwap = null;
+    try { splitSwap = JSON.parse(sessionStorage.getItem('nt:replaceSplitChild') || 'null'); } catch {}
     // Foods & Recipes: prompt for quantity if setting enabled
-    if ($diaryPromptQuantity) {
+    if ($diaryPromptQuantity || splitSwap) {
       promptFood = food;
       promptServings = 1;
-      promptPortion = food.portion || 100;
-      promptUnit = food.unit || 'g';
+      promptPortion = splitSwap?.portion || food.portion || 100;
+      promptUnit = splitSwap?.unit || food.unit || 'g';
       showQtyPrompt = true;
       return;
     }
@@ -1003,7 +1008,7 @@
   }
 
   async function _addFoodToDiaryNoNav(food, qty) {
-    const { addDiaryItem } = await import('../stores/diary.js');
+    const { addDiaryItem, replaceSplitChild } = await import('../stores/diary.js');
     let savedFood = food;
     if (!food.id || typeof food.id !== 'number') {
       const { id: _drop, ...rest } = food;
@@ -1016,6 +1021,15 @@
       quantity: qty,
       nutrition: savedFood.nutrition
     };
+    const swapRaw = sessionStorage.getItem('nt:replaceSplitChild');
+    if (swapRaw) {
+      const swap = JSON.parse(swapRaw);
+      const replacement = { ...item, quantity: 1 };
+      const replaced = await replaceSplitChild(swap.parentIdentity, swap.childIdentity, replacement);
+      if (!replaced) throw new Error('The recipe ingredient is no longer available to swap.');
+      sessionStorage.removeItem('nt:replaceSplitChild');
+      return;
+    }
     await addDiaryItem(item, Number(pickMeal) || 0, pickDate || undefined);
   }
 
@@ -1699,6 +1713,11 @@
       <h1 class="select-mode-title">{manageSelected.size} selected</h1>
     {:else}
       <h1>{$_('routes.foods.title')}</h1>
+      {#if activeTab === 2}
+        <button class="btn-icon accent" on:click={() => push('/recipe-import')} aria-label="Import recipe from URL" title="Import recipe from URL">
+          <span class="material-symbols-rounded">link</span>
+        </button>
+      {/if}
       <button class="btn-icon accent" on:click={() => {
         if (activeTab === 0) openEditor(null, 'foodList');
         else if (activeTab === 1) openMealEditor(null, false);

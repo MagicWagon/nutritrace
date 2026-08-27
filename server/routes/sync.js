@@ -58,7 +58,7 @@ function _serializeAltUnitsForServer(v) {
 
 function parse(row) {
   if (!row) return null;
-  for (const key of ['nutrition', 'items', 'body_stats', 'water', 'metadata', 'alt_units']) {
+  for (const key of ['nutrition', 'items', 'body_stats', 'water', 'metadata', 'alt_units', 'recipe_details', 'external_refs']) {
     if (typeof row[key] === 'string') {
       try { row[key] = JSON.parse(row[key]); } catch {}
     }
@@ -183,7 +183,7 @@ router.post('/push', wrap((req, res) => {
             db.prepare(`UPDATE foods SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`).run(f.server_id);
           } else {
             db.prepare(
-              `UPDATE foods SET name=?, brand=?, nutrition=?, portion=?, unit=?, img_url=?, notes=?, category=?, barcode=?, favorite=?, usage_count=MAX(usage_count, ?), last_used_at=MAX(COALESCE(last_used_at, ''), COALESCE(?, '')), nutrition_basis=?, alt_units=?, density_g_ml=?, updated_at=datetime('now') WHERE id=?`
+              `UPDATE foods SET name=?, brand=?, nutrition=?, portion=?, unit=?, img_url=?, notes=?, category=?, barcode=?, favorite=?, usage_count=MAX(usage_count, ?), last_used_at=MAX(COALESCE(last_used_at, ''), COALESCE(?, '')), nutrition_basis=?, alt_units=?, density_g_ml=?, external_refs=?, updated_at=datetime('now') WHERE id=?`
             ).run(f.name, f.brand, JSON.stringify(f.nutrition || {}), f.portion ?? 100, f.unit || 'g',
               f.img_url || null, f.notes || null, f.category || null, f.barcode || null,
               f.favorite ? 1 : 0, f.usage_count || 0, f.last_used_at || null,
@@ -191,18 +191,19 @@ router.post('/push', wrap((req, res) => {
               // these keys yet get null, which preserves existing behavior.
               f.nutrition_basis || null,
               _serializeAltUnitsForServer(f.alt_units),
-              f.density_g_ml != null && Number.isFinite(Number(f.density_g_ml))
-                ? Number(f.density_g_ml)
-                : null,
-              f.server_id);
+            f.density_g_ml != null && Number.isFinite(Number(f.density_g_ml))
+              ? Number(f.density_g_ml)
+              : null,
+            f.external_refs ? JSON.stringify(f.external_refs) : null,
+            f.server_id);
           }
         }
         result.foods.push({ client_id: f.client_id, server_id: f.server_id });
       } else if (!f.deleted_at) {
         // New record (no server_id, OR server_id refs missing row → re-create)
         const r = db.prepare(
-          `INSERT INTO foods (user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, favorite, usage_count, last_used_at, nutrition_basis, alt_units, density_g_ml, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+          `INSERT INTO foods (user_id, name, brand, nutrition, portion, unit, img_url, notes, category, barcode, favorite, usage_count, last_used_at, nutrition_basis, alt_units, density_g_ml, external_refs, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
         ).run(u, f.name, f.brand || null, JSON.stringify(f.nutrition || {}), f.portion ?? 100, f.unit || 'g',
           f.img_url || null, f.notes || null, f.category || null, f.barcode || null,
           f.favorite ? 1 : 0, f.usage_count || 0, f.last_used_at || null,
@@ -210,7 +211,8 @@ router.post('/push', wrap((req, res) => {
           _serializeAltUnitsForServer(f.alt_units),
           f.density_g_ml != null && Number.isFinite(Number(f.density_g_ml))
             ? Number(f.density_g_ml)
-            : null);
+            : null,
+          f.external_refs ? JSON.stringify(f.external_refs) : null);
         result.foods.push({ client_id: f.client_id, server_id: r.lastInsertRowid });
       }
     }
@@ -226,22 +228,27 @@ router.post('/push', wrap((req, res) => {
             db.prepare(`UPDATE meals SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`).run(m.server_id);
           } else {
             db.prepare(
-              `UPDATE meals SET name=?, nutrition=?, items=?, img_url=?, notes=?, is_recipe=?, portion=?, unit=?, servings=?, favorite=?, usage_count=MAX(usage_count, ?), last_used_at=MAX(COALESCE(last_used_at, ''), COALESCE(?, '')), updated_at=datetime('now') WHERE id=?`
+              `UPDATE meals SET name=?, nutrition=?, items=?, img_url=?, notes=?, is_recipe=?, portion=?, unit=?, servings=?, favorite=?, usage_count=MAX(usage_count, ?), last_used_at=MAX(COALESCE(last_used_at, ''), COALESCE(?, '')), recipe_details=?, external_refs=?, updated_at=datetime('now') WHERE id=?`
             ).run(m.name, JSON.stringify(m.nutrition || {}), JSON.stringify(m.items || []),
               m.img_url || null, m.notes || null, m.is_recipe ? 1 : 0, m.portion ?? 100, m.unit || 'g',
               m.servings != null ? Math.max(1, parseInt(m.servings) || 1) : null,
-              m.favorite ? 1 : 0, m.usage_count || 0, m.last_used_at || null, m.server_id);
+              m.favorite ? 1 : 0, m.usage_count || 0, m.last_used_at || null,
+              m.recipe_details ? JSON.stringify(m.recipe_details) : null,
+              m.external_refs ? JSON.stringify(m.external_refs) : null,
+              m.server_id);
           }
         }
         result.meals.push({ client_id: m.client_id, server_id: m.server_id });
       } else if (!m.deleted_at) {
         const r = db.prepare(
-          `INSERT INTO meals (user_id, name, nutrition, items, img_url, notes, is_recipe, portion, unit, servings, favorite, usage_count, last_used_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+          `INSERT INTO meals (user_id, name, nutrition, items, img_url, notes, is_recipe, portion, unit, servings, favorite, usage_count, last_used_at, recipe_details, external_refs, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
         ).run(u, m.name, JSON.stringify(m.nutrition || {}), JSON.stringify(m.items || []),
           m.img_url || null, m.notes || null, m.is_recipe ? 1 : 0, m.portion ?? 100, m.unit || 'g',
           Math.max(1, parseInt(m.servings) || 1),
-          m.favorite ? 1 : 0, m.usage_count || 0, m.last_used_at || null);
+          m.favorite ? 1 : 0, m.usage_count || 0, m.last_used_at || null,
+          m.recipe_details ? JSON.stringify(m.recipe_details) : null,
+          m.external_refs ? JSON.stringify(m.external_refs) : null);
         result.meals.push({ client_id: m.client_id, server_id: r.lastInsertRowid });
       }
     }

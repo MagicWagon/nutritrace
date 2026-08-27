@@ -248,12 +248,12 @@
   // split recipe parent. Saving routes through updateSplitChild so the
   // parent's _splitItems[] gets the change (and the parent's totals
   // recompute via Nutrition.calculate sum-of-children).
-  function openEditChild(parentIdx, childIdx, child) {
+  function openEditChild(parentIdentity, childIdentity, child) {
     editItem     = child;
     editPortion  = child.portion || child.amount || 100;
     editUnit     = child.unit || 'g';
     editQuantity = child.quantity || 1;
-    _editChildContext = { parentIdx, childIdx };
+    _editChildContext = { parentIdentity, childIdentity };
     _lockAndOpen(() => showEditSheet = true);
   }
 
@@ -319,7 +319,7 @@
     if (_editChildContext) {
       // Split-recipe children inherit the parent's dateTime; skip the time
       // edit here so a child change doesn't fork the timestamp.
-      await updateSplitChild(_editChildContext.parentIdx, _editChildContext.childIdx, changes);
+      await updateSplitChild(_editChildContext.parentIdentity, _editChildContext.childIdentity, changes);
     } else {
       const prevAt = editItem.addedAt || editItem.dateTime;
       const newAt = _hmMergeInto(prevAt, editLoggedTime);
@@ -1202,12 +1202,13 @@
   // sub-list below it.
   async function splitRecipe(item) {
     if (!item || item._i == null) return;
-    const ok = await splitRecipeItem(item._i);
+    const parentIdentity = item.uuid || item._i;
+    const ok = await splitRecipeItem(parentIdentity);
     if (ok) {
       showSuccess('Recipe split into ingredients');
       // Auto-expand the just-split parent so the user immediately sees
       // what was unpacked and can act on individual ingredients.
-      _splitExpanded.add(item._i);
+      _splitExpanded.add(parentIdentity);
       _splitExpanded = _splitExpanded;
     } else {
       showError("Couldn't split — no ingredients found on this item");
@@ -1237,8 +1238,19 @@
   }
   $: if ($currentDate) _quickCalExpanded = new Set();
 
-  async function onRemoveSplitChild(parentIdx, childIdx) {
-    await removeSplitChild(parentIdx, childIdx);
+  async function onRemoveSplitChild(parentIdentity, childIdentity) {
+    await removeSplitChild(parentIdentity, childIdentity);
+  }
+
+  function swapSplitChild(parent, child) {
+    sessionStorage.setItem('nt:replaceSplitChild', JSON.stringify({
+      parentIdentity: parent.uuid || parent._i,
+      childIdentity: child.uuid || parent._splitItems.indexOf(child),
+      meal: Number(parent.meal ?? 0),
+      portion: Number(child.portion) || 1,
+      unit: child.unit || 'g',
+    }));
+    push('/foods?pick=1&meal=' + Number(parent.meal ?? 0) + '&date=' + encodeURIComponent($currentDate));
   }
 
   // Whether the currently-selected action item is a recipe (so we should
@@ -1817,26 +1829,30 @@
                   </div>
                 </button>
                 {#if Array.isArray(item._splitItems) && item._splitItems.length > 0}
-                  <button type="button" class="split-toggle" on:click|stopPropagation={() => toggleSplitExpand(item._i)}
-                    aria-label={_splitExpanded.has(item._i) ? 'Collapse ingredients' : 'Expand ingredients'}
-                    title={_splitExpanded.has(item._i) ? 'Collapse ingredients' : 'Expand ingredients'}>
-                    <span class="material-symbols-rounded split-chevron" class:split-chevron-open={_splitExpanded.has(item._i)}>expand_more</span>
+                  <button type="button" class="split-toggle" on:click|stopPropagation={() => toggleSplitExpand(item.uuid || item._i)}
+                    aria-label={_splitExpanded.has(item.uuid || item._i) ? 'Collapse ingredients' : 'Expand ingredients'}
+                    title={_splitExpanded.has(item.uuid || item._i) ? 'Collapse ingredients' : 'Expand ingredients'}>
+                    <span class="material-symbols-rounded split-chevron" class:split-chevron-open={_splitExpanded.has(item.uuid || item._i)}>expand_more</span>
                   </button>
                 {/if}
               </div>
-              {#if Array.isArray(item._splitItems) && item._splitItems.length > 0 && _splitExpanded.has(item._i)}
+              {#if Array.isArray(item._splitItems) && item._splitItems.length > 0 && _splitExpanded.has(item.uuid || item._i)}
                 <div class="split-children">
-                  {#each item._splitItems as child, ci (child.addedAt + '-' + ci + '-' + (child.name || ''))}
+                  {#each item._splitItems as child, ci (child.uuid || child.addedAt + '-' + ci + '-' + (child.name || ''))}
                     {@const _ce = Nutrition.displayEnergy((Nutrition.calculate(child).calories || 0), $energyUnit)}
                     <div class="split-child">
-                      <button type="button" class="split-child-btn" on:click={() => openEditChild(item._i, ci, child)}
+                      <button type="button" class="split-child-btn" on:click={() => openEditChild(item.uuid || item._i, child.uuid || ci, child)}
                         aria-label="Edit {child.name}" title="Edit serving size">
                         <span class="split-child-name truncate">{child.name}</span>
                         <span class="split-child-meta text-3 text-sm">
                           {amountAndUnit(Math.round((child.portion || 100) * (child.quantity || 1) * 10) / 10, child.unit)} · {_ce.value.toLocaleString()} {_ce.unit}
                         </span>
                       </button>
-                      <button type="button" class="btn-icon split-child-del" on:click|stopPropagation={() => onRemoveSplitChild(item._i, ci)}
+                      <button type="button" class="btn-icon split-child-swap" on:click|stopPropagation={() => swapSplitChild(item, child)}
+                        aria-label="Swap {child.name}" title="Swap ingredient">
+                        <span class="material-symbols-rounded" style="font-size:16px">swap_horiz</span>
+                      </button>
+                      <button type="button" class="btn-icon split-child-del" on:click|stopPropagation={() => onRemoveSplitChild(item.uuid || item._i, child.uuid || ci)}
                         aria-label={$_('diary.edit_item.remove_ingredient')} title={$_('diary.edit_item.remove_ingredient')}>
                         <span class="material-symbols-rounded" style="font-size:16px">close</span>
                       </button>
@@ -3818,13 +3834,14 @@
   }
   .split-child-name { flex: 0 0 auto; font-size: 13px; max-width: 45%; }
   .split-child-meta { flex: 1; min-width: 0; }
-  .split-child-del {
+  .split-child-del, .split-child-swap {
     flex-shrink: 0;
     width: 24px;
     height: 24px;
     color: var(--text-3);
   }
   .split-child-del:hover { color: var(--danger, #ef4444); }
+  .split-child-swap:hover { color: var(--accent); }
 
   .edit-sheet-body { padding: 16px; }
   .edit-macros { display: flex; gap: 8px; flex-wrap: wrap; }

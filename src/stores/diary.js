@@ -335,9 +335,10 @@ export async function addQuickCalories({ kcal, name, meal, date, proteins, carbo
   return addDiaryItem(item, meal, date);
 }
 
-// NOTE: removeDiaryItem / updateDiaryItem / splitRecipeItem /
-// removeSplitChild / updateSplitChild all operate on a positional
-// array index from the rendered cached view. Issue #81's refactor
+// NOTE: removeDiaryItem / updateDiaryItem still operate on a positional
+// array index from the rendered cached view. Split parents/children use
+// stable UUID identity (with index fallback for pre-migration entries).
+// Issue #81's refactor
 // uses _refetchAndSave for append/set paths, but these index-based
 // paths intentionally stay on the cached entry: refetching first
 // could shift items in the array (another device added/removed
@@ -399,9 +400,20 @@ export async function updateDiaryItem(index, changes) {
  * quantity). Logging 1.5 servings of a recipe produces 1.5x of every
  * ingredient.
  */
-export async function splitRecipeItem(index) {
+function _identityIndex(items, identity) {
+  if (typeof identity === 'string') return items.findIndex(item => item?.uuid === identity);
+  return Number.isInteger(identity) ? identity : -1;
+}
+
+function _childIdentityIndex(items, identity) {
+  if (typeof identity === 'string') return items.findIndex(item => item?.uuid === identity);
+  return Number.isInteger(identity) ? identity : -1;
+}
+
+export async function splitRecipeItem(identity) {
   let entry = null;
   currentEntry.subscribe(v => entry = v)();
+  const index = _identityIndex(entry?.items || [], identity);
   if (!entry || !Array.isArray(entry.items) || index < 0 || index >= entry.items.length) return false;
 
   const item = entry.items[index];
@@ -432,7 +444,15 @@ export async function splitRecipeItem(index) {
   const recipeMass = ingredientsMass > 0
     ? ingredientsMass
     : (recipe.portion || 100) * (recipe.quantity || 1);
-  const scale = recipeMass > 0 ? itemMass / recipeMass : 1;
+  // Imported recipes retain an explicit yield. Use it before attempting to
+  // add unlike ingredient units (for example cups + cloves), which is not a
+  // meaningful mass. A diary row represents `quantity` servings at its
+  // stored per-serving portion.
+  const yieldCount = Number(recipe.servings);
+  const perServingPortion = Number(recipe.portion);
+  const scale = Number.isFinite(yieldCount) && yieldCount > 0 && Number.isFinite(perServingPortion) && perServingPortion > 0
+    ? ((Number(item.portion) || perServingPortion) / perServingPortion) * (Number(item.quantity) || 1) / yieldCount
+    : (recipeMass > 0 ? itemMass / recipeMass : 1);
 
   const now  = new Date().toISOString();
   // Bake the scale factor into portion + nutrition rather than into quantity.
@@ -469,10 +489,12 @@ export async function splitRecipeItem(index) {
     }
     return {
       ...ing,
+      uuid: _newUuid(),
       portion: newPortion,
       quantity: 1,
       nutrition: scaledNutrition,
       addedAt: now,
+      updatedAt: now,
       food_server_id,
     };
   });
@@ -492,12 +514,14 @@ export async function splitRecipeItem(index) {
  * children array, the entire parent is removed from the diary — the user
  * has effectively dropped the whole recipe.
  */
-export async function removeSplitChild(parentIndex, childIndex) {
+export async function removeSplitChild(parentIdentity, childIdentity) {
   let entry = null;
   currentEntry.subscribe(v => entry = v)();
+  const parentIndex = _identityIndex(entry?.items || [], parentIdentity);
   if (!entry || !Array.isArray(entry.items) || parentIndex < 0 || parentIndex >= entry.items.length) return;
 
   const parent = entry.items[parentIndex];
+  const childIndex = _childIdentityIndex(parent?._splitItems || [], childIdentity);
   if (!Array.isArray(parent._splitItems) || childIndex < 0 || childIndex >= parent._splitItems.length) return;
 
   const remaining = parent._splitItems.filter((_, i) => i !== childIndex);
@@ -506,7 +530,7 @@ export async function removeSplitChild(parentIndex, childIndex) {
     newItems = entry.items.filter((_, i) => i !== parentIndex);
   } else {
     newItems = entry.items.map((it, i) =>
-      i === parentIndex ? { ...parent, _splitItems: remaining } : it
+      i === parentIndex ? { ...parent, _splitItems: remaining, updatedAt: new Date().toISOString() } : it
     );
   }
   currentEntry.set(await _save({ ...entry, items: newItems }));
@@ -517,21 +541,58 @@ export async function removeSplitChild(parentIndex, childIndex) {
  * tweaks a child's quantity / portion — keeps the parent intact, only
  * the child changes.
  */
-export async function updateSplitChild(parentIndex, childIndex, changes) {
+export async function updateSplitChild(parentIdentity, childIdentity, changes) {
   let entry = null;
   currentEntry.subscribe(v => entry = v)();
+  const parentIndex = _identityIndex(entry?.items || [], parentIdentity);
   if (!entry || !Array.isArray(entry.items) || parentIndex < 0 || parentIndex >= entry.items.length) return;
 
   const parent = entry.items[parentIndex];
+  const childIndex = _childIdentityIndex(parent?._splitItems || [], childIdentity);
   if (!Array.isArray(parent._splitItems) || childIndex < 0 || childIndex >= parent._splitItems.length) return;
 
   const newChildren = parent._splitItems.map((c, i) =>
-    i === childIndex ? { ...c, ...changes } : c
+    i === childIndex ? { ...c, ...changes, updatedAt: new Date().toISOString() } : c
   );
   const newItems = entry.items.map((it, i) =>
-    i === parentIndex ? { ...parent, _splitItems: newChildren } : it
+    i === parentIndex ? { ...parent, _splitItems: newChildren, updatedAt: new Date().toISOString() } : it
   );
   currentEntry.set(await _save({ ...entry, items: newItems }));
+}
+
+/** Replace one split child with a food snapshot without changing the saved recipe. */
+export async function replaceSplitChild(parentIdentity, childIdentity, replacement) {
+  let entry = null;
+  currentEntry.subscribe(v => entry = v)();
+  const parentIndex = _identityIndex(entry?.items || [], parentIdentity);
+  if (parentIndex < 0) return false;
+  const parent = entry.items[parentIndex];
+  const childIndex = _childIdentityIndex(parent?._splitItems || [], childIdentity);
+  if (childIndex < 0 || !replacement) return false;
+  const prior = parent._splitItems[childIndex];
+  const sameUnit = (replacement.unit || 'g') === (prior.unit || 'g');
+  const basePortion = Number(replacement.portion) || 100;
+  const targetPortion = sameUnit ? (Number(prior.portion) || basePortion) : basePortion;
+  const factor = sameUnit ? targetPortion / basePortion : 1;
+  const nutrition = Object.fromEntries(Object.entries(replacement.nutrition || {}).map(([key, value]) => [key, (Number(value) || 0) * factor]));
+  const now = new Date().toISOString();
+  const food_server_id = ('server_id' in replacement) ? replacement.server_id : (typeof replacement.id === 'number' ? replacement.id : null);
+  const next = {
+    ...replacement,
+    uuid: prior.uuid || _newUuid(),
+    portion: targetPortion,
+    unit: sameUnit ? prior.unit : (replacement.unit || 'g'),
+    quantity: 1,
+    nutrition,
+    food_server_id,
+    addedAt: prior.addedAt || now,
+    updatedAt: now,
+  };
+  const children = parent._splitItems.map((child, index) => index === childIndex ? next : child);
+  const items = entry.items.map((item, index) => index === parentIndex ? { ...parent, _splitItems: children, updatedAt: now } : item);
+  currentEntry.set(await _save({ ...entry, items }));
+  if (typeof replacement.id === 'number') NtApi.markFoodUsed(replacement.id, entry.date).catch(() => {});
+  return true;
 }
 
 export async function copyMealItems(fromMealIdx, toMealIdx) {

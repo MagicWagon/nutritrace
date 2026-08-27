@@ -180,6 +180,7 @@
   import Foods      from './routes/Foods.svelte';
   import FoodEditor from './routes/FoodEditor.svelte';
   import MealEditor from './routes/MealEditor.svelte';
+  import RecipeImport from './routes/RecipeImport.svelte';
   import Statistics from './routes/Statistics.svelte';
   import Goals      from './routes/Goals.svelte';
   import Settings   from './routes/Settings.svelte';
@@ -200,6 +201,7 @@
     '/foods/edit/:id':  FoodEditor,
     '/meal-editor':     MealEditor,
     '/meal-editor/:id': MealEditor,
+    '/recipe-import':   RecipeImport,
     '/statistics':      Statistics,
     '/wellness':        Wellness,
     '/goals':           Goals,
@@ -213,9 +215,9 @@
     '*':                  Diary,
   };
 
-  const NAV_HIDDEN = ['/wizard', '/foods/edit', '/meal-editor', '/profile'];
+  const NAV_HIDDEN = ['/wizard', '/foods/edit', '/meal-editor', '/recipe-import', '/profile'];
   $: showNav       = !NAV_HIDDEN.some(p => $location.startsWith(p));
-  const EDITOR_ROUTES = ['/foods/edit', '/meal-editor', '/profile', '/wizard'];
+  const EDITOR_ROUTES = ['/foods/edit', '/meal-editor', '/recipe-import', '/profile', '/wizard'];
   $: _isEditorRoute = EDITOR_ROUTES.some(r => $location.startsWith(r));
   $: isEditor      = NAV_HIDDEN.some(p => $location.startsWith(p));
 

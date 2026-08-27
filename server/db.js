@@ -52,6 +52,8 @@ db.exec(`
     portion    REAL DEFAULT 100,
     unit       TEXT DEFAULT 'g',
     servings   INTEGER DEFAULT 1,
+    recipe_details TEXT DEFAULT NULL,
+    external_refs  TEXT DEFAULT NULL,
     created_at TEXT DEFAULT (datetime('now'))
   );
 
@@ -502,6 +504,15 @@ if (!columnExists('meals', 'servings')) {
   // default of 1 still applies to fresh installs that INSERT without
   // specifying servings, which should never happen via the editor path.
   db.exec(`ALTER TABLE meals ADD COLUMN servings INTEGER`);
+}
+if (!columnExists('meals', 'recipe_details')) {
+  db.exec(`ALTER TABLE meals ADD COLUMN recipe_details TEXT DEFAULT NULL`);
+}
+if (!columnExists('meals', 'external_refs')) {
+  db.exec(`ALTER TABLE meals ADD COLUMN external_refs TEXT DEFAULT NULL`);
+}
+if (!columnExists('foods', 'external_refs')) {
+  db.exec(`ALTER TABLE foods ADD COLUMN external_refs TEXT DEFAULT NULL`);
 }
 if (!columnExists('diary', 'deleted_at')) {
   db.exec(`ALTER TABLE diary ADD COLUMN deleted_at TEXT DEFAULT NULL`);
