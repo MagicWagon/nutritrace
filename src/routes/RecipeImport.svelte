@@ -547,7 +547,18 @@
     const sequence = ++searchSequence;
     sheetSearching = true;
     try {
-      const results = await collectMatches(resolutions[searchRowIndex], searchQuery.trim(), searchSource, 50);
+      const query = searchQuery.trim();
+      // A manual single-provider search is the same catalogue operation as
+      // Add Food. Recipe-specific filtering/ranking belongs to automatic
+      // ingredient matching and to the merged All tab; applying it here made
+      // USDA/OFF tabs fetch fewer rows and then reorder or discard them.
+      const results = searchSource === 'usda' || searchSource === 'openfoodfacts'
+        ? await searchFoodCatalogs({
+            query, source: searchSource, localFoods: foods, offEnabled: $offEnabled,
+            usdaEnabled: $usdaEnabled, usdaApiKey: $usdaApiKey, limit: 50,
+            schedule: scheduleProviderRequest,
+          })
+        : await collectMatches(resolutions[searchRowIndex], query, searchSource, 50);
       if (sequence === searchSequence) sheetResults = results;
     }
     catch (error) { if (sequence === searchSequence) { sheetResults = []; showError(error?.message || 'Food search failed'); } }

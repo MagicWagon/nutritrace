@@ -460,6 +460,9 @@ test('recipe import UI restores drafts safely and Back always returns to Foods',
   assert.match(source, /mealie_image:/);
   assert.match(source, /recipeImportUsePreferredBrands/);
   assert.match(source, /searchFoodCatalogs/);
+  assert.match(source, /searchSource === 'usda' \|\| searchSource === 'openfoodfacts'/);
+  assert.match(source, /query, source: searchSource, localFoods: foods/);
+  assert.match(source, /usdaEnabled: \$usdaEnabled, usdaApiKey: \$usdaApiKey, limit: 50/);
   assert.doesNotMatch(source, /countryFilter:\s*false/);
   assert.doesNotMatch(source, /\bpop\(\)/);
 });
