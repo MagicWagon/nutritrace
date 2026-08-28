@@ -133,10 +133,29 @@ function _offProductName(p, language, strict = false) {
     || '';
   if (String(localized).trim()) return { name: String(localized).trim(), language: lang };
   const primaryLanguage = String(p?.lang || p?.lc || p?.language_code || '').slice(0, 2).toLowerCase();
+  // OFF has used several language metadata shapes over time. Search results
+  // can expose `languages_codes`/`languages` even when the short `lang`/`lc`
+  // field is absent, so accept a product whose catalog explicitly contains
+  // the requested language before considering the generic product_name.
+  const languageCodes = [
+    ...(Array.isArray(p?.languages_codes) ? p.languages_codes : String(p?.languages_codes || '').split(/[,;\s]+/)),
+    ...(Array.isArray(p?.language_codes) ? p.language_codes : String(p?.language_codes || '').split(/[,;\s]+/)),
+    ...(Array.isArray(p?.languages) ? p.languages : (p?.languages && typeof p.languages === 'object' ? Object.keys(p.languages) : [])),
+  ].map(value => String(value || '').slice(0, 2).toLowerCase()).filter(Boolean);
+  if (languageCodes.includes(lang) && String(p?.product_name || '').trim()) {
+    return { name: String(p.product_name).trim(), language: lang };
+  }
   if (primaryLanguage === lang && String(p?.product_name || '').trim()) {
     return { name: String(p.product_name).trim(), language: lang };
   }
-  if (strict) return { name: '', language: primaryLanguage || null };
+  // Strict filtering still excludes a product whose metadata explicitly says
+  // it is another language. Missing language metadata is common in OFF's
+  // search index, though; dropping those rows makes valid products such as
+  // Kirkland Sea Salt and Maple Syrup disappear. Keep an unknown-language hit
+  // and let ingredient relevance/ranking decide whether it is useful.
+  if (strict && primaryLanguage && primaryLanguage !== lang && !languageCodes.includes(lang)) {
+    return { name: '', language: primaryLanguage };
+  }
   return { name: String(p?.product_name || '').trim(), language: primaryLanguage || null };
 }
 

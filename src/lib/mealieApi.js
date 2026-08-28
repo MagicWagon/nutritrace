@@ -8,6 +8,15 @@
 import { DB } from './db.js';
 import { apiUrl, isNative, getServerUrl, getAuthToken } from './platform.js';
 import { Nutrition } from './nutrition.js';
+import { normalizePortionUnit } from './provider-portions.js';
+import { parseRecipeIngredientText } from './recipe-ingredient.js';
+
+const KNOWN_RECIPE_UNITS = new Set([
+  'g', 'mg', 'kg', 'oz', 'lb', 'ml', 'l', 'tsp', 'tbsp', 'fl oz', 'cup',
+  'pinch', 'dash', 'clove', 'slice', 'piece', 'can', 'package', 'sprig',
+  'stalk', 'bunch', 'serving', 'scoop', 'stick', 'biscuit', 'cookie', 'bar',
+  'packet', 'jar', 'bag', 'box',
+]);
 
 function _cfg() {
   const baseUrl = (DB.getSetting('mealieBaseUrl', '') || '').replace(/\/$/, '');
@@ -174,24 +183,45 @@ const Mealie = {
     const { baseUrl } = _cfg();
     const ingredientRows = recipe.recipeIngredient || recipe.recipeIngredients || [];
     const ingredients = ingredientRows.map(row => {
-      const quantity = Number(row.quantity);
-      const unit = typeof row.unit === 'string' ? row.unit : (row.unit?.abbreviation || row.unit?.name || '');
-      const food = typeof row.food === 'string' ? row.food : (row.food?.name || '');
-      const original = row.display || row.originalText || row.original_text || [row.quantity, unit, food, row.note].filter(Boolean).join(' ');
-      const normalizedName = food || row.title || original || 'Unresolved ingredient';
+      const structuredQuantity = Number(row.quantity);
+      const structuredUnit = typeof row.unit === 'string' ? row.unit : (row.unit?.abbreviation || row.unit?.name || '');
+      const structuredFood = typeof row.food === 'string' ? row.food : (row.food?.name || '');
+      const original = row.display || row.originalText || row.original_text || [row.quantity, structuredUnit, structuredFood, row.note].filter(Boolean).join(' ');
+      const parsed = parseRecipeIngredientText(original);
+      // Mealie versions differ: some expose quantity/unit/food fields, while
+      // others only expose `display`/`originalText`. Prefer the structured
+      // value when it is useful, then fall back to the display parser so a
+      // line such as "1 medium apple (chopped)" stays 1 Piece instead of
+      // silently inheriting the selected food's default 100 Grams.
+      const quantity = Number.isFinite(structuredQuantity) && structuredQuantity > 0
+        ? structuredQuantity
+        : parsed.quantity;
+      const parsedUnit = normalizePortionUnit(parsed.unit);
+      const structuredCanonicalUnit = normalizePortionUnit(structuredUnit);
+      const unit = (KNOWN_RECIPE_UNITS.has(structuredCanonicalUnit) ? structuredCanonicalUnit : parsedUnit) || '';
+      const sizeOnlyFood = /^(?:(?:extra|very)\s+)?(?:small|medium|large|jumbo|mini|baby)\b/i.test(structuredFood.trim());
+      const food = (!sizeOnlyFood && structuredFood.trim()) ? structuredFood.trim() : '';
+      const normalizedName = food || parsed.name || row.title || original || 'Unresolved ingredient';
+      const searchNames = [...new Set([
+        ...(parsed.search_names || []),
+        normalizedName,
+      ].map(value => String(value || '').trim()).filter(Boolean))].slice(0, 3);
+      const amounts = parsed.amounts?.length
+        ? parsed.amounts
+        : (Number.isFinite(quantity) && quantity > 0 && unit
+          ? [{ quantity, unit, role: 'primary' }]
+          : []);
       return {
         original_text: original || food || 'Unresolved ingredient',
         quantity: Number.isFinite(quantity) ? quantity : null,
         quantity_max: null,
-        unit: unit.toLowerCase() || null,
+        unit: unit || null,
         name: normalizedName,
-        search_names: [normalizedName],
-        amounts: Number.isFinite(quantity) && quantity > 0 && unit
-          ? [{ quantity, unit: unit.toLowerCase(), role: 'primary' }]
-          : [],
-        note: row.note || '',
+        search_names: searchNames.length ? searchNames : [normalizedName],
+        amounts,
+        note: [parsed.note, row.note].filter(Boolean).join('; '),
         package_size: null,
-        parse_confidence: food ? 'high' : 'low',
+        parse_confidence: parsed.parse_confidence === 'high' || food ? 'high' : parsed.parse_confidence,
         source_food_id: row.food?.id || null,
         reference_id: row.referenceId || row.reference_id || null,
       };

@@ -12,6 +12,7 @@
   import { isStrongIngredientCandidate, normalizeIngredientName, normalizeIngredientSearchText, rankIngredientCandidates } from '../lib/ingredient-match.js';
   import { estimateIngredientGramsWithAI, refineIngredientWithAI } from '../lib/ingredient-ai.js';
   import { altUnitGrams, conversionProvenance, displayUnitName, normalizePortionUnit } from '../lib/provider-portions.js';
+  import { parseRecipeIngredientText } from '../lib/recipe-ingredient.js';
   import Sheet from '../components/ui/Sheet.svelte';
   import { Mealie } from '../lib/mealieApi.js';
 
@@ -35,6 +36,31 @@
   let searchTimer;
   let searchSequence = 0;
   let conversionEstimateQueue = Promise.resolve();
+  // A recipe can fan out to several normalized provider queries. Keep the
+  // browser from opening one request per ingredient/provider at once while
+  // still allowing OFF and USDA to proceed independently when one source is
+  // slow or unavailable.
+  const MAX_PROVIDER_REQUESTS = 4;
+  let activeProviderRequests = 0;
+  const providerRequestQueue = [];
+
+  function scheduleProviderRequest(task) {
+    return new Promise((resolve, reject) => {
+      providerRequestQueue.push({ task, resolve, reject });
+      pumpProviderRequests();
+    });
+  }
+
+  function pumpProviderRequests() {
+    while (activeProviderRequests < MAX_PROVIDER_REQUESTS && providerRequestQueue.length) {
+      const job = providerRequestQueue.shift();
+      activeProviderRequests += 1;
+      Promise.resolve().then(job.task).then(job.resolve, job.reject).finally(() => {
+        activeProviderRequests -= 1;
+        pumpProviderRequests();
+      });
+    }
+  }
 
   onMount(async () => {
     const transientDraft = editorState.recipeImportDraft;
@@ -89,39 +115,112 @@
   }
 
   function providerSearchQueries(names) {
-    const queries = [];
-    const add = value => {
+    const exact = [];
+    const branded = [];
+    const fallbacks = [];
+    const add = (list, value) => {
       const clean = String(value || '').replace(/\s+/g, ' ').trim();
-      if (clean && !queries.some(item => normalizeName(item) === normalizeName(clean))) queries.push(clean);
+      if (clean && !list.some(item => normalizeName(item) === normalizeName(clean))) list.push(clean);
     };
     for (const name of names) {
-      add(name);
+      add(exact, name);
       const cleaned = normalizeIngredientSearchText(name);
-      add(cleaned);
+      add(exact, cleaned);
       for (const brand of $preferredFoodBrands.slice(0, 2)) {
-        if (!normalizeName(cleaned).includes(normalizeName(brand))) add(`${cleaned} ${brand}`);
+        if (!normalizeName(cleaned).includes(normalizeName(brand))) add(branded, `${cleaned} ${brand}`);
       }
       const tokens = cleaned.split(' ').filter(Boolean);
       // Provider indexes vary between phrase, food-name, and brand matching.
-      // Shorter fallbacks are ranked against the full query after retrieval.
-      if (tokens.length > 2) add(tokens.slice(0, -1).join(' '));
-      if (tokens.length > 1) add(tokens.slice(0, 2).join(' '));
-      if (tokens.length > 1) add(tokens.at(-1));
-      if (tokens.length === 2) add(tokens[0]);
+      // Keep the exact alternatives first, then try noun phrases. This is
+      // important for names such as "pure maple syrup" and
+      // "unsweetened almond milk": the useful provider query is usually the
+      // final two food tokens ("maple syrup" / "almond milk"), not the
+      // descriptive adjective plus the first noun.
+      if (tokens.length > 1) add(fallbacks, tokens.slice(-2).join(' '));
+      if (tokens.length > 2) add(fallbacks, tokens.slice(0, 2).join(' '));
+      for (let size = Math.min(3, tokens.length - 1); size >= 2; size--) {
+        for (let start = Math.max(0, tokens.length - size - 1); start >= 0; start--) {
+          add(fallbacks, tokens.slice(start, start + size).join(' '));
+        }
+      }
+      for (const token of tokens) {
+        if (token.length > 2) add(fallbacks, token);
+      }
     }
-    return queries.slice(0, 4);
+    // Six queries per provider keeps automatic import responsive while still
+    // covering alternatives, preferred-brand searches, and food-only noun
+    // phrases when a provider's phrase index is overly strict.
+    const queries = [];
+    for (const list of [exact, branded, fallbacks]) {
+      for (const value of list) {
+        if (!queries.some(item => normalizeName(item) === normalizeName(value))) queries.push(value);
+      }
+    }
+    return queries.slice(0, 6);
   }
 
   function preferredIngredientAmount(ingredient, fallbackFood = null) {
+    // Keep the recipe's primary household measurement in the editable row.
+    // An explicit parenthetical metric amount ("1 cup (120 g)") is a
+    // conversion hint, not a replacement for the amount the cook entered.
+    const primary = (ingredient?.amounts || []).find(amount =>
+      amount?.role === 'primary' && Number(amount?.quantity) > 0 && amount?.unit
+    );
+    if (primary) return { portion: Number(primary.quantity), unit: normalizePortionUnit(primary.unit) || primary.unit };
+    const sourceAmount = Number(ingredient?.quantity);
+    const hasSourceAmount = Number.isFinite(sourceAmount) && sourceAmount > 0;
     const equivalent = (ingredient?.amounts || []).find(amount =>
       amount?.role === 'equivalent' && ['g', 'kg'].includes(String(amount?.unit || '').toLowerCase())
       && Number(amount?.quantity) > 0
     );
-    if (equivalent) return { portion: Number(equivalent.quantity), unit: equivalent.unit };
-    const sourceAmount = Number(ingredient?.quantity);
+    if (!hasSourceAmount && equivalent) {
+      return { portion: Number(equivalent.quantity), unit: normalizePortionUnit(equivalent.unit) || equivalent.unit };
+    }
     return {
-      portion: Number.isFinite(sourceAmount) && sourceAmount > 0 ? sourceAmount : (fallbackFood?.portion || 1),
-      unit: ingredient?.unit || fallbackFood?.unit || 'serving',
+      portion: hasSourceAmount ? sourceAmount : (fallbackFood?.portion || 1),
+      unit: normalizePortionUnit(ingredient?.unit) || normalizePortionUnit(fallbackFood?.unit) || ingredient?.unit || fallbackFood?.unit || 'serving',
+    };
+  }
+
+  function explicitEquivalentGrams(ingredient) {
+    const equivalent = (ingredient?.amounts || []).find(amount =>
+      amount?.role === 'equivalent' && Number(amount?.quantity) > 0
+      && ['g', 'kg'].includes(normalizePortionUnit(amount?.unit))
+    );
+    if (!equivalent) return null;
+    const grams = Number(equivalent.quantity) * (normalizePortionUnit(equivalent.unit) === 'kg' ? 1000 : 1);
+    return Number.isFinite(grams) && grams > 0 ? grams : null;
+  }
+
+  function normalizeImportedIngredient(ingredient) {
+    const original = String(ingredient?.original_text || '').trim();
+    if (!original) return ingredient;
+    const parsed = parseRecipeIngredientText(original);
+    const currentName = String(ingredient?.name || '').trim();
+    const rawName = !currentName || normalizeName(currentName) === normalizeName(original)
+      || currentName.toLowerCase() === 'unresolved ingredient';
+    const currentSearch = Array.isArray(ingredient?.search_names) ? ingredient.search_names : [];
+    const currentUnit = normalizePortionUnit(ingredient?.unit);
+    const usableCurrentUnit = currentUnit && (CORE_UNITS.includes(currentUnit) || currentUnit === 'pinch' || currentUnit === 'dash' || currentUnit === 'clove');
+    const existingAmounts = Array.isArray(ingredient?.amounts) ? ingredient.amounts : [];
+    const normalizedAmounts = existingAmounts.map(amount => ({
+      ...amount,
+      unit: normalizePortionUnit(amount?.unit) || amount?.unit,
+    })).filter(amount => amount?.quantity > 0 && amount?.unit && (CORE_UNITS.includes(amount.unit) || ['pinch', 'dash', 'clove'].includes(amount.unit)));
+    const searchNames = rawName
+      ? (parsed.search_names?.length ? parsed.search_names : currentSearch)
+      : [...new Set([...(parsed.search_names || []), ...currentSearch])].filter(Boolean).slice(0, 3);
+    return {
+      ...ingredient,
+      quantity: Number(ingredient?.quantity) > 0 ? ingredient.quantity : parsed.quantity,
+      unit: usableCurrentUnit || parsed.unit || ingredient?.unit || null,
+      name: rawName ? (parsed.name || currentName || original) : currentName,
+      search_names: searchNames.length ? searchNames : [currentName || parsed.name || original],
+      amounts: normalizedAmounts.length ? normalizedAmounts : (parsed.amounts || []),
+      note: [parsed.note, ingredient?.note].filter(Boolean).join('; '),
+      parse_confidence: ingredient?.parse_confidence && ingredient.parse_confidence !== 'low'
+        ? ingredient.parse_confidence
+        : parsed.parse_confidence,
     };
   }
 
@@ -150,7 +249,9 @@
     return { system: 'opaque', value: n, unit: normalizedUnit };
   }
 
-  const CORE_UNITS = ['g', 'mg', 'kg', 'oz', 'lb', 'ml', 'l', 'tsp', 'tbsp', 'fl oz', 'cup', 'piece', 'serving'];
+  const CORE_UNITS = ['g', 'mg', 'kg', 'oz', 'lb', 'ml', 'l', 'tsp', 'tbsp', 'fl oz', 'cup', 'piece', 'serving',
+    'slice', 'pinch', 'dash', 'clove', 'can', 'package', 'sprig', 'stalk', 'bunch',
+    'scoop', 'stick', 'biscuit', 'cookie', 'bar', 'packet', 'jar', 'bag', 'box'];
 
   function unitOptions(row) {
     const food = selectedFood(row);
@@ -206,7 +307,8 @@
   }
 
   function initializeResolutions(nextRecipe) {
-    resolutions = (nextRecipe.ingredients || []).map(ingredient => {
+    resolutions = (nextRecipe.ingredients || []).map(rawIngredient => {
+      const ingredient = normalizeImportedIngredient(rawIngredient);
       const targets = ingredientSearchNames(ingredient).map(normalizeName);
       const matches = foods.filter(food => targets.includes(normalizeName(food.name)));
       const mapped = nextRecipe.source === 'mealie' && nextRecipe.source_instance && ingredient.source_food_id
@@ -227,8 +329,8 @@
         searchAttempted: false,
         aiRefining: false,
         aiProposal: null,
-        equivalentGrams: null,
-        conversionSource: null,
+        equivalentGrams: explicitEquivalentGrams(ingredient),
+        conversionSource: explicitEquivalentGrams(ingredient) ? 'recipe' : null,
         conversionEstimateFailed: false,
         manuallySelected: false,
         selectionVersion: 0,
@@ -237,11 +339,16 @@
   }
 
   function cachedProviderSearch(provider, name) {
-    const key = `${provider}:${normalizeName(name)}`;
+    // OFF returns a localized product name. Include the active language in
+    // the cache key so changing the language setting during an import cannot
+    // reuse stale results from the previous catalog language; USDA is
+    // language-neutral but sharing the same shape keeps the key simple.
+    const languageKey = provider === 'openfoodfacts' ? `:${$offSearchLanguage}` : '';
+    const key = `${provider}${languageKey}:${normalizeName(name)}`;
     if (providerSearchCache.has(key)) return providerSearchCache.get(key);
-    const promise = provider === 'openfoodfacts'
+    const promise = scheduleProviderRequest(() => provider === 'openfoodfacts'
       ? API.searchByName(name, 1, { countryFilter: false }).then(items => (items || []).slice(0, 20).map(food => ({ ...food, _candidateProvider: provider })))
-      : USDA.searchByName(name, 1, $usdaApiKey).then(items => (items || []).slice(0, 20).map(food => ({ ...food, _candidateProvider: provider })));
+      : USDA.searchByName(name, 1, $usdaApiKey).then(items => (items || []).slice(0, 20).map(food => ({ ...food, _candidateProvider: provider }))));
     providerSearchCache.set(key, promise);
     promise.catch(() => providerSearchCache.delete(key));
     return promise;
@@ -346,7 +453,7 @@
   }
 
   function cleanProviderFood(candidate, row) {
-    const { _candidateProvider, _matchScore, _relevanceScore, _matchReasons, _convertible, _brandRank, _sourceRank, _localFoodId, nameLanguage, id: _drop, ...foodData } = candidate;
+    const { _candidateProvider, _matchScore, _relevanceScore, _matchReasons, _convertible, _brandRank, _unbranded, _sourceRank, _localFoodId, nameLanguage, id: _drop, ...foodData } = candidate;
     return { ...foodData, external_refs: providerReferences(candidate, row), _candidateProvider };
   }
 
@@ -361,7 +468,9 @@
     row.manuallySelected = !automatic;
     row.selectionVersion = (row.selectionVersion || 0) + 1;
     row.equivalentGrams = null;
-    row.conversionSource = null;
+    const explicit = explicitEquivalentGrams(row.ingredient);
+    row.equivalentGrams = explicit;
+    row.conversionSource = explicit ? 'recipe' : null;
     row.estimatingConversion = false;
     row.conversionEstimateFailed = false;
   }
@@ -507,8 +616,8 @@
       automatic: false,
       manuallySelected: true,
       selectionVersion: (rows[index].selectionVersion || 0) + 1,
-      equivalentGrams: null,
-      conversionSource: null,
+      equivalentGrams: explicitEquivalentGrams(rows[index].ingredient),
+      conversionSource: explicitEquivalentGrams(rows[index].ingredient) ? 'recipe' : null,
     };
     resolutions = rows;
   }
@@ -695,9 +804,12 @@
                 {/if}
               {:else}
                 {#if $aiEffectivelyEnabled && (row.ingredient.parse_confidence !== 'high' || (row.searchAttempted && !row.candidates?.length))}
-                  <button class="btn btn-ghost ai-refine" on:click={() => requestAiRefinement(index)} disabled={row.aiRefining}>
-                    {row.aiRefining ? $_('recipe_import.ai_refining') : $_('recipe_import.ai_refine')}
-                  </button>
+                  <div class="ai-refine-action">
+                    <small>{$_('recipe_import.ai_help')}</small>
+                    <button class="btn btn-ghost ai-refine" on:click={() => requestAiRefinement(index)} disabled={row.aiRefining}>
+                      {row.aiRefining ? $_('recipe_import.ai_refining') : $_('recipe_import.ai_refine')}
+                    </button>
+                  </div>
                 {/if}
                 {#if row.aiProposal}
                   <div class="ai-proposal">
@@ -817,8 +929,9 @@
   .match-picker > span:first-child { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
   .match-picker strong, .match-picker small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .match-picker small { color: var(--text-3); }
-  .amount-row { grid-column: 3; min-width: 0; display: grid; grid-template-columns: 60px minmax(0, 1fr); gap: 6px; }
-  .amount-row > *, .unit-select { width: 100%; min-width: 0; }
+  .amount-row { grid-column: 3; min-width: 0; display: grid; grid-template-columns: minmax(72px, .55fr) minmax(120px, 1fr); gap: 6px; }
+  .amount-row > *, .unit-select { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
+  .unit-select { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ack-row { grid-column: 2 / -1; font-size: 12px; display: flex; gap: 7px; align-items: start; }
   .ack-row span { display: flex; flex-direction: column; gap: 2px; }
   .ack-row small { color: var(--text-3); font-weight: 400; }
@@ -826,6 +939,8 @@
   .conversion-detail { grid-column: 2 / -1; margin: 0; color: var(--text-3); font-size: 12px; }
   .conversion-detail.estimated { color: #b66a00; }
   .retry-estimate { margin-left: 6px; border: 0; padding: 0; background: none; color: var(--accent); cursor: pointer; text-decoration: underline; }
+  .ai-refine-action { grid-column: 1 / -1; min-width: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .ai-refine-action small { color: var(--text-3); font-size: 11px; line-height: 1.35; }
   .ai-refine { justify-self: start; font-size: 12px; }
   .ai-proposal { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border)); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--accent) 8%, var(--surface-2)); font-size: 12px; }
   .ai-proposal > div { display: flex; gap: 8px; }

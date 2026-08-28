@@ -1,7 +1,7 @@
 <script>
   import { onMount, tick } from 'svelte';
   import { pop } from 'svelte-spa-router';
-  import { _ } from 'svelte-i18n';
+  import { _, locale } from 'svelte-i18n';
   import { NtApi, API, USDA } from '../lib/api.js';
   import { Mealie } from '../lib/mealieApi.js';
   import BarcodeScanner from '../components/foods/BarcodeScanner.svelte';
@@ -14,6 +14,8 @@
   import UnitPicker from '../components/ui/UnitPicker.svelte';
   import ImageCropper from '../components/ui/ImageCropper.svelte';
   import { scaleFactor as _unitScaleFactor, amountAndUnit } from '../lib/units.js';
+  import { displayUnitName } from '../lib/provider-portions.js';
+  import { recipeItemAmount, recipeItemAmountLabel, recipeItemGramLabel, recipeItemGrams, restoreRecipeItemMeasurements } from '../lib/recipe-item-display.js';
   import { showSuccess, showError } from '../stores/toast.js';
   import { editorState, clearMealEditorState } from '../stores/editorState.js';
   import { Nutrition, NUTRIMENTS } from '../lib/nutrition.js';
@@ -75,6 +77,12 @@
   // Banner state so a restored draft is visible + dismissable.
   let _draftRestored = false;
   let _serverBaseline = null;
+  // True when a pre-household-measurement recipe was upgraded in memory. We
+  // use this to repair the editor's total-weight field as well as each row;
+  // the old importer wrote the selected food's default 100 g serving into
+  // both places. A user-restored draft remains authoritative and is never
+  // overwritten by this compatibility migration.
+  let _legacyMeasurementsRestored = false;
 
   // Ingredient picker
   let showPicker = false;
@@ -132,6 +140,7 @@
   let portionUnit = 'g';
   let portionSheet = false;
   let editingIndex = null; // null = adding new, number = editing existing
+  $: _portionTotal = Math.round((parseDecimal(portionAmount) || 100) * (parseDecimal(portionQty) || 1) * 10) / 10;
 
   // Multi-select
   let selectedIngredients = new Set();
@@ -154,12 +163,41 @@
     // Overlays a fresh (<4h) draft on top of what we just loaded so
     // the user's typing survives a camera-triggered process death.
     // Banner + Discard exposed to the user (Wildenhaus feedback on dev05).
+    // Capture the pre-overlay server state. Keep the automatic legacy-
+    // measurement migration in the baseline so Discard restores a recipe as
+    // it should appear today, not a misleading 100 Gram copy of every row.
+    // Recipe totals are derived here as well; at this point the live fields
+    // still contain their blank/new-editor defaults, and a restored draft
+    // must never leak those defaults into the Discard target.
+    const sourceItems = Array.isArray(meal.items) ? meal.items : [];
+    const baselineItems = isRecipe ? restoreRecipeItemMeasurements(sourceItems) : sourceItems;
+    let baselineRecipeAmount = '';
+    let baselineRecipeUnit = 'g';
+    let baselineRecipeYields = 1;
+    if (isRecipe) {
+      const baselineExisting = !!params?.id || !!editorState.mealPrefill?.id;
+      const baselineHasServings = meal.servings != null;
+      const baselineEffectiveServings = baselineHasServings
+        ? Math.max(1, parseInt(meal.servings) || 1)
+        : 1;
+      baselineRecipeYields = baselineExisting && !baselineHasServings ? '' : baselineEffectiveServings;
+      if (meal.portion) baselineRecipeAmount = String((parseFloat(meal.portion) || 0) * baselineEffectiveServings);
+      if (meal.unit) baselineRecipeUnit = meal.unit;
+      const baselineWasMigrated = baselineItems.some((item, index) => item !== sourceItems[index]);
+      if (baselineWasMigrated) {
+        const grams = baselineItems.reduce((sum, item) => sum + (recipeItemGrams(item) || 0), 0);
+        if (grams > 0 && baselineItems.length > 0 && baselineItems.every(item => recipeItemGrams(item) > 0)) {
+          baselineRecipeAmount = String(Math.round(grams));
+          baselineRecipeUnit = 'g';
+        }
+      }
+    }
     _serverBaseline = {
-      meal: { ...meal },
+      meal: { ...meal, items: baselineItems },
       photoPreviewUrl,
-      recipeAmount,
-      recipeUnit,
-      recipeYields,
+      recipeAmount: baselineRecipeAmount,
+      recipeUnit: baselineRecipeUnit,
+      recipeYields: baselineRecipeYields,
       isRecipe,
     };
     try {
@@ -174,6 +212,17 @@
         _draftRestored = true;
       }
     } catch { /* draft parse issues fall through to server-loaded state */ }
+    // Recipes imported before household measurements were persisted may still
+    // have each row stored as the selected food's default 100 g serving. The
+    // source_ingredient snapshot has the original line, so restore that
+    // amount (and deterministic gram nutrition) before the editor renders.
+    if (isRecipe && Array.isArray(meal.items)) {
+      const restoredItems = restoreRecipeItemMeasurements(meal.items);
+      _legacyMeasurementsRestored = restoredItems.some((item, index) => item !== meal.items[index]);
+      if (_legacyMeasurementsRestored) {
+        meal = { ...meal, items: restoredItems };
+      }
+    }
     // Photo lives in IndexedDB now (kept out of localStorage's tight
     // quota). Async restore; if the user's already picked a fresher
     // photo by the time it lands, don't clobber theirs.
@@ -199,6 +248,19 @@
       recipeYields = isExistingRecipe && !hasExplicitServings ? '' : effectiveServings;
       if (meal.portion) recipeAmount = (parseFloat(meal.portion) || 0) * effectiveServings;
       if (meal.unit) recipeUnit = meal.unit;
+      // The legacy recipe row migration above can recover deterministic gram
+      // weights from provider portions or explicit source equivalents. When
+      // every known row contributes a weight, prefer that corrected sum over
+      // the stale parent total (usually 100 g × item count). Keep a draft's
+      // explicit total untouched because it represents the user's edits.
+      if (_legacyMeasurementsRestored && !_draftRestored) {
+        const restoredGrams = meal.items.reduce((sum, item) => sum + (recipeItemGrams(item) || 0), 0);
+        const everyRowHasGrams = meal.items.length > 0 && meal.items.every(item => recipeItemGrams(item) > 0);
+        if (restoredGrams > 0 && everyRowHasGrams) {
+          recipeAmount = String(Math.round(restoredGrams));
+          recipeUnit = 'g';
+        }
+      }
     }
 
   });
@@ -438,7 +500,12 @@
           Object.entries(item.food.nutrition).map(([k, v]) => [k, (parseFloat(v)||0) * factor])
         );
       }
-      meal = { ...meal, items: [...meal.items, { ...item.food, portion: newPortion * newQty, unit: newUnit, quantity: 1, nutrition: scaledNutrition }] };
+      const nextItem = withCurrentRecipeMeasurement({
+        ...item.food, portion: newPortion * newQty, unit: newUnit,
+        recipe_portion: newPortion * newQty, recipe_unit: newUnit,
+        quantity: 1, nutrition: scaledNutrition,
+      });
+      meal = { ...meal, items: [...meal.items, nextItem] };
     }
     if (isRecipe) autoUpdateRecipeAmount();
     showMultiPortionSheet = false;
@@ -533,8 +600,9 @@
     const item = meal.items[i];
     editingIndex = i;
     portionFood = item;
-    portionAmount = item.portion || 100;
-    portionUnit = item.unit || 'g';
+    const displayed = recipeItemAmount(item);
+    portionAmount = displayed.amount;
+    portionUnit = displayed.unit;
     portionQty = item.quantity || 1;
     clearTimeout(_meLockTimer);
     _meLock = true;
@@ -566,7 +634,11 @@
         );
       }
       const items = [...meal.items];
-      items[editingIndex] = { ...item, portion: newTotal, unit: portionUnit, quantity: 1, nutrition: newNutrition };
+      items[editingIndex] = withCurrentRecipeMeasurement({
+        ...item, portion: newTotal, unit: portionUnit,
+        recipe_portion: newTotal, recipe_unit: portionUnit,
+        quantity: 1, nutrition: newNutrition,
+      });
       meal = { ...meal, items };
       editingIndex = null;
     } else {
@@ -580,7 +652,11 @@
           Object.entries(portionFood.nutrition).map(([k, v]) => [k, (parseFloat(v)||0) * factor])
         );
       }
-      const item = { ...portionFood, portion: newTotal, unit: portionUnit, quantity: 1, nutrition: scaledNutrition };
+      const item = withCurrentRecipeMeasurement({
+        ...portionFood, portion: newTotal, unit: portionUnit,
+        recipe_portion: newTotal, recipe_unit: portionUnit,
+        quantity: 1, nutrition: scaledNutrition,
+      });
       meal = { ...meal, items: [...meal.items, item] };
     }
 
@@ -662,14 +738,27 @@
   }
 
   function autoUpdateRecipeAmount() {
-    const grams = meal.items.reduce((s, it) => s + toGrams(it.portion, it.unit) * (it.quantity||1), 0);
+    const grams = meal.items.reduce((s, it) => s + (recipeItemGrams(it) || 0), 0);
     recipeAmount = grams > 0 ? String(Math.round(grams)) : '';
     recipeUnit = 'g';
   }
 
-  function toGrams(amount, unit) {
-    const c = { g:1, ml:1, oz:28.35, cup:240, tbsp:15, tsp:5, piece:100, serving:100 };
-    return (parseFloat(amount)||0) * (c[unit]||1);
+  function toGrams(item) {
+    return recipeItemGrams(item) || 0;
+  }
+
+  // `equivalent_grams` is a snapshot for the row's current measurement. Any
+  // edit/add operation must clear the old snapshot before recalculating it;
+  // otherwise a row imported as 1 Cup (80 Grams) would keep displaying 80
+  // Grams after the user changed it to 2 Cups. When no deterministic
+  // conversion exists, leave the field undefined so the UI can accurately
+  // omit the gram line instead of reusing stale data.
+  function withCurrentRecipeMeasurement(item) {
+    const candidate = { ...item, equivalent_grams: undefined };
+    const grams = recipeItemGrams(candidate);
+    return Number.isFinite(grams) && grams > 0
+      ? { ...candidate, equivalent_grams: grams }
+      : candidate;
   }
 
   let showAllNutrients = false;
@@ -714,7 +803,7 @@
         is_recipe: isRecipe,
       };
       if (isRecipe) {
-        const totalGrams = parseDecimal(recipeAmount) || Math.round(meal.items.reduce((s,it)=>s+toGrams(it.portion,it.unit),0)) || 100;
+        const totalGrams = parseDecimal(recipeAmount) || Math.round(meal.items.reduce((s,it)=>s+toGrams(it),0)) || 100;
         const explicit = recipeYields !== '' && recipeYields != null && !Number.isNaN(parseInt(recipeYields));
         const yields = explicit ? Math.max(1, parseInt(recipeYields) || 1) : 1;
         // Store per-serving values. Adding "1" of this recipe to the diary
@@ -931,7 +1020,7 @@
           {@const _g = Math.round((parseDecimal(recipeAmount) / _y) * 10) / 10}
           {@const _perServE = Nutrition.displayEnergy((totals?.calories || 0) / _y, $energyUnit)}
           <div style="border-top:1px solid var(--border);margin-top:10px;padding-top:8px">
-            <p style="margin:0;font-size:13px"><span class="text-3">{$_('meal_editor.servings.per_serving_label')}</span> <strong>{amountAndUnit(_g, recipeUnit)} · {_perServE.value} {_perServE.unit}</strong></p>
+            <p style="margin:0;font-size:13px"><span class="text-3">{$_('meal_editor.servings.per_serving_label')}</span> <strong>{_g} {displayUnitName(recipeUnit, _g, $locale)} · {_perServE.value} {_perServE.unit}</strong></p>
           </div>
         {/if}
       </div>
@@ -1001,6 +1090,8 @@
           on:pointercancel={onDragPointerUp}>
           {#each meal.items as item, i}
             {@const _ingEnergy = Nutrition.displayEnergy(Nutrition.calculate(item).calories || 0, $energyUnit)}
+            {@const _ingAmount = recipeItemAmountLabel(item, $locale)}
+            {@const _ingGrams = recipeItemGramLabel(item, $locale)}
             <div class="ingredient-row"
               class:drag-over={dragOver === i && dragFrom !== null && dragFrom !== i}
               class:dragging={dragFrom === i}>
@@ -1019,7 +1110,7 @@
               {/if}
               <div class="ing-info">
                 <span class="ingredient-name">{item.name}</span>
-                <span class="text-3" style="font-size:12px">{item.portion} {item.unit}</span>
+                <span class="text-3" style="font-size:12px">{_ingAmount}{#if _ingGrams} · {_ingGrams}{/if}</span>
               </div>
               <span class="text-3 text-sm">{_ingEnergy.value.toLocaleString()} {_ingEnergy.unit}</span>
               <button class="btn-icon btn-sm" on:click={() => openEditIngredient(i)}
@@ -1192,7 +1283,7 @@
     </div>
     <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface-2);border-radius:var(--radius-md)">
       <span style="font-size:13px;color:var(--text-3)">{$_('meal_editor_deep.total_amount')}</span>
-      <span style="font-size:14px;font-weight:500">{Math.round((parseDecimal(portionAmount) || 100) * (parseDecimal(portionQty) || 1) * 10) / 10}{portionUnit || 'g'}</span>
+      <span style="font-size:14px;font-weight:500">{_portionTotal} {displayUnitName(portionUnit || 'g', _portionTotal, $locale)}</span>
     </div>
     <button class="btn btn-primary w-full" on:click={confirmPortion}>{editingIndex !== null ? $_('meal_editor.save_changes') : $_('meal_editor.add_ingredient')}</button>
   </div>

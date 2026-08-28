@@ -1,7 +1,7 @@
 <script>
   import { onMount, onDestroy, tick } from 'svelte';
   import { push, location } from 'svelte-spa-router';
-  import { _ } from 'svelte-i18n';
+  import { _, locale } from 'svelte-i18n';
   import { fade, fly, slide } from 'svelte/transition';
 
   import Tabs        from '../components/ui/Tabs.svelte';
@@ -27,6 +27,8 @@
   import { offCountryTagToFlag, offCountryTagToName } from '../lib/off-country-flag.js';
   import { foodsShowThumbnails, foodsShowCategories, foodsShowLabels, foodsShowNotes, foodsSort, mealsSort, recipesSort, foodCategories, foodsShowYesterdayMeals, foodsYesterdayCollapsed, foodsSavedCollapsed, mealNames, usdaEnabled, usdaApiKey, offEnabled, offSearchCountry, offSearchLanguage, foodsDefaultSource, catName as _catName, catDisplay as _catDisplay, pageBanners, bannerStyle, energyUnit } from '../stores/settings.js';
   import { mealIcon } from '../lib/mealIcon.js';
+  import { displayUnitName } from '../lib/provider-portions.js';
+  import { recipeItemAmountLabel, recipeItemGramLabel, recipeItemGrams, restoreRecipeItemMeasurements } from '../lib/recipe-item-display.js';
 
   // Query string params
   function qs() {
@@ -451,7 +453,9 @@
   let _mealInfoImgFailed = new Set();
 
   function openMealInfo(food) {
-    const items = food.items || [];
+    const items = food.is_recipe
+      ? restoreRecipeItemMeasurements(food.items || [])
+      : (food.items || []);
     const totalKcal = Nutrition.sum(items.map(i => Nutrition.calculate(i))).calories || 0;
     mealInfoGroup = { food, mealName: food.name, items, totalKcal, isRecipe: !!food.is_recipe };
     _mealInfoImgFailed = new Set();
@@ -484,12 +488,18 @@
   // dismissed so it doesn't need this treatment.
   $: { activeTab; searchSource; activeCategoryFilter; _paneFood = null; }
 
-  // Convert item portions to grams for total serving display
-  const _toG = { g:1, ml:1, oz:28.35, lb:453.59, cup:240, tbsp:15, tsp:5 };
+  // Convert item portions to grams for total serving display. Recipe items
+  // carry provider-backed equivalent_grams when available, so this no longer
+  // treats every household portion as an arbitrary 100 g.
   function mealServing(items) {
-    if (!items?.length) return '0g';
-    const total = items.reduce((s, i) => s + (parseFloat(i.portion)||0) * (_toG[i.unit] ?? 1), 0);
-    return `${Math.round(total)}g`;
+    if (!items?.length) return `0 ${displayUnitName('g', 0, $locale)}`;
+    // Apply the same compatibility migration used by the editor/detail
+    // sheet. Older imported recipes were saved as the selected food's
+    // default 100 Grams even though source_ingredient retained the entered
+    // household amount; the list summary should not perpetuate that value.
+    const restored = restoreRecipeItemMeasurements(items);
+    const total = restored.reduce((s, i) => s + (recipeItemGrams(i) || 0), 0);
+    return `${Math.round(total)} ${displayUnitName('g', total, $locale)}`;
   }
 
   $: currentStore = TABS[activeTab].value;
@@ -997,7 +1007,14 @@
       if (typeof meal.id === 'number') {
         NtApi.markMealUsed(meal.id, pickDate || undefined).catch(() => {});
       }
-      for (const item of meal.items) {
+      // Legacy imported recipes may still carry the selected food's default
+      // 100 Gram row. Recover the original household measurement before
+      // expanding into the diary, matching the editor and recipe detail
+      // sheet displays.
+      const items = meal.is_recipe
+        ? restoreRecipeItemMeasurements(meal.items || [])
+        : (meal.items || []);
+      for (const item of items) {
         await addDiaryItem(
           { ...item, quantity: item.quantity || 1 },
           Number(pickMeal) || 0,
@@ -2444,6 +2461,8 @@
     <div style="padding:0 4px 8px">
       {#each yesterdayInfoGroup.items as it}
         {@const _itEnergy = Nutrition.displayEnergy((it.nutrition?.calories || it.calories || 0) * (it.quantity || 1), $energyUnit)}
+        {@const _itAmount = recipeItemAmountLabel(it, $locale)}
+        {@const _itGrams = recipeItemGramLabel(it, $locale)}
         {@const _img = liveImgFor(it)}
         <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border)">
           {#if _img && !_yesterdayImgFailed.has(it)}
@@ -2459,7 +2478,7 @@
             <span style="font-weight:500;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{it.name || 'Unnamed'}</span>
             {#if it.brand}<span class="text-3 text-sm">{it.brand}</span>{/if}
             <span class="text-3 text-sm">
-              {it.quantity ? `${it.quantity} × ` : ''}{amountAndUnit(it.portion || 100, it.unit)}
+              {it.quantity ? `${it.quantity} × ` : ''}{_itAmount}{#if _itGrams} · {_itGrams}{/if}
             </span>
           </div>
           <span class="text-2 text-sm" style="font-variant-numeric:tabular-nums;margin-left:8px;flex-shrink:0">
@@ -2488,6 +2507,8 @@
     <div style="padding:0 4px 8px">
       {#each mealInfoGroup.items as it}
         {@const _itEnergy = Nutrition.displayEnergy((it.nutrition?.calories || it.calories || 0) * (it.quantity || 1), $energyUnit)}
+        {@const _itAmount = recipeItemAmountLabel(it, $locale)}
+        {@const _itGrams = recipeItemGramLabel(it, $locale)}
         {@const _img = liveImgFor(it)}
         <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border)">
           {#if _img && !_mealInfoImgFailed.has(it)}
@@ -2503,7 +2524,7 @@
             <span style="font-weight:500;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{it.name || 'Unnamed'}</span>
             {#if it.brand}<span class="text-3 text-sm">{it.brand}</span>{/if}
             <span class="text-3 text-sm">
-              {it.quantity ? `${it.quantity} × ` : ''}{amountAndUnit(it.portion || 100, it.unit)}
+              {it.quantity ? `${it.quantity} × ` : ''}{_itAmount}{#if _itGrams} · {_itGrams}{/if}
             </span>
           </div>
           <span class="text-2 text-sm" style="font-variant-numeric:tabular-nums;margin-left:8px;flex-shrink:0">

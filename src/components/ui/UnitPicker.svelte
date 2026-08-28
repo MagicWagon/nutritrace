@@ -14,7 +14,9 @@
    */
   import { onMount, onDestroy, tick, createEventDispatcher } from 'svelte';
   import { fade } from 'svelte/transition';
+  import { locale } from 'svelte-i18n';
   import { unitGroupsWithCustoms } from '../../lib/units.js';
+  import { displayUnitName } from '../../lib/provider-portions.js';
   import { customUnits } from '../../stores/settings.js';
   import { portal } from '../../lib/portal.js';
 
@@ -152,7 +154,7 @@
     type="text"
     {placeholder}
     {disabled}
-    value={open ? _query : (value || '')}
+    value={open ? _query : (value ? displayUnitName(value, 1, $locale) : '')}
     on:input={onInput}
     on:focus={onFocus}
     on:blur={onBlur}
@@ -184,8 +186,7 @@
             on:mousedown|preventDefault={() => pick(u)}
             on:mouseenter={() => highlight = idx}
           >
-            <span class="opt-full">{u.full}</span>
-            <span class="opt-abbr">{u.abbr}</span>
+            <span class="opt-full">{displayUnitName(u.abbr, 1, $locale)}</span>
           </button>
         {/each}
       {/each}

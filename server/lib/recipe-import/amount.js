@@ -5,7 +5,9 @@ function unitKey(value) {
   const raw = String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
   return ({ c: 'cup', cups: 'cup', teaspoons: 'tsp', teaspoon: 'tsp', tablespoons: 'tbsp', tablespoon: 'tbsp',
     grams: 'g', gram: 'g', kilograms: 'kg', kilogram: 'kg', milliliters: 'ml', milliliter: 'ml',
-    litres: 'l', litre: 'l', liters: 'l', liter: 'l', ounces: 'oz', ounce: 'oz', pounds: 'lb', pound: 'lb' })[raw] || raw;
+    litres: 'l', litre: 'l', liters: 'l', liter: 'l', ounces: 'oz', ounce: 'oz', pounds: 'lb', pound: 'lb',
+    each: 'piece', whole: 'piece', wholes: 'piece', item: 'piece', items: 'piece',
+    unit: 'piece', units: 'piece', fruit: 'piece', fruits: 'piece' })[raw] || raw;
 }
 
 function altUnitGrams(food, unit) {
@@ -48,4 +50,19 @@ export function resolveAmountFactor(food, amount, unit) {
   }
   const requestedValue = inSameFrame(requested, original.system, food);
   return requestedValue != null && original.value > 0 ? requestedValue / original.value : null;
+}
+
+/**
+ * Resolve a recipe amount to grams when the provider has enough information
+ * to do so deterministically. This is deliberately separate from
+ * resolveAmountFactor: nutrition scaling can work in a food's ml basis, but
+ * recipe totals and UI provenance need a physical gram value.
+ */
+export function resolveAmountGrams(food, amount, unit) {
+  const requested = measure(amount, unit, food);
+  if (!requested || requested.system === 'opaque') return null;
+  if (requested.system === 'mass') return requested.value;
+  const density = Number(food?.density_g_ml);
+  if (Number.isFinite(density) && density > 0) return requested.value * density;
+  return null;
 }

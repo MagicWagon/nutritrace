@@ -7,7 +7,7 @@ import db from '../db.js';
 import { fetchRecipePage, resolvePublicAddress, validateRecipeUrl } from '../lib/recipe-import/fetch-page.js';
 import { parseRecipeJsonLd } from '../lib/recipe-import/jsonld.js';
 import { RecipeImportError, recipeImportErrorBody } from '../lib/recipe-import/errors.js';
-import { resolveAmountFactor } from '../lib/recipe-import/amount.js';
+import { resolveAmountFactor, resolveAmountGrams } from '../lib/recipe-import/amount.js';
 import { importMealieRecipeImage } from '../lib/mealie-image.js';
 
 const router = Router();
@@ -244,17 +244,27 @@ router.post('/commit', wrap(async (req, res) => {
 
       if (food) {
         const basePortion = Number(food.portion) || 100;
-        const portion = Number(resolution.portion) || basePortion;
-        const unit = String(resolution.unit || food.unit || 'g').slice(0, 40);
+        const sourcePrimary = Array.isArray(sourceIngredient.amounts)
+          ? sourceIngredient.amounts.find(amount => amount?.role === 'primary' && Number(amount?.quantity) > 0 && amount?.unit)
+          : null;
+        const requestedPortion = Number(resolution.portion);
+        const portion = Number.isFinite(requestedPortion) && requestedPortion > 0
+          ? requestedPortion
+          : (Number(sourcePrimary?.quantity) || Number(sourceIngredient.original_quantity) || basePortion);
+        const unit = String(resolution.unit || sourcePrimary?.unit || sourceIngredient.original_unit || food.unit || 'g').slice(0, 40);
         const foodForConversion = { ...food, alt_units: parseJson(food.alt_units, []) };
-        const equivalentGrams = Number(resolution.equivalent_grams);
-        const factor = Number.isFinite(equivalentGrams) && equivalentGrams > 0
-          ? resolveAmountFactor(foodForConversion, equivalentGrams, 'g')
+        const explicitEquivalentGrams = Number(resolution.equivalent_grams);
+        const derivedEquivalentGrams = resolveAmountGrams(foodForConversion, portion, unit);
+        const equivalentGrams = Number.isFinite(explicitEquivalentGrams) && explicitEquivalentGrams > 0
+          ? explicitEquivalentGrams
+          : derivedEquivalentGrams;
+        const factor = Number.isFinite(explicitEquivalentGrams) && explicitEquivalentGrams > 0
+          ? resolveAmountFactor(foodForConversion, explicitEquivalentGrams, 'g')
           : resolveAmountFactor(foodForConversion, portion, unit);
         if (factor == null) throw commitFailure(422, 'conversion_required', `No reliable unit conversion is available for ${food.name}.`);
         const foodNutrition = parseJson(food.nutrition, {});
         items.push({
-          id: food.id, name: food.name, brand: food.brand || '', portion, unit, quantity: 1,
+          id: food.id, name: food.name, brand: food.brand || '', portion, unit, recipe_portion: portion, recipe_unit: unit, quantity: 1,
           nutrition: Object.fromEntries(Object.entries(foodNutrition).map(([key, value]) => [key, (Number(value) || 0) * factor])),
           imgUrl: food.img_url || '', nutrition_basis: food.nutrition_basis || null,
           alt_units: foodForConversion.alt_units, density_g_ml: food.density_g_ml ?? null,
@@ -263,10 +273,18 @@ router.post('/commit', wrap(async (req, res) => {
         });
       } else {
         if (!resolution.unresolved_acknowledged) throw commitFailure(422, 'unresolved_ingredients', 'Every unresolved ingredient must be acknowledged.');
+        const sourcePrimary = Array.isArray(sourceIngredient.amounts)
+          ? sourceIngredient.amounts.find(amount => amount?.role === 'primary' && Number(amount?.quantity) > 0 && amount?.unit)
+          : null;
+        const unresolvedPortion = Number(resolution.portion) || Number(sourcePrimary?.quantity) || Number(sourceIngredient.original_quantity) || 1;
+        const unresolvedUnit = resolution.unit || sourcePrimary?.unit || sourceIngredient.original_unit || 'serving';
         items.push({
           type: 'unresolved_ingredient', name: String(resolution.name || sourceIngredient.original_text || 'Unresolved ingredient').slice(0, 500),
-          portion: Number(resolution.portion) || Number(sourceIngredient.original_quantity) || 1,
-          unit: resolution.unit || sourceIngredient.original_unit || 'serving', quantity: 1, nutrition: {},
+          portion: unresolvedPortion,
+          unit: unresolvedUnit,
+          recipe_portion: unresolvedPortion,
+          recipe_unit: unresolvedUnit,
+          quantity: 1, nutrition: {},
           source_ingredient: { ...sourceIngredient, resolution: 'unresolved' },
         });
       }

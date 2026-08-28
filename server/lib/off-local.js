@@ -289,11 +289,13 @@ export async function searchByName(query, { page = 1, pageSize = 20, lang = 'en'
       ? `SELECT *,
               CASE WHEN LEN(list_filter(product_name, x ->
                 LOWER(x.text) LIKE $2 ESCAPE '\\'
-                AND ($5 = '' OR LOWER(x.lang) = $5 OR (LOWER(x.lang) = 'main' AND LOWER(lang) = $5)))) > 0 THEN 0 ELSE 1 END AS _rank
+                AND ($5 = '' OR LOWER(x.lang) = $5 OR COALESCE(LOWER(x.lang), '') = ''
+                  OR (LOWER(x.lang) = 'main' AND (LOWER(lang) = $5 OR COALESCE(LOWER(lang), '') = '')))) > 0 THEN 0 ELSE 1 END AS _rank
            FROM products
           WHERE LEN(list_filter(product_name, x ->
                   LOWER(x.text) LIKE $1 ESCAPE '\\'
-                  AND ($5 = '' OR LOWER(x.lang) = $5 OR (LOWER(x.lang) = 'main' AND LOWER(lang) = $5)))) > 0
+                  AND ($5 = '' OR LOWER(x.lang) = $5 OR COALESCE(LOWER(x.lang), '') = ''
+                    OR (LOWER(x.lang) = 'main' AND (LOWER(lang) = $5 OR COALESCE(LOWER(lang), '') = '')))) > 0
              OR LOWER(brands) LIKE $1 ESCAPE '\\'
           ORDER BY _rank ASC
           LIMIT $3 OFFSET $4`
@@ -567,7 +569,7 @@ function _toOffProduct(row, preferLang = 'en', strictLanguage = false) {
   }
   // Legacy native DuckDB shape (product_name is a plain string column)
   const legacyLang = _coerceString(row.lang).slice(0, 2).toLowerCase();
-  if (strictLanguage && legacyLang !== String(preferLang).slice(0, 2).toLowerCase()) return null;
+  if (strictLanguage && legacyLang && legacyLang !== String(preferLang).slice(0, 2).toLowerCase()) return null;
   const nutriments = _flattenNutrimentsStruct(row.nutriments) || _pickNutrimentColumns(row);
   return {
     code: _coerceString(row.code),
@@ -866,10 +868,13 @@ function _extractLocalized(list, preferLang = 'en', strictLanguage = false, prim
   // Strict searches accept `main` only when the row's declared primary
   // language proves that `main` is the requested language.
   for (const x of list) { if (getLang(x) === wantLang) { const t = getText(x); if (t) return t; } }
-  if (!strictLanguage || String(primaryLang).slice(0, 2).toLowerCase() === wantLang) {
+  // A missing primary language is common in older OFF mirror rows. Treat it
+  // as unknown (rather than as a mismatch) so a strict search can still use
+  // the row; an explicitly declared non-matching language remains excluded.
+  if (!strictLanguage || !String(primaryLang).trim() || String(primaryLang).slice(0, 2).toLowerCase() === wantLang) {
     for (const x of list) { if (getLang(x) === 'main') { const t = getText(x); if (t) return t; } }
   }
-  if (!strictLanguage) {
+  if (!strictLanguage || !String(primaryLang).trim()) {
     for (const x of list) { const t = getText(x); if (t) return t; }
   }
 

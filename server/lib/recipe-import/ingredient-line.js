@@ -24,7 +24,17 @@ const UNIT_ALIASES = new Map(Object.entries({
   can: 'can', cans: 'can', package: 'package', packages: 'package', pkg: 'package',
   piece: 'piece', pieces: 'piece', sprig: 'sprig', sprigs: 'sprig',
   stalk: 'stalk', stalks: 'stalk', bunch: 'bunch', bunches: 'bunch',
+  scoop: 'scoop', scoops: 'scoop', stick: 'stick', sticks: 'stick',
+  biscuit: 'biscuit', biscuits: 'biscuit', cookie: 'cookie', cookies: 'cookie',
+  bar: 'bar', bars: 'bar', packet: 'packet', packets: 'packet',
+  jar: 'jar', jars: 'jar', bag: 'bag', bags: 'bag', box: 'box', boxes: 'box',
 }));
+
+// Recipe sites often put produce size between the quantity and food name
+// ("1 medium apple"). It is useful context, but it is not part of the food
+// name sent to provider search. A size-qualified item is treated as a piece
+// when no explicit household unit follows it.
+const SIZE_QUALIFIERS = /^(?:(?:extra|very)\s+)?(?:small|medium|large|jumbo|mini|baby)(?:\s+large|\s+small)?\s+/i;
 
 function parseNumericToken(token) {
   if (!token) return null;
@@ -43,6 +53,12 @@ function parseNumericToken(token) {
 
 function cleanName(value) {
   return value.replace(/^of\s+/i, '').replace(/^[,;:\-–—]\s*/, '').replace(/\s+/g, ' ').trim();
+}
+
+function appendNote(existing, value) {
+  const note = String(value || '').trim();
+  if (!note) return existing || '';
+  return existing ? `${existing}; ${note}` : note;
 }
 
 function readUnit(value) {
@@ -83,6 +99,7 @@ function stripAlternativeAmount(value) {
   if (amount) rest = rest.slice(amount.length);
   const equivalent = readParentheticalAmount(rest);
   if (equivalent) rest = rest.slice(equivalent.length);
+  rest = rest.replace(SIZE_QUALIFIERS, '');
   return cleanName(rest);
 }
 
@@ -133,6 +150,15 @@ export function parseIngredientLine(input) {
     rest = rest.slice(packageMatch[0].length);
   }
 
+  const sizeQualifier = SIZE_QUALIFIERS.exec(rest);
+  if (sizeQualifier) {
+    out.note = appendNote(out.note, sizeQualifier[0].trim());
+    rest = rest.slice(sizeQualifier[0].length);
+    // "1 medium apple" means one apple, not one abstract serving. Provider
+    // portions can then supply a piece conversion when available.
+    out.unit = 'piece';
+  }
+
   const unitMatch = /^([A-Za-z]+)\.?\b\s*/.exec(rest);
   if (unitMatch) {
     const canonical = UNIT_ALIASES.get(unitMatch[1].toLowerCase());
@@ -164,18 +190,38 @@ export function parseIngredientLine(input) {
     rest = rest.slice(equivalent.length);
   }
 
+  // Alternatives are frequently wrapped in parentheses (`milk (or almond
+  // milk)`). Extract those as searchable names before treating the remaining
+  // trailing parentheses as preparation notes.
+  const parentheticalAlternatives = [];
+  rest = rest.replace(/\(\s*or\s+([^()]*)\)/ig, (_match, alternative) => {
+    parentheticalAlternatives.push(alternative);
+    return ' ';
+  });
+
+  // Keep preparation directions out of the searchable food name while
+  // retaining them as a note.
+  const trailingNote = /\s*\(([^()]*)\)\s*$/.exec(rest);
+  if (trailingNote && !/^or\s+/i.test(trailingNote[1].trim())) {
+    out.note = appendNote(out.note, trailingNote[1]);
+    rest = rest.slice(0, trailingNote.index).trim();
+  }
+
   // Preserve preparation text separately where the conventional comma form is clear.
   const comma = rest.indexOf(',');
   let rawName;
   if (comma >= 0) {
     rawName = cleanName(rest.slice(0, comma));
-    out.note = rest.slice(comma + 1).trim();
+    out.note = appendNote(out.note, rest.slice(comma + 1));
   } else {
     rawName = cleanName(rest);
   }
 
 
-  const alternatives = rawName.split(/\s+or\s+/i).map(stripAlternativeAmount).filter(Boolean);
+  const alternatives = [
+    ...rawName.split(/\s+or\s+/i),
+    ...parentheticalAlternatives.flatMap(value => String(value).split(/\s+or\s+/i)),
+  ].map(stripAlternativeAmount).filter(Boolean);
   out.name = alternatives[0] || rawName;
   out.search_names = [...new Set(alternatives.length ? alternatives : [out.name])].slice(0, 3);
 

@@ -3,7 +3,7 @@
 import { altUnitGrams, normalizePortionUnit, unitKind } from './provider-portions.js';
 
 const SHORT_PLURALS = new Set(['gas', 'glass', 'molasses']);
-const REFINEMENT_UNITS = new Set(['g','kg','mg','oz','lb','ml','l','tsp','tbsp','cup','pinch','dash','clove','slice','can','package','piece','sprig','stalk','bunch']);
+const REFINEMENT_UNITS = new Set(['g','kg','mg','oz','lb','ml','l','tsp','tbsp','cup','pinch','dash','clove','slice','can','package','piece','sprig','stalk','bunch','scoop','stick','biscuit','cookie','bar','packet','jar','bag','box']);
 const AMOUNT_ROLES = new Set(['primary', 'additional', 'equivalent']);
 const PREPARATION_WORDS = new Set([
   'optional', 'chopped', 'diced', 'minced', 'sliced', 'crushed', 'ground',
@@ -74,21 +74,36 @@ function tokenMatches(queryToken, candidateToken) {
 
 function scoreOne(query, candidate) {
   const q = normalizeIngredientSearchText(query);
-  const c = normalizeIngredientName(`${candidate?.name || ''} ${candidate?.brand || ''}`);
-  if (!q || !c) return null;
+  const name = normalizeIngredientSearchText(candidate?.name || '');
+  const brand = normalizeBrandName(candidate?.brand || '');
+  const c = `${name} ${brand}`.trim();
+  if (!q || !name || !c) return null;
   const qTokens = q.split(' ');
-  const cTokens = c.split(' ');
+  const nameTokens = name.split(' ').filter(Boolean);
+  const brandTokens = brand.split(' ').filter(Boolean);
+  const cTokens = [...nameTokens, ...brandTokens];
   const matchedQuery = qTokens.filter(qt => cTokens.some(ct => tokenMatches(qt, ct))).length;
-  const matchedCandidate = cTokens.filter(ct => qTokens.some(qt => tokenMatches(qt, ct))).length;
+  const matchedNameQuery = qTokens.filter(qt => nameTokens.some(nt => tokenMatches(qt, nt))).length;
+  // Precision is measured against the food name, not the optional brand.
+  // A branded result such as "Maple Syrup — Kirkland" should not lose to an
+  // unrelated record merely because the brand adds tokens that were not in
+  // the ingredient text. Brand tokens still participate in coverage so a
+  // deliberate brand-only/food+brand search remains useful.
+  const matchedCandidate = nameTokens.filter(nt => qTokens.some(qt => tokenMatches(qt, nt))).length;
   const coverage = matchedQuery / qTokens.length;
-  const precision = matchedCandidate / cTokens.length;
-  const phrase = c.includes(q) || q.includes(normalizeIngredientName(candidate?.name || ''));
-  const exact = q === normalizeIngredientName(candidate?.name || '') || q === c;
+  const precision = matchedCandidate / nameTokens.length;
+  const phrase = name.includes(q) || q.includes(name);
+  const exact = q === name || q === c;
   const meaningful = qTokens.some(qt => qt.length >= 4 && cTokens.some(ct => tokenMatches(qt, ct)));
+  const brandOnly = matchedNameQuery === 0 && matchedQuery > 0;
   const eligible = exact || phrase || (coverage >= 2 / 3 && meaningful);
   if (!eligible) return null;
-  const relevance = coverage * 65 + precision * 20 + (exact ? 15 : phrase ? 10 : 0);
-  return { relevance, coverage, precision, exact, phrase, query: q };
+  // Brand-only hits are intentionally visible in the manual search sheet,
+  // but they should not auto-select over a food-name match during recipe
+  // import. The penalty leaves them ranked and searchable while keeping
+  // them below the automatic relevance threshold in normal cases.
+  const relevance = coverage * 65 + precision * 20 + (exact ? 15 : phrase ? 10 : 0) - (brandOnly ? 20 : 0);
+  return { relevance, coverage, precision, exact, phrase, brandOnly, query: q };
 }
 
 export function scoreIngredientCandidate(searchNames, candidate) {
@@ -117,6 +132,7 @@ export function rankIngredientCandidates(searchNames, candidates, limit = 8, opt
     .map(normalizeBrandName).filter(Boolean);
   const preferredBrandRank = brand => {
     const normalized = normalizeBrandName(brand);
+    if (!normalized) return 0;
     const index = preferredBrands.findIndex(item => normalized === item || normalized.includes(item) || item.includes(normalized));
     return index < 0 ? 0 : preferredBrands.length - index;
   };
@@ -131,6 +147,7 @@ export function rankIngredientCandidates(searchNames, candidates, limit = 8, opt
     const key = external ? `external:${semanticKey}` : `${provider}:${candidate?.id || semanticKey}`;
     const convertible = options.requiredUnit ? candidateSupportsUnit(candidate, options.requiredUnit) : false;
     const brandRank = preferredBrandRank(candidate?.brand);
+    const unbranded = !normalizeBrandName(candidate?.brand);
     const next = {
       ...candidate,
       _matchScore: scored.score,
@@ -138,6 +155,7 @@ export function rankIngredientCandidates(searchNames, candidates, limit = 8, opt
       _matchReasons: [...scored.reasons, convertible ? 'unit conversion available' : '', brandRank ? 'preferred brand' : ''].filter(Boolean),
       _convertible: convertible,
       _brandRank: brandRank,
+      _unbranded: unbranded,
       _sourceRank: sourceRank(candidate),
     };
     const previous = unique.get(key);
@@ -150,10 +168,20 @@ export function rankIngredientCandidates(searchNames, candidates, limit = 8, opt
 
 function compareCandidates(a, b, brandPriority = 'standard') {
   const relevanceDifference = Number(b._relevanceScore || 0) - Number(a._relevanceScore || 0);
+  // Strong preferred brands are an explicit user policy. Once both records
+  // are genuinely relevant, that policy may promote the preferred record even
+  // across provider/source tiers; an unrelated preferred product never gets
+  // this opportunity because it is filtered out or fails the threshold.
+  if (brandPriority === 'strong' && a._brandRank !== b._brandRank) {
+    const aRelevant = Number(a._relevanceScore || 0) >= 65;
+    const bRelevant = Number(b._relevanceScore || 0) >= 65;
+    if (aRelevant && bRelevant) return b._brandRank - a._brandRank;
+  }
   if (Math.abs(relevanceDifference) > 8) return relevanceDifference;
   if (!!a._convertible !== !!b._convertible) return a._convertible ? -1 : 1;
   if (brandPriority === 'strong' && a._brandRank !== b._brandRank) return b._brandRank - a._brandRank;
   if (a._sourceRank !== b._sourceRank) return b._sourceRank - a._sourceRank;
+  if (!!a._unbranded !== !!b._unbranded) return a._unbranded ? -1 : 1;
   if (brandPriority !== 'strong' && a._brandRank !== b._brandRank) return b._brandRank - a._brandRank;
   return relevanceDifference
     || Number(b.completeness || 0) - Number(a.completeness || 0)

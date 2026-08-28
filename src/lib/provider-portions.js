@@ -13,6 +13,12 @@ const UNIT_ALIASES = new Map([
   ['fl oz', 'fl oz'], ['fluid ounce', 'fl oz'], ['fluid ounces', 'fl oz'],
   ['c', 'cup'], ['cup', 'cup'], ['cups', 'cup'],
   ['pc', 'piece'], ['piece', 'piece'], ['pieces', 'piece'],
+  // USDA calls count portions "fruit", "whole", or "item" depending on
+  // the food category. Normalize those catalog terms to the recipe parser's
+  // canonical Piece unit so `1 medium apple` can use a provider gram weight.
+  ['each', 'piece'], ['whole', 'piece'], ['wholes', 'piece'],
+  ['item', 'piece'], ['items', 'piece'], ['unit', 'piece'], ['units', 'piece'],
+  ['fruit', 'piece'], ['fruits', 'piece'],
   ['serving', 'serving'], ['servings', 'serving'],
 ]);
 
@@ -96,14 +102,25 @@ export function normalizeAltUnits(rows) {
 
 function parseHouseholdMeasure(text) {
   const cleaned = String(text || '').replace(/\([^)]*(?:g|gram|grams)\b[^)]*\)/ig, ' ').trim();
-  const match = cleaned.match(/(?:^|\s)(\d+(?:\.\d+)?|\d+\/\d+)\s*([a-zA-Z][a-zA-Z ._-]*)/);
+  const match = cleaned.match(/^(\d+\/\d+|\d+(?:\.\d+)?)\s*(.*)$/);
   if (!match) return null;
   let amount;
   if (match[1].includes('/')) {
     const [a, b] = match[1].split('/').map(Number);
     amount = b ? a / b : null;
   } else amount = Number(match[1]);
-  const unit = normalizePortionUnit(match[2].trim().split(/\s+(?:of|\(|-|,)/)[0]);
+  const tail = match[2].trim();
+  // Read only the unit prefix. The previous greedy expression treated
+  // "1/2 cup oats" as a unit named "cup oats", which made valid OFF
+  // serving metadata impossible to match back to Cup.
+  const unitMatch = /^(fluid\s+ounces?|tablespoons?|teaspoons?|millilit(?:er|re)s?|kilograms?|ounces?|pounds?|grams?|cups?|tbsp|tsp|kg|mg|ml|oz|lb|g|l|pinch(?:es)?|dash(?:es)?|cloves?|slices?|pieces?|each|cans?|packages?|pkg|sprigs?|stalks?|bunches?|[a-z][a-z_-]*)(?=\s|$|\()/i.exec(tail);
+  const rawUnit = unitMatch?.[1] || '';
+  // Portion descriptions such as "1 large apple" have no household unit;
+  // the size adjective still means one countable piece. Keep the provider's
+  // full text in `label`, but canonicalize the lookup unit to Piece.
+  const unit = /^(?:(?:extra|very)\s+)?(?:small|medium|large|jumbo|mini|baby)(?:\s+large|\s+small)?$/i.test(rawUnit)
+    ? 'piece'
+    : normalizePortionUnit(rawUnit);
   return finitePositive(amount) && unit ? { amount, unit } : null;
 }
 

@@ -6,10 +6,12 @@ import { readFileSync } from 'node:fs';
 import { parseIngredientLine } from '../server/lib/recipe-import/ingredient-line.js';
 import { extractJsonLdBlocks, parseRecipeJsonLd } from '../server/lib/recipe-import/jsonld.js';
 import { createPinnedLookup, fetchRecipePage, isBlockedAddress, requestPinned, validateRecipeUrl } from '../server/lib/recipe-import/fetch-page.js';
-import { resolveAmountFactor } from '../server/lib/recipe-import/amount.js';
+import { resolveAmountFactor, resolveAmountGrams } from '../server/lib/recipe-import/amount.js';
 import { persistRecipeImportDraft, prepareRecipeImportDraft, RECIPE_IMPORT_DRAFT_KEY } from '../src/lib/recipe-import-draft.js';
 import { normalizeIngredientName, normalizeIngredientSearchText, rankIngredientCandidates, validateIngredientRefinement } from '../src/lib/ingredient-match.js';
 import { densityFromAltUnits, displayUnitName, normalizePortionUnit, parseOffAltUnits, parseUsdaAltUnits } from '../src/lib/provider-portions.js';
+import { parseRecipeIngredientText } from '../src/lib/recipe-ingredient.js';
+import { recipeItemAmount, recipeItemGrams, recipeItemAmountLabel, recipeItemGramLabel, restoreRecipeItemMeasurement } from '../src/lib/recipe-item-display.js';
 
 test('ingredient parser handles mixed fractions, ranges, packages, units, and notes', () => {
   assert.deepEqual(parseIngredientLine('1 1/2 cups all-purpose flour, sifted'), {
@@ -55,6 +57,23 @@ test('ingredient parser removes equivalent measures and separates explicit alter
   assert.deepEqual(oats.search_names, ['King Arthur Rolled Oats', 'old-fashioned rolled oats']);
 });
 
+test('ingredient parser strips size and trailing preparation qualifiers from search names', () => {
+  const apple = parseIngredientLine('1 medium apple (chopped)');
+  assert.equal(apple.name, 'apple');
+  assert.deepEqual(apple.search_names, ['apple']);
+  assert.equal(apple.unit, 'piece');
+  assert.deepEqual(apple.amounts, [{ quantity: 1, unit: 'piece', role: 'primary' }]);
+  assert.match(apple.note, /medium/);
+  assert.match(apple.note, /chopped/);
+  assert.equal(apple.original_text, '1 medium apple (chopped)');
+
+  const egg = parseIngredientLine('1 large egg, at room temperature');
+  assert.equal(egg.name, 'egg');
+  assert.equal(egg.unit, 'piece');
+  assert.match(egg.note, /large/);
+  assert.match(egg.note, /room temperature/);
+});
+
 test('ingredient candidate scoring excludes irrelevant products and ranks relevant names', () => {
   assert.equal(normalizeIngredientName("Confectioners' Sugars"), 'confectioner sugar');
   const ranked = rankIngredientCandidates(['light brown sugar'], [
@@ -64,6 +83,12 @@ test('ingredient candidate scoring excludes irrelevant products and ranks releva
   ]);
   assert.deepEqual(ranked.map(item => item.barcode || item.fdcId), ['2', '3']);
   assert.ok(ranked.every(item => item._matchReasons.length));
+
+  const brandedMaple = rankIngredientCandidates(['pure maple syrup'], [
+    { name: 'MAPLE SYRUP', brand: 'KIRKLAND Signature', barcode: 'maple', _candidateProvider: 'openfoodfacts' },
+  ]);
+  assert.equal(brandedMaple.length, 1);
+  assert.ok(brandedMaple[0]._relevanceScore >= 65);
 });
 
 test('ingredient matching ignores preparation directions but preserves meaningful food terms', () => {
@@ -83,10 +108,13 @@ test('provider portions normalize household measures into grams per unit', () =>
   assert.deepEqual(parseOffAltUnits({ code: '1', serving_size: '2 tablespoons (30 g)', serving_quantity: 30, serving_quantity_unit: 'g' }), [{
     abbr: 'tbsp', grams: 15, label: '2 tablespoons (30 g)', source: 'openfoodfacts', source_id: '1', source_amount: 2, source_grams: 30,
   }]);
+  assert.equal(parseOffAltUnits({ code: '2', serving_size: '1 medium apple (182 g)' })[0].abbr, 'piece');
+  assert.equal(parseOffAltUnits({ code: '3', serving_size: '1/2 cup oats (40 g)' })[0].grams, 80);
   assert.deepEqual(parseOffAltUnits({ serving_size: '30 g' }), []);
   assert.deepEqual(parseUsdaAltUnits({ fdcId: 2, foodPortions: [{ amount: 0.5, gramWeight: 40, measureUnit: { name: 'cup' }, portionDescription: '1/2 cup' }] }), [{
     abbr: 'cup', grams: 80, label: '1/2 cup', source: 'usda', source_id: '2', source_amount: 0.5, source_grams: 40,
   }]);
+  assert.equal(parseUsdaAltUnits({ fdcId: 3, foodPortions: [{ amount: 1, gramWeight: 182, measureUnit: { name: 'fruit' }, portionDescription: '1 large' }] })[0].abbr, 'piece');
   assert.ok(Math.abs(densityFromAltUnits([{ abbr: 'cup', grams: 80 }]) - 0.33814) < 0.000001);
 });
 
@@ -96,6 +124,80 @@ test('recipe units normalize aliases and display full names', () => {
   assert.equal(displayUnitName('cup', 1, 'en'), 'Cup');
   assert.equal(displayUnitName('cup', 2, 'en'), 'Cups');
   assert.equal(displayUnitName('g', 2, 'en'), 'Grams');
+});
+
+test('Mealie display strings retain recipe amounts and searchable names', () => {
+  const apple = parseRecipeIngredientText('1 medium apple (chopped)');
+  assert.equal(apple.quantity, 1);
+  assert.equal(apple.unit, 'piece');
+  assert.equal(apple.name, 'apple');
+  assert.deepEqual(apple.search_names, ['apple']);
+
+  const oats = parseRecipeIngredientText('1 cup old-fashioned rolled oats');
+  assert.deepEqual(oats.amounts, [{ quantity: 1, unit: 'cup', role: 'primary' }]);
+  const alternative = parseRecipeIngredientText('1 tablespoon pure maple syrup (or sugar-free maple syrup)');
+  assert.equal(alternative.name, 'pure maple syrup');
+  assert.deepEqual(alternative.search_names, ['pure maple syrup', 'sugar-free maple syrup']);
+  const scoop = parseRecipeIngredientText('2 scoops protein powder or 50 gram vanilla or chocolate');
+  assert.equal(scoop.unit, 'scoop');
+  assert.equal(scoop.name, 'protein powder');
+  assert.deepEqual(scoop.search_names, ['protein powder', 'vanilla', 'chocolate']);
+  const item = {
+    name: 'Old fashioned oats', portion: 100, unit: 'g', nutrition: { calories: 375 },
+    source_ingredient: {
+      original_quantity: 1, original_unit: 'cup', original_text: oats.original_text,
+      amounts: oats.amounts,
+    },
+  };
+  assert.deepEqual(recipeItemAmount(item), { amount: 1, unit: 'cup' });
+  assert.equal(recipeItemGrams({ ...item, recipe_portion: 1, recipe_unit: 'cup', alt_units: [{ abbr: 'cup', grams: 80 }] }), 80);
+  assert.equal(recipeItemAmountLabel({ recipe_portion: 1, recipe_unit: 'cup' }), '1 Cup');
+  assert.equal(recipeItemGramLabel({ recipe_portion: 1, recipe_unit: 'cup', alt_units: [{ abbr: 'cup', grams: 80 }] }), '80 Grams');
+
+  const pinch = parseRecipeIngredientText('1 pinch sea salt');
+  assert.equal(pinch.unit, 'pinch');
+  assert.equal(pinch.name, 'sea salt');
+  assert.deepEqual(pinch.search_names, ['sea salt']);
+});
+
+test('legacy imported recipe rows recover source measurements instead of 100 grams', () => {
+  const item = restoreRecipeItemMeasurement({
+    name: 'Old fashioned oats', portion: 100, unit: 'g',
+    nutrition: { calories: 375, carbohydrates: 68 },
+    alt_units: [{ abbr: 'cup', grams: 80 }],
+    source_ingredient: {
+      original_quantity: 1, original_unit: 'cup', original_text: '1 cup old-fashioned rolled oats',
+      amounts: [{ quantity: 1, unit: 'cup', role: 'primary' }],
+    },
+  });
+  assert.equal(item.portion, 1);
+  assert.equal(item.unit, 'cup');
+  assert.equal(item.recipe_portion, 1);
+  assert.equal(item.recipe_unit, 'cup');
+  assert.equal(item.equivalent_grams, 80);
+  assert.equal(item.nutrition.calories, 300);
+  assert.ok(Math.abs(item.nutrition.carbohydrates - 54.4) < 1e-9);
+
+  const sizeUnit = restoreRecipeItemMeasurement({
+    name: 'Apple', portion: 100, unit: 'g', nutrition: { calories: 52 },
+    source_ingredient: { original_quantity: 1, original_unit: 'medium', original_text: '1 medium apple (chopped)' },
+  });
+  assert.equal(sizeUnit.unit, 'piece');
+  assert.equal(sizeUnit.portion, 1);
+  assert.equal(sizeUnit.equivalent_grams, undefined);
+});
+
+test('source gram equivalents do not survive a changed recipe measurement', () => {
+  const item = {
+    name: 'Old fashioned oats', portion: 2, unit: 'cup', recipe_portion: 2, recipe_unit: 'cup',
+    equivalent_grams: undefined,
+    source_ingredient: {
+      original_quantity: 1, original_unit: 'cup', original_text: '1 cup old-fashioned rolled oats',
+      amounts: [{ quantity: 1, unit: 'cup', role: 'primary' }, { quantity: 80, unit: 'g', role: 'equivalent' }],
+    },
+    alt_units: [{ abbr: 'cup', grams: 80 }],
+  };
+  assert.equal(recipeItemGrams(item), 160);
 });
 
 test('candidate ranking prefers conversion and source order while supporting strong brands', () => {
@@ -108,6 +210,19 @@ test('candidate ranking prefers conversion and source order while supporting str
   assert.equal(standard[0].barcode, '2');
   const strong = rankIngredientCandidates(['almond milk'], candidates, 10, { requiredUnit: 'cup', preferredBrands: ['Kirkland Signature'], brandPriority: 'strong' });
   assert.equal(strong[0].fdcId, 3);
+});
+
+test('candidate ranking prefers unbranded foods within the same source tier', () => {
+  const ranked = rankIngredientCandidates(['apple'], [
+    { barcode: 'branded', name: 'Apple', brand: 'Store Brand', unit: 'g', _candidateProvider: 'openfoodfacts' },
+    { barcode: 'plain', name: 'Apple', brand: '', unit: 'g', _candidateProvider: 'openfoodfacts' },
+  ], 10);
+  assert.equal(ranked[0].barcode, 'plain');
+  const strong = rankIngredientCandidates(['apple'], [
+    { barcode: 'local', name: 'Apple', brand: '', unit: 'g', _candidateProvider: 'local', id: 1 },
+    { barcode: 'preferred', name: 'Apple', brand: 'Kirkland Signature', unit: 'g', _candidateProvider: 'openfoodfacts' },
+  ], 10, { preferredBrands: ['Kirkland Signature'], brandPriority: 'strong' });
+  assert.equal(strong[0].barcode, 'preferred');
 });
 
 test('external semantic duplicates collapse silently to the stronger record', () => {
@@ -296,6 +411,12 @@ test('recipe import UI restores drafts safely and Back always returns to Foods',
   assert.match(source, /displayUnitName\(row\.unit/);
   assert.match(source, /provider_food:/);
   assert.match(source, /Import without nutrition/);
+  assert.match(source, /recipe_import\.ai_refine/);
+  assert.match(source, /ai_help/);
+  const en = readFileSync(new URL('../src/i18n/en.json', import.meta.url), 'utf8');
+  const fr = readFileSync(new URL('../src/i18n/fr.json', import.meta.url), 'utf8');
+  assert.match(en, /"ai_refine": "Identify this food with AI"/);
+  assert.match(fr, /"ai_refine": "Identifier cet aliment avec l’IA"/);
   assert.match(source, /Promise\.allSettled\(jobs\)/);
   assert.match(source, /conversionEstimateQueue/);
   assert.match(source, /container-type: inline-size/);
@@ -321,6 +442,10 @@ test('amount resolution converts mass and food-aware volume/count without guessi
   assert.equal(resolveAmountFactor({ portion: 100, unit: 'g', density_g_ml: 0.8 }, 1, 'c'), 236.5882365 * 0.8 / 100);
   assert.equal(resolveAmountFactor({ portion: 100, unit: 'g' }, 1, 'cup'), null);
   assert.equal(resolveAmountFactor({ portion: 100, unit: 'g', alt_units: [{ abbr: 'slice', grams: 35 }] }, 2, 'slice'), 0.7);
+  assert.equal(resolveAmountGrams({ portion: 100, unit: 'g', alt_units: [{ abbr: 'fruit', grams: 182 }] }, 1, 'piece'), 182);
   assert.equal(resolveAmountFactor({ portion: 1, unit: 'serving' }, 3, 'serving'), 3);
   assert.equal(resolveAmountFactor({ portion: 1, unit: 'serving' }, 1, 'piece'), null);
+  assert.equal(resolveAmountGrams({ portion: 100, unit: 'g' }, 1, 'cup'), null);
+  assert.equal(resolveAmountGrams({ portion: 100, unit: 'g', alt_units: [{ abbr: 'cup', grams: 80 }] }, 1, 'cup'), 80);
+  assert.equal(resolveAmountGrams({ portion: 100, unit: 'g', density_g_ml: 0.8 }, 1, 'cup'), 236.5882365 * 0.8);
 });
