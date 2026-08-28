@@ -9,6 +9,7 @@ import { createPinnedLookup, fetchRecipePage, isBlockedAddress, requestPinned, v
 import { resolveAmountFactor } from '../server/lib/recipe-import/amount.js';
 import { persistRecipeImportDraft, prepareRecipeImportDraft, RECIPE_IMPORT_DRAFT_KEY } from '../src/lib/recipe-import-draft.js';
 import { normalizeIngredientName, rankIngredientCandidates, validateIngredientRefinement } from '../src/lib/ingredient-match.js';
+import { densityFromAltUnits, displayUnitName, normalizePortionUnit, parseOffAltUnits, parseUsdaAltUnits } from '../src/lib/provider-portions.js';
 
 test('ingredient parser handles mixed fractions, ranges, packages, units, and notes', () => {
   assert.deepEqual(parseIngredientLine('1 1/2 cups all-purpose flour, sifted'), {
@@ -63,6 +64,46 @@ test('ingredient candidate scoring excludes irrelevant products and ranks releva
   ]);
   assert.deepEqual(ranked.map(item => item.barcode || item.fdcId), ['2', '3']);
   assert.ok(ranked.every(item => item._matchReasons.length));
+});
+
+test('provider portions normalize household measures into grams per unit', () => {
+  assert.deepEqual(parseOffAltUnits({ code: '1', serving_size: '2 tablespoons (30 g)', serving_quantity: 30, serving_quantity_unit: 'g' }), [{
+    abbr: 'tbsp', grams: 15, label: '2 tablespoons (30 g)', source: 'openfoodfacts', source_id: '1', source_amount: 2, source_grams: 30,
+  }]);
+  assert.deepEqual(parseOffAltUnits({ serving_size: '30 g' }), []);
+  assert.deepEqual(parseUsdaAltUnits({ fdcId: 2, foodPortions: [{ amount: 0.5, gramWeight: 40, measureUnit: { name: 'cup' }, portionDescription: '1/2 cup' }] }), [{
+    abbr: 'cup', grams: 80, label: '1/2 cup', source: 'usda', source_id: '2', source_amount: 0.5, source_grams: 40,
+  }]);
+  assert.ok(Math.abs(densityFromAltUnits([{ abbr: 'cup', grams: 80 }]) - 0.33814) < 0.000001);
+});
+
+test('recipe units normalize aliases and display full names', () => {
+  assert.equal(normalizePortionUnit('c'), 'cup');
+  assert.equal(normalizePortionUnit('Tablespoons'), 'tbsp');
+  assert.equal(displayUnitName('cup', 1, 'en'), 'Cup');
+  assert.equal(displayUnitName('cup', 2, 'en'), 'Cups');
+  assert.equal(displayUnitName('g', 2, 'en'), 'Grams');
+});
+
+test('candidate ranking prefers conversion and source order while supporting strong brands', () => {
+  const candidates = [
+    { id: 1, name: 'Almond milk', brand: '', unit: 'g', _candidateProvider: 'local' },
+    { barcode: '2', name: 'Almond milk', brand: 'Random', unit: 'g', alt_units: [{ abbr: 'cup', grams: 240 }], _candidateProvider: 'openfoodfacts' },
+    { fdcId: 3, name: 'Almond milk', brand: 'Kirkland Signature', unit: 'g', alt_units: [{ abbr: 'cup', grams: 240 }], _candidateProvider: 'usda' },
+  ];
+  const standard = rankIngredientCandidates(['almond milk'], candidates, 10, { requiredUnit: 'cup', preferredBrands: ['Kirkland Signature'], brandPriority: 'standard' });
+  assert.equal(standard[0].barcode, '2');
+  const strong = rankIngredientCandidates(['almond milk'], candidates, 10, { requiredUnit: 'cup', preferredBrands: ['Kirkland Signature'], brandPriority: 'strong' });
+  assert.equal(strong[0].fdcId, 3);
+});
+
+test('external semantic duplicates collapse silently to the stronger record', () => {
+  const ranked = rankIngredientCandidates(['dark chocolate chips'], [
+    { barcode: '1', name: 'Dark Chocolate Chips', brand: '', completeness: 0.4, _candidateProvider: 'openfoodfacts' },
+    { barcode: '2', name: 'dark chocolate chips', brand: '', completeness: 0.9, nutrition: { calories: 500 }, _candidateProvider: 'openfoodfacts' },
+  ]);
+  assert.equal(ranked.length, 1);
+  assert.equal(ranked[0].barcode, '2');
 });
 
 test('AI ingredient refinements are bounded and reject unsafe shapes', () => {
@@ -236,12 +277,30 @@ test('recipe import UI restores drafts safely and Back always returns to Foods',
   assert.match(source, /on:click=\{\(\) => requestAiRefinement\(index\)\}/);
   assert.match(source, /role === 'equivalent'/);
   assert.match(source, /rankIngredientCandidates/);
+  assert.match(source, /<Sheet bind:open=\{searchSheetOpen\}/);
+  assert.match(source, /<select class="select unit-select"/);
+  assert.doesNotMatch(source, /class="input unit-input"/);
+  assert.match(source, /displayUnitName\(row\.unit/);
+  assert.match(source, /provider_food:/);
+  assert.match(source, /Import without nutrition/);
   assert.doesNotMatch(source, /\bpop\(\)/);
+});
+
+test('recipe commit stages provider foods atomically and returns cache hydration data', () => {
+  const route = readFileSync(new URL('../server/routes/recipe-import.js', import.meta.url), 'utf8');
+  const api = readFileSync(new URL('../src/lib/api-cached.js', import.meta.url), 'utf8');
+  assert.match(route, /resolution\.provider_food/);
+  assert.match(route, /const save = db\.transaction/);
+  assert.match(route, /recipe:\s*\{/);
+  assert.match(route, /foods: returnedFoods/);
+  assert.match(api, /for \(const serverFood of response\.foods/);
+  assert.match(api, /dbUpsertFromServer\('meals', response\.recipe\)/);
 });
 
 test('amount resolution converts mass and food-aware volume/count without guessing', () => {
   assert.equal(resolveAmountFactor({ portion: 100, unit: 'g' }, 1, 'kg'), 10);
   assert.equal(resolveAmountFactor({ portion: 100, unit: 'g', density_g_ml: 0.8 }, 1, 'cup'), 236.5882365 * 0.8 / 100);
+  assert.equal(resolveAmountFactor({ portion: 100, unit: 'g', density_g_ml: 0.8 }, 1, 'c'), 236.5882365 * 0.8 / 100);
   assert.equal(resolveAmountFactor({ portion: 100, unit: 'g' }, 1, 'cup'), null);
   assert.equal(resolveAmountFactor({ portion: 100, unit: 'g', alt_units: [{ abbr: 'slice', grams: 35 }] }, 2, 'slice'), 0.7);
   assert.equal(resolveAmountFactor({ portion: 1, unit: 'serving' }, 3, 'serving'), 3);

@@ -1,3 +1,5 @@
+import { densityFromAltUnits, normalizeAltUnits, parseOffAltUnits, parseUsdaAltUnits } from './provider-portions.js';
+
 /**
  * api.js - External API calls (Open Food Facts)
  */
@@ -473,20 +475,7 @@ const API = {
       if (su === 'ml' || su === 'l') return 'ml';
       return null;
     })();
-    const altUnits = (() => {
-      const ss = String(p.serving_size || '').trim();
-      const sq = parseFloat(p.serving_quantity);
-      if (!ss || !Number.isFinite(sq) || sq <= 0) return null;
-      // OFF serving_size strings look like "1 slice (35 g)" or "2 biscuits
-      // (24 g)". Extract the discrete-portion label: first non-numeric word
-      // before any open paren. Skip if it's a base mass/volume unit (the
-      // serving_quantity itself already carries that case).
-      const m = ss.match(/^\s*\d+\s*([a-zA-ZÀ-ÿ]+)/);
-      const label = m ? m[1].toLowerCase() : '';
-      const BASE_UNITS = new Set(['g','mg','kg','ml','l','oz','lb','cup','tbsp','tsp']);
-      if (!label || BASE_UNITS.has(label)) return null;
-      return [{ abbr: label, grams: Math.round(sq * 10) / 10 }];
-    })();
+    const altUnits = parseOffAltUnits(p);
     // Quality signals lifted from the OFF product/hit shape. Used by the
     // Foods search UI to rank results (more complete + graded entries
     // surface higher than sparse ones) and to render a small quality dot
@@ -517,7 +506,8 @@ const API = {
       dateTime:  new Date().toISOString(),
       categories: [],
       nutrition_basis: basis,
-      alt_units:       altUnits,
+      alt_units:       altUnits.length ? altUnits : null,
+      density_g_ml:    densityFromAltUnits(altUnits),
       completeness,
       nutriscore,
       nova,
@@ -667,11 +657,13 @@ const USDA = {
     const rawUnit = (item.servingSizeUnit || 'g').toLowerCase();
     const unit = rawUnit === 'ml' ? 'ml' : 'g';
 
+    const altUnits = normalizeAltUnits(parseUsdaAltUnits(item));
     return {
       name:      (item.description || '').trim(),
       brand:     (item.brandOwner || item.brandName || '').trim(),
       // Use fdcId_ prefix as barcode (matches Android; lets food editor link to USDA page)
       barcode:   item.fdcId ? 'fdcId_' + item.fdcId : (item.gtinUpc || ''),
+      fdcId:      item.fdcId || null,
       unit,
       portion:   100,
       quantity:  1,
@@ -679,6 +671,9 @@ const USDA = {
       dateTime:  new Date().toISOString(),
       categories: [],
       nutrition,
+      nutrition_basis: unit,
+      alt_units: altUnits,
+      density_g_ml: densityFromAltUnits(altUnits),
       // USDA's `dataType` distinguishes the source database. Feeds both the
       // in-page result sort (curated tiers first) and the small badge that
       // renders next to each USDA result row so users can pick informed.
@@ -689,6 +684,28 @@ const USDA = {
       dataType:  item.dataType || null,
       _source:   'usda',
     };
+  },
+
+  _detailCache: new Map(),
+  async fetchFoodById(fdcId, apiKey) {
+    if (!fdcId || !apiKey) return null;
+    const key = String(fdcId);
+    if (this._detailCache.has(key)) return this._detailCache.get(key);
+    try {
+      const res = await _extFetch(`${_USDA_BASE}/food/${encodeURIComponent(key)}?api_key=${encodeURIComponent(apiKey)}`);
+      if (!res.ok) return null;
+      const item = await res.json();
+      const serving = Number(item.servingSize) > 0 ? Number(item.servingSize) : 100;
+      const mapped = this._mapProduct(item, serving);
+      if (mapped) {
+        if (this._detailCache.size >= 200) this._detailCache.delete(this._detailCache.keys().next().value);
+        this._detailCache.set(key, mapped);
+      }
+      return mapped;
+    } catch (error) {
+      console.warn('[USDA] Detail hydration failed:', error);
+      return null;
+    }
   },
 
   async searchByName(query, page, apiKey) {
@@ -867,7 +884,10 @@ const _NtApiHttp = {
   previewRecipeUrl(url)           { return this.post('/api/recipes/import/preview', { url }); },
   async commitRecipeImport(payload) {
     const r = await this.post('/api/recipes/import/commit', payload);
-    return this._mealFromApi(r);
+    return {
+      recipe: this._mealFromApi(r.recipe),
+      foods: (r.foods || []).map(food => this._foodFromApi(food)),
+    };
   },
 
   // Users list for sharing picker (non-admin, returns peers only)

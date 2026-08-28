@@ -266,9 +266,10 @@ export const NtApiCached = {
   },
 
   async commitRecipeImport(payload) {
-    const serverMeal = await _serverFetch('POST', '/api/recipes/import/commit', payload, 20_000);
-    await dbUpsertFromServer('meals', serverMeal);
-    return _mealFromApi(serverMeal);
+    const response = await _serverFetch('POST', '/api/recipes/import/commit', payload, 20_000);
+    for (const serverFood of response.foods || []) await dbUpsertFromServer('foods', serverFood);
+    await dbUpsertFromServer('meals', response.recipe);
+    return { recipe: _mealFromApi(response.recipe), foods: (response.foods || []).map(_foodFromApi) };
   },
 
   // ── Diary — always local-first ────────────────────────────────────────

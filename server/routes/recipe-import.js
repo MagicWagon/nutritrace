@@ -111,7 +111,62 @@ function normalizeRefs(value) {
   return [...unique.values()];
 }
 
-/** Commit a reviewed draft as one recipe row. Reused foods are reloaded server-side. */
+function commitFailure(status, code, message) {
+  const error = new Error(message);
+  error.status = status;
+  error.code = code;
+  return error;
+}
+
+function cleanAltUnits(value) {
+  const unique = new Map();
+  for (const row of Array.isArray(value) ? value : []) {
+    const abbr = String(row?.abbr || '').trim().toLowerCase().slice(0, 60);
+    const grams = Number(row?.grams);
+    if (!abbr || !Number.isFinite(grams) || grams <= 0 || grams > 1_000_000) continue;
+    unique.set(abbr, {
+      abbr, grams,
+      ...(row.label ? { label: String(row.label).slice(0, 160) } : {}),
+      ...(row.source ? { source: String(row.source).slice(0, 40) } : {}),
+      ...(row.source_id ? { source_id: String(row.source_id).slice(0, 160) } : {}),
+      ...(Number(row.source_amount) > 0 ? { source_amount: Number(row.source_amount) } : {}),
+      ...(Number(row.source_grams) > 0 ? { source_grams: Number(row.source_grams) } : {}),
+    });
+  }
+  return [...unique.values()].slice(0, 50);
+}
+
+function cleanProviderFood(value) {
+  if (!value || typeof value !== 'object') return null;
+  const name = String(value.name || '').trim().slice(0, 500);
+  const provider = String(value._candidateProvider || '').toLowerCase();
+  if (!name || !['openfoodfacts', 'usda'].includes(provider)) return null;
+  const nutrition = {};
+  for (const [key, raw] of Object.entries(value.nutrition || {}).slice(0, 100)) {
+    const number = Number(raw);
+    if (Number.isFinite(number) && Math.abs(number) <= 10_000_000) nutrition[String(key).slice(0, 80)] = number;
+  }
+  const portion = Number(value.portion);
+  const density = Number(value.density_g_ml);
+  return {
+    name,
+    brand: String(value.brand || '').trim().slice(0, 300),
+    nutrition,
+    portion: Number.isFinite(portion) && portion > 0 ? portion : 100,
+    unit: String(value.unit || 'g').trim().toLowerCase().slice(0, 40) || 'g',
+    barcode: String(value.barcode || '').trim().slice(0, 160),
+    nutrition_basis: ['g', 'ml'].includes(value.nutrition_basis) ? value.nutrition_basis : null,
+    alt_units: cleanAltUnits(value.alt_units),
+    density_g_ml: Number.isFinite(density) && density > 0 ? density : null,
+    external_refs: normalizeRefs(value.external_refs),
+  };
+}
+
+function parsedFood(row) {
+  return { ...row, nutrition: parseJson(row.nutrition, {}), alt_units: parseJson(row.alt_units, []), external_refs: parseJson(row.external_refs, []) };
+}
+
+/** Commit a reviewed draft and any staged provider foods atomically. */
 router.post('/commit', wrap(async (req, res) => {
   const draft = req.body?.recipe;
   const resolutions = Array.isArray(req.body?.ingredients) ? req.body.ingredients : [];
@@ -139,56 +194,7 @@ router.post('/commit', wrap(async (req, res) => {
     return res.status(404).json({ error: 'Previously imported recipe not found', code: 'recipe_not_found' });
   }
 
-  const items = [];
-  for (const resolution of resolutions) {
-    const sourceIngredient = resolution?.source_ingredient || {};
-    if (resolution.food_id != null) {
-      const food = db.prepare(`SELECT * FROM foods WHERE id = ? AND ${ownerClause(userId)} AND deleted_at IS NULL`)
-        .get(resolution.food_id, ...ownerArgs(userId));
-      if (!food) return res.status(400).json({ error: 'A selected food is unavailable.', code: 'invalid_food_reference' });
-      const basePortion = Number(food.portion) || 100;
-      const portion = Number(resolution.portion) || basePortion;
-      const unit = resolution.unit || food.unit || 'g';
-      const foodForConversion = { ...food, alt_units: parseJson(food.alt_units, []) };
-      const factor = resolveAmountFactor(foodForConversion, portion, unit);
-      if (factor == null) {
-        return res.status(422).json({ error: `Choose an equivalent amount for ${food.name}.`, code: 'conversion_required' });
-      }
-      const foodNutrition = parseJson(food.nutrition, {});
-      items.push({
-        id: food.id,
-        name: food.name,
-        brand: food.brand || '',
-        portion,
-        unit,
-        quantity: 1,
-        nutrition: Object.fromEntries(Object.entries(foodNutrition).map(([key, value]) => [key, (Number(value) || 0) * factor])),
-        imgUrl: food.img_url || '',
-        nutrition_basis: food.nutrition_basis || null,
-        alt_units: foodForConversion.alt_units,
-        density_g_ml: food.density_g_ml ?? null,
-        source_ingredient: sourceIngredient,
-      });
-    } else {
-      if (!resolution.unresolved_acknowledged) {
-        return res.status(422).json({ error: 'Every unresolved ingredient must be acknowledged.', code: 'unresolved_ingredients' });
-      }
-      items.push({
-        type: 'unresolved_ingredient',
-        name: String(resolution.name || sourceIngredient.original_text || 'Unresolved ingredient').slice(0, 500),
-        portion: Number(resolution.portion) || Number(sourceIngredient.original_quantity) || 1,
-        unit: resolution.unit || sourceIngredient.original_unit || 'serving',
-        quantity: 1,
-        nutrition: {},
-        source_ingredient: { ...sourceIngredient, resolution: 'unresolved' },
-      });
-    }
-  }
-
   const servings = Math.max(1, Math.min(10_000, Number.parseInt(req.body?.servings) || 1));
-  const totalNutrition = sumNutrition(items);
-  const perServing = Object.fromEntries(Object.entries(totalNutrition).map(([key, value]) => [key, value / servings]));
-  const knownGrams = items.reduce((sum, item) => sum + (item.unit === 'g' ? Number(item.portion) || 0 : item.unit === 'kg' ? (Number(item.portion) || 0) * 1000 : 0), 0);
   const safeImage = draft.images?.[0] ? await publicUrl(draft.images[0], safeSource.startsWith('http') ? safeSource : undefined) : '';
   // Keep the already-validated public URL. The generic image localizer does
   // not pin DNS for the download, so invoking it here would weaken the
@@ -201,7 +207,70 @@ router.post('/commit', wrap(async (req, res) => {
   };
   const refs = normalizeRefs([{ provider: draft.source || 'schemaorg', instance: draft.source_instance || undefined, kind: 'recipe', id: hash }]);
 
+  let affectedFoodIds = [];
+  let savedItems = [];
   const save = db.transaction(() => {
+    const items = [];
+    const providerFoodIds = [];
+    for (const resolution of resolutions) {
+      const sourceIngredient = resolution?.source_ingredient || {};
+      let food = null;
+      if (resolution.food_id != null) {
+        food = db.prepare(`SELECT * FROM foods WHERE id = ? AND ${ownerClause(userId)} AND deleted_at IS NULL`)
+          .get(resolution.food_id, ...ownerArgs(userId));
+        if (!food) throw commitFailure(400, 'invalid_food_reference', 'A selected food is unavailable.');
+      } else if (resolution.provider_food) {
+        const staged = cleanProviderFood(resolution.provider_food);
+        if (!staged) throw commitFailure(400, 'invalid_provider_food', 'A selected provider food is invalid.');
+        if (staged.barcode) {
+          food = db.prepare(`SELECT * FROM foods WHERE barcode = ? AND ${ownerClause(userId)} AND deleted_at IS NULL LIMIT 1`)
+            .get(staged.barcode, ...ownerArgs(userId));
+        }
+        if (!food) {
+          const result = db.prepare(
+            `INSERT INTO foods (user_id, name, brand, nutrition, portion, unit, img_url, visibility, barcode, nutrition_basis, alt_units, density_g_ml, external_refs, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, NULL, 'private', ?, ?, ?, ?, ?, datetime('now'))`
+          ).run(userId, staged.name, staged.brand || null, JSON.stringify(staged.nutrition), staged.portion, staged.unit,
+            staged.barcode || null, staged.nutrition_basis, staged.alt_units.length ? JSON.stringify(staged.alt_units) : null,
+            staged.density_g_ml, staged.external_refs.length ? JSON.stringify(staged.external_refs) : null);
+          food = db.prepare('SELECT * FROM foods WHERE id = ?').get(result.lastInsertRowid);
+        }
+        providerFoodIds.push(food.id);
+      }
+
+      if (food) {
+        const basePortion = Number(food.portion) || 100;
+        const portion = Number(resolution.portion) || basePortion;
+        const unit = String(resolution.unit || food.unit || 'g').slice(0, 40);
+        const foodForConversion = { ...food, alt_units: parseJson(food.alt_units, []) };
+        const equivalentGrams = Number(resolution.equivalent_grams);
+        const factor = Number.isFinite(equivalentGrams) && equivalentGrams > 0
+          ? resolveAmountFactor(foodForConversion, equivalentGrams, 'g')
+          : resolveAmountFactor(foodForConversion, portion, unit);
+        if (factor == null) throw commitFailure(422, 'conversion_required', `No reliable unit conversion is available for ${food.name}.`);
+        const foodNutrition = parseJson(food.nutrition, {});
+        items.push({
+          id: food.id, name: food.name, brand: food.brand || '', portion, unit, quantity: 1,
+          nutrition: Object.fromEntries(Object.entries(foodNutrition).map(([key, value]) => [key, (Number(value) || 0) * factor])),
+          imgUrl: food.img_url || '', nutrition_basis: food.nutrition_basis || null,
+          alt_units: foodForConversion.alt_units, density_g_ml: food.density_g_ml ?? null,
+          equivalent_grams: Number.isFinite(equivalentGrams) && equivalentGrams > 0 ? equivalentGrams : undefined,
+          source_ingredient: sourceIngredient,
+        });
+      } else {
+        if (!resolution.unresolved_acknowledged) throw commitFailure(422, 'unresolved_ingredients', 'Every unresolved ingredient must be acknowledged.');
+        items.push({
+          type: 'unresolved_ingredient', name: String(resolution.name || sourceIngredient.original_text || 'Unresolved ingredient').slice(0, 500),
+          portion: Number(resolution.portion) || Number(sourceIngredient.original_quantity) || 1,
+          unit: resolution.unit || sourceIngredient.original_unit || 'serving', quantity: 1, nutrition: {},
+          source_ingredient: { ...sourceIngredient, resolution: 'unresolved' },
+        });
+      }
+    }
+
+    const totalNutrition = sumNutrition(items);
+    const perServing = Object.fromEntries(Object.entries(totalNutrition).map(([key, value]) => [key, value / servings]));
+    const knownGrams = items.reduce((sum, item) => sum + (Number(item.equivalent_grams) || (item.unit === 'g' ? Number(item.portion) || 0 : item.unit === 'kg' ? (Number(item.portion) || 0) * 1000 : 0)), 0);
     for (const item of items) {
       const source = item.source_ingredient;
       if (!item.id || source?.provider !== 'mealie' || !source.instance || !source.food_id) continue;
@@ -219,21 +288,29 @@ router.post('/commit', wrap(async (req, res) => {
         `UPDATE meals SET name=?, nutrition=?, items=?, img_url=?, notes=?, is_recipe=1, portion=?, unit='g', servings=?, recipe_details=?, external_refs=?, updated_at=datetime('now') WHERE id=?`
       ).run(draft.name.trim(), JSON.stringify(perServing), JSON.stringify(items), image, draft.description || null,
         knownGrams ? knownGrams / servings : 100, servings, JSON.stringify(details), JSON.stringify(refs), existing.id);
-      return existing.id;
+      affectedFoodIds = providerFoodIds; savedItems = items; return existing.id;
     }
     const result = db.prepare(
       `INSERT INTO meals (user_id, name, nutrition, items, img_url, notes, is_recipe, portion, unit, servings, visibility, recipe_details, external_refs, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, 1, ?, 'g', ?, 'private', ?, ?, datetime('now'))`
     ).run(userId, draft.name.trim(), JSON.stringify(perServing), JSON.stringify(items), image, draft.description || null,
       knownGrams ? knownGrams / servings : 100, servings, JSON.stringify(details), JSON.stringify(refs));
-    return result.lastInsertRowid;
+    affectedFoodIds = providerFoodIds; savedItems = items; return result.lastInsertRowid;
   });
-  const id = save();
+  let id;
+  try { id = save(); }
+  catch (error) {
+    if (error?.status) return res.status(error.status).json({ error: error.message, code: error.code });
+    throw error;
+  }
   const row = db.prepare('SELECT * FROM meals WHERE id = ?').get(id);
+  const returnedFoods = [...new Set(affectedFoodIds)].map(foodId => parsedFood(db.prepare('SELECT * FROM foods WHERE id = ?').get(foodId))).filter(Boolean);
   res.status(existing && mode === 'update' ? 200 : 201).json({
-    ...row,
-    nutrition: parseJson(row.nutrition, {}), items: parseJson(row.items, []), is_recipe: true,
-    recipe_details: parseJson(row.recipe_details, {}), external_refs: parseJson(row.external_refs, []),
+    recipe: {
+      ...row, nutrition: parseJson(row.nutrition, {}), items: savedItems, is_recipe: true,
+      recipe_details: parseJson(row.recipe_details, {}), external_refs: parseJson(row.external_refs, []),
+    },
+    foods: returnedFoods,
   });
 }));
 

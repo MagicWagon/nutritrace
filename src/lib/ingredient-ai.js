@@ -40,3 +40,22 @@ Rules:
   if (!validated) throw new Error('AI returned an invalid ingredient refinement.');
   return validated;
 }
+
+export async function estimateIngredientGramsWithAI({ ingredientText, foodName, brand, amount, unit }) {
+  const systemPrompt = `Estimate a recipe household measurement in grams only when no food database portion is available.
+Return JSON only: {"grams":123,"confidence":"high|medium|low"}.
+Use the named food and brand when supplied. Do not change the requested amount or unit. Return low confidence when the food is too ambiguous.`;
+  const messages = [{ role: 'user', content: JSON.stringify({ ingredientText, foodName, brand, amount, unit }).slice(0, 2_000) }];
+  const reply = get(envLocks)?.ai
+    ? await callAIProxy({ messages, systemPrompt, tools: [] })
+    : await callAI({
+        provider: get(aiProvider) || 'claude', apiKey: get(aiApiKey), model: get(aiModel), baseUrl: get(aiBaseUrl),
+        messages, systemPrompt, tools: [],
+      });
+  const parsed = jsonReply(reply);
+  const grams = Number(parsed?.grams);
+  if (!Number.isFinite(grams) || grams <= 0 || grams > 1_000_000 || parsed?.confidence === 'low') {
+    throw new Error('AI could not provide a reliable unit conversion.');
+  }
+  return { grams: Math.round(grams * 10) / 10, confidence: parsed.confidence || 'medium', source: 'ai' };
+}

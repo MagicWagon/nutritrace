@@ -35,7 +35,7 @@ export const USER_PREFS = new Set([
   'showQuickCalories','quickCaloriesDisplay',
   'foodsShowCategories','foodsShowLabels','foodsShowNotes','foodsShowThumbnails',
   'foodsShowYesterdayMeals','foodsYesterdayCollapsed','foodsSavedCollapsed','foodsSort','mealsSort','recipesSort',
-  'foodsDefaultSource',
+  'foodsDefaultSource','preferredFoodBrands','preferredBrandPriority',
   'updateCheckInterval', // hours between checks: 1, 4, 12, 24, or 0 for manual only
   'barcodeBeep','cropPhotos',
   'offEnabled','offSearchLanguage','offSearchCountry','offUploadCountry','offImportPortion',
@@ -563,6 +563,8 @@ export const recipesSort            = createSettingStore('recipesSort',         
 // (requested via #128). Foods.svelte reads this on mount and initialises
 // searchSource from it.
 export const foodsDefaultSource     = createSettingStore('foodsDefaultSource',     'local');
+export const preferredFoodBrands    = createSettingStore('preferredFoodBrands',    []);
+export const preferredBrandPriority = createSettingStore('preferredBrandPriority', 'standard');
 
 // Hours between automatic update checks. 0 = manual only (Settings →
 // Updates → Check now is the only way). Also gates the visibility-change

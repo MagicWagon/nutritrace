@@ -1,16 +1,18 @@
 <script>
   import { onMount } from 'svelte';
   import { push } from 'svelte-spa-router';
-  import { _ } from 'svelte-i18n';
+  import { _, locale } from 'svelte-i18n';
   import { NtApi, API, USDA } from '../lib/api.js';
   import { isNative, getServerUrl } from '../lib/platform.js';
   import { showSuccess, showError } from '../stores/toast.js';
   import { editorState } from '../stores/editorState.js';
-  import { offEnabled, offSearchLanguage, usdaEnabled, usdaApiKey, aiEffectivelyEnabled } from '../stores/settings.js';
+  import { offEnabled, offSearchLanguage, usdaEnabled, usdaApiKey, aiEffectivelyEnabled, preferredFoodBrands, preferredBrandPriority } from '../stores/settings.js';
   import { unitToGrams, unitSystem } from '../lib/units.js';
   import { prepareRecipeImportDraft, persistRecipeImportDraft, RECIPE_IMPORT_DRAFT_KEY } from '../lib/recipe-import-draft.js';
-  import { normalizeIngredientName, rankIngredientCandidates } from '../lib/ingredient-match.js';
-  import { refineIngredientWithAI } from '../lib/ingredient-ai.js';
+  import { isStrongIngredientCandidate, normalizeIngredientName, rankIngredientCandidates } from '../lib/ingredient-match.js';
+  import { estimateIngredientGramsWithAI, refineIngredientWithAI } from '../lib/ingredient-ai.js';
+  import { altUnitGrams, conversionProvenance, displayUnitName, normalizePortionUnit } from '../lib/provider-portions.js';
+  import Sheet from '../components/ui/Sheet.svelte';
 
   let url = '';
   let loading = false;
@@ -23,6 +25,14 @@
   let restoringDraft = true;
   const serverRequired = isNative && !getServerUrl();
   const providerSearchCache = new Map();
+  let searchSheetOpen = false;
+  let searchRowIndex = -1;
+  let searchQuery = '';
+  let searchSource = 'all';
+  let sheetSearching = false;
+  let sheetResults = [];
+  let searchTimer;
+  let searchSequence = 0;
 
   onMount(async () => {
     const transientDraft = editorState.recipeImportDraft;
@@ -51,10 +61,11 @@
     }
     result = prepared.result;
     restoringDraft = false;
+    if (!saved?.resolutions) autoMatchAll();
   });
 
   $: recipe = result?.recipes?.[selectedIndex] || null;
-  $: unresolvedReady = resolutions.every(row => (row.foodId != null && !conversionRequired(row)) || row.acknowledged);
+  $: unresolvedReady = resolutions.every(row => (selectedFood(row) && !conversionRequired(row)) || row.acknowledged);
   $: if (result && typeof localStorage !== 'undefined') {
     persistRecipeImportDraft(localStorage, result, selectedIndex, resolutions);
   }
@@ -92,30 +103,76 @@
   }
 
   function altGrams(food, unit) {
-    const key = String(unit || '').toLowerCase();
-    const match = (food?.alt_units || []).find(row => String(row?.abbr || '').toLowerCase() === key && Number(row?.grams) > 0);
-    return match ? Number(match.grams) : null;
+    return altUnitGrams(food, unit);
+  }
+
+  function selectedFood(row) {
+    return row?.providerFood || foods.find(item => String(item.id) === String(row?.foodId)) || null;
   }
 
   function amountFrame(food, amount, unit) {
     const n = Number(amount);
     if (!Number.isFinite(n) || n <= 0) return null;
-    const alt = altGrams(food, unit);
+    const normalizedUnit = normalizePortionUnit(unit) || unit;
+    const alt = altGrams(food, normalizedUnit);
     if (alt != null) return { system: 'g', value: n * alt };
-    const system = unitSystem(unit);
-    const multiplier = unitToGrams(unit);
+    const system = unitSystem(normalizedUnit);
+    const multiplier = unitToGrams(normalizedUnit);
     if (system && multiplier != null) return { system, value: n * multiplier };
-    return { system: 'opaque', value: n, unit: String(unit || '').toLowerCase() };
+    return { system: 'opaque', value: n, unit: normalizedUnit };
+  }
+
+  const CORE_UNITS = ['g', 'mg', 'kg', 'oz', 'lb', 'ml', 'l', 'tsp', 'tbsp', 'fl oz', 'cup', 'piece', 'serving'];
+
+  function unitOptions(row) {
+    const food = selectedFood(row);
+    const values = [...CORE_UNITS, ...(food?.alt_units || []).map(item => item.abbr), row?.unit]
+      .map(normalizePortionUnit).filter(Boolean);
+    return [...new Set(values)].map(value => ({ value, label: displayUnitName(value, row?.portion, $locale) }));
+  }
+
+  function setRowUnit(index, event) {
+    const next = [...resolutions];
+    next[index] = { ...next[index], unit: normalizePortionUnit(event.currentTarget.value), acknowledged: false, equivalentGrams: null, conversionSource: null, estimatingConversion: false, selectionVersion: (next[index].selectionVersion || 0) + 1 };
+    resolutions = next;
+    maybeEstimateConversion(index);
+  }
+
+  function prettyNumber(value) {
+    return Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 });
+  }
+
+  function conversionDetail(row) {
+    const food = selectedFood(row);
+    if (!food) return null;
+    if (Number(row.equivalentGrams) > 0) {
+      return { value: Number(row.equivalentGrams), unit: 'g', source: row.conversionSource || 'recipe' };
+    }
+    const wanted = amountFrame(food, row.portion, row.unit);
+    if (!wanted || wanted.system === 'opaque') return null;
+    if (wanted.system === 'g') return { value: wanted.value, unit: 'g', source: conversionProvenance(food, row.unit) || 'calculated' };
+    const density = Number(food.density_g_ml);
+    if (wanted.system === 'ml' && Number.isFinite(density) && density > 0) {
+      return { value: wanted.value * density, unit: 'g', source: 'density' };
+    }
+    if (wanted.system === 'ml' && (food.nutrition_basis === 'ml' || normalizePortionUnit(food.unit) === 'ml')) {
+      return { value: wanted.value, unit: 'ml', source: 'provider' };
+    }
+    return null;
+  }
+
+  function conversionSourceLabel(source) {
+    return ({ openfoodfacts: 'Open Food Facts portion data', usda: 'USDA portion data', ai: 'AI estimate', recipe: 'Recipe measurement', density: 'Food density', provider: 'Provider volume data', calculated: 'Unit conversion' })[source] || 'Unit conversion';
   }
 
   function conversionRequired(row) {
-    if (row.foodId == null) return false;
-    const food = foods.find(item => String(item.id) === String(row.foodId));
-    if (!food) return true;
+    const food = selectedFood(row);
+    if (!food) return false;
+    if (Number(row?.equivalentGrams) > 0) return false;
     const base = amountFrame(food, food.portion || 100, food.unit || 'g');
     const wanted = amountFrame(food, row.portion, row.unit);
     if (!base || !wanted) return true;
-    if (base.system === wanted.system) return base.system !== 'opaque' || base.unit !== wanted.unit;
+    if (base.system === wanted.system) return base.system === 'opaque' ? base.unit !== wanted.unit : false;
     if (base.system === 'opaque' || wanted.system === 'opaque') return true;
     return !(Number(food.density_g_ml) > 0);
   }
@@ -132,8 +189,9 @@
       return {
         ingredient,
         foodId: food?.id ?? null,
+        providerFood: null,
         portion: preferred.portion,
-        unit: preferred.unit,
+        unit: normalizePortionUnit(preferred.unit) || preferred.unit,
         acknowledged: false,
         automatic: !!food,
         searching: false,
@@ -141,6 +199,10 @@
         searchAttempted: false,
         aiRefining: false,
         aiProposal: null,
+        equivalentGrams: null,
+        conversionSource: null,
+        manuallySelected: false,
+        selectionVersion: 0,
       };
     });
   }
@@ -156,19 +218,54 @@
     return promise;
   }
 
+  function localCandidates(query) {
+    return foods.map(food => ({ ...food, _candidateProvider: 'local', _localFoodId: food.id }))
+      .filter(food => normalizeName(`${food.name} ${food.brand || ''}`).includes(normalizeName(query)) || normalizeName(query).split(' ').some(token => token.length > 2 && normalizeName(`${food.name} ${food.brand || ''}`).includes(token)));
+  }
+
+  async function hydrateCandidate(candidate) {
+    if (!candidate || candidate._candidateProvider === 'local') return candidate;
+    let hydrated = null;
+    if (candidate._candidateProvider === 'openfoodfacts' && candidate.barcode) {
+      hydrated = await API.fetchProductByCode(candidate.barcode).catch(() => null);
+    } else if (candidate._candidateProvider === 'usda' && (candidate.fdcId || String(candidate.barcode || '').startsWith('fdcId_'))) {
+      const fdcId = candidate.fdcId || String(candidate.barcode).slice(6);
+      hydrated = await USDA.fetchFoodById(fdcId, $usdaApiKey).catch(() => null);
+    }
+    return hydrated ? { ...candidate, ...hydrated, _candidateProvider: candidate._candidateProvider } : candidate;
+  }
+
+  function rankingOptions(row) {
+    return {
+      requiredUnit: row?.unit || row?.ingredient?.unit,
+      preferredBrands: $preferredFoodBrands,
+      brandPriority: $preferredBrandPriority,
+    };
+  }
+
+  async function collectMatches(row, query, source = 'all', limit = 30) {
+    const names = query ? [query] : ingredientSearchNames(row.ingredient);
+    const jobs = [];
+    if (source === 'all' || source === 'local') jobs.push(Promise.resolve(localCandidates(names[0])));
+    if ((source === 'all' || source === 'openfoodfacts') && $offEnabled) {
+      for (const name of names) jobs.push(cachedProviderSearch('openfoodfacts', name));
+    }
+    if ((source === 'all' || source === 'usda') && $usdaEnabled && $usdaApiKey) {
+      for (const name of names) jobs.push(cachedProviderSearch('usda', name));
+    }
+    const raw = (await Promise.all(jobs)).flat();
+    const provisional = rankIngredientCandidates(names, raw, Math.max(limit, 8), rankingOptions(row));
+    const hydrated = await Promise.all(provisional.slice(0, 8).map(hydrateCandidate));
+    return rankIngredientCandidates(names, [...hydrated, ...provisional.slice(8)], limit, rankingOptions(row));
+  }
+
   async function findProviderMatches(index) {
     const row = resolutions[index];
     const rows = [...resolutions];
     rows[index] = { ...row, searching: true, candidates: [], searchAttempted: true };
     resolutions = rows;
     try {
-      const names = ingredientSearchNames(row.ingredient);
-      const jobs = [];
-      for (const name of names) {
-        if ($offEnabled) jobs.push(cachedProviderSearch('openfoodfacts', name));
-        if ($usdaEnabled && $usdaApiKey) jobs.push(cachedProviderSearch('usda', name));
-      }
-      const candidates = rankIngredientCandidates(names, (await Promise.all(jobs)).flat(), 8);
+      const candidates = await collectMatches(row, '', 'all', 30);
       const next = [...resolutions];
       next[index] = { ...next[index], searching: false, candidates };
       resolutions = next;
@@ -180,32 +277,118 @@
     }
   }
 
+  async function autoMatchAll() {
+    const snapshot = resolutions;
+    await Promise.all(snapshot.map(async (row, index) => {
+      try {
+        const candidates = await collectMatches(row, '', 'all', 30);
+        const current = resolutions[index];
+        if (!current || current.ingredient.original_text !== row.ingredient.original_text) return;
+        const best = candidates[0];
+        const next = [...resolutions];
+        next[index] = { ...current, candidates, searchAttempted: true, searching: false };
+        if (best && isStrongIngredientCandidate(best) && !current.manuallySelected) {
+          applyCandidateToRow(next[index], best, true);
+        }
+        resolutions = next;
+        if (best && isStrongIngredientCandidate(best) && !current.manuallySelected) maybeEstimateConversion(index);
+      } catch {
+        // Provider outages leave the row unresolved; local/manual search remains available.
+      }
+    }));
+  }
+
+  function providerReferences(candidate, row) {
+    const refs = [];
+    if (candidate._candidateProvider === 'openfoodfacts' && candidate.barcode) refs.push({ provider: 'openfoodfacts', kind: 'product', id: candidate.barcode });
+    if (candidate._candidateProvider === 'usda' && (candidate.fdcId || candidate.id)) refs.push({ provider: 'usda', kind: 'food', id: String(candidate.fdcId || candidate.id) });
+    if (recipe?.source === 'mealie' && recipe.source_instance && row.ingredient.source_food_id) refs.push({ provider: 'mealie', instance: recipe.source_instance, kind: 'food', id: String(row.ingredient.source_food_id) });
+    return refs;
+  }
+
+  function cleanProviderFood(candidate, row) {
+    const { _candidateProvider, _matchScore, _relevanceScore, _matchReasons, _convertible, _brandRank, _sourceRank, _localFoodId, nameLanguage, id: _drop, ...foodData } = candidate;
+    return { ...foodData, external_refs: providerReferences(candidate, row), _candidateProvider };
+  }
+
+  function applyCandidateToRow(row, candidate, automatic = false) {
+    const preferred = preferredIngredientAmount(row.ingredient, candidate);
+    row.foodId = candidate._candidateProvider === 'local' ? (candidate._localFoodId ?? candidate.id) : null;
+    row.providerFood = candidate._candidateProvider === 'local' ? null : cleanProviderFood(candidate, row);
+    row.portion = preferred.portion;
+    row.unit = normalizePortionUnit(preferred.unit) || preferred.unit;
+    row.acknowledged = false;
+    row.automatic = automatic;
+    row.manuallySelected = !automatic;
+    row.selectionVersion = (row.selectionVersion || 0) + 1;
+    row.equivalentGrams = null;
+    row.conversionSource = null;
+    row.estimatingConversion = false;
+  }
+
   async function chooseProvider(index, candidate) {
     const row = resolutions[index];
-    const providerReference = candidate._candidateProvider === 'openfoodfacts' && candidate.barcode
-      ? [{ provider: 'openfoodfacts', kind: 'product', id: candidate.barcode }]
-      : candidate._candidateProvider === 'usda' && (candidate.fdcId || candidate.id)
-        ? [{ provider: 'usda', kind: 'food', id: String(candidate.fdcId || candidate.id) }]
-        : [];
-    const mealieReference = recipe?.source === 'mealie' && recipe.source_instance && row.ingredient.source_food_id
-      ? [{ provider: 'mealie', instance: recipe.source_instance, kind: 'food', id: String(row.ingredient.source_food_id) }]
-      : [];
-    const { _candidateProvider, _matchScore, _matchReasons, nameLanguage, id: _drop, ...foodData } = candidate;
     try {
-      const saved = await NtApi.createFood({ ...foodData, external_refs: [...providerReference, ...mealieReference] });
-      foods = [...foods, saved].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      const hydrated = await hydrateCandidate(candidate);
       const next = [...resolutions];
-      const preferred = preferredIngredientAmount(row.ingredient, saved);
-      next[index] = {
-        ...next[index], foodId: saved.id,
-        portion: preferred.portion,
-        unit: preferred.unit,
-        acknowledged: false, automatic: false, candidates: [], searching: false,
-      };
+      next[index] = { ...next[index] };
+      applyCandidateToRow(next[index], hydrated, false);
       resolutions = next;
+      searchSheetOpen = false;
+      await maybeEstimateConversion(index);
     } catch (error) {
-      showError(error?.message || 'Could not save provider food');
+      showError(error?.message || 'Could not select provider food');
     }
+  }
+
+  async function maybeEstimateConversion(index) {
+    const row = resolutions[index];
+    const food = selectedFood(row);
+    if (!row || !food || !conversionRequired(row) || !$aiEffectivelyEnabled || row.estimatingConversion) return;
+    const selectionVersion = row.selectionVersion || 0;
+    const next = [...resolutions];
+    next[index] = { ...row, estimatingConversion: true };
+    resolutions = next;
+    try {
+      const estimate = await estimateIngredientGramsWithAI({
+        ingredientText: row.ingredient.original_text, foodName: food.name, brand: food.brand,
+        amount: row.portion, unit: row.unit,
+      });
+      const done = [...resolutions];
+      if ((done[index]?.selectionVersion || 0) !== selectionVersion) return;
+      done[index] = { ...done[index], estimatingConversion: false, equivalentGrams: estimate.grams, conversionSource: 'ai' };
+      resolutions = done;
+    } catch {
+      const done = [...resolutions];
+      if ((done[index]?.selectionVersion || 0) !== selectionVersion) return;
+      done[index] = { ...done[index], estimatingConversion: false };
+      resolutions = done;
+    }
+  }
+
+  function openMatchSearch(index) {
+    searchRowIndex = index;
+    searchQuery = resolutions[index]?.ingredient?.name || '';
+    searchSource = 'all';
+    searchSheetOpen = true;
+    runSheetSearch();
+  }
+
+  async function runSheetSearch() {
+    if (searchRowIndex < 0 || !searchQuery.trim()) { sheetResults = []; return; }
+    const sequence = ++searchSequence;
+    sheetSearching = true;
+    try {
+      const results = await collectMatches(resolutions[searchRowIndex], searchQuery.trim(), searchSource, 50);
+      if (sequence === searchSequence) sheetResults = results;
+    }
+    catch (error) { if (sequence === searchSequence) { sheetResults = []; showError(error?.message || 'Food search failed'); } }
+    finally { if (sequence === searchSequence) sheetSearching = false; }
+  }
+
+  function scheduleSheetSearch() {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(runSheetSearch, 250);
   }
 
   async function requestAiRefinement(index) {
@@ -255,6 +438,7 @@
   function chooseRecipe(index) {
     selectedIndex = index;
     initializeResolutions(result.recipes[index]);
+    autoMatchAll();
   }
 
   function chooseFood(index, event) {
@@ -265,10 +449,15 @@
     rows[index] = {
       ...rows[index],
       foodId: food?.id ?? null,
+      providerFood: null,
       portion: preferred.portion,
       unit: preferred.unit,
       acknowledged: food ? false : rows[index].acknowledged,
       automatic: false,
+      manuallySelected: true,
+      selectionVersion: (rows[index].selectionVersion || 0) + 1,
+      equivalentGrams: null,
+      conversionSource: null,
     };
     resolutions = rows;
   }
@@ -282,6 +471,7 @@
       [result, foods] = await Promise.all([NtApi.previewRecipeUrl(url.trim()), NtApi.getFoods()]);
       selectedIndex = 0;
       initializeResolutions(result.recipes[0]);
+      autoMatchAll();
     } catch (error) {
       showError(error?.message || 'Could not import that recipe URL');
     } finally {
@@ -300,8 +490,10 @@
         mode,
         ingredients: resolutions.map(row => ({
           food_id: row.acknowledged && conversionRequired(row) ? null : row.foodId,
+          provider_food: row.acknowledged && conversionRequired(row) ? null : row.providerFood,
           portion: row.portion,
           unit: row.unit,
+          equivalent_grams: Number(row.equivalentGrams) > 0 ? Number(row.equivalentGrams) : undefined,
           name: row.ingredient.name,
           unresolved_acknowledged: row.acknowledged,
           source_ingredient: {
@@ -318,7 +510,9 @@
             amounts: row.ingredient.amounts || [],
             normalization_source: row.ingredient.normalization_source || 'deterministic',
             group: row.ingredient.group || '',
-            resolution: row.foodId && !(row.acknowledged && conversionRequired(row)) ? (row.automatic ? 'local_exact' : 'local_selected') : 'unresolved',
+            resolution: selectedFood(row) && !(row.acknowledged && conversionRequired(row))
+              ? (row.providerFood ? (row.automatic ? 'provider_automatic' : 'provider_selected') : (row.automatic ? 'local_automatic' : 'local_selected'))
+              : 'unresolved',
           },
         })),
       });
@@ -326,7 +520,7 @@
       showSuccess(mode === 'update' ? $_('recipe_import.updated') : $_('recipe_import.success'));
       editorState.foodsActiveTab = 2;
       editorState.mealIsRecipe = true;
-      editorState.mealPrefill = saved;
+      editorState.mealPrefill = saved.recipe;
       push('/meal-editor');
     } catch (error) {
       if (error?.code === 'recipe_exists') conflict = { id: error.existingId };
@@ -406,46 +600,41 @@
         <p class="text-3">{$_('recipe_import.match_help')}</p>
         <div class="ingredient-list">
           {#each resolutions as row, index}
-            <div class="ingredient-row" class:unresolved={row.foodId == null}>
+            <div class="ingredient-row" class:unresolved={!selectedFood(row)}>
               <div class="ingredient-source">
                 <strong>{row.ingredient.original_text}</strong>
                 {#if row.ingredient.parse_confidence !== 'high'}<span class="status warn">{$_('recipe_import.check_amount')}</span>{/if}
                 {#if row.automatic}<span class="status">{$_('recipe_import.exact_match')}</span>{/if}
               </div>
-              <select class="select" value={row.foodId ?? ''} on:change={event => chooseFood(index, event)}>
-                <option value="">{$_('recipe_import.placeholder')}</option>
-                {#each foods as food}<option value={food.id}>{food.name}{food.brand ? ` — ${food.brand}` : ''}</option>{/each}
-              </select>
-              {#if row.foodId != null}
+              <button class="match-picker" on:click={() => openMatchSearch(index)}>
+                {#if selectedFood(row)}
+                  <span><strong>{selectedFood(row).name}</strong>{#if selectedFood(row).brand}<small>{selectedFood(row).brand}</small>{/if}</span>
+                {:else}
+                  <span><strong>{row.searching ? 'Finding a match…' : 'Find a food match'}</strong><small>Search foods or brands</small></span>
+                {/if}
+                <span class="material-symbols-rounded">search</span>
+              </button>
+              {#if selectedFood(row)}
                 <div class="amount-row">
                   <input class="input" type="number" min="0" step="any" bind:value={row.portion} aria-label={$_('recipe_import.amount')} />
-                  <input class="input unit-input" bind:value={row.unit} aria-label={$_('recipe_import.unit')} />
+                  <select class="select unit-select" value={normalizePortionUnit(row.unit)} on:change={event => setRowUnit(index, event)} aria-label={$_('recipe_import.unit')}>
+                    {#each unitOptions(row) as option}<option value={option.value}>{option.label}</option>{/each}
+                  </select>
                 </div>
+                {@const detail = conversionDetail(row)}
+                {#if detail}
+                  <p class="conversion-detail" class:estimated={detail.source === 'ai'}>
+                    {prettyNumber(row.portion)} {displayUnitName(row.unit, row.portion, $locale)} → {prettyNumber(detail.value)} {displayUnitName(detail.unit, detail.value, $locale)} · {conversionSourceLabel(detail.source)}
+                  </p>
+                {/if}
                 {#if conversionRequired(row)}
-                  <p class="conversion-warning">{$_('recipe_import.conversion', { values: { unit: foods.find(item => String(item.id) === String(row.foodId))?.unit || $_('recipe_import.unit') } })}</p>
+                  <p class="conversion-warning">{row.estimatingConversion ? 'Estimating the unit conversion…' : 'This food does not provide a usable conversion for the selected unit.'}</p>
                   <label class="ack-row">
                     <input type="checkbox" bind:checked={row.acknowledged} />
-                    {$_('recipe_import.use_placeholder')}
+                    <span><strong>Import without nutrition</strong><small>Keep this ingredient in the recipe, but do not count calories or nutrients.</small></span>
                   </label>
                 {/if}
               {:else}
-                {#if $offEnabled || ($usdaEnabled && $usdaApiKey)}
-                  <button class="btn btn-ghost provider-search" on:click={() => findProviderMatches(index)} disabled={row.searching}>
-                    {row.searching ? $_('recipe_import.searching') : $_('recipe_import.find_provider')}
-                  </button>
-                  {#if row.candidates?.length}
-                    <div class="candidate-list">
-                      {#each row.candidates as candidate}
-                        <button on:click={() => chooseProvider(index, candidate)}>
-                          <span class="candidate-name"><strong>{candidate.name}</strong><small>{(candidate._matchReasons || []).join(' · ')}</small></span>
-                          <span>{candidate.brand || candidate._candidateProvider}</span>
-                        </button>
-                      {/each}
-                    </div>
-                  {:else if row.searchAttempted && !row.searching}
-                    <p class="provider-empty">{$_('recipe_import.provider_empty')}</p>
-                  {/if}
-                {/if}
                 {#if $aiEffectivelyEnabled && (row.ingredient.parse_confidence !== 'high' || (row.searchAttempted && !row.candidates?.length))}
                   <button class="btn btn-ghost ai-refine" on:click={() => requestAiRefinement(index)} disabled={row.aiRefining}>
                     {row.aiRefining ? $_('recipe_import.ai_refining') : $_('recipe_import.ai_refine')}
@@ -456,7 +645,7 @@
                     <strong>{$_('recipe_import.ai_proposal')}</strong>
                     <span>{$_('recipe_import.ai_original', { values: { value: row.ingredient.name } })}</span>
                     <span>{$_('recipe_import.ai_proposed', { values: { value: row.aiProposal.search_names.join(' · ') } })}</span>
-                    {#if row.aiProposal.amounts?.length}<span>{$_('recipe_import.ai_amounts', { values: { value: row.aiProposal.amounts.map(a => `${a.quantity} ${a.unit} (${a.role})`).join(' · ') } })}</span>{/if}
+                    {#if row.aiProposal.amounts?.length}<span>{$_('recipe_import.ai_amounts', { values: { value: row.aiProposal.amounts.map(a => `${a.quantity} ${displayUnitName(a.unit, a.quantity, $locale)} (${a.role})`).join(' · ') } })}</span>{/if}
                     <div>
                       <button class="btn btn-primary" on:click={() => applyAiRefinement(index)}>{$_('recipe_import.ai_apply')}</button>
                       <button class="btn btn-ghost" on:click={() => dismissAiRefinement(index)}>{$_('recipe_import.dismiss')}</button>
@@ -465,7 +654,7 @@
                 {/if}
                 <label class="ack-row">
                   <input type="checkbox" bind:checked={row.acknowledged} />
-                  {$_('recipe_import.acknowledge')}
+                  <span><strong>Import without nutrition</strong><small>Keep this ingredient in the recipe, but do not count calories or nutrients.</small></span>
                 </label>
               {/if}
             </div>
@@ -493,7 +682,7 @@
       {/if}
 
       <div class="import-actions">
-        <button class="btn btn-ghost" on:click={() => { result = null; resolutions = []; try { localStorage.removeItem(DRAFT_KEY); } catch {} }}>{$_('recipe_import.another')}</button>
+        <button class="btn btn-ghost" on:click={() => { result = null; resolutions = []; try { localStorage.removeItem(RECIPE_IMPORT_DRAFT_KEY); } catch {} }}>{$_('recipe_import.another')}</button>
         <button class="btn btn-primary" on:click={() => commit()} disabled={saving || !unresolvedReady}>
           {saving ? $_('recipe_import.importing') : $_('recipe_import.import')}
         </button>
@@ -501,6 +690,44 @@
       {#if !unresolvedReady}<p class="blocking-note">{$_('recipe_import.blocked')}</p>{/if}
     {/if}
   </main>
+
+  <Sheet bind:open={searchSheetOpen} title="Choose a food match" height="full" on:close={() => searchSheetOpen = false}>
+    <div class="match-search-sheet">
+      <div class="sheet-search-row">
+        <span class="material-symbols-rounded">search</span>
+        <input class="input" type="search" placeholder="Search food or brand" bind:value={searchQuery}
+          on:input={scheduleSheetSearch} on:keydown={event => event.key === 'Enter' && runSheetSearch()} />
+      </div>
+      <div class="source-tabs" role="tablist" aria-label="Food source">
+        {#each [
+          { value: 'all', label: 'All' },
+          { value: 'local', label: 'My Foods' },
+          ...($offEnabled ? [{ value: 'openfoodfacts', label: 'Open Food Facts' }] : []),
+          ...($usdaEnabled && $usdaApiKey ? [{ value: 'usda', label: 'USDA' }] : []),
+        ] as sourceOption}
+          <button class:active={searchSource === sourceOption.value} on:click={() => { searchSource = sourceOption.value; runSheetSearch(); }}>{sourceOption.label}</button>
+        {/each}
+      </div>
+      {#if sheetSearching}
+        <div class="sheet-state"><span class="material-symbols-rounded spin">refresh</span> Searching…</div>
+      {:else if sheetResults.length}
+        <div class="sheet-results">
+          {#each sheetResults as candidate}
+            <button class="sheet-result" on:click={() => chooseProvider(searchRowIndex, candidate)}>
+              <span class="result-main">
+                <strong>{candidate.name}</strong>
+                {#if candidate.brand}<small>{candidate.brand}</small>{/if}
+                <small>{(candidate._matchReasons || []).join(' · ')}</small>
+              </span>
+              <span class="result-source">{candidate._candidateProvider === 'local' ? 'My Foods' : candidate._candidateProvider === 'openfoodfacts' ? 'Open Food Facts' : 'USDA'}</span>
+            </button>
+          {/each}
+        </div>
+      {:else}
+        <div class="sheet-state">No relevant foods found. Try a food name, brand, or both.</div>
+      {/if}
+    </div>
+  </Sheet>
 </div>
 
 <style>
@@ -527,16 +754,18 @@
   .ingredient-source { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
   .status { font-size: 11px; padding: 2px 6px; color: var(--accent); border-radius: 999px; background: color-mix(in srgb, var(--accent) 12%, transparent); }
   .status.warn { color: #b66a00; background: color-mix(in srgb, #f59e0b 15%, transparent); }
-  .amount-row { display: grid; grid-template-columns: 1fr 72px; gap: 6px; }
-  .ack-row { font-size: 12px; display: flex; gap: 7px; align-items: start; }
-  .provider-search { justify-self: start; font-size: 12px; }
+  .match-picker { min-width: 0; min-height: 44px; padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-1); cursor: pointer; }
+  .match-picker > span:first-child { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .match-picker strong, .match-picker small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .match-picker small { color: var(--text-3); }
+  .amount-row { display: grid; grid-template-columns: minmax(70px, .7fr) minmax(130px, 1.3fr); gap: 6px; }
+  .unit-select { min-width: 0; }
+  .ack-row { grid-column: 2 / -1; font-size: 12px; display: flex; gap: 7px; align-items: start; }
+  .ack-row span { display: flex; flex-direction: column; gap: 2px; }
+  .ack-row small { color: var(--text-3); font-weight: 400; }
   .conversion-warning { grid-column: 2 / -1; margin: 0; color: #b66a00; font-size: 12px; }
-  .candidate-list { grid-column: 1 / -1; display: grid; gap: 6px; }
-  .candidate-list button { display: flex; justify-content: space-between; gap: 8px; text-align: left; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-1); cursor: pointer; }
-  .candidate-list span { color: var(--text-3); font-size: 12px; }
-  .candidate-list .candidate-name { display: flex; flex-direction: column; gap: 2px; color: var(--text-1); }
-  .candidate-list .candidate-name small { color: var(--text-3); font-size: 10px; font-weight: 400; }
-  .provider-empty { grid-column: 1 / -1; margin: 0; color: var(--text-3); font-size: 12px; }
+  .conversion-detail { grid-column: 2 / -1; margin: 0; color: var(--text-3); font-size: 12px; }
+  .conversion-detail.estimated { color: #b66a00; }
   .ai-refine { justify-self: start; font-size: 12px; }
   .ai-proposal { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border)); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--accent) 8%, var(--surface-2)); font-size: 12px; }
   .ai-proposal > div { display: flex; gap: 8px; }
@@ -544,10 +773,25 @@
   .conflict-card { display: flex; flex-direction: column; gap: 8px; }
   .import-actions { display: flex; justify-content: flex-end; gap: 10px; position: sticky; bottom: 12px; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(8px); padding: 12px; border-radius: var(--radius-lg); }
   .blocking-note { text-align: right; }
+  .match-search-sheet { min-height: 100%; display: flex; flex-direction: column; gap: 12px; }
+  .sheet-search-row { position: relative; }
+  .sheet-search-row > span { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--text-3); pointer-events: none; }
+  .sheet-search-row .input { width: 100%; padding-left: 40px; }
+  .source-tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+  .source-tabs button { flex: 0 0 auto; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-2); color: var(--text-2); padding: 7px 11px; cursor: pointer; }
+  .source-tabs button.active { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface-2)); }
+  .sheet-results { display: flex; flex-direction: column; gap: 7px; }
+  .sheet-result { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-1); text-align: left; cursor: pointer; }
+  .result-main { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .result-main strong, .result-main small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .result-main small, .result-source { color: var(--text-3); font-size: 11px; }
+  .result-source { flex: 0 0 auto; }
+  .sheet-state { min-height: 160px; display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--text-3); text-align: center; }
   @media (max-width: 700px) {
     .url-row { flex-direction: column; }
     .recipe-summary { grid-template-columns: 90px 1fr; }
     .recipe-summary img { width: 90px; height: 90px; }
     .ingredient-row { grid-template-columns: 1fr; }
+    .ack-row, .conversion-warning, .conversion-detail { grid-column: 1; }
   }
 </style>

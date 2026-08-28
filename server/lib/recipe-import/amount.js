@@ -2,7 +2,10 @@ const MASS_TO_G = Object.freeze({ g: 1, mg: 0.001, kg: 1000, oz: 28.349523125, l
 const VOLUME_TO_ML = Object.freeze({ ml: 1, l: 1000, tsp: 4.92892159375, tbsp: 14.78676478125, 'fl oz': 29.5735295625, cup: 236.5882365 });
 
 function unitKey(value) {
-  return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const raw = String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  return ({ c: 'cup', cups: 'cup', teaspoons: 'tsp', teaspoon: 'tsp', tablespoons: 'tbsp', tablespoon: 'tbsp',
+    grams: 'g', gram: 'g', kilograms: 'kg', kilogram: 'kg', milliliters: 'ml', milliliter: 'ml',
+    litres: 'l', litre: 'l', liters: 'l', liter: 'l', ounces: 'oz', ounce: 'oz', pounds: 'lb', pound: 'lb' })[raw] || raw;
 }
 
 function altUnitGrams(food, unit) {
@@ -46,4 +49,3 @@ export function resolveAmountFactor(food, amount, unit) {
   const requestedValue = inSameFrame(requested, original.system, food);
   return requestedValue != null && original.value > 0 ? requestedValue / original.value : null;
 }
-

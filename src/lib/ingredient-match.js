@@ -1,5 +1,7 @@
 /** Deterministic ingredient-name normalization and provider candidate scoring. */
 
+import { altUnitGrams, normalizePortionUnit, unitKind } from './provider-portions.js';
+
 const SHORT_PLURALS = new Set(['gas', 'glass', 'molasses']);
 const REFINEMENT_UNITS = new Set(['g','kg','mg','oz','lb','ml','l','tsp','tbsp','cup','pinch','dash','clove','slice','can','package','piece','sprig','stalk','bunch']);
 const AMOUNT_ROLES = new Set(['primary', 'additional', 'equivalent']);
@@ -15,6 +17,24 @@ export function normalizeIngredientName(value) {
       word.endsWith('ss') || SHORT_PLURALS.has(word) ? word : stem
     ))
     .replace(/\s+/g, ' ');
+}
+
+export function normalizeBrandName(value) {
+  return normalizeIngredientName(value)
+    .replace(/\b(?:inc|incorporated|llc|ltd|limited|company|co|corp|corporation|brand|brands)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function candidateSupportsUnit(candidate, unit) {
+  const wanted = normalizePortionUnit(unit);
+  if (!wanted) return false;
+  if (altUnitGrams(candidate, wanted)) return true;
+  const requestedKind = unitKind(wanted);
+  const baseKind = unitKind(candidate?.unit || candidate?.nutrition_basis);
+  if (requestedKind === baseKind && requestedKind !== 'portion') return true;
+  if (requestedKind === 'portion') return normalizePortionUnit(candidate?.unit) === wanted;
+  return Number(candidate?.density_g_ml) > 0;
 }
 
 function editDistance(a, b) {
@@ -69,6 +89,7 @@ export function scoreIngredientCandidate(searchNames, candidate) {
     && ['Foundation', 'SR Legacy', 'Survey (FNDDS)'].includes(candidate?.dataType) ? 2 : 0;
   return {
     score: Math.round((best.relevance + quality + nutrition + provider) * 10) / 10,
+    relevance: Math.round(best.relevance * 10) / 10,
     reasons: [
       best.exact ? 'exact name' : best.phrase ? 'phrase match' : `${Math.round(best.coverage * 100)}% ingredient-token coverage`,
       quality ? 'complete nutrition record' : '',
@@ -78,19 +99,58 @@ export function scoreIngredientCandidate(searchNames, candidate) {
   };
 }
 
-export function rankIngredientCandidates(searchNames, candidates, limit = 8) {
+export function rankIngredientCandidates(searchNames, candidates, limit = 8, options = {}) {
+  const preferredBrands = (Array.isArray(options.preferredBrands) ? options.preferredBrands : [])
+    .map(normalizeBrandName).filter(Boolean);
+  const preferredBrandRank = brand => {
+    const normalized = normalizeBrandName(brand);
+    const index = preferredBrands.findIndex(item => normalized === item || normalized.includes(item) || item.includes(normalized));
+    return index < 0 ? 0 : preferredBrands.length - index;
+  };
+  const sourceRank = candidate => ({ local: 3, openfoodfacts: 2, usda: 1 }[candidate?._candidateProvider] || 0);
   const unique = new Map();
   for (const candidate of candidates || []) {
     const scored = scoreIngredientCandidate(searchNames, candidate);
     if (!scored) continue;
-    const key = `${candidate?._candidateProvider || ''}:${candidate?.barcode || candidate?.fdcId || candidate?.id || normalizeIngredientName(`${candidate?.name} ${candidate?.brand}`)}`;
-    const next = { ...candidate, _matchScore: scored.score, _matchReasons: scored.reasons };
+    const provider = candidate?._candidateProvider || '';
+    const external = provider === 'openfoodfacts' || provider === 'usda';
+    const semanticKey = `${normalizeIngredientName(candidate?.name)}\0${normalizeBrandName(candidate?.brand)}`;
+    const key = external ? `external:${semanticKey}` : `${provider}:${candidate?.id || semanticKey}`;
+    const convertible = options.requiredUnit ? candidateSupportsUnit(candidate, options.requiredUnit) : false;
+    const brandRank = preferredBrandRank(candidate?.brand);
+    const next = {
+      ...candidate,
+      _matchScore: scored.score,
+      _relevanceScore: scored.relevance,
+      _matchReasons: [...scored.reasons, convertible ? 'unit conversion available' : '', brandRank ? 'preferred brand' : ''].filter(Boolean),
+      _convertible: convertible,
+      _brandRank: brandRank,
+      _sourceRank: sourceRank(candidate),
+    };
     const previous = unique.get(key);
-    if (!previous || next._matchScore > previous._matchScore) unique.set(key, next);
+    if (!previous || compareCandidates(next, previous, options.brandPriority) < 0) unique.set(key, next);
   }
   return [...unique.values()]
-    .sort((a, b) => b._matchScore - a._matchScore || String(a.name || '').localeCompare(String(b.name || '')))
+    .sort((a, b) => compareCandidates(a, b, options.brandPriority))
     .slice(0, limit);
+}
+
+function compareCandidates(a, b, brandPriority = 'standard') {
+  const relevanceDifference = Number(b._relevanceScore || 0) - Number(a._relevanceScore || 0);
+  if (Math.abs(relevanceDifference) > 8) return relevanceDifference;
+  if (!!a._convertible !== !!b._convertible) return a._convertible ? -1 : 1;
+  if (brandPriority === 'strong' && a._brandRank !== b._brandRank) return b._brandRank - a._brandRank;
+  if (a._sourceRank !== b._sourceRank) return b._sourceRank - a._sourceRank;
+  if (brandPriority !== 'strong' && a._brandRank !== b._brandRank) return b._brandRank - a._brandRank;
+  return relevanceDifference
+    || Number(b.completeness || 0) - Number(a.completeness || 0)
+    || String(a.name || '').localeCompare(String(b.name || ''))
+    || String(a.brand || '').localeCompare(String(b.brand || ''));
+}
+
+export function isStrongIngredientCandidate(candidate) {
+  if (!candidate) return false;
+  return Number(candidate._relevanceScore || candidate._matchScore || 0) >= 65;
 }
 
 export function validateIngredientRefinement(value) {

@@ -5,12 +5,34 @@
   import {
     foodsShowCategories, foodsShowLabels, foodsShowNotes, foodsShowThumbnails,
     foodsShowYesterdayMeals, foodsSort, mealsSort, recipesSort,
-    foodsDefaultSource, offEnabled, usdaEnabled,
+    foodsDefaultSource, preferredFoodBrands, preferredBrandPriority, offEnabled, usdaEnabled,
     barcodeBeep, barcodeFlashlight, cropPhotos,
   } from '../../stores/settings.js';
   import { DB } from '../../lib/db.js';
   // Mealie is a plain localStorage flag (not a store), unlike OFF/USDA.
   const _mealieEnabled = DB.getSetting('mealieEnabled', false);
+  let preferredBrandInput = '';
+
+  function addPreferredBrand() {
+    const value = preferredBrandInput.trim();
+    if (!value) return;
+    if (!$preferredFoodBrands.some(item => item.toLowerCase() === value.toLowerCase())) {
+      preferredFoodBrands.set([...$preferredFoodBrands, value]);
+    }
+    preferredBrandInput = '';
+  }
+
+  function removePreferredBrand(index) {
+    preferredFoodBrands.set($preferredFoodBrands.filter((_, i) => i !== index));
+  }
+
+  function movePreferredBrand(index, direction) {
+    const target = index + direction;
+    if (target < 0 || target >= $preferredFoodBrands.length) return;
+    const next = [...$preferredFoodBrands];
+    [next[index], next[target]] = [next[target], next[index]];
+    preferredFoodBrands.set(next);
+  }
 </script>
 
 <div class="section-body">
@@ -22,6 +44,36 @@
     <div class="setting-row">
       <div><span class="setting-label">{$_('settings_foods_picker.show_thumbnails')}</span><div class="setting-desc">{$_('settings_foods_picker.show_thumbnails_desc')}</div></div>
       <Toggle checked={$foodsShowThumbnails} on:change={e => foodsShowThumbnails.set(e.detail)} />
+    </div>
+    <div class="setting-divider"></div>
+    <div class="setting-row brand-setting-row">
+      <div>
+        <span class="setting-label">Preferred Brands</span>
+        <div class="setting-desc">Relevant matches from these brands are promoted in recipe matching. Earlier brands have higher priority.</div>
+        <div class="brand-entry">
+          <input class="input" type="text" placeholder="Great Value or Kirkland Signature" bind:value={preferredBrandInput}
+            on:keydown={event => event.key === 'Enter' && (event.preventDefault(), addPreferredBrand())} />
+          <button class="btn btn-ghost" on:click={addPreferredBrand} disabled={!preferredBrandInput.trim()}>Add</button>
+        </div>
+        {#if $preferredFoodBrands.length}
+          <div class="brand-tags">
+            {#each $preferredFoodBrands as brand, index}
+              <span class="brand-tag">
+                <button class="brand-move" on:click={() => movePreferredBrand(index, -1)} disabled={index === 0} aria-label={`Move ${brand} up`}>↑</button>
+                <button class="brand-move" on:click={() => movePreferredBrand(index, 1)} disabled={index === $preferredFoodBrands.length - 1} aria-label={`Move ${brand} down`}>↓</button>
+                {brand}
+                <button class="brand-remove" on:click={() => removePreferredBrand(index)} aria-label={`Remove ${brand}`}>×</button>
+              </span>
+            {/each}
+          </div>
+        {/if}
+      </div>
+      <div class="select-wrap" style="width:160px">
+        <select class="select sel-sm" value={$preferredBrandPriority} on:change={e => preferredBrandPriority.set(e.target.value)}>
+          <option value="standard">Standard</option>
+          <option value="strong">Strong</option>
+        </select>
+      </div>
     </div>
     <div class="setting-divider"></div>
     <div class="setting-row">
@@ -122,3 +174,16 @@
   </div>
 
 </div>
+
+<style>
+  .brand-setting-row { align-items: flex-start; }
+  .brand-setting-row > div:first-child { flex: 1; min-width: 0; }
+  .brand-entry { display: flex; gap: 8px; margin-top: 10px; max-width: 520px; }
+  .brand-entry .input { flex: 1; }
+  .brand-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .brand-tag { display: inline-flex; align-items: center; gap: 4px; padding: 4px 7px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-2); font-size: 12px; }
+  .brand-move, .brand-remove { border: 0; background: transparent; color: var(--text-2); cursor: pointer; padding: 0 2px; }
+  .brand-move:disabled { opacity: .3; cursor: default; }
+  .brand-remove { font-size: 16px; }
+  @media (max-width: 700px) { .brand-setting-row { align-items: stretch; } }
+</style>

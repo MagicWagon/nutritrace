@@ -589,8 +589,12 @@ function _serializeAltUnits(v) {
   const clean = v
     .filter(r => r && typeof r === 'object')
     .map(r => ({
-      abbr: String(r.abbr || '').trim(),
-      grams: Number(r.grams),
+      abbr: String(r.abbr || '').trim(), grams: Number(r.grams),
+      ...(r.label ? { label: String(r.label).slice(0, 160) } : {}),
+      ...(r.source ? { source: String(r.source).slice(0, 40) } : {}),
+      ...(r.source_id ? { source_id: String(r.source_id).slice(0, 160) } : {}),
+      ...(Number(r.source_amount) > 0 ? { source_amount: Number(r.source_amount) } : {}),
+      ...(Number(r.source_grams) > 0 ? { source_grams: Number(r.source_grams) } : {}),
     }))
     .filter(r => r.abbr && Number.isFinite(r.grams) && r.grams > 0);
   return clean.length ? JSON.stringify(clean) : null;
