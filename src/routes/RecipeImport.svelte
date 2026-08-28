@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import { push, replace } from 'svelte-spa-router';
   import { _, locale } from 'svelte-i18n';
   import { NtApi, API, USDA } from '../lib/api.js';
@@ -10,10 +10,11 @@
   import { unitToGrams, unitSystem } from '../lib/units.js';
   import { prepareRecipeImportDraft, persistRecipeImportDraft, RECIPE_IMPORT_DRAFT_KEY } from '../lib/recipe-import-draft.js';
   import { isStrongIngredientCandidate, normalizeIngredientName, normalizeIngredientSearchText, rankIngredientCandidates } from '../lib/ingredient-match.js';
-  import { estimateIngredientGramsWithAI, refineIngredientWithAI } from '../lib/ingredient-ai.js';
+  import { estimateIngredientGramsWithAI } from '../lib/ingredient-ai.js';
   import { altUnitGrams, conversionProvenance, displayUnitName, normalizePortionUnit } from '../lib/provider-portions.js';
   import { parseRecipeIngredientText } from '../lib/recipe-ingredient.js';
-  import { searchFoodCatalogs } from '../lib/food-search.js';
+  import { createProviderRequestScheduler, searchFoodCatalogsDetailed, searchLocalFoods } from '../lib/food-search.js';
+  import { buildIngredientSearchStages } from '../lib/ingredient-search-plan.js';
   import Sheet from '../components/ui/Sheet.svelte';
   import { Mealie } from '../lib/mealieApi.js';
 
@@ -34,35 +35,23 @@
   let searchSource = 'all';
   let sheetSearching = false;
   let sheetResults = [];
+  let sheetRateLimitedSources = [];
+  let sheetUnavailableSources = [];
+  let sheetRetryAfter = null;
   let searchTimer;
   let searchSequence = 0;
   let conversionEstimateQueue = Promise.resolve();
   let autoRematchTimer;
-  // A recipe can fan out to several normalized provider queries. Keep the
-  // browser from opening one request per ingredient/provider at once while
-  // still allowing OFF and USDA to proceed independently when one source is
-  // slow or unavailable.
-  const MAX_PROVIDER_REQUESTS = 4;
-  let activeProviderRequests = 0;
-  const providerRequestQueue = [];
-
-  function scheduleProviderRequest(task) {
-    return new Promise((resolve, reject) => {
-      providerRequestQueue.push({ task, resolve, reject });
-      pumpProviderRequests();
-    });
-  }
-
-  function pumpProviderRequests() {
-    while (activeProviderRequests < MAX_PROVIDER_REQUESTS && providerRequestQueue.length) {
-      const job = providerRequestQueue.shift();
-      activeProviderRequests += 1;
-      Promise.resolve().then(job.task).then(job.resolve, job.reject).finally(() => {
-        activeProviderRequests -= 1;
-        pumpProviderRequests();
-      });
-    }
-  }
+  let autoMatchGeneration = 0;
+  const autoRetryTimers = new Map();
+  // Leave headroom under the proxy's 60/minute API bucket for winner
+  // hydration and for interactive work. The exact-first planner normally
+  // uses far fewer calls; this guard covers recipes with no exact candidates
+  // so token fallbacks cannot fan out past the server budget.
+  const AUTO_PROVIDER_CALL_LIMIT = 50;
+  let automaticProviderCalls = 0;
+  let automaticProviderWindowStarted = 0;
+  const providerRequestScheduler = createProviderRequestScheduler({ maxConcurrent: 4, minIntervalMs: 1000 });
 
   onMount(async () => {
     const transientDraft = editorState.recipeImportDraft;
@@ -91,16 +80,23 @@
     }
     result = prepared.result;
     restoringDraft = false;
-    // Re-run automatic matching for restored drafts as well. Provider data,
-    // settings, or an earlier partial outage may have changed since save.
-    autoMatchAll();
+  });
+
+  onDestroy(() => {
+    clearTimeout(autoRematchTimer);
+    clearTimeout(searchTimer);
+    for (const timer of autoRetryTimers.values()) clearTimeout(timer);
+    autoRetryTimers.clear();
+    // Active provider calls cannot be aborted by the shared scheduler, but
+    // all queued work observes these generations and will be ignored.
+    autoMatchGeneration += 1;
+    searchSequence += 1;
   });
 
   $: recipe = result?.recipes?.[selectedIndex] || null;
   $: matchSettingsKey = `${$offEnabled}:${$offSearchLanguage}:${$offSearchCountry}:${$usdaEnabled}:${$usdaApiKey}:${$recipeImportUsePreferredBrands}:${$recipeImportPreferredBrandsFirst}:${JSON.stringify($preferredFoodBrands)}`;
   $: if (!restoringDraft && result && matchSettingsKey) {
-    clearTimeout(autoRematchTimer);
-    autoRematchTimer = setTimeout(() => autoMatchAll(), 300);
+    scheduleAutoMatch();
   }
   $: unresolvedReady = resolutions.every(row => (selectedFood(row) && !conversionRequired(row)) || row.acknowledged);
   $: if (result && typeof localStorage !== 'undefined') {
@@ -121,50 +117,6 @@
     return [...new Set(names)].slice(0, 3);
   }
 
-  function providerSearchQueries(names) {
-    const exact = [];
-    const branded = [];
-    const fallbacks = [];
-    const add = (list, value) => {
-      const clean = String(value || '').replace(/\s+/g, ' ').trim();
-      if (clean && !list.some(item => normalizeName(item) === normalizeName(clean))) list.push(clean);
-    };
-    for (const name of names) {
-      add(exact, name);
-      const cleaned = normalizeIngredientSearchText(name);
-      add(exact, cleaned);
-      for (const brand of $preferredFoodBrands.filter(item => item && typeof item === 'object' && item.offTag).slice(0, 2)) {
-        if (!normalizeName(cleaned).includes(normalizeName(brand.name))) add(branded, `${cleaned} ${brand.name}`);
-      }
-      const tokens = cleaned.split(' ').filter(Boolean);
-      // Provider indexes vary between phrase, food-name, and brand matching.
-      // Keep the exact alternatives first, then try noun phrases. This is
-      // important for names such as "pure maple syrup" and
-      // "unsweetened almond milk": the useful provider query is usually the
-      // final two food tokens ("maple syrup" / "almond milk"), not the
-      // descriptive adjective plus the first noun.
-      if (tokens.length > 1) add(fallbacks, tokens.slice(-2).join(' '));
-      if (tokens.length > 2) add(fallbacks, tokens.slice(0, 2).join(' '));
-      for (let size = Math.min(3, tokens.length - 1); size >= 2; size--) {
-        for (let start = Math.max(0, tokens.length - size - 1); start >= 0; start--) {
-          add(fallbacks, tokens.slice(start, start + size).join(' '));
-        }
-      }
-      for (const token of tokens) {
-        if (token.length > 2) add(fallbacks, token);
-      }
-    }
-    // Six queries per provider keeps automatic import responsive while still
-    // covering alternatives, preferred-brand searches, and food-only noun
-    // phrases when a provider's phrase index is overly strict.
-    const queries = [];
-    for (const list of [exact, branded, fallbacks]) {
-      for (const value of list) {
-        if (!queries.some(item => normalizeName(item) === normalizeName(value))) queries.push(value);
-      }
-    }
-    return queries.slice(0, 6);
-  }
 
   function preferredIngredientAmount(ingredient, fallbackFood = null) {
     // Keep the recipe's primary household measurement in the editable row.
@@ -334,8 +286,9 @@
         searching: false,
         candidates: [],
         searchAttempted: false,
-        aiRefining: false,
-        aiProposal: null,
+        searchStatus: null,
+        searchRetryAfter: null,
+        rateLimitRetries: 0,
         equivalentGrams: explicitEquivalentGrams(ingredient),
         conversionSource: explicitEquivalentGrams(ingredient) ? 'recipe' : null,
         conversionEstimateFailed: false,
@@ -345,35 +298,116 @@
     });
   }
 
-  function cachedProviderSearch(provider, name) {
-    const languageKey = provider === 'openfoodfacts' ? `:${$offSearchLanguage}:${$offSearchCountry}` : '';
-    const key = `${provider}${languageKey}:${normalizeName(name)}`;
-    if (providerSearchCache.has(key)) return providerSearchCache.get(key);
-    const promise = searchFoodCatalogs({
+  // Initial preview, draft restoration, recipe switching, and settings
+  // changes can all invalidate the same recipe at nearly the same time.
+  // Debouncing this entry point ensures one recipe starts one full pass while
+  // still allowing a later settings change to supersede an active generation.
+  function scheduleAutoMatch() {
+    // Invalidate active workers immediately, before the debounce window, so a
+    // recipe switch cannot let an old worker write into a new row with the
+    // same ingredient text.
+    autoMatchGeneration += 1;
+    for (const timer of autoRetryTimers.values()) clearTimeout(timer);
+    autoRetryTimers.clear();
+    resolutions = resolutions.map(row => row.searching ? { ...row, searching: false } : row);
+    clearTimeout(autoRematchTimer);
+    autoRematchTimer = setTimeout(() => {
+      autoRematchTimer = null;
+      autoMatchAll();
+    }, 300);
+  }
+
+  function providerCacheKey(provider, name) {
+    const languageKey = provider === 'openfoodfacts' ? `:${$offSearchLanguage}:${$offSearchCountry}` : `:${$usdaApiKey}`;
+    return `${provider}${languageKey}:${normalizeName(name)}`;
+  }
+
+  function reserveAutomaticProviderCall() {
+    const now = Date.now();
+    if (!automaticProviderWindowStarted || now - automaticProviderWindowStarted >= 60_000) {
+      automaticProviderWindowStarted = now;
+      automaticProviderCalls = 0;
+    }
+    if (automaticProviderCalls >= AUTO_PROVIDER_CALL_LIMIT) return false;
+    automaticProviderCalls += 1;
+    return true;
+  }
+
+  function cachedProviderSearch(provider, name, { priority = -1, isCurrent = () => true } = {}) {
+    const key = providerCacheKey(provider, name);
+    const existing = providerSearchCache.get(key);
+    // A newer generation must not reuse a pending promise whose scheduler job
+    // is about to be cancelled. Completed, successful results remain valid
+    // cache entries across generations; only in-flight stale work is replaced.
+    if (existing) {
+      if (existing.pending && !existing.isCurrent()) providerSearchCache.delete(key);
+      else return existing.promise || Promise.resolve(existing.value);
+    }
+    if (priority < 0 && !reserveAutomaticProviderCall()) {
+      return Promise.resolve({ items: [], rateLimitedSources: [], unavailableSources: [], retryAfter: null, cancelled: false, budgetExhausted: true });
+    }
+    const entry = { pending: true, isCurrent, promise: null, value: null };
+    const promise = searchFoodCatalogsDetailed({
       query: name, source: provider, localFoods: [], offEnabled: $offEnabled,
       usdaEnabled: $usdaEnabled, usdaApiKey: $usdaApiKey, limit: 20,
-      schedule: scheduleProviderRequest,
+      schedule: providerRequestScheduler, priority, isCurrent,
+    }).then(result => {
+      // An empty rate-limited/unavailable response is not a catalogue answer.
+      // Evict it so a later retry can actually contact the provider again.
+      if (result.cancelled || result.rateLimitedSources.length || result.unavailableSources.length) {
+        if (providerSearchCache.get(key) === entry) providerSearchCache.delete(key);
+        // A cancelled queued job never consumed a provider request. Return
+        // that reservation so a replacement generation still has budget.
+        if (result.cancelled && priority < 0 && automaticProviderWindowStarted
+          && Date.now() - automaticProviderWindowStarted < 60_000) {
+          automaticProviderCalls = Math.max(0, automaticProviderCalls - 1);
+        }
+      } else {
+        entry.pending = false;
+        entry.value = result;
+      }
+      return result;
+    }).catch(error => {
+      if (providerSearchCache.get(key) === entry) providerSearchCache.delete(key);
+      throw error;
     });
-    providerSearchCache.set(key, promise);
-    promise.catch(() => providerSearchCache.delete(key));
+    entry.promise = promise;
+    providerSearchCache.set(key, entry);
     return promise;
   }
 
-  function localCandidates(query) {
-    return foods.map(food => ({ ...food, _candidateProvider: 'local', _localFoodId: food.id }))
-      .filter(food => normalizeName(`${food.name} ${food.brand || ''}`).includes(normalizeName(query)) || normalizeName(query).split(' ').some(token => token.length > 2 && normalizeName(`${food.name} ${food.brand || ''}`).includes(token)));
-  }
-
-  async function hydrateCandidate(candidate) {
-    if (!candidate || candidate._candidateProvider === 'local') return candidate;
-    let hydrated = null;
-    if (candidate._candidateProvider === 'openfoodfacts' && candidate.barcode) {
-      hydrated = await API.fetchProductByCode(candidate.barcode).catch(() => null);
-    } else if (candidate._candidateProvider === 'usda' && (candidate.fdcId || String(candidate.barcode || '').startsWith('fdcId_'))) {
-      const fdcId = candidate.fdcId || String(candidate.barcode).slice(6);
-      hydrated = await USDA.fetchFoodById(fdcId, $usdaApiKey).catch(() => null);
+  async function hydrateCandidate(candidate, { priority = 10, isCurrent = () => true } = {}) {
+    if (!candidate || candidate._candidateProvider === 'local') {
+      return { food: candidate, rateLimitedSources: [], unavailableSources: [], retryAfter: null, cancelled: false };
     }
-    return hydrated ? { ...candidate, ...hydrated, _candidateProvider: candidate._candidateProvider } : candidate;
+    const provider = candidate._candidateProvider;
+    let result = null;
+    const hasHydrationRequest = (provider === 'openfoodfacts' && candidate.barcode)
+      || (provider === 'usda' && (candidate.fdcId || String(candidate.barcode || '').startsWith('fdcId_')));
+    if (hasHydrationRequest && priority < 0 && !reserveAutomaticProviderCall()) {
+      return { food: candidate, rateLimitedSources: [], unavailableSources: [], retryAfter: null, cancelled: false, budgetExhausted: true };
+    }
+    try {
+      if (provider === 'openfoodfacts' && candidate.barcode) {
+        result = await providerRequestScheduler(() => API.fetchProductByCodeWithMeta(candidate.barcode), { priority, isCurrent });
+      } else if (provider === 'usda' && (candidate.fdcId || String(candidate.barcode || '').startsWith('fdcId_'))) {
+        const fdcId = candidate.fdcId || String(candidate.barcode).slice(6);
+        result = await providerRequestScheduler(() => USDA.fetchFoodByIdWithMeta(fdcId, $usdaApiKey), { priority, isCurrent });
+      }
+    } catch {
+      result = { item: null, rateLimited: false, retryAfter: null, unavailable: true };
+    }
+    if (result?.cancelled) return { food: candidate, rateLimitedSources: [], unavailableSources: [], retryAfter: null, cancelled: true };
+    const rateLimitedSources = result?.rateLimited ? [provider] : [];
+    const unavailableSources = result?.unavailable ? [provider] : [];
+    return {
+      food: result?.item ? { ...candidate, ...result.item, _candidateProvider: provider } : candidate,
+      rateLimitedSources,
+      unavailableSources,
+      retryAfter: result?.retryAfter || null,
+      cancelled: false,
+      budgetExhausted: false,
+    };
   }
 
   function rankingOptions(row) {
@@ -385,68 +419,235 @@
     };
   }
 
-  async function collectMatches(row, query, source = 'all', limit = 30) {
+  async function collectMatches(row, query, source = 'all', limit = 30, { queries: requestedQueries = null, priority = -1, isCurrent = () => true, skipSources = new Set() } = {}) {
     const names = query ? [query] : ingredientSearchNames(row.ingredient);
-    // Manual searches are sent verbatim, matching Add Food. Automatic
-    // matching alone uses bounded parsed-name/provider fallbacks.
-    const queries = query ? [query.trim()] : providerSearchQueries(names);
+    // Manual searches are sent verbatim. Automatic matching passes one
+    // bounded stage at a time so exact phrases can short-circuit fallbacks.
+    const queries = requestedQueries || (query ? [query.trim()] : []);
+    const raw = [];
+    const rateLimitedSources = new Set();
+    const unavailableSources = new Set();
+    let retryAfter = null;
+    let cancelled = false;
+    let budgetExhausted = false;
+
+    if (source === 'all' || source === 'local') {
+      for (const value of queries) raw.push(...searchLocalFoods(foods, value, limit));
+    }
+    const providers = [];
+    if ((source === 'all' || source === 'openfoodfacts') && $offEnabled && !skipSources.has('openfoodfacts')) providers.push('openfoodfacts');
+    if ((source === 'all' || source === 'usda') && $usdaEnabled && $usdaApiKey && !skipSources.has('usda')) providers.push('usda');
     const jobs = [];
-    if (source === 'all' || source === 'local') jobs.push(Promise.resolve(queries.flatMap(localCandidates)));
-    if ((source === 'all' || source === 'openfoodfacts') && $offEnabled) {
-      for (const name of queries) jobs.push(cachedProviderSearch('openfoodfacts', name));
+    // Interleave providers for each phrase so one slow/rate-limited source
+    // cannot occupy the entire queue ahead of the other source.
+    for (const value of queries) {
+      for (const provider of providers) jobs.push({ provider, promise: cachedProviderSearch(provider, value, { priority, isCurrent }) });
     }
-    if ((source === 'all' || source === 'usda') && $usdaEnabled && $usdaApiKey) {
-      for (const name of queries) jobs.push(cachedProviderSearch('usda', name));
+    const settledJobs = await Promise.allSettled(jobs.map(job => job.promise));
+    for (let jobIndex = 0; jobIndex < settledJobs.length; jobIndex += 1) {
+      const jobProvider = jobs[jobIndex].provider;
+      const settled = settledJobs[jobIndex];
+      if (settled.status === 'rejected') {
+        unavailableSources.add(jobProvider);
+        continue;
+      }
+      const detail = settled.value || { items: [], rateLimitedSources: [], unavailableSources: [] };
+      if (detail.cancelled) { cancelled = true; continue; }
+      if (detail.budgetExhausted) { budgetExhausted = true; continue; }
+      (detail.rateLimitedSources || []).forEach(provider => rateLimitedSources.add(provider));
+      (detail.unavailableSources || []).forEach(provider => unavailableSources.add(provider));
+      if (Number.isFinite(Number(detail.retryAfter)) && Number(detail.retryAfter) > 0) {
+        retryAfter = retryAfter == null ? Number(detail.retryAfter) : Math.max(retryAfter, Number(detail.retryAfter));
+      }
+      raw.push(...(Array.isArray(detail.items) ? detail.items : []));
     }
-    const raw = (await Promise.allSettled(jobs)).flatMap(result => result.status === 'fulfilled' ? result.value : []);
-    const provisional = rankIngredientCandidates(names, raw, Math.max(limit, 8), rankingOptions(row));
-    const hydrated = await Promise.all(provisional.slice(0, 8).map(hydrateCandidate));
-    return rankIngredientCandidates(names, [...hydrated, ...provisional.slice(8)], limit, rankingOptions(row));
+    return {
+      candidates: rankIngredientCandidates(names, raw, limit, rankingOptions(row)),
+      rateLimitedSources: [...rateLimitedSources],
+      unavailableSources: [...unavailableSources],
+      retryAfter,
+      cancelled,
+      budgetExhausted,
+    };
   }
 
-  async function findProviderMatches(index) {
-    const row = resolutions[index];
-    const rows = [...resolutions];
-    rows[index] = { ...row, searching: true, candidates: [], searchAttempted: true };
-    resolutions = rows;
-    try {
-      const candidates = await collectMatches(row, '', 'all', 30);
-      const next = [...resolutions];
-      next[index] = { ...next[index], searching: false, candidates };
-      resolutions = next;
-    } catch (error) {
-      const next = [...resolutions];
-      next[index] = { ...next[index], searching: false, candidates: [] };
-      resolutions = next;
-      showError(error?.message || 'Provider search failed');
+  function mergeSearchOutcome(base, next) {
+    const rateLimitedSources = new Set([...(base.rateLimitedSources || []), ...(next.rateLimitedSources || [])]);
+    const unavailableSources = new Set([...(base.unavailableSources || []), ...(next.unavailableSources || [])]);
+    const retryAfter = base.retryAfter == null ? next.retryAfter : next.retryAfter == null ? base.retryAfter : Math.max(base.retryAfter, next.retryAfter);
+    return {
+      candidates: rankIngredientCandidates(base.names, [...(base.candidates || []), ...(next.candidates || [])], 30, base.options),
+      names: base.names,
+      options: base.options,
+      rateLimitedSources: [...rateLimitedSources],
+      unavailableSources: [...unavailableSources],
+      retryAfter,
+      cancelled: base.cancelled || next.cancelled,
+      budgetExhausted: base.budgetExhausted || next.budgetExhausted,
+    };
+  }
+
+  async function collectAutomaticMatches(row, generation) {
+    const names = ingredientSearchNames(row.ingredient);
+    const options = rankingOptions(row);
+    const stages = buildIngredientSearchStages(names, $recipeImportUsePreferredBrands && $offEnabled ? $preferredFoodBrands : []);
+    const preferredExactQueries = new Set(($recipeImportUsePreferredBrands && $offEnabled ? $preferredFoodBrands : [])
+      .filter(item => item && typeof item === 'object' && item.offTag)
+      .slice(0, 2)
+      .map(item => normalizeName(`${normalizeIngredientSearchText(names[0])} ${String(item.name || '').trim()}`)));
+    let outcome = { candidates: [], names, options, rateLimitedSources: [], unavailableSources: [], retryAfter: null, cancelled: false, budgetExhausted: false };
+    const blockedSources = new Set();
+    const activeProviders = [
+      ...($offEnabled ? ['openfoodfacts'] : []),
+      ...($usdaEnabled && $usdaApiKey ? ['usda'] : []),
+    ];
+    for (let stageIndex = 0; stageIndex < stages.length; stageIndex += 1) {
+      const stage = stages[stageIndex];
+      // Verified preferred-brand phrases are OFF taxonomy queries. Keeping
+      // them out of USDA/local fan-out preserves the recipe-specific brand
+      // ordering while leaving the other provider available for the primary
+      // ingredient phrase.
+      const preferred = stageIndex === 0 ? stage.filter(query => preferredExactQueries.has(normalizeName(query))) : [];
+      const general = stage.filter(query => !preferredExactQueries.has(normalizeName(query)));
+      for (const [queries, source] of [[general, 'all'], [preferred, 'openfoodfacts']]) {
+        if (!queries.length) continue;
+        const next = await collectMatches(row, '', source, 30, {
+          queries,
+          priority: -1,
+          isCurrent: () => generation === autoMatchGeneration,
+          skipSources: blockedSources,
+        });
+        outcome = mergeSearchOutcome(outcome, next);
+        if (outcome.cancelled) return outcome;
+        if (outcome.budgetExhausted) return outcome;
+        next.rateLimitedSources.forEach(provider => blockedSources.add(provider));
+        next.unavailableSources.forEach(provider => blockedSources.add(provider));
+      }
+      const strong = outcome.candidates.some(isStrongIngredientCandidate);
+      if (strong) break;
+      // Do not repeat requests to a provider that has already told us it is
+      // rate-limited. Continue with any provider that remains available.
+      if (activeProviders.length && activeProviders.every(provider => blockedSources.has(provider))) break;
     }
+    return outcome;
+  }
+
+  function scheduleRateLimitRetry(index, retryAfter) {
+    if (autoRetryTimers.has(index)) return;
+    const seconds = Number.isFinite(Number(retryAfter)) && Number(retryAfter) > 0 ? Number(retryAfter) : 60;
+    // Respect the provider's Retry-After value (including values longer than
+    // a minute); only enforce a small lower bound so malformed zero/negative
+    // headers cannot create a tight retry loop.
+    const delay = Math.max(1_000, Math.ceil(seconds * 1000));
+    const timer = setTimeout(() => {
+      autoRetryTimers.delete(index);
+      const row = resolutions[index];
+      if (row && Number(row.rateLimitRetries || 0) < 1) retryIngredientMatch(index, true);
+    }, delay);
+    autoRetryTimers.set(index, timer);
+  }
+
+  function clearRateLimitRetry(index) {
+    const timer = autoRetryTimers.get(index);
+    if (timer) clearTimeout(timer);
+    autoRetryTimers.delete(index);
+  }
+
+  async function runAutomaticMatchAtIndex(index, row, generation) {
+    const currentBefore = resolutions[index];
+    if (!currentBefore || currentBefore.ingredient.original_text !== row.ingredient.original_text || generation !== autoMatchGeneration) return;
+    resolutions = resolutions.map((item, itemIndex) => itemIndex === index
+      ? { ...item, searching: true, searchAttempted: true, searchStatus: null, searchRetryAfter: null }
+      : item);
+    try {
+      const outcome = await collectAutomaticMatches(row, generation);
+      if (outcome.cancelled || generation !== autoMatchGeneration) return;
+      const current = resolutions[index];
+      if (!current || current.ingredient.original_text !== row.ingredient.original_text) return;
+      let best = outcome.candidates[0];
+      let hydration = { food: best, rateLimitedSources: [], unavailableSources: [], retryAfter: null, cancelled: false };
+      if (best && isStrongIngredientCandidate(best) && !current.manuallySelected) {
+        hydration = await hydrateCandidate(best, { priority: -1, isCurrent: () => generation === autoMatchGeneration });
+        if (hydration.cancelled || generation !== autoMatchGeneration) return;
+        best = hydration.food || best;
+      }
+      const rateLimitedSources = [...new Set([...(outcome.rateLimitedSources || []), ...(hydration.rateLimitedSources || [])])];
+      const unavailableSources = [...new Set([...(outcome.unavailableSources || []), ...(hydration.unavailableSources || [])])];
+      const strongBest = best && isStrongIngredientCandidate(best);
+      // Keep diagnostics visible even when another provider supplied a usable
+      // winner. A partial outage should never be mistaken for a clean
+      // no-match, and the selected result remains usable while it is shown.
+      const searchStatus = rateLimitedSources.length
+        ? 'rate_limited'
+        : unavailableSources.length ? 'unavailable' : null;
+      const searchRetryAfter = hydration.retryAfter || outcome.retryAfter || null;
+      const next = [...resolutions];
+      next[index] = {
+        ...current,
+        candidates: outcome.candidates,
+        searchAttempted: true,
+        searching: false,
+        searchStatus,
+        searchRetryAfter,
+      };
+      if (strongBest && !current.manuallySelected) {
+        applyCandidateToRow(next[index], best, true);
+        // Applying a winner resets selection/conversion state, but a partial
+        // provider outage is still useful context for the row and may need a
+        // single scheduled retry.
+        next[index].searchStatus = searchStatus;
+        next[index].searchRetryAfter = searchRetryAfter;
+      }
+      resolutions = next;
+      if (searchStatus === 'rate_limited' && Number(current.rateLimitRetries || 0) < 1) {
+        scheduleRateLimitRetry(index, searchRetryAfter);
+      } else if (searchStatus !== 'rate_limited') {
+        clearRateLimitRetry(index);
+      }
+      if (strongBest && !current.manuallySelected) maybeEstimateConversion(index);
+    } catch {
+      const next = [...resolutions];
+      if (next[index]) next[index] = { ...next[index], searching: false, searchAttempted: true, searchStatus: 'unavailable' };
+      resolutions = next;
+    }
+  }
+
+  async function retryIngredientMatch(index, automatic = false) {
+    const row = resolutions[index];
+    if (!row || row.manuallySelected || row.searching || Number(row.rateLimitRetries || 0) >= 1) return;
+    clearRateLimitRetry(index);
+    const generation = ++autoMatchGeneration;
+    const next = resolutions.map((item, itemIndex) => itemIndex === index
+      ? {
+        ...row,
+        searching: true,
+        searchStatus: null,
+        searchRetryAfter: null,
+        rateLimitRetries: automatic ? Number(row.rateLimitRetries || 0) + 1 : Math.max(1, Number(row.rateLimitRetries || 0)),
+      }
+      : item.searching ? { ...item, searching: false } : item);
+    resolutions = next;
+    await runAutomaticMatchAtIndex(index, next[index], generation);
   }
 
   async function autoMatchAll() {
+    const generation = ++autoMatchGeneration;
+    // A newer recipe/settings generation supersedes queued work and any
+    // pending retry from the previous pass. Clear stale UI state as well so a
+    // cancelled worker cannot leave rows showing an endless spinner.
+    for (const timer of autoRetryTimers.values()) clearTimeout(timer);
+    autoRetryTimers.clear();
+    resolutions = resolutions.map(row => row.manuallySelected
+      ? row
+      : { ...row, searching: false, searchStatus: null, searchRetryAfter: null, rateLimitRetries: 0 });
     const snapshot = resolutions;
     let nextIndex = 0;
     const worker = async () => {
       while (nextIndex < snapshot.length) {
         const index = nextIndex++;
         const row = snapshot[index];
-        if (row.manuallySelected) continue;
-      try {
-        const candidates = await collectMatches(row, '', 'all', 30);
-        const current = resolutions[index];
-        if (!current || current.ingredient.original_text !== row.ingredient.original_text) continue;
-        const best = candidates[0];
-        const next = [...resolutions];
-        next[index] = { ...current, candidates, searchAttempted: true, searching: false };
-        if (best && isStrongIngredientCandidate(best) && !current.manuallySelected) {
-          applyCandidateToRow(next[index], best, true);
-        }
-        resolutions = next;
-        if (best && isStrongIngredientCandidate(best) && !current.manuallySelected) maybeEstimateConversion(index);
-      } catch {
-        const next = [...resolutions];
-        if (next[index]) next[index] = { ...next[index], searching: false, searchAttempted: true };
-        resolutions = next;
-      }
+        if (row.manuallySelected || generation !== autoMatchGeneration) continue;
+        await runAutomaticMatchAtIndex(index, row, generation);
       }
     };
     await Promise.all([worker(), worker()]);
@@ -481,15 +682,25 @@
     row.conversionSource = explicit ? 'recipe' : null;
     row.estimatingConversion = false;
     row.conversionEstimateFailed = false;
+    row.searchStatus = null;
+    row.searchRetryAfter = null;
   }
 
   async function chooseProvider(index, candidate) {
     const row = resolutions[index];
+    clearRateLimitRetry(index);
     try {
-      const hydrated = await hydrateCandidate(candidate);
+      const hydration = await hydrateCandidate(candidate, { priority: 10, isCurrent: () => true });
+      const hydrated = hydration.food || candidate;
       const next = [...resolutions];
       next[index] = { ...next[index] };
       applyCandidateToRow(next[index], hydrated, false);
+      if (hydration.rateLimitedSources.length) {
+        next[index].searchStatus = 'rate_limited';
+        next[index].searchRetryAfter = hydration.retryAfter || null;
+      } else if (hydration.unavailableSources.length) {
+        next[index].searchStatus = 'unavailable';
+      }
       resolutions = next;
       searchSheetOpen = false;
       await maybeEstimateConversion(index);
@@ -543,25 +754,50 @@
   }
 
   async function runSheetSearch() {
-    if (searchRowIndex < 0 || !searchQuery.trim()) { sheetResults = []; return; }
+    if (searchRowIndex < 0 || !searchQuery.trim()) {
+      sheetResults = [];
+      sheetRateLimitedSources = [];
+      sheetUnavailableSources = [];
+      sheetRetryAfter = null;
+      return;
+    }
     const sequence = ++searchSequence;
     sheetSearching = true;
+    sheetRateLimitedSources = [];
+    sheetUnavailableSources = [];
+    sheetRetryAfter = null;
     try {
       const query = searchQuery.trim();
-      // A manual single-provider search is the same catalogue operation as
-      // Add Food. Recipe-specific filtering/ranking belongs to automatic
-      // ingredient matching and to the merged All tab; applying it here made
-      // USDA/OFF tabs fetch fewer rows and then reorder or discard them.
-      const results = searchSource === 'usda' || searchSource === 'openfoodfacts'
-        ? await searchFoodCatalogs({
-            query, source: searchSource, localFoods: foods, offEnabled: $offEnabled,
-            usdaEnabled: $usdaEnabled, usdaApiKey: $usdaApiKey, limit: 50,
-            schedule: scheduleProviderRequest,
-          })
-        : await collectMatches(resolutions[searchRowIndex], query, searchSource, 50);
-      if (sequence === searchSequence) sheetResults = results;
+      // Manual lookup uses the exact same catalogue operation as the meal
+      // editor. Do not put interactive searches behind the automatic-match
+      // request queue: a large recipe can otherwise make a valid lookup look
+      // empty or unresponsive. Recipe-only preferred-brand ordering is
+      // applied after the shared retrieval step and only in the merged view.
+      const detail = await searchFoodCatalogsDetailed({
+        query, source: searchSource, localFoods: foods, offEnabled: $offEnabled,
+        usdaEnabled: $usdaEnabled, usdaApiKey: $usdaApiKey, limit: 50,
+        schedule: providerRequestScheduler, priority: 10,
+        isCurrent: () => sequence === searchSequence,
+      });
+      if (detail.cancelled) return;
+      const catalogueResults = detail.items;
+      const results = searchSource === 'all'
+        ? rankIngredientCandidates([query], catalogueResults, 50, rankingOptions(resolutions[searchRowIndex]))
+        : catalogueResults;
+      if (sequence === searchSequence) {
+        sheetResults = results;
+        sheetRateLimitedSources = detail.rateLimitedSources;
+        sheetUnavailableSources = detail.unavailableSources;
+        sheetRetryAfter = detail.retryAfter;
+      }
     }
-    catch (error) { if (sequence === searchSequence) { sheetResults = []; showError(error?.message || 'Food search failed'); } }
+    catch (error) {
+      if (sequence === searchSequence) {
+        sheetResults = [];
+        sheetUnavailableSources = ['provider'];
+        showError(error?.message || 'Food search failed');
+      }
+    }
     finally { if (sequence === searchSequence) sheetSearching = false; }
   }
 
@@ -570,59 +806,16 @@
     searchTimer = setTimeout(runSheetSearch, 250);
   }
 
-  async function requestAiRefinement(index) {
-    const row = resolutions[index];
-    if (!row || row.aiRefining) return;
-    const next = [...resolutions];
-    next[index] = { ...row, aiRefining: true, aiProposal: null };
-    resolutions = next;
-    try {
-      const proposal = await refineIngredientWithAI(row.ingredient.original_text, $offSearchLanguage);
-      const done = [...resolutions];
-      done[index] = { ...done[index], aiRefining: false, aiProposal: proposal };
-      resolutions = done;
-    } catch (error) {
-      const done = [...resolutions];
-      done[index] = { ...done[index], aiRefining: false, aiProposal: null };
-      resolutions = done;
-      showError(error?.message || 'Could not refine this ingredient');
-    }
-  }
-
-  async function applyAiRefinement(index) {
-    const row = resolutions[index];
-    const proposal = row?.aiProposal;
-    if (!proposal) return;
-    const ingredient = {
-      ...row.ingredient,
-      name: proposal.name,
-      brand: proposal.brand,
-      search_names: proposal.search_names,
-      note: proposal.note || row.ingredient.note,
-      amounts: proposal.amounts.length ? proposal.amounts : (row.ingredient.amounts || []),
-      normalization_source: 'ai',
-    };
-    const next = [...resolutions];
-    next[index] = { ...row, ingredient, aiProposal: null, candidates: [], searchAttempted: false };
-    resolutions = next;
-    await findProviderMatches(index);
-  }
-
-  function dismissAiRefinement(index) {
-    const next = [...resolutions];
-    next[index] = { ...next[index], aiProposal: null };
-    resolutions = next;
-  }
-
   function chooseRecipe(index) {
     selectedIndex = index;
     initializeResolutions(result.recipes[index]);
-    autoMatchAll();
+    scheduleAutoMatch();
   }
 
   function chooseFood(index, event) {
     const value = event.currentTarget.value;
     const food = foods.find(item => String(item.id) === value);
+    clearRateLimitRetry(index);
     const rows = [...resolutions];
     const preferred = preferredIngredientAmount(rows[index].ingredient, food);
     rows[index] = {
@@ -637,6 +830,9 @@
       selectionVersion: (rows[index].selectionVersion || 0) + 1,
       equivalentGrams: explicitEquivalentGrams(rows[index].ingredient),
       conversionSource: explicitEquivalentGrams(rows[index].ingredient) ? 'recipe' : null,
+      searchStatus: null,
+      searchRetryAfter: null,
+      rateLimitRetries: 0,
     };
     resolutions = rows;
   }
@@ -650,7 +846,6 @@
       [result, foods] = await Promise.all([NtApi.previewRecipeUrl(url.trim()), NtApi.getFoods()]);
       selectedIndex = 0;
       initializeResolutions(result.recipes[0]);
-      autoMatchAll();
     } catch (error) {
       showError(error?.message || 'Could not import that recipe URL');
     } finally {
@@ -794,6 +989,11 @@
                 {/if}
                 <span class="material-symbols-rounded">search</span>
               </button>
+              {#if row.searchStatus === 'rate_limited'}
+                <p class="search-warning">Provider search was temporarily rate-limited. {#if !row.manuallySelected && (row.rateLimitRetries || 0) < 1}<button class="retry-search" on:click={() => retryIngredientMatch(index)}>Retry now</button>{:else if !row.manuallySelected}Retry scheduled or already attempted.{/if}</p>
+              {:else if row.searchStatus === 'unavailable'}
+                <p class="search-warning">A food provider is temporarily unavailable. {#if !row.manuallySelected && (row.rateLimitRetries || 0) < 1}<button class="retry-search" on:click={() => retryIngredientMatch(index)}>Retry</button>{:else if !row.manuallySelected}Retry already attempted.{/if}</p>
+              {/if}
               {#if selectedFood(row)}
                 <div class="amount-row">
                   <input class="input" type="number" min="0" step="any" bind:value={row.portion} aria-label={$_('recipe_import.amount')} />
@@ -822,26 +1022,6 @@
                   </label>
                 {/if}
               {:else}
-                {#if $aiEffectivelyEnabled && (row.ingredient.parse_confidence !== 'high' || (row.searchAttempted && !row.candidates?.length))}
-                  <div class="ai-refine-action">
-                    <small>{$_('recipe_import.ai_help')}</small>
-                    <button class="btn btn-ghost ai-refine" on:click={() => requestAiRefinement(index)} disabled={row.aiRefining}>
-                      {row.aiRefining ? $_('recipe_import.ai_refining') : $_('recipe_import.ai_refine')}
-                    </button>
-                  </div>
-                {/if}
-                {#if row.aiProposal}
-                  <div class="ai-proposal">
-                    <strong>{$_('recipe_import.ai_proposal')}</strong>
-                    <span>{$_('recipe_import.ai_original', { values: { value: row.ingredient.name } })}</span>
-                    <span>{$_('recipe_import.ai_proposed', { values: { value: row.aiProposal.search_names.join(' · ') } })}</span>
-                    {#if row.aiProposal.amounts?.length}<span>{$_('recipe_import.ai_amounts', { values: { value: row.aiProposal.amounts.map(a => `${a.quantity} ${displayUnitName(a.unit, a.quantity, $locale)} (${a.role})`).join(' · ') } })}</span>{/if}
-                    <div>
-                      <button class="btn btn-primary" on:click={() => applyAiRefinement(index)}>{$_('recipe_import.ai_apply')}</button>
-                      <button class="btn btn-ghost" on:click={() => dismissAiRefinement(index)}>{$_('recipe_import.dismiss')}</button>
-                    </div>
-                  </div>
-                {/if}
                 <label class="ack-row">
                   <input type="checkbox" bind:checked={row.acknowledged} />
                   <span><strong>Import without nutrition</strong><small>Keep this ingredient in the recipe, but do not count calories or nutrients.</small></span>
@@ -901,6 +1081,8 @@
       {#if sheetSearching}
         <div class="sheet-state"><span class="material-symbols-rounded spin">refresh</span> Searching…</div>
       {:else if sheetResults.length}
+        {#if sheetRateLimitedSources.length}<div class="sheet-warning">Some providers were rate-limited; showing the results that arrived. <button class="retry-search" on:click={runSheetSearch}>Retry</button></div>{/if}
+        {#if !sheetRateLimitedSources.length && sheetUnavailableSources.length}<div class="sheet-warning">Some food providers were unavailable; showing the results that arrived. <button class="retry-search" on:click={runSheetSearch}>Retry</button></div>{/if}
         <div class="sheet-results">
           {#each sheetResults as candidate}
             <button class="sheet-result" on:click={() => chooseProvider(searchRowIndex, candidate)}>
@@ -913,6 +1095,10 @@
             </button>
           {/each}
         </div>
+      {:else if sheetRateLimitedSources.length}
+        <div class="sheet-state sheet-state-stack"><span>Provider search was temporarily rate-limited.</span><button class="btn btn-ghost" on:click={runSheetSearch}>Retry</button></div>
+      {:else if sheetUnavailableSources.length}
+        <div class="sheet-state sheet-state-stack"><span>Food provider temporarily unavailable.</span><button class="btn btn-ghost" on:click={runSheetSearch}>Retry</button></div>
       {:else}
         <div class="sheet-state">No relevant foods found. Try a food name, brand, or both.</div>
       {/if}
@@ -955,14 +1141,11 @@
   .ack-row span { display: flex; flex-direction: column; gap: 2px; }
   .ack-row small { color: var(--text-3); font-weight: 400; }
   .conversion-warning { grid-column: 2 / -1; margin: 0; color: #b66a00; font-size: 12px; }
+  .search-warning { grid-column: 2 / -1; margin: 0; color: #b66a00; font-size: 12px; }
+  .retry-search { border: 0; padding: 0; background: none; color: var(--accent); cursor: pointer; text-decoration: underline; }
   .conversion-detail { grid-column: 2 / -1; margin: 0; color: var(--text-3); font-size: 12px; }
   .conversion-detail.estimated { color: #b66a00; }
   .retry-estimate { margin-left: 6px; border: 0; padding: 0; background: none; color: var(--accent); cursor: pointer; text-decoration: underline; }
-  .ai-refine-action { grid-column: 1 / -1; min-width: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .ai-refine-action small { color: var(--text-3); font-size: 11px; line-height: 1.35; }
-  .ai-refine { justify-self: start; font-size: 12px; }
-  .ai-proposal { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border)); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--accent) 8%, var(--surface-2)); font-size: 12px; }
-  .ai-proposal > div { display: flex; gap: 8px; }
   .instructions { margin: 0; padding-left: 24px; display: flex; flex-direction: column; gap: 10px; }
   .conflict-card { display: flex; flex-direction: column; gap: 8px; }
   .import-actions { display: flex; justify-content: flex-end; gap: 10px; position: sticky; bottom: 12px; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(8px); padding: 12px; border-radius: var(--radius-lg); }
@@ -975,28 +1158,30 @@
   .source-tabs button { flex: 0 0 auto; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-2); color: var(--text-2); padding: 7px 11px; cursor: pointer; }
   .source-tabs button.active { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface-2)); }
   .sheet-results { display: flex; flex-direction: column; gap: 7px; }
+  .sheet-warning { color: #b66a00; font-size: 12px; }
   .sheet-result { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-1); text-align: left; cursor: pointer; }
   .result-main { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
   .result-main strong, .result-main small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .result-main small, .result-source { color: var(--text-3); font-size: 11px; }
   .result-source { flex: 0 0 auto; }
   .sheet-state { min-height: 160px; display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--text-3); text-align: center; }
+  .sheet-state-stack { flex-direction: column; }
   @media (max-width: 700px) {
     .url-row { flex-direction: column; }
     .recipe-summary { grid-template-columns: 90px 1fr; }
     .recipe-summary img { width: 90px; height: 90px; }
     .ingredient-row { grid-template-columns: 1fr; }
-    .ack-row, .conversion-warning, .conversion-detail { grid-column: 1; }
+    .ack-row, .conversion-warning, .conversion-detail, .search-warning { grid-column: 1; }
   }
   @container (max-width: 760px) {
     .ingredient-row { grid-template-columns: minmax(180px, 1fr) minmax(280px, 1.25fr); }
     .ingredient-source { grid-column: 1; grid-row: 1 / span 2; }
     .match-picker { grid-column: 2; }
     .amount-row { grid-column: 2; }
-    .ack-row, .conversion-warning, .conversion-detail { grid-column: 2; }
+    .ack-row, .conversion-warning, .conversion-detail, .search-warning { grid-column: 2; }
   }
   @container (max-width: 540px) {
     .ingredient-row { grid-template-columns: minmax(0, 1fr); }
-    .ingredient-source, .match-picker, .amount-row, .ack-row, .conversion-warning, .conversion-detail { grid-column: 1; grid-row: auto; }
+    .ingredient-source, .match-picker, .amount-row, .ack-row, .conversion-warning, .conversion-detail, .search-warning { grid-column: 1; grid-row: auto; }
   }
 </style>

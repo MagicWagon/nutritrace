@@ -39,3 +39,12 @@ test('OFF name search enforces the selected product-name language end to end', (
   assert.match(proxyJs, /searchParams\.get\('langs'\)/);
   assert.match(proxyJs, /strictLanguage:\s*true/);
 });
+
+test('food API and image proxy buckets stay separate and propagate Retry-After', () => {
+  assert.match(proxyJs, /apiProxyLimit = makeRateLimiter\(\{ max: 60, windowMs: 60_000/);
+  assert.match(proxyJs, /imageProxyLimit = makeRateLimiter\(\{ max: 120, windowMs: 60_000/);
+  assert.match(proxyJs, /IMG_ALLOWED\.some\(h => _hostMatches\(target\.hostname, h\)\)/);
+  assert.match(proxyJs, /res\.set\('Retry-After', retryAfter\)/);
+  assert.match(apiJs, /rateLimited/);
+  assert.match(apiJs, /_retryAfterSeconds/);
+});

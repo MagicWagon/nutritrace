@@ -36,6 +36,7 @@ async function _extFetch(url) {
       return {
         ok: resp.status >= 200 && resp.status < 300,
         status: resp.status,
+        headers: resp.headers || {},
         json: async () => typeof resp.data === 'string' ? JSON.parse(resp.data) : resp.data,
       };
     }
@@ -45,6 +46,7 @@ async function _extFetch(url) {
     return {
       ok: resp.status >= 200 && resp.status < 300,
       status: resp.status,
+      headers: resp.headers || {},
       json: async () => typeof resp.data === 'string' ? JSON.parse(resp.data) : resp.data,
     };
   }
@@ -52,6 +54,32 @@ async function _extFetch(url) {
   // the path with the BASE_URL when running at a subpath.
   const { apiUrl } = await import('./platform.js');
   return fetch(apiUrl('/api/proxy?url=' + encodeURIComponent(url)));
+}
+
+// Proxy and upstream providers communicate rate limits with Retry-After.
+// Keep the parser tolerant of both browser Headers and Capacitor's plain
+// object response headers so callers can schedule a single bounded retry.
+function _retryAfterSeconds(response) {
+  let raw = null;
+  try { raw = response?.headers?.get?.('Retry-After'); } catch {}
+  if (raw == null && response?.headers) {
+    raw = response.headers['retry-after'] ?? response.headers['Retry-After'];
+  }
+  const seconds = Number(raw);
+  if (Number.isFinite(seconds) && seconds > 0) return Math.ceil(seconds);
+  const date = Date.parse(String(raw || ''));
+  return Number.isFinite(date) ? Math.max(1, Math.ceil((date - Date.now()) / 1000)) : null;
+}
+
+function _providerFailure(response, page, extra = {}) {
+  const rateLimited = Number(response?.status) === 429;
+  return {
+    items: [], totalHits: 0, page, hasMore: false,
+    rateLimited,
+    retryAfter: rateLimited ? _retryAfterSeconds(response) : null,
+    unavailable: !rateLimited,
+    ...extra,
+  };
 }
 
 // Read the user's saved OFF country-filter preference from localStorage.
@@ -247,20 +275,25 @@ const API = {
   _offHydrateCache: new Map(),
   _OFF_HYDRATE_MAX: 200,
   async fetchProductByCode(code) {
+    const result = await this.fetchProductByCodeWithMeta(code);
+    return result?.item || null;
+  },
+
+  async fetchProductByCodeWithMeta(code) {
     if (!code) return null;
     if (this._offHydrateCache.has(code)) {
       const cached = this._offHydrateCache.get(code);
       this._offHydrateCache.delete(code);
       this._offHydrateCache.set(code, cached);
-      return cached;
+      return { item: cached, rateLimited: false, retryAfter: null };
     }
     try {
       const lc = _getOffSearchLanguage();
       const url = `${this.OFF_BASE}/api/v3/product/${code}?lc=${encodeURIComponent(lc)}`;
       const res = await _extFetch(url);
-      if (!res.ok) return null;
+      if (!res.ok) return { item: null, rateLimited: Number(res.status) === 429, retryAfter: Number(res.status) === 429 ? _retryAfterSeconds(res) : null, unavailable: Number(res.status) !== 429 };
       const data = await res.json();
-      if (!_isOffSuccess(data)) return null;
+      if (!_isOffSuccess(data)) return { item: null, rateLimited: false, retryAfter: null };
       const mapped = this._mapOFFProduct(data.product);
       if (mapped) {
         if (this._offHydrateCache.size >= this._OFF_HYDRATE_MAX) {
@@ -269,10 +302,10 @@ const API = {
         }
         this._offHydrateCache.set(code, mapped);
       }
-      return mapped;
+      return { item: mapped, rateLimited: false, retryAfter: null };
     } catch(e) {
       console.warn('OFF hydrate failed:', e);
-      return null;
+      return { item: null, rateLimited: false, retryAfter: null, unavailable: true };
     }
   },
 
@@ -309,7 +342,7 @@ const API = {
     try {
       const offUrl = _offSearchUrl(query, page, pageSize);
       const res = await _extFetch(offUrl);
-      if (!res.ok) return { items: [], totalHits: 0, page, hasMore: false };
+      if (!res.ok) return _providerFailure(res, page);
       const data = await res.json();
       // Read whichever envelope is present. The proxy at server/routes/proxy.js
       // may respond with `hits` (local OFF mirror) or `products` (remote v2
@@ -322,10 +355,10 @@ const API = {
         .filter(Boolean);
       const totalHits = typeof data.count === 'number' ? data.count : items.length;
       const hasMore = page * pageSize < totalHits;
-      return { items: _rankOFFResults(items), totalHits, page, hasMore };
+      return { items: _rankOFFResults(items), totalHits, page, hasMore, rateLimited: false, retryAfter: null };
     } catch(e) {
       console.error('Search failed:', e);
-      return { items: [], totalHits: 0, page, hasMore: false };
+      return _providerFailure(null, page, { error: e?.message || 'Search failed' });
     }
   },
 
@@ -766,12 +799,17 @@ const USDA = {
 
   _detailCache: new Map(),
   async fetchFoodById(fdcId, apiKey) {
+    const result = await this.fetchFoodByIdWithMeta(fdcId, apiKey);
+    return result?.item || null;
+  },
+
+  async fetchFoodByIdWithMeta(fdcId, apiKey) {
     if (!fdcId || !apiKey) return null;
     const key = String(fdcId);
-    if (this._detailCache.has(key)) return this._detailCache.get(key);
+    if (this._detailCache.has(key)) return { item: this._detailCache.get(key), rateLimited: false, retryAfter: null };
     try {
       const res = await _extFetch(`${_USDA_BASE}/food/${encodeURIComponent(key)}?api_key=${encodeURIComponent(apiKey)}`);
-      if (!res.ok) return null;
+      if (!res.ok) return { item: null, rateLimited: Number(res.status) === 429, retryAfter: Number(res.status) === 429 ? _retryAfterSeconds(res) : null, unavailable: Number(res.status) !== 429 };
       const item = await res.json();
       const serving = Number(item.servingSize) > 0 ? Number(item.servingSize) : 100;
       const mapped = this._mapProduct(item, serving);
@@ -779,10 +817,10 @@ const USDA = {
         if (this._detailCache.size >= 200) this._detailCache.delete(this._detailCache.keys().next().value);
         this._detailCache.set(key, mapped);
       }
-      return mapped;
+      return { item: mapped, rateLimited: false, retryAfter: null };
     } catch (error) {
       console.warn('[USDA] Detail hydration failed:', error);
-      return null;
+      return { item: null, rateLimited: false, retryAfter: null, unavailable: true };
     }
   },
 
@@ -817,13 +855,16 @@ const USDA = {
   // totalPages so we can stop fetching cleanly at the tail. #96.
   async searchByNameWithMeta(query, page, apiKey, pageSize = 50) {
     page = page || 1;
-    if (!apiKey) return { items: [], totalHits: 0, page, hasMore: false };
+    if (!apiKey) return {
+      items: [], totalHits: 0, page, hasMore: false,
+      rateLimited: false, retryAfter: null,
+    };
     try {
       const url = _USDA_BASE + '/foods/search?query=' + encodeURIComponent(query) +
         '&pageSize=' + pageSize + '&pageNumber=' + page +
         '&api_key=' + encodeURIComponent(apiKey);
       const res = await _extFetch(url);
-      if (!res.ok) return { items: [], totalHits: 0, page, hasMore: false };
+      if (!res.ok) return _providerFailure(res, page);
       const data = await res.json();
       const items = (data.foods || []).map(f => {
         const ss = (f.servingSize && !isNaN(f.servingSize)) ? f.servingSize : 100;
@@ -832,10 +873,10 @@ const USDA = {
       const totalHits = typeof data.totalHits === 'number' ? data.totalHits : items.length;
       const totalPages = typeof data.totalPages === 'number' ? data.totalPages : Math.ceil(totalHits / pageSize);
       const hasMore = page < totalPages;
-      return { items: _rankUSDAResults(items), totalHits, page, hasMore };
+      return { items: _rankUSDAResults(items), totalHits, page, hasMore, rateLimited: false, retryAfter: null };
     } catch(e) {
       console.error('[USDA] Search failed:', e);
-      return { items: [], totalHits: 0, page, hasMore: false };
+      return _providerFailure(null, page, { error: e?.message || 'Search failed' });
     }
   },
 

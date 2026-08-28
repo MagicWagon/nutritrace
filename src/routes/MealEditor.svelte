@@ -1,5 +1,5 @@
 <script>
-  import { onMount, tick } from 'svelte';
+  import { onDestroy, onMount, tick } from 'svelte';
   import { pop, replace } from 'svelte-spa-router';
   import { _, locale } from 'svelte-i18n';
   import { NtApi, API } from '../lib/api.js';
@@ -23,7 +23,7 @@
   import { fitImageDataUrl } from '../lib/image-fit.js';
   import { draftKey as _mkDraftKey, loadDraft, loadDraftImg, clearDraft, makeDebouncedPersist } from '../lib/editor-draft.js';
   import { decimalInput, parseDecimal } from '../lib/decimal-input.js';
-  import { searchFoodCatalogs } from '../lib/food-search.js';
+  import { createProviderRequestScheduler, foodSearchMatches, searchFoodCatalogs } from '../lib/food-search.js';
 
   export let params = {};
 
@@ -109,6 +109,8 @@
   let _pickerScannerOpen   = false;
   let _pickerSearchTimeout = null;
   let _pickerSavingPick    = false; // disables list while a non-local pick is being saved
+  let _pickerSearchGeneration = 0;
+  const pickerProviderScheduler = createProviderRequestScheduler({ maxConcurrent: 4, minIntervalMs: 1000 });
   let _pickerSharingEnabled = false;
   let _pickerSharedCounts   = { foods: 0 };
   const _pickerMealieEnabled = DB.getSetting('mealieEnabled', false);
@@ -267,6 +269,11 @@
 
   });
 
+  onDestroy(() => {
+    clearTimeout(_pickerSearchTimeout);
+    _pickerSearchGeneration += 1;
+  });
+
   // Discard restored draft (#157 followup, Wildenhaus). Resets each
   // tracked field to what the server actually loaded (or empty for the
   // add-new path) and wipes both text + photo from the draft store.
@@ -387,10 +394,13 @@
 
   function _onPickerSearch() {
     clearTimeout(_pickerSearchTimeout);
+    const generation = ++_pickerSearchGeneration;
     _pickerApiResults = [];
     _pickerMealieResults = [];
-    if (pickerTab !== 0) return;                          // Meals/Recipes are local-only
-    if (_pickerSource === 'local' || _pickerSource === 'shared') return;
+    if (pickerTab !== 0 || _pickerSource === 'local' || _pickerSource === 'shared') {
+      _pickerLoadingExt = false;
+      return; // Meals/Recipes and local/shared foods are local-only
+    }
     const q = (pickerSearch || '').trim();
     if (!q) return;
     const src = _pickerSource;
@@ -398,15 +408,19 @@
       _pickerLoadingExt = true;
       try {
         if (src === 'off' || src === 'usda') {
-          _pickerApiResults = await searchFoodCatalogs({
+          const results = await searchFoodCatalogs({
             query: q, source: src, localFoods: pickerFoods, offEnabled: $offEnabled,
             usdaEnabled: $usdaEnabled, usdaApiKey: $usdaApiKey, limit: 50,
+            schedule: pickerProviderScheduler, priority: 10,
+            isCurrent: () => generation === _pickerSearchGeneration,
           });
+          if (generation === _pickerSearchGeneration) _pickerApiResults = results;
         } else if (src === 'mealie') {
-          _pickerMealieResults = await Mealie.search(q) || [];
+          const results = await Mealie.search(q) || [];
+          if (generation === _pickerSearchGeneration) _pickerMealieResults = results;
         }
       } catch { /* keep empty, the UI shows the empty state */ }
-      finally { _pickerLoadingExt = false; }
+      finally { if (generation === _pickerSearchGeneration) _pickerLoadingExt = false; }
     }, 400);
   }
   // Pull the per-tab sort mode from the same settings the Foods page reads,
@@ -444,9 +458,7 @@
   $: _pickerListSorted = _isExternalSearch ? _pickerList : _applyPickerSort(_pickerList, _pickerSortMode);
   $: pickerFiltered = (_isExternalSearch || !pickerSearch)
     ? _pickerListSorted
-    : _pickerListSorted.filter(f =>
-        (f.name||'').toLowerCase().includes(pickerSearch.toLowerCase()) ||
-        (f.brand||'').toLowerCase().includes(pickerSearch.toLowerCase()));
+    : _pickerListSorted.filter(f => foodSearchMatches(f, pickerSearch));
 
   // Switching the outer tab (Foods/Meals/Recipes) resets cross-source state
   // so the Foods source filter doesn't leak into Meals/Recipes views.
@@ -1239,7 +1251,7 @@
       <div class="picker-source-row">
         {#each _pickerSourceOptions as opt}
           <button class="picker-source-chip" class:active={_pickerSource === opt.value}
-            on:click={() => { _pickerSource = opt.value; pickerSearch = ''; }}>
+            on:click={() => { _pickerSource = opt.value; }}>
             {opt.label}
           </button>
         {/each}

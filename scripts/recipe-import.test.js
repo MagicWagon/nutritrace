@@ -9,6 +9,7 @@ import { createPinnedLookup, fetchRecipePage, isBlockedAddress, requestPinned, v
 import { resolveAmountFactor, resolveAmountGrams } from '../server/lib/recipe-import/amount.js';
 import { persistRecipeImportDraft, prepareRecipeImportDraft, RECIPE_IMPORT_DRAFT_KEY } from '../src/lib/recipe-import-draft.js';
 import { normalizeIngredientName, normalizeIngredientSearchText, rankIngredientCandidates, validateIngredientRefinement } from '../src/lib/ingredient-match.js';
+import { buildIngredientSearchStages } from '../src/lib/ingredient-search-plan.js';
 import { densityFromAltUnits, displayUnitName, normalizePortionUnit, parseOffAltUnits, parseUsdaAltUnits } from '../src/lib/provider-portions.js';
 import { parseRecipeIngredientText } from '../src/lib/recipe-ingredient.js';
 import { recipeItemAmount, recipeItemGrams, recipeItemAmountLabel, recipeItemGramLabel, restoreRecipeItemMeasurement } from '../src/lib/recipe-item-display.js';
@@ -102,6 +103,20 @@ test('ingredient matching ignores preparation directions but preserves meaningfu
   ]);
   assert.equal(walnut.length, 1);
   assert.equal(peanut.length, 1);
+});
+
+test('automatic ingredient search keeps simple phrases in the first exact stage', () => {
+  assert.deepEqual(buildIngredientSearchStages(['maple syrup']), [
+    ['maple syrup'], ['maple', 'syrup'],
+  ]);
+  assert.deepEqual(buildIngredientSearchStages(['sea salt']), [
+    ['sea salt'], ['sea', 'salt'],
+  ]);
+  const staged = buildIngredientSearchStages(['pure maple syrup'], [
+    { name: 'Kirkland Signature', offTag: 'kirkland-signature' },
+  ]);
+  assert.deepEqual(staged[0], ['pure maple syrup', 'pure maple syrup Kirkland Signature']);
+  assert.ok(staged.slice(1).every(stage => !stage.includes('pure maple syrup')));
 });
 
 test('provider portions normalize household measures into grams per unit', () => {
@@ -438,8 +453,8 @@ test('recipe import UI restores drafts safely and Back always returns to Foods',
   assert.match(source, /restoringDraft/);
   assert.match(source, /recipe\?\.images\?\.\[0\]/);
   assert.match(source, /on:click=\{\(\) => push\('\/foods'\)\}/);
-  assert.match(source, /recipe_import\.ai_refine/);
-  assert.match(source, /on:click=\{\(\) => requestAiRefinement\(index\)\}/);
+  assert.doesNotMatch(source, /recipe_import\.ai_refine/);
+  assert.doesNotMatch(source, /requestAiRefinement/);
   assert.match(source, /role === 'equivalent'/);
   assert.match(source, /rankIngredientCandidates/);
   assert.match(source, /<Sheet bind:open=\{searchSheetOpen\}/);
@@ -448,23 +463,34 @@ test('recipe import UI restores drafts safely and Back always returns to Foods',
   assert.match(source, /displayUnitName\(row\.unit/);
   assert.match(source, /provider_food:/);
   assert.match(source, /Import without nutrition/);
-  assert.match(source, /recipe_import\.ai_refine/);
-  assert.match(source, /ai_help/);
+  assert.doesNotMatch(source, /refineIngredientWithAI/);
   const en = readFileSync(new URL('../src/i18n/en.json', import.meta.url), 'utf8');
   const fr = readFileSync(new URL('../src/i18n/fr.json', import.meta.url), 'utf8');
   assert.match(en, /"ai_refine": "Identify this food with AI"/);
   assert.match(fr, /"ai_refine": "Identifier cet aliment avec l’IA"/);
-  assert.match(source, /Promise\.allSettled\(jobs\)/);
+  assert.match(source, /Promise\.allSettled\(/);
   assert.match(source, /conversionEstimateQueue/);
   assert.match(source, /container-type: inline-size/);
   assert.match(source, /mealie_image:/);
   assert.match(source, /recipeImportUsePreferredBrands/);
-  assert.match(source, /searchFoodCatalogs/);
-  assert.match(source, /searchSource === 'usda' \|\| searchSource === 'openfoodfacts'/);
+  assert.match(source, /searchFoodCatalogsDetailed/);
+  assert.match(source, /const detail = await searchFoodCatalogsDetailed/);
+  assert.match(source, /buildIngredientSearchStages/);
+  assert.match(source, /rateLimitedSources/);
+  assert.match(source, /hydrateCandidate\(best/);
+  assert.doesNotMatch(source, /slice\(0, 8\)\.map\(hydrateCandidate\)/);
   assert.match(source, /query, source: searchSource, localFoods: foods/);
   assert.match(source, /usdaEnabled: \$usdaEnabled, usdaApiKey: \$usdaApiKey, limit: 50/);
+  assert.doesNotMatch(source, /schedule: scheduleProviderRequest,[\s\S]{0,120}const results/);
   assert.doesNotMatch(source, /countryFilter:\s*false/);
   assert.doesNotMatch(source, /\bpop\(\)/);
+});
+
+test('meal editor preserves the food query when switching provider sources', () => {
+  const source = readFileSync(new URL('../src/routes/MealEditor.svelte', import.meta.url), 'utf8');
+  assert.match(source, /on:click=\{\(\) => \{ _pickerSource = opt\.value; \}\}/);
+  assert.match(source, /foodSearchMatches\(f, pickerSearch\)/);
+  assert.doesNotMatch(source, /_pickerSource = opt\.value; pickerSearch = ''/);
 });
 
 test('Mealie servings and recipe editor completion behavior are preserved', () => {

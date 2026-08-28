@@ -4,8 +4,6 @@ import { makeRateLimiter } from '../middleware/rate-limit.js';
 import { isLocalOffEnabled, isLocalOffOnly, lookupByBarcode, searchByName } from '../lib/off-local.js';
 
 const router = Router();
-const proxyLimit = makeRateLimiter({ max: 60, windowMs: 60_000, label: 'proxy' });
-router.use(proxyLimit);
 
 // Whitelist: hosts allowed for API proxy (JSON responses)
 const API_ALLOWED = ['world.openfoodfacts.org', 'search.openfoodfacts.org', 'api.nal.usda.gov'];
@@ -14,10 +12,31 @@ const API_ALLOWED = ['world.openfoodfacts.org', 'search.openfoodfacts.org', 'api
 const IMG_ALLOWED = ['external-content.duckduckgo.com', 'i5.walmartimages.com', 'images.openfoodfacts.org',
   'i.imgur.com', 'upload.wikimedia.org', 'www.kroger.com', 'target.scene7.com'];
 
+// Keep image fetches from consuming the food-search budget. API calls retain
+// the existing 60/minute limit; images get an independent bucket because a
+// diary/recipe page can legitimately load many thumbnails at once.
+const apiProxyLimit = makeRateLimiter({ max: 60, windowMs: 60_000, label: 'proxy-api' });
+const imageProxyLimit = makeRateLimiter({ max: 120, windowMs: 60_000, label: 'proxy-image' });
+
 // Strict host match: equal OR proper subdomain. Rejects 'i.imgur.com.evil.tld'.
 function _hostMatches(hostname, allowed) {
   return hostname === allowed || hostname.endsWith('.' + allowed);
 }
+
+router.use((req, res, next) => {
+  let apiRequest = true;
+  try {
+    const target = new URL(String(req.query?.url || ''));
+    // Only explicitly whitelisted image hosts use the image bucket. Unknown
+    // and malformed targets stay in the stricter API bucket until the route
+    // rejects them, so callers cannot bypass the food-search budget by
+    // changing the target host.
+    apiRequest = !IMG_ALLOWED.some(h => _hostMatches(target.hostname, h));
+  } catch {
+    // Malformed/unknown targets are charged to the stricter API bucket.
+  }
+  return (apiRequest ? apiProxyLimit : imageProxyLimit)(req, res, next);
+});
 
 router.get('/', async (req, res) => {
   const { url } = req.query;
@@ -62,6 +81,8 @@ router.get('/', async (req, res) => {
 
     if (!response.ok) {
       logger.warn(`[proxy] upstream ${response.status} for ${url}`);
+      const retryAfter = response.headers?.get?.('retry-after');
+      if (retryAfter) res.set('Retry-After', retryAfter);
       return res.status(response.status).json({ error: `Upstream ${response.status}` });
     }
 
