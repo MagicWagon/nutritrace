@@ -5,6 +5,11 @@ import { altUnitGrams, normalizePortionUnit, unitKind } from './provider-portion
 const SHORT_PLURALS = new Set(['gas', 'glass', 'molasses']);
 const REFINEMENT_UNITS = new Set(['g','kg','mg','oz','lb','ml','l','tsp','tbsp','cup','pinch','dash','clove','slice','can','package','piece','sprig','stalk','bunch']);
 const AMOUNT_ROLES = new Set(['primary', 'additional', 'equivalent']);
+const PREPARATION_WORDS = new Set([
+  'optional', 'chopped', 'diced', 'minced', 'sliced', 'crushed', 'ground',
+  'melted', 'softened', 'packed', 'sifted', 'drained', 'rinsed', 'divided',
+  'warm', 'cold', 'room', 'temperature', 'finely', 'coarsely', 'roughly',
+]);
 
 export function normalizeIngredientName(value) {
   return String(value || '')
@@ -24,6 +29,14 @@ export function normalizeBrandName(value) {
     .replace(/\b(?:inc|incorporated|llc|ltd|limited|company|co|corp|corporation|brand|brands)\b/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+/** Remove recipe directions that describe preparation rather than the food. */
+export function normalizeIngredientSearchText(value) {
+  return normalizeIngredientName(value)
+    .split(' ')
+    .filter(token => !PREPARATION_WORDS.has(token))
+    .join(' ');
 }
 
 export function candidateSupportsUnit(candidate, unit) {
@@ -60,7 +73,7 @@ function tokenMatches(queryToken, candidateToken) {
 }
 
 function scoreOne(query, candidate) {
-  const q = normalizeIngredientName(query);
+  const q = normalizeIngredientSearchText(query);
   const c = normalizeIngredientName(`${candidate?.name || ''} ${candidate?.brand || ''}`);
   if (!q || !c) return null;
   const qTokens = q.split(' ');

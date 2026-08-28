@@ -107,6 +107,13 @@ const Mealie = {
     return `${baseUrl}/api/media/recipes/${recipeId}/images/original.webp`;
   },
 
+  /** Commit-only credentials used by the server to copy private recipe media. */
+  imageImport(recipeId) {
+    const { baseUrl, token } = _cfg();
+    if (!baseUrl || !token || !recipeId) return null;
+    return { base_url: baseUrl, token, recipe_id: String(recipeId) };
+  },
+
   async instanceKey() {
     const { baseUrl } = _cfg();
     if (!baseUrl) return '';

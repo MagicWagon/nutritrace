@@ -8,7 +8,7 @@ import { extractJsonLdBlocks, parseRecipeJsonLd } from '../server/lib/recipe-imp
 import { createPinnedLookup, fetchRecipePage, isBlockedAddress, requestPinned, validateRecipeUrl } from '../server/lib/recipe-import/fetch-page.js';
 import { resolveAmountFactor } from '../server/lib/recipe-import/amount.js';
 import { persistRecipeImportDraft, prepareRecipeImportDraft, RECIPE_IMPORT_DRAFT_KEY } from '../src/lib/recipe-import-draft.js';
-import { normalizeIngredientName, rankIngredientCandidates, validateIngredientRefinement } from '../src/lib/ingredient-match.js';
+import { normalizeIngredientName, normalizeIngredientSearchText, rankIngredientCandidates, validateIngredientRefinement } from '../src/lib/ingredient-match.js';
 import { densityFromAltUnits, displayUnitName, normalizePortionUnit, parseOffAltUnits, parseUsdaAltUnits } from '../src/lib/provider-portions.js';
 
 test('ingredient parser handles mixed fractions, ranges, packages, units, and notes', () => {
@@ -64,6 +64,19 @@ test('ingredient candidate scoring excludes irrelevant products and ranks releva
   ]);
   assert.deepEqual(ranked.map(item => item.barcode || item.fdcId), ['2', '3']);
   assert.ok(ranked.every(item => item._matchReasons.length));
+});
+
+test('ingredient matching ignores preparation directions but preserves meaningful food terms', () => {
+  assert.equal(normalizeIngredientSearchText('walnuts, finely chopped'), 'walnut');
+  assert.equal(normalizeIngredientSearchText('peanut butter optional'), 'peanut butter');
+  const walnut = rankIngredientCandidates(['walnut chopped'], [
+    { name: 'Walnuts', unit: 'g', _candidateProvider: 'local' },
+  ]);
+  const peanut = rankIngredientCandidates(['peanut butter optional'], [
+    { name: 'Peanut Butter', brand: 'Kirkland Signature', unit: 'g', _candidateProvider: 'openfoodfacts' },
+  ]);
+  assert.equal(walnut.length, 1);
+  assert.equal(peanut.length, 1);
 });
 
 test('provider portions normalize household measures into grams per unit', () => {
@@ -283,6 +296,10 @@ test('recipe import UI restores drafts safely and Back always returns to Foods',
   assert.match(source, /displayUnitName\(row\.unit/);
   assert.match(source, /provider_food:/);
   assert.match(source, /Import without nutrition/);
+  assert.match(source, /Promise\.allSettled\(jobs\)/);
+  assert.match(source, /conversionEstimateQueue/);
+  assert.match(source, /container-type: inline-size/);
+  assert.match(source, /mealie_image:/);
   assert.doesNotMatch(source, /\bpop\(\)/);
 });
 
@@ -293,6 +310,7 @@ test('recipe commit stages provider foods atomically and returns cache hydration
   assert.match(route, /const save = db\.transaction/);
   assert.match(route, /recipe:\s*\{/);
   assert.match(route, /foods: returnedFoods/);
+  assert.match(route, /importMealieRecipeImage/);
   assert.match(api, /for \(const serverFood of response\.foods/);
   assert.match(api, /dbUpsertFromServer\('meals', response\.recipe\)/);
 });

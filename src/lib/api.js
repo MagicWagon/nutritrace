@@ -91,8 +91,8 @@ function _luceneEscape(s) {
 // query. Country filter goes inline into `q` as Lucene syntax rather
 // than a separate query param (v2's `countries_tags=` is a no-op here).
 // Language filter uses `langs=` (v2 used `lc=`, ignored by search-a-licious).
-function _offSearchUrl(query, page, pageSize) {
-  const country = _getOffSearchCountry();
+function _offSearchUrl(query, page, pageSize, options = {}) {
+  const country = options.countryFilter === false ? '' : _getOffSearchCountry();
   const escaped  = _luceneEscape(query);
   const qWithFilter = country
     ? `${escaped} +countries_tags:"${country}"`
@@ -257,10 +257,10 @@ const API = {
     }
   },
 
-  async searchByName(query, page) {
+  async searchByName(query, page, options = {}) {
     page = page || 1;
     try {
-      const offUrl = _offSearchUrl(query, page, 50);
+      const offUrl = _offSearchUrl(query, page, 50, options);
       const res = await _extFetch(offUrl);
       if (!res.ok) return [];
       const data = await res.json();

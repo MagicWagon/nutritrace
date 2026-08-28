@@ -8,6 +8,7 @@ import { fetchRecipePage, resolvePublicAddress, validateRecipeUrl } from '../lib
 import { parseRecipeJsonLd } from '../lib/recipe-import/jsonld.js';
 import { RecipeImportError, recipeImportErrorBody } from '../lib/recipe-import/errors.js';
 import { resolveAmountFactor } from '../lib/recipe-import/amount.js';
+import { importMealieRecipeImage } from '../lib/mealie-image.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -195,11 +196,14 @@ router.post('/commit', wrap(async (req, res) => {
   }
 
   const servings = Math.max(1, Math.min(10_000, Number.parseInt(req.body?.servings) || 1));
+  const mealieImage = draft.source === 'mealie'
+    ? await importMealieRecipeImage(req.body?.mealie_image, userId)
+    : '';
   const safeImage = draft.images?.[0] ? await publicUrl(draft.images[0], safeSource.startsWith('http') ? safeSource : undefined) : '';
   // Keep the already-validated public URL. The generic image localizer does
   // not pin DNS for the download, so invoking it here would weaken the
   // importer's DNS-rebinding boundary.
-  const image = safeImage || null;
+  const image = mealieImage || safeImage || null;
   const details = {
     description: draft.description || '', instructions: draft.instructions || [], source_url: safeSource,
     prep_time: draft.prep_time || '', cook_time: draft.cook_time || '', total_time: draft.total_time || '',

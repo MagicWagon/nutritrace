@@ -9,10 +9,11 @@
   import { offEnabled, offSearchLanguage, usdaEnabled, usdaApiKey, aiEffectivelyEnabled, preferredFoodBrands, preferredBrandPriority } from '../stores/settings.js';
   import { unitToGrams, unitSystem } from '../lib/units.js';
   import { prepareRecipeImportDraft, persistRecipeImportDraft, RECIPE_IMPORT_DRAFT_KEY } from '../lib/recipe-import-draft.js';
-  import { isStrongIngredientCandidate, normalizeIngredientName, rankIngredientCandidates } from '../lib/ingredient-match.js';
+  import { isStrongIngredientCandidate, normalizeIngredientName, normalizeIngredientSearchText, rankIngredientCandidates } from '../lib/ingredient-match.js';
   import { estimateIngredientGramsWithAI, refineIngredientWithAI } from '../lib/ingredient-ai.js';
   import { altUnitGrams, conversionProvenance, displayUnitName, normalizePortionUnit } from '../lib/provider-portions.js';
   import Sheet from '../components/ui/Sheet.svelte';
+  import { Mealie } from '../lib/mealieApi.js';
 
   let url = '';
   let loading = false;
@@ -33,6 +34,7 @@
   let sheetResults = [];
   let searchTimer;
   let searchSequence = 0;
+  let conversionEstimateQueue = Promise.resolve();
 
   onMount(async () => {
     const transientDraft = editorState.recipeImportDraft;
@@ -61,7 +63,9 @@
     }
     result = prepared.result;
     restoringDraft = false;
-    if (!saved?.resolutions) autoMatchAll();
+    // Re-run automatic matching for restored drafts as well. Provider data,
+    // settings, or an earlier partial outage may have changed since save.
+    autoMatchAll();
   });
 
   $: recipe = result?.recipes?.[selectedIndex] || null;
@@ -82,6 +86,30 @@
       names.unshift(`${brand} ${names[0]}`);
     }
     return [...new Set(names)].slice(0, 3);
+  }
+
+  function providerSearchQueries(names) {
+    const queries = [];
+    const add = value => {
+      const clean = String(value || '').replace(/\s+/g, ' ').trim();
+      if (clean && !queries.some(item => normalizeName(item) === normalizeName(clean))) queries.push(clean);
+    };
+    for (const name of names) {
+      add(name);
+      const cleaned = normalizeIngredientSearchText(name);
+      add(cleaned);
+      for (const brand of $preferredFoodBrands.slice(0, 2)) {
+        if (!normalizeName(cleaned).includes(normalizeName(brand))) add(`${cleaned} ${brand}`);
+      }
+      const tokens = cleaned.split(' ').filter(Boolean);
+      // Provider indexes vary between phrase, food-name, and brand matching.
+      // Shorter fallbacks are ranked against the full query after retrieval.
+      if (tokens.length > 2) add(tokens.slice(0, -1).join(' '));
+      if (tokens.length > 1) add(tokens.slice(0, 2).join(' '));
+      if (tokens.length > 1) add(tokens.at(-1));
+      if (tokens.length === 2) add(tokens[0]);
+    }
+    return queries.slice(0, 4);
   }
 
   function preferredIngredientAmount(ingredient, fallbackFood = null) {
@@ -133,7 +161,7 @@
 
   function setRowUnit(index, event) {
     const next = [...resolutions];
-    next[index] = { ...next[index], unit: normalizePortionUnit(event.currentTarget.value), acknowledged: false, equivalentGrams: null, conversionSource: null, estimatingConversion: false, selectionVersion: (next[index].selectionVersion || 0) + 1 };
+    next[index] = { ...next[index], unit: normalizePortionUnit(event.currentTarget.value), acknowledged: false, equivalentGrams: null, conversionSource: null, estimatingConversion: false, conversionEstimateFailed: false, selectionVersion: (next[index].selectionVersion || 0) + 1 };
     resolutions = next;
     maybeEstimateConversion(index);
   }
@@ -201,6 +229,7 @@
         aiProposal: null,
         equivalentGrams: null,
         conversionSource: null,
+        conversionEstimateFailed: false,
         manuallySelected: false,
         selectionVersion: 0,
       };
@@ -211,7 +240,7 @@
     const key = `${provider}:${normalizeName(name)}`;
     if (providerSearchCache.has(key)) return providerSearchCache.get(key);
     const promise = provider === 'openfoodfacts'
-      ? API.searchByName(name, 1).then(items => (items || []).slice(0, 20).map(food => ({ ...food, _candidateProvider: provider })))
+      ? API.searchByName(name, 1, { countryFilter: false }).then(items => (items || []).slice(0, 20).map(food => ({ ...food, _candidateProvider: provider })))
       : USDA.searchByName(name, 1, $usdaApiKey).then(items => (items || []).slice(0, 20).map(food => ({ ...food, _candidateProvider: provider })));
     providerSearchCache.set(key, promise);
     promise.catch(() => providerSearchCache.delete(key));
@@ -245,15 +274,16 @@
 
   async function collectMatches(row, query, source = 'all', limit = 30) {
     const names = query ? [query] : ingredientSearchNames(row.ingredient);
+    const queries = providerSearchQueries(names);
     const jobs = [];
-    if (source === 'all' || source === 'local') jobs.push(Promise.resolve(localCandidates(names[0])));
+    if (source === 'all' || source === 'local') jobs.push(Promise.resolve(queries.flatMap(localCandidates)));
     if ((source === 'all' || source === 'openfoodfacts') && $offEnabled) {
-      for (const name of names) jobs.push(cachedProviderSearch('openfoodfacts', name));
+      for (const name of queries) jobs.push(cachedProviderSearch('openfoodfacts', name));
     }
     if ((source === 'all' || source === 'usda') && $usdaEnabled && $usdaApiKey) {
-      for (const name of names) jobs.push(cachedProviderSearch('usda', name));
+      for (const name of queries) jobs.push(cachedProviderSearch('usda', name));
     }
-    const raw = (await Promise.all(jobs)).flat();
+    const raw = (await Promise.allSettled(jobs)).flatMap(result => result.status === 'fulfilled' ? result.value : []);
     const provisional = rankIngredientCandidates(names, raw, Math.max(limit, 8), rankingOptions(row));
     const hydrated = await Promise.all(provisional.slice(0, 8).map(hydrateCandidate));
     return rankIngredientCandidates(names, [...hydrated, ...provisional.slice(8)], limit, rankingOptions(row));
@@ -279,11 +309,16 @@
 
   async function autoMatchAll() {
     const snapshot = resolutions;
-    await Promise.all(snapshot.map(async (row, index) => {
+    let nextIndex = 0;
+    const worker = async () => {
+      while (nextIndex < snapshot.length) {
+        const index = nextIndex++;
+        const row = snapshot[index];
+        if (row.manuallySelected) continue;
       try {
         const candidates = await collectMatches(row, '', 'all', 30);
         const current = resolutions[index];
-        if (!current || current.ingredient.original_text !== row.ingredient.original_text) return;
+        if (!current || current.ingredient.original_text !== row.ingredient.original_text) continue;
         const best = candidates[0];
         const next = [...resolutions];
         next[index] = { ...current, candidates, searchAttempted: true, searching: false };
@@ -293,9 +328,13 @@
         resolutions = next;
         if (best && isStrongIngredientCandidate(best) && !current.manuallySelected) maybeEstimateConversion(index);
       } catch {
-        // Provider outages leave the row unresolved; local/manual search remains available.
+        const next = [...resolutions];
+        if (next[index]) next[index] = { ...next[index], searching: false, searchAttempted: true };
+        resolutions = next;
       }
-    }));
+      }
+    };
+    await Promise.all([worker(), worker()]);
   }
 
   function providerReferences(candidate, row) {
@@ -324,6 +363,7 @@
     row.equivalentGrams = null;
     row.conversionSource = null;
     row.estimatingConversion = false;
+    row.conversionEstimateFailed = false;
   }
 
   async function chooseProvider(index, candidate) {
@@ -349,21 +389,32 @@
     const next = [...resolutions];
     next[index] = { ...row, estimatingConversion: true };
     resolutions = next;
-    try {
-      const estimate = await estimateIngredientGramsWithAI({
-        ingredientText: row.ingredient.original_text, foodName: food.name, brand: food.brand,
-        amount: row.portion, unit: row.unit,
-      });
+    conversionEstimateQueue = conversionEstimateQueue.catch(() => {}).then(async () => {
+      const current = resolutions[index];
+      if (!current || (current.selectionVersion || 0) !== selectionVersion) return;
+      if (!conversionRequired(current)) {
+        const skipped = [...resolutions];
+        skipped[index] = { ...current, estimatingConversion: false, conversionEstimateFailed: false };
+        resolutions = skipped;
+        return;
+      }
+      let estimate = null;
+      for (let attempt = 0; attempt < 2 && !estimate; attempt++) {
+        try {
+          estimate = await estimateIngredientGramsWithAI({
+            ingredientText: row.ingredient.original_text, foodName: food.name, brand: food.brand,
+            amount: row.portion, unit: row.unit,
+          });
+        } catch {}
+      }
       const done = [...resolutions];
       if ((done[index]?.selectionVersion || 0) !== selectionVersion) return;
-      done[index] = { ...done[index], estimatingConversion: false, equivalentGrams: estimate.grams, conversionSource: 'ai' };
+      done[index] = estimate
+        ? { ...done[index], estimatingConversion: false, conversionEstimateFailed: false, equivalentGrams: estimate.grams, conversionSource: 'ai' }
+        : { ...done[index], estimatingConversion: false, conversionEstimateFailed: true };
       resolutions = done;
-    } catch {
-      const done = [...resolutions];
-      if ((done[index]?.selectionVersion || 0) !== selectionVersion) return;
-      done[index] = { ...done[index], estimatingConversion: false };
-      resolutions = done;
-    }
+    });
+    await conversionEstimateQueue;
   }
 
   function openMatchSearch(index) {
@@ -486,6 +537,7 @@
     try {
       const saved = await NtApi.commitRecipeImport({
         recipe,
+        mealie_image: recipe.source === 'mealie' ? Mealie.imageImport(recipe.source_id) : null,
         servings: inferServings(recipe.yield_text),
         mode,
         ingredients: resolutions.map(row => ({
@@ -628,7 +680,14 @@
                   </p>
                 {/if}
                 {#if conversionRequired(row)}
-                  <p class="conversion-warning">{row.estimatingConversion ? 'Estimating the unit conversion…' : 'This food does not provide a usable conversion for the selected unit.'}</p>
+                  <p class="conversion-warning">
+                    {row.estimatingConversion
+                      ? 'Estimating the unit conversion with AI…'
+                      : row.conversionEstimateFailed && $aiEffectivelyEnabled
+                        ? 'AI could not estimate this conversion.'
+                        : 'No automatic conversion is available for the selected unit.'}
+                    {#if row.conversionEstimateFailed && $aiEffectivelyEnabled}<button class="retry-estimate" on:click={() => maybeEstimateConversion(index)}>Retry</button>{/if}
+                  </p>
                   <label class="ack-row">
                     <input type="checkbox" bind:checked={row.acknowledged} />
                     <span><strong>Import without nutrition</strong><small>Keep this ingredient in the recipe, but do not count calories or nutrients.</small></span>
@@ -748,24 +807,25 @@
   .recipe-summary img { width: 140px; height: 140px; object-fit: cover; border-radius: var(--radius-md); }
   .recipe-summary > div { display: flex; flex-direction: column; gap: 8px; }
   .warning-card { padding: 14px 16px; border-radius: var(--radius-md); background: color-mix(in srgb, #f59e0b 14%, var(--surface)); border: 1px solid color-mix(in srgb, #f59e0b 50%, var(--border)); }
-  .ingredient-list { display: flex; flex-direction: column; gap: 10px; }
-  .ingredient-row { display: grid; grid-template-columns: minmax(180px, 1.3fr) minmax(180px, 1fr) 180px; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); align-items: center; }
+  .ingredient-list { display: flex; flex-direction: column; gap: 10px; container-type: inline-size; }
+  .ingredient-row { display: grid; grid-template-columns: minmax(180px, 1.3fr) minmax(180px, 1fr) minmax(210px, .9fr); gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); align-items: center; }
   .ingredient-row.unresolved { border-color: color-mix(in srgb, #f59e0b 55%, var(--border)); }
-  .ingredient-source { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .ingredient-source { grid-column: 1; min-width: 0; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
   .status { font-size: 11px; padding: 2px 6px; color: var(--accent); border-radius: 999px; background: color-mix(in srgb, var(--accent) 12%, transparent); }
   .status.warn { color: #b66a00; background: color-mix(in srgb, #f59e0b 15%, transparent); }
-  .match-picker { min-width: 0; min-height: 44px; padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-1); cursor: pointer; }
+  .match-picker { grid-column: 2; min-width: 0; min-height: 44px; padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-1); cursor: pointer; }
   .match-picker > span:first-child { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
   .match-picker strong, .match-picker small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .match-picker small { color: var(--text-3); }
-  .amount-row { display: grid; grid-template-columns: minmax(70px, .7fr) minmax(130px, 1.3fr); gap: 6px; }
-  .unit-select { min-width: 0; }
+  .amount-row { grid-column: 3; min-width: 0; display: grid; grid-template-columns: 60px minmax(0, 1fr); gap: 6px; }
+  .amount-row > *, .unit-select { width: 100%; min-width: 0; }
   .ack-row { grid-column: 2 / -1; font-size: 12px; display: flex; gap: 7px; align-items: start; }
   .ack-row span { display: flex; flex-direction: column; gap: 2px; }
   .ack-row small { color: var(--text-3); font-weight: 400; }
   .conversion-warning { grid-column: 2 / -1; margin: 0; color: #b66a00; font-size: 12px; }
   .conversion-detail { grid-column: 2 / -1; margin: 0; color: var(--text-3); font-size: 12px; }
   .conversion-detail.estimated { color: #b66a00; }
+  .retry-estimate { margin-left: 6px; border: 0; padding: 0; background: none; color: var(--accent); cursor: pointer; text-decoration: underline; }
   .ai-refine { justify-self: start; font-size: 12px; }
   .ai-proposal { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border)); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--accent) 8%, var(--surface-2)); font-size: 12px; }
   .ai-proposal > div { display: flex; gap: 8px; }
@@ -793,5 +853,16 @@
     .recipe-summary img { width: 90px; height: 90px; }
     .ingredient-row { grid-template-columns: 1fr; }
     .ack-row, .conversion-warning, .conversion-detail { grid-column: 1; }
+  }
+  @container (max-width: 760px) {
+    .ingredient-row { grid-template-columns: minmax(180px, 1fr) minmax(280px, 1.25fr); }
+    .ingredient-source { grid-column: 1; grid-row: 1 / span 2; }
+    .match-picker { grid-column: 2; }
+    .amount-row { grid-column: 2; }
+    .ack-row, .conversion-warning, .conversion-detail { grid-column: 2; }
+  }
+  @container (max-width: 540px) {
+    .ingredient-row { grid-template-columns: minmax(0, 1fr); }
+    .ingredient-source, .match-picker, .amount-row, .ack-row, .conversion-warning, .conversion-detail { grid-column: 1; grid-row: auto; }
   }
 </style>
