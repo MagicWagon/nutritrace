@@ -45,6 +45,47 @@ function cleanName(value) {
   return value.replace(/^of\s+/i, '').replace(/^[,;:\-–—]\s*/, '').replace(/\s+/g, ' ').trim();
 }
 
+function readUnit(value) {
+  const match = /^([A-Za-z]+)\.?\b\s*/.exec(value);
+  if (!match) return null;
+  const unit = UNIT_ALIASES.get(match[1].toLowerCase());
+  return unit ? { unit, length: match[0].length } : null;
+}
+
+function readAmount(value) {
+  const quantityMatch = /^(\d+\s+\d+\/\d+|\d+-\d+\/\d+|\d+[¼½¾⅐⅑⅒⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]|\d+(?:[.,]\d+)?|\d+\/\d+|[¼½¾⅐⅑⅒⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]|one|two|three|four|five|six)(?=\s|$)\s*/i.exec(value);
+  if (!quantityMatch) return null;
+  const afterQuantity = value.slice(quantityMatch[0].length);
+  const unit = readUnit(afterQuantity);
+  if (!unit) return null;
+  return {
+    quantity: parseNumericToken(quantityMatch[1]),
+    unit: unit.unit,
+    length: quantityMatch[0].length + unit.length,
+  };
+}
+
+function readParentheticalAmount(value) {
+  const match = /^\(\s*(\d+(?:[.,]\d+)?|\d+\/\d+)\s*([A-Za-z]+)\.?\s*\)\s*/.exec(value);
+  if (!match) return null;
+  const unit = UNIT_ALIASES.get(match[2].toLowerCase());
+  const quantity = parseNumericToken(match[1]);
+  if (!unit || quantity == null) return null;
+  return { quantity, unit, length: match[0].length };
+}
+
+// Alternative clauses often repeat their own amount ("or 1/2 cup (45g)").
+// Strip only a leading, fully-recognized amount so meaningful numbers inside a
+// product name remain untouched.
+function stripAlternativeAmount(value) {
+  let rest = String(value || '').trim();
+  const amount = readAmount(rest);
+  if (amount) rest = rest.slice(amount.length);
+  const equivalent = readParentheticalAmount(rest);
+  if (equivalent) rest = rest.slice(equivalent.length);
+  return cleanName(rest);
+}
+
 /** Best-effort parser. The original line is always authoritative. */
 export function parseIngredientLine(input) {
   const original = String(input ?? '').replace(/\s+/g, ' ').trim();
@@ -56,6 +97,8 @@ export function parseIngredientLine(input) {
     name: original,
     note: '',
     package_size: null,
+    search_names: original ? [original] : [],
+    amounts: [],
     parse_confidence: original ? 'low' : 'none',
   };
   if (!original) return out;
@@ -99,14 +142,42 @@ export function parseIngredientLine(input) {
     }
   }
 
+  if (out.quantity != null && out.unit) {
+    out.amounts.push({ quantity: out.quantity, unit: out.unit, role: 'primary' });
+  }
+
+  // Recipe sites commonly spell a single amount in two systems:
+  // "8 tablespoons (113g) butter". They also use additive volume syntax:
+  // "1/2 cup plus 2 tablespoons (133g) sugar". Capture these measurements
+  // structurally and remove them from the food name used for matching.
+  const additional = /^plus\s+/i.exec(rest);
+  if (additional) {
+    const parsed = readAmount(rest.slice(additional[0].length));
+    if (parsed) {
+      out.amounts.push({ quantity: parsed.quantity, unit: parsed.unit, role: 'additional' });
+      rest = rest.slice(additional[0].length + parsed.length);
+    }
+  }
+  const equivalent = readParentheticalAmount(rest);
+  if (equivalent) {
+    out.amounts.push({ quantity: equivalent.quantity, unit: equivalent.unit, role: 'equivalent' });
+    rest = rest.slice(equivalent.length);
+  }
+
   // Preserve preparation text separately where the conventional comma form is clear.
   const comma = rest.indexOf(',');
+  let rawName;
   if (comma >= 0) {
-    out.name = cleanName(rest.slice(0, comma));
+    rawName = cleanName(rest.slice(0, comma));
     out.note = rest.slice(comma + 1).trim();
   } else {
-    out.name = cleanName(rest);
+    rawName = cleanName(rest);
   }
+
+
+  const alternatives = rawName.split(/\s+or\s+/i).map(stripAlternativeAmount).filter(Boolean);
+  out.name = alternatives[0] || rawName;
+  out.search_names = [...new Set(alternatives.length ? alternatives : [out.name])].slice(0, 3);
 
   const hasUsefulName = out.name.length > 0;
   if (out.quantity != null && out.unit && hasUsefulName) out.parse_confidence = 'high';

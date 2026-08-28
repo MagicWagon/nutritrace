@@ -123,6 +123,21 @@ function _getOffSearchLanguage() {
   } catch { return 'en'; }
 }
 
+function _offProductName(p, language, strict = false) {
+  const lang = String(language || 'en').slice(0, 2).toLowerCase();
+  const localized = p?.[`product_name_${lang}`]
+    || p?.product_names?.[lang]
+    || p?.product_name_translations?.[lang]
+    || '';
+  if (String(localized).trim()) return { name: String(localized).trim(), language: lang };
+  const primaryLanguage = String(p?.lang || p?.lc || p?.language_code || '').slice(0, 2).toLowerCase();
+  if (primaryLanguage === lang && String(p?.product_name || '').trim()) {
+    return { name: String(p.product_name).trim(), language: lang };
+  }
+  if (strict) return { name: '', language: primaryLanguage || null };
+  return { name: String(p?.product_name || '').trim(), language: primaryLanguage || null };
+}
+
 // Re-rank OFF search results within the fetched page so higher-quality
 // entries surface first. OFF's server-side relevance is name-match based
 // and doesn't consider how complete the entry is, so a search for
@@ -252,7 +267,10 @@ const API = {
       // API fall-through when the mirror is off or misses). v1.1.0 shipped
       // reading `hits` only, which silently returned empty for the majority
       // of self-hosters who don't run the mirror. #133 (@JacosVerksted).
-      const items = (data.hits || data.products || []).map(p => this._mapOFFProduct(p)).filter(Boolean);
+      const language = _getOffSearchLanguage();
+      const items = (data.hits || data.products || [])
+        .map(p => this._mapOFFProduct(p, { language, strictLanguage: true }))
+        .filter(Boolean);
       return _rankOFFResults(items);
     } catch(e) {
       console.error('Search failed:', e);
@@ -277,7 +295,10 @@ const API = {
       // API fall-through when the mirror is off or misses). v1.1.0 shipped
       // reading `hits` only, which silently returned empty for the majority
       // of self-hosters who don't run the mirror. #133 (@JacosVerksted).
-      const items = (data.hits || data.products || []).map(p => this._mapOFFProduct(p)).filter(Boolean);
+      const language = _getOffSearchLanguage();
+      const items = (data.hits || data.products || [])
+        .map(p => this._mapOFFProduct(p, { language, strictLanguage: true }))
+        .filter(Boolean);
       const totalHits = typeof data.count === 'number' ? data.count : items.length;
       const hasMore = page * pageSize < totalHits;
       return { items: _rankOFFResults(items), totalHits, page, hasMore };
@@ -394,8 +415,10 @@ const API = {
     }
   },
 
-  _mapOFFProduct(p) {
-    if (!p || !p.product_name) return null;
+  _mapOFFProduct(p, { language = _getOffSearchLanguage(), strictLanguage = false } = {}) {
+    if (!p) return null;
+    const localizedName = _offProductName(p, language, strictLanguage);
+    if (!localizedName.name) return null;
     const n = p.nutriments || {};
     // Per-serving import: enabled by the user via Settings → Connected Services →
     // Open Food Facts → Import Portion As, and only when the product actually
@@ -483,7 +506,8 @@ const API = {
                    || (Array.isArray(p.manufacturing_places_tags) && p.manufacturing_places_tags[0])
                    || null;
     return {
-      name:      (p.product_name || '').trim(),
+      name:      localizedName.name,
+      nameLanguage: localizedName.language,
       brand:     (Array.isArray(p.brands) ? (p.brands[0] || '') : (p.brands || '').split(',')[0] || '').trim(),
       barcode:   p.code || p._id || p.id || '',
       unit,

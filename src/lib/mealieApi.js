@@ -171,12 +171,17 @@ const Mealie = {
       const unit = typeof row.unit === 'string' ? row.unit : (row.unit?.abbreviation || row.unit?.name || '');
       const food = typeof row.food === 'string' ? row.food : (row.food?.name || '');
       const original = row.display || row.originalText || row.original_text || [row.quantity, unit, food, row.note].filter(Boolean).join(' ');
+      const normalizedName = food || row.title || original || 'Unresolved ingredient';
       return {
         original_text: original || food || 'Unresolved ingredient',
         quantity: Number.isFinite(quantity) ? quantity : null,
         quantity_max: null,
         unit: unit.toLowerCase() || null,
-        name: food || row.title || original || 'Unresolved ingredient',
+        name: normalizedName,
+        search_names: [normalizedName],
+        amounts: Number.isFinite(quantity) && quantity > 0 && unit
+          ? [{ quantity, unit: unit.toLowerCase(), role: 'primary' }]
+          : [],
         note: row.note || '',
         package_size: null,
         parse_confidence: food ? 'high' : 'low',

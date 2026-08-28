@@ -8,6 +8,7 @@ import { extractJsonLdBlocks, parseRecipeJsonLd } from '../server/lib/recipe-imp
 import { createPinnedLookup, fetchRecipePage, isBlockedAddress, requestPinned, validateRecipeUrl } from '../server/lib/recipe-import/fetch-page.js';
 import { resolveAmountFactor } from '../server/lib/recipe-import/amount.js';
 import { persistRecipeImportDraft, prepareRecipeImportDraft, RECIPE_IMPORT_DRAFT_KEY } from '../src/lib/recipe-import-draft.js';
+import { normalizeIngredientName, rankIngredientCandidates, validateIngredientRefinement } from '../src/lib/ingredient-match.js';
 
 test('ingredient parser handles mixed fractions, ranges, packages, units, and notes', () => {
   assert.deepEqual(parseIngredientLine('1 1/2 cups all-purpose flour, sifted'), {
@@ -18,12 +19,68 @@ test('ingredient parser handles mixed fractions, ranges, packages, units, and no
     name: 'all-purpose flour',
     note: 'sifted',
     package_size: null,
+    search_names: ['all-purpose flour'],
+    amounts: [{ quantity: 1.5, unit: 'cup', role: 'primary' }],
     parse_confidence: 'high',
   });
   assert.equal(parseIngredientLine('2–3 cloves garlic').quantity_max, 3);
   assert.equal(parseIngredientLine('½ tsp salt').quantity, 0.5);
   assert.deepEqual(parseIngredientLine('one 14-ounce can tomatoes').package_size, { amount: 14, unit: 'oz' });
   assert.equal(parseIngredientLine('salt to taste').parse_confidence, 'low');
+});
+
+test('ingredient parser removes equivalent measures and separates explicit alternatives', () => {
+  const sugar = parseIngredientLine('1/2 cup plus 2 tablespoons (133g) light brown sugar, packed');
+  assert.equal(sugar.name, 'light brown sugar');
+  assert.deepEqual(sugar.search_names, ['light brown sugar']);
+  assert.deepEqual(sugar.amounts, [
+    { quantity: 0.5, unit: 'cup', role: 'primary' },
+    { quantity: 2, unit: 'tbsp', role: 'additional' },
+    { quantity: 133, unit: 'g', role: 'equivalent' },
+  ]);
+  assert.equal(sugar.note, 'packed');
+
+  const butter = parseIngredientLine('8 tablespoons (113g) unsalted butter, at room temperature');
+  assert.equal(butter.name, 'unsalted butter');
+  assert.deepEqual(butter.amounts.at(-1), { quantity: 113, unit: 'g', role: 'equivalent' });
+
+  const flour = parseIngredientLine('1 cup (120g) King Arthur Unbleached All-Purpose Flour or King Arthur Gluten-Free Measure for Measure Flour');
+  assert.deepEqual(flour.search_names, [
+    'King Arthur Unbleached All-Purpose Flour',
+    'King Arthur Gluten-Free Measure for Measure Flour',
+  ]);
+
+  const oats = parseIngredientLine('1/2 cup (57g) King Arthur Rolled Oats or 1/2 cup (45g) old-fashioned rolled oats');
+  assert.deepEqual(oats.search_names, ['King Arthur Rolled Oats', 'old-fashioned rolled oats']);
+});
+
+test('ingredient candidate scoring excludes irrelevant products and ranks relevant names', () => {
+  assert.equal(normalizeIngredientName("Confectioners' Sugars"), 'confectioner sugar');
+  const ranked = rankIngredientCandidates(['light brown sugar'], [
+    { name: 'Delikatess Geräucherter Schinkenspeck', brand: 'Dulano', barcode: '1', _candidateProvider: 'openfoodfacts' },
+    { name: 'Organic Light Brown Sugar', brand: 'Store', barcode: '2', completeness: 0.8, nutrition: { calories: 380 }, _candidateProvider: 'openfoodfacts' },
+    { name: 'Brown Sugar', brand: '', fdcId: '3', dataType: 'Foundation', nutrition: { calories: 380 }, _candidateProvider: 'usda' },
+  ]);
+  assert.deepEqual(ranked.map(item => item.barcode || item.fdcId), ['2', '3']);
+  assert.ok(ranked.every(item => item._matchReasons.length));
+});
+
+test('AI ingredient refinements are bounded and reject unsafe shapes', () => {
+  assert.equal(validateIngredientRefinement({ amounts: [] }), null);
+  const refined = validateIngredientRefinement({
+    search_names: [' unsalted butter ', 'unsalted butter', 'butter', 'ignored fourth'],
+    brand: 'x'.repeat(200),
+    note: 'room temperature',
+    amounts: [
+      { quantity: 113, unit: 'G', role: 'equivalent' },
+      { quantity: -1, unit: 'g', role: 'primary' },
+      { quantity: 1, unit: 'bucket', role: 'primary' },
+    ],
+  });
+  assert.deepEqual(refined.search_names, ['unsalted butter', 'butter', 'ignored fourth']);
+  assert.equal(refined.brand.length, 120);
+  assert.deepEqual(refined.amounts, [{ quantity: 113, unit: 'g', role: 'equivalent' }]);
+  assert.equal(refined.normalization_source, 'ai');
 });
 
 test('JSON-LD extractor finds scripts and canonical links without treating other scripts as data', () => {
@@ -175,6 +232,10 @@ test('recipe import UI restores drafts safely and Back always returns to Foods',
   assert.match(source, /restoringDraft/);
   assert.match(source, /recipe\?\.images\?\.\[0\]/);
   assert.match(source, /on:click=\{\(\) => push\('\/foods'\)\}/);
+  assert.match(source, /recipe_import\.ai_refine/);
+  assert.match(source, /on:click=\{\(\) => requestAiRefinement\(index\)\}/);
+  assert.match(source, /role === 'equivalent'/);
+  assert.match(source, /rankIngredientCandidates/);
   assert.doesNotMatch(source, /\bpop\(\)/);
 });
 

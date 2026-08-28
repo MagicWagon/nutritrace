@@ -6,9 +6,11 @@
   import { isNative, getServerUrl } from '../lib/platform.js';
   import { showSuccess, showError } from '../stores/toast.js';
   import { editorState } from '../stores/editorState.js';
-  import { offEnabled, usdaEnabled, usdaApiKey } from '../stores/settings.js';
+  import { offEnabled, offSearchLanguage, usdaEnabled, usdaApiKey, aiEffectivelyEnabled } from '../stores/settings.js';
   import { unitToGrams, unitSystem } from '../lib/units.js';
   import { prepareRecipeImportDraft, persistRecipeImportDraft, RECIPE_IMPORT_DRAFT_KEY } from '../lib/recipe-import-draft.js';
+  import { normalizeIngredientName, rankIngredientCandidates } from '../lib/ingredient-match.js';
+  import { refineIngredientWithAI } from '../lib/ingredient-ai.js';
 
   let url = '';
   let loading = false;
@@ -20,6 +22,7 @@
   let conflict = null;
   let restoringDraft = true;
   const serverRequired = isNative && !getServerUrl();
+  const providerSearchCache = new Map();
 
   onMount(async () => {
     const transientDraft = editorState.recipeImportDraft;
@@ -57,7 +60,30 @@
   }
 
   function normalizeName(value) {
-    return String(value || '').normalize('NFKD').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    return normalizeIngredientName(value);
+  }
+
+  function ingredientSearchNames(ingredient) {
+    const rawNames = Array.isArray(ingredient?.search_names) ? ingredient.search_names : [ingredient?.name];
+    const names = rawNames.map(name => String(name || '').trim()).filter(Boolean);
+    const brand = String(ingredient?.brand || '').trim();
+    if (brand && names[0] && !normalizeName(names[0]).includes(normalizeName(brand))) {
+      names.unshift(`${brand} ${names[0]}`);
+    }
+    return [...new Set(names)].slice(0, 3);
+  }
+
+  function preferredIngredientAmount(ingredient, fallbackFood = null) {
+    const equivalent = (ingredient?.amounts || []).find(amount =>
+      amount?.role === 'equivalent' && ['g', 'kg'].includes(String(amount?.unit || '').toLowerCase())
+      && Number(amount?.quantity) > 0
+    );
+    if (equivalent) return { portion: Number(equivalent.quantity), unit: equivalent.unit };
+    const sourceAmount = Number(ingredient?.quantity);
+    return {
+      portion: Number.isFinite(sourceAmount) && sourceAmount > 0 ? sourceAmount : (fallbackFood?.portion || 1),
+      unit: ingredient?.unit || fallbackFood?.unit || 'serving',
+    };
   }
 
   function inferServings(text) {
@@ -96,36 +122,53 @@
 
   function initializeResolutions(nextRecipe) {
     resolutions = (nextRecipe.ingredients || []).map(ingredient => {
-      const target = normalizeName(ingredient.name);
-      const matches = foods.filter(food => normalizeName(food.name) === target);
+      const targets = ingredientSearchNames(ingredient).map(normalizeName);
+      const matches = foods.filter(food => targets.includes(normalizeName(food.name)));
       const mapped = nextRecipe.source === 'mealie' && nextRecipe.source_instance && ingredient.source_food_id
         ? foods.filter(food => (food.external_refs || []).some(ref => ref.provider === 'mealie' && ref.instance === nextRecipe.source_instance && ref.kind === 'food' && String(ref.id) === String(ingredient.source_food_id)))
         : [];
       const food = mapped.length === 1 ? mapped[0] : (matches.length === 1 ? matches[0] : null);
-      const sourceAmount = Number(ingredient.quantity);
+      const preferred = preferredIngredientAmount(ingredient, food);
       return {
         ingredient,
         foodId: food?.id ?? null,
-        portion: Number.isFinite(sourceAmount) && sourceAmount > 0 ? sourceAmount : (food?.portion || 1),
-        unit: ingredient.unit || food?.unit || 'serving',
+        portion: preferred.portion,
+        unit: preferred.unit,
         acknowledged: false,
         automatic: !!food,
         searching: false,
         candidates: [],
+        searchAttempted: false,
+        aiRefining: false,
+        aiProposal: null,
       };
     });
+  }
+
+  function cachedProviderSearch(provider, name) {
+    const key = `${provider}:${normalizeName(name)}`;
+    if (providerSearchCache.has(key)) return providerSearchCache.get(key);
+    const promise = provider === 'openfoodfacts'
+      ? API.searchByName(name, 1).then(items => (items || []).slice(0, 20).map(food => ({ ...food, _candidateProvider: provider })))
+      : USDA.searchByName(name, 1, $usdaApiKey).then(items => (items || []).slice(0, 20).map(food => ({ ...food, _candidateProvider: provider })));
+    providerSearchCache.set(key, promise);
+    promise.catch(() => providerSearchCache.delete(key));
+    return promise;
   }
 
   async function findProviderMatches(index) {
     const row = resolutions[index];
     const rows = [...resolutions];
-    rows[index] = { ...row, searching: true, candidates: [] };
+    rows[index] = { ...row, searching: true, candidates: [], searchAttempted: true };
     resolutions = rows;
     try {
+      const names = ingredientSearchNames(row.ingredient);
       const jobs = [];
-      if ($offEnabled) jobs.push(API.searchByName(row.ingredient.name, 1).then(items => (items || []).slice(0, 5).map(food => ({ ...food, _candidateProvider: 'openfoodfacts' }))));
-      if ($usdaEnabled && $usdaApiKey) jobs.push(USDA.searchByName(row.ingredient.name, 1, $usdaApiKey).then(items => (items || []).slice(0, 5).map(food => ({ ...food, _candidateProvider: 'usda' }))));
-      const candidates = (await Promise.all(jobs)).flat().slice(0, 8);
+      for (const name of names) {
+        if ($offEnabled) jobs.push(cachedProviderSearch('openfoodfacts', name));
+        if ($usdaEnabled && $usdaApiKey) jobs.push(cachedProviderSearch('usda', name));
+      }
+      const candidates = rankIngredientCandidates(names, (await Promise.all(jobs)).flat(), 8);
       const next = [...resolutions];
       next[index] = { ...next[index], searching: false, candidates };
       resolutions = next;
@@ -138,6 +181,7 @@
   }
 
   async function chooseProvider(index, candidate) {
+    const row = resolutions[index];
     const providerReference = candidate._candidateProvider === 'openfoodfacts' && candidate.barcode
       ? [{ provider: 'openfoodfacts', kind: 'product', id: candidate.barcode }]
       : candidate._candidateProvider === 'usda' && (candidate.fdcId || candidate.id)
@@ -146,21 +190,66 @@
     const mealieReference = recipe?.source === 'mealie' && recipe.source_instance && row.ingredient.source_food_id
       ? [{ provider: 'mealie', instance: recipe.source_instance, kind: 'food', id: String(row.ingredient.source_food_id) }]
       : [];
-    const { _candidateProvider, id: _drop, ...foodData } = candidate;
+    const { _candidateProvider, _matchScore, _matchReasons, nameLanguage, id: _drop, ...foodData } = candidate;
     try {
       const saved = await NtApi.createFood({ ...foodData, external_refs: [...providerReference, ...mealieReference] });
       foods = [...foods, saved].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       const next = [...resolutions];
+      const preferred = preferredIngredientAmount(row.ingredient, saved);
       next[index] = {
         ...next[index], foodId: saved.id,
-        portion: Number(row.ingredient.quantity) > 0 ? Number(row.ingredient.quantity) : (saved.portion || 100),
-        unit: row.ingredient.unit || saved.unit || 'g',
+        portion: preferred.portion,
+        unit: preferred.unit,
         acknowledged: false, automatic: false, candidates: [], searching: false,
       };
       resolutions = next;
     } catch (error) {
       showError(error?.message || 'Could not save provider food');
     }
+  }
+
+  async function requestAiRefinement(index) {
+    const row = resolutions[index];
+    if (!row || row.aiRefining) return;
+    const next = [...resolutions];
+    next[index] = { ...row, aiRefining: true, aiProposal: null };
+    resolutions = next;
+    try {
+      const proposal = await refineIngredientWithAI(row.ingredient.original_text, $offSearchLanguage);
+      const done = [...resolutions];
+      done[index] = { ...done[index], aiRefining: false, aiProposal: proposal };
+      resolutions = done;
+    } catch (error) {
+      const done = [...resolutions];
+      done[index] = { ...done[index], aiRefining: false, aiProposal: null };
+      resolutions = done;
+      showError(error?.message || 'Could not refine this ingredient');
+    }
+  }
+
+  async function applyAiRefinement(index) {
+    const row = resolutions[index];
+    const proposal = row?.aiProposal;
+    if (!proposal) return;
+    const ingredient = {
+      ...row.ingredient,
+      name: proposal.name,
+      brand: proposal.brand,
+      search_names: proposal.search_names,
+      note: proposal.note || row.ingredient.note,
+      amounts: proposal.amounts.length ? proposal.amounts : (row.ingredient.amounts || []),
+      normalization_source: 'ai',
+    };
+    const next = [...resolutions];
+    next[index] = { ...row, ingredient, aiProposal: null, candidates: [], searchAttempted: false };
+    resolutions = next;
+    await findProviderMatches(index);
+  }
+
+  function dismissAiRefinement(index) {
+    const next = [...resolutions];
+    next[index] = { ...next[index], aiProposal: null };
+    resolutions = next;
   }
 
   function chooseRecipe(index) {
@@ -172,11 +261,12 @@
     const value = event.currentTarget.value;
     const food = foods.find(item => String(item.id) === value);
     const rows = [...resolutions];
+    const preferred = preferredIngredientAmount(rows[index].ingredient, food);
     rows[index] = {
       ...rows[index],
       foodId: food?.id ?? null,
-      portion: Number(rows[index].ingredient.quantity) > 0 ? Number(rows[index].ingredient.quantity) : (food?.portion || 1),
-      unit: rows[index].ingredient.unit || food?.unit || 'serving',
+      portion: preferred.portion,
+      unit: preferred.unit,
       acknowledged: food ? false : rows[index].acknowledged,
       automatic: false,
     };
@@ -224,6 +314,9 @@
             original_text: row.ingredient.original_text,
             note: row.ingredient.note,
             parse_confidence: row.ingredient.parse_confidence,
+            search_names: ingredientSearchNames(row.ingredient),
+            amounts: row.ingredient.amounts || [],
+            normalization_source: row.ingredient.normalization_source || 'deterministic',
             group: row.ingredient.group || '',
             resolution: row.foodId && !(row.acknowledged && conversionRequired(row)) ? (row.automatic ? 'local_exact' : 'local_selected') : 'unresolved',
           },
@@ -344,12 +437,31 @@
                     <div class="candidate-list">
                       {#each row.candidates as candidate}
                         <button on:click={() => chooseProvider(index, candidate)}>
-                          <strong>{candidate.name}</strong>
+                          <span class="candidate-name"><strong>{candidate.name}</strong><small>{(candidate._matchReasons || []).join(' · ')}</small></span>
                           <span>{candidate.brand || candidate._candidateProvider}</span>
                         </button>
                       {/each}
                     </div>
+                  {:else if row.searchAttempted && !row.searching}
+                    <p class="provider-empty">{$_('recipe_import.provider_empty')}</p>
                   {/if}
+                {/if}
+                {#if $aiEffectivelyEnabled && (row.ingredient.parse_confidence !== 'high' || (row.searchAttempted && !row.candidates?.length))}
+                  <button class="btn btn-ghost ai-refine" on:click={() => requestAiRefinement(index)} disabled={row.aiRefining}>
+                    {row.aiRefining ? $_('recipe_import.ai_refining') : $_('recipe_import.ai_refine')}
+                  </button>
+                {/if}
+                {#if row.aiProposal}
+                  <div class="ai-proposal">
+                    <strong>{$_('recipe_import.ai_proposal')}</strong>
+                    <span>{$_('recipe_import.ai_original', { values: { value: row.ingredient.name } })}</span>
+                    <span>{$_('recipe_import.ai_proposed', { values: { value: row.aiProposal.search_names.join(' · ') } })}</span>
+                    {#if row.aiProposal.amounts?.length}<span>{$_('recipe_import.ai_amounts', { values: { value: row.aiProposal.amounts.map(a => `${a.quantity} ${a.unit} (${a.role})`).join(' · ') } })}</span>{/if}
+                    <div>
+                      <button class="btn btn-primary" on:click={() => applyAiRefinement(index)}>{$_('recipe_import.ai_apply')}</button>
+                      <button class="btn btn-ghost" on:click={() => dismissAiRefinement(index)}>{$_('recipe_import.dismiss')}</button>
+                    </div>
+                  </div>
                 {/if}
                 <label class="ack-row">
                   <input type="checkbox" bind:checked={row.acknowledged} />
@@ -422,6 +534,12 @@
   .candidate-list { grid-column: 1 / -1; display: grid; gap: 6px; }
   .candidate-list button { display: flex; justify-content: space-between; gap: 8px; text-align: left; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text-1); cursor: pointer; }
   .candidate-list span { color: var(--text-3); font-size: 12px; }
+  .candidate-list .candidate-name { display: flex; flex-direction: column; gap: 2px; color: var(--text-1); }
+  .candidate-list .candidate-name small { color: var(--text-3); font-size: 10px; font-weight: 400; }
+  .provider-empty { grid-column: 1 / -1; margin: 0; color: var(--text-3); font-size: 12px; }
+  .ai-refine { justify-self: start; font-size: 12px; }
+  .ai-proposal { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border)); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--accent) 8%, var(--surface-2)); font-size: 12px; }
+  .ai-proposal > div { display: flex; gap: 8px; }
   .instructions { margin: 0; padding-left: 24px; display: flex; flex-direction: column; gap: 10px; }
   .conflict-card { display: flex; flex-direction: column; gap: 8px; }
   .import-actions { display: flex; justify-content: flex-end; gap: 10px; position: sticky; bottom: 12px; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(8px); padding: 12px; border-radius: var(--radius-lg); }

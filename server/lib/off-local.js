@@ -252,7 +252,7 @@ export async function lookupByBarcode(code) {
 }
 
 /** Search by free-text against product_name + brands. */
-export async function searchByName(query, { page = 1, pageSize = 20 } = {}) {
+export async function searchByName(query, { page = 1, pageSize = 20, lang = 'en', strictLanguage = false } = {}) {
   const conn = await _init();
   if (!conn) return null;
   // The frontend now builds Lucene-syntax queries for search-a-licious
@@ -284,11 +284,16 @@ export async function searchByName(query, { page = 1, pageSize = 20 } = {}) {
     // Two SQL shapes — Parquet's product_name is LIST<{lang,text}> so we
     // need list_filter to LIKE-match any localized entry; legacy DuckDB's
     // product_name is a single string so the simple LIKE works directly.
+    const wantedLang = String(lang || 'en').slice(0, 2).toLowerCase();
     const sql = _isParquet
       ? `SELECT *,
-              CASE WHEN LEN(list_filter(product_name, x -> LOWER(x.text) LIKE $2 ESCAPE '\\')) > 0 THEN 0 ELSE 1 END AS _rank
+              CASE WHEN LEN(list_filter(product_name, x ->
+                LOWER(x.text) LIKE $2 ESCAPE '\\'
+                AND ($5 = '' OR LOWER(x.lang) = $5 OR (LOWER(x.lang) = 'main' AND LOWER(lang) = $5)))) > 0 THEN 0 ELSE 1 END AS _rank
            FROM products
-          WHERE LEN(list_filter(product_name, x -> LOWER(x.text) LIKE $1 ESCAPE '\\')) > 0
+          WHERE LEN(list_filter(product_name, x ->
+                  LOWER(x.text) LIKE $1 ESCAPE '\\'
+                  AND ($5 = '' OR LOWER(x.lang) = $5 OR (LOWER(x.lang) = 'main' AND LOWER(lang) = $5)))) > 0
              OR LOWER(brands) LIKE $1 ESCAPE '\\'
           ORDER BY _rank ASC
           LIMIT $3 OFFSET $4`
@@ -298,11 +303,15 @@ export async function searchByName(query, { page = 1, pageSize = 20 } = {}) {
              OR LOWER(brands) LIKE $1 ESCAPE '\\'
           ORDER BY _rank ASC, LENGTH(COALESCE(product_name, '')) ASC
           LIMIT $3 OFFSET $4`;
-    const reader = await conn.runAndReadAll(sql, [pattern, startPattern, pageSize, offset]);
+    const params = _isParquet
+      ? [pattern, startPattern, pageSize, offset, strictLanguage ? wantedLang : '']
+      : [pattern, startPattern, pageSize, offset];
+    const reader = await conn.runAndReadAll(sql, params);
     const rows = reader.getRowObjects();
+    const hits = rows.map(row => _toOffProduct(row, wantedLang, strictLanguage)).filter(Boolean);
     return {
-      hits: rows.map(_toOffProduct),
-      count: rows.length,
+      hits,
+      count: hits.length,
       page,
       page_size: pageSize,
     };
@@ -498,7 +507,7 @@ function _sniffParquet(filePath) {
 // response shape so callers (proxy.js, the client) don't need to know
 // which file format was used.
 
-function _toOffProduct(row) {
+function _toOffProduct(row, preferLang = 'en', strictLanguage = false) {
   // Normalize LIST<STRUCT> columns up front: DuckDB Node API can return
   // LIST values as either a real Array (typical) or a list-like object
   // (iterable but not Array.isArray) depending on version. The previous
@@ -536,10 +545,15 @@ function _toOffProduct(row) {
     // came through as null (the helpers below tolerate empty input).
     const pn       = pnList || [];
     const generic  = _asArray(row.generic_name) || _maybeParseListString(row.generic_name) || [];
-    const name     = _extractLocalized(pn) || _extractLocalized(generic);
+    const rowLang  = _coerceString(row.lang).toLowerCase();
+    const name     = _extractLocalized(pn, preferLang, strictLanguage, rowLang)
+                  || _extractLocalized(generic, preferLang, strictLanguage, rowLang);
+    if (!name) return null;
     return {
       code: _coerceString(row.code),
       product_name: _coerceString(name),
+      [`product_name_${preferLang}`]: _coerceString(name),
+      lang: preferLang,
       brands: _coerceString(row.brands),
       brands_tags: coerceList(row.brands_tags),
       categories: _coerceString(row.categories),
@@ -552,10 +566,13 @@ function _toOffProduct(row) {
     };
   }
   // Legacy native DuckDB shape (product_name is a plain string column)
+  const legacyLang = _coerceString(row.lang).slice(0, 2).toLowerCase();
+  if (strictLanguage && legacyLang !== String(preferLang).slice(0, 2).toLowerCase()) return null;
   const nutriments = _flattenNutrimentsStruct(row.nutriments) || _pickNutrimentColumns(row);
   return {
     code: _coerceString(row.code),
     product_name: _coerceString(row.product_name),
+    lang: legacyLang || undefined,
     brands: _coerceString(row.brands),
     brands_tags: coerceList(row.brands_tags),
     categories: _coerceString(row.categories),
@@ -835,8 +852,9 @@ let _loggedExtractFallthrough = false;
  *  (`product_name`, `generic_name`, `ingredients_text`, etc.).
  *  Preference order: requested lang → 'main' (OFF's canonical entry) →
  *  first entry with non-empty text. Returns '' if nothing usable.
- *  preferLang defaults to 'en'; could later read from the user's offSearchLanguage setting. */
-function _extractLocalized(list, preferLang = 'en') {
+ *  preferLang defaults to 'en'; strict searches require proof that the
+ *  returned text belongs to that language. */
+function _extractLocalized(list, preferLang = 'en', strictLanguage = false, primaryLang = '') {
   if (!Array.isArray(list) || list.length === 0) return '';
   const wantLang = String(preferLang || '').toLowerCase();
   const getLang = x => _coerceString(_readField(x, 'lang')
@@ -845,10 +863,15 @@ function _extractLocalized(list, preferLang = 'en') {
   const getText = x => _coerceString(_readField(x, 'text')
                       ?? _readField(x, 'value')
                       ?? _readField(x, 'name'));
-  // Pass 1: requested lang. Pass 2: 'main'. Pass 3: any non-empty text.
+  // Strict searches accept `main` only when the row's declared primary
+  // language proves that `main` is the requested language.
   for (const x of list) { if (getLang(x) === wantLang) { const t = getText(x); if (t) return t; } }
-  for (const x of list) { if (getLang(x) === 'main')   { const t = getText(x); if (t) return t; } }
-  for (const x of list) { const t = getText(x);          if (t) return t; }
+  if (!strictLanguage || String(primaryLang).slice(0, 2).toLowerCase() === wantLang) {
+    for (const x of list) { if (getLang(x) === 'main') { const t = getText(x); if (t) return t; } }
+  }
+  if (!strictLanguage) {
+    for (const x of list) { const t = getText(x); if (t) return t; }
+  }
 
   // Fell through despite a non-empty list — surface the actual element
   // shape ONCE so we can see what's happening if a future schema/runtime

@@ -32,3 +32,10 @@ test('local OFF proxy handles v2 search endpoint', () => {
   assert.match(proxyJs, /world\.openfoodfacts\.org[\s\S]*\/api\/v2\/search/);
   assert.match(proxyJs, /searchParams\.get\('search_terms'\)/);
 });
+
+test('OFF name search enforces the selected product-name language end to end', () => {
+  assert.match(apiJs, /strictLanguage:\s*true/);
+  assert.match(apiJs, /product_name_\$\{lang\}/);
+  assert.match(proxyJs, /searchParams\.get\('langs'\)/);
+  assert.match(proxyJs, /strictLanguage:\s*true/);
+});
