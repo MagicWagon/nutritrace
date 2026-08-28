@@ -1,8 +1,8 @@
 <script>
   import { onMount, tick } from 'svelte';
-  import { pop } from 'svelte-spa-router';
+  import { pop, replace } from 'svelte-spa-router';
   import { _, locale } from 'svelte-i18n';
-  import { NtApi, API, USDA } from '../lib/api.js';
+  import { NtApi, API } from '../lib/api.js';
   import { Mealie } from '../lib/mealieApi.js';
   import BarcodeScanner from '../components/foods/BarcodeScanner.svelte';
   import { DB } from '../lib/db.js';
@@ -23,6 +23,7 @@
   import { fitImageDataUrl } from '../lib/image-fit.js';
   import { draftKey as _mkDraftKey, loadDraft, loadDraftImg, clearDraft, makeDebouncedPersist } from '../lib/editor-draft.js';
   import { decimalInput, parseDecimal } from '../lib/decimal-input.js';
+  import { searchFoodCatalogs } from '../lib/food-search.js';
 
   export let params = {};
 
@@ -115,8 +116,8 @@
     { value: 'local',  label: 'Local'        },
     ...($offEnabled                          ? [{ value: 'off',    label: 'OFF'        }] : []),
     ...($usdaEnabled                         ? [{ value: 'usda',   label: 'USDA'       }] : []),
-    ...(_pickerMealieEnabled                 ? [{ value: 'mealie', label: 'Mealie'     }] : []),
-    ...(_pickerSharingEnabled && _pickerSharedCounts.foods > 0
+    ...(replacingIndex === null && _pickerMealieEnabled ? [{ value: 'mealie', label: 'Mealie' }] : []),
+    ...(replacingIndex === null && _pickerSharingEnabled && _pickerSharedCounts.foods > 0
                                              ? [{ value: 'shared', label: 'From Others'}] : []),
   ];
   async function _refreshPickerSharing() {
@@ -140,6 +141,7 @@
   let portionUnit = 'g';
   let portionSheet = false;
   let editingIndex = null; // null = adding new, number = editing existing
+  let replacingIndex = null;
   $: _portionTotal = Math.round((parseDecimal(portionAmount) || 100) * (parseDecimal(portionQty) || 1) * 10) / 10;
 
   // Multi-select
@@ -341,7 +343,8 @@
   }
 
   // ── Ingredient picker ──────────────────────────────────────────────────────
-  async function openPicker() {
+  async function openPicker(replacement = null) {
+    replacingIndex = Number.isInteger(replacement) ? replacement : null;
     showPicker = true;
     pickerTab = 0;
     pickerSearch = '';
@@ -394,11 +397,11 @@
     _pickerSearchTimeout = setTimeout(async () => {
       _pickerLoadingExt = true;
       try {
-        if (src === 'off') {
-          _pickerApiResults = await API.searchByName(q) || [];
-        } else if (src === 'usda') {
-          const key = $usdaApiKey;
-          _pickerApiResults = await USDA.searchByName(q, 1, key) || [];
+        if (src === 'off' || src === 'usda') {
+          _pickerApiResults = await searchFoodCatalogs({
+            query: q, source: src, localFoods: pickerFoods, offEnabled: $offEnabled,
+            usdaEnabled: $usdaEnabled, usdaApiKey: $usdaApiKey, limit: 50,
+          });
         } else if (src === 'mealie') {
           _pickerMealieResults = await Mealie.search(q) || [];
         }
@@ -555,9 +558,16 @@
     const persisted = await _maybePersistPickedFood(food);
     if (!persisted) return;
     portionFood   = persisted;
-    portionAmount = persisted.portion || 100;
-    portionUnit   = persisted.unit || 'g';
-    portionQty    = persisted.quantity || 1;
+    if (replacingIndex !== null && meal.items[replacingIndex]) {
+      const displayed = recipeItemAmount(meal.items[replacingIndex]);
+      portionAmount = displayed.amount;
+      portionUnit = displayed.unit;
+      portionQty = 1;
+    } else {
+      portionAmount = persisted.portion || 100;
+      portionUnit = persisted.unit || 'g';
+      portionQty = persisted.quantity || 1;
+    }
     clearTimeout(_meLockTimer);
     _meLock = true;
     portionSheet = true;
@@ -616,7 +626,28 @@
     const newQty     = parseDecimal(portionQty) || 1;
     const newTotal   = newPortion * newQty;
 
-    if (editingIndex !== null) {
+    if (replacingIndex !== null) {
+      const oldItem = meal.items[replacingIndex];
+      const originalPortion = parseFloat(portionFood.portion) || 100;
+      const originalUnit = portionFood.unit || 'g';
+      let replacementNutrition = portionFood.nutrition;
+      if (replacementNutrition) {
+        const factor = _unitScaleFactor(originalPortion, originalUnit, newTotal, portionUnit, portionFood);
+        replacementNutrition = Object.fromEntries(
+          Object.entries(replacementNutrition).map(([key, value]) => [key, (parseFloat(value) || 0) * factor])
+        );
+      }
+      const items = [...meal.items];
+      items[replacingIndex] = withCurrentRecipeMeasurement({
+        ...portionFood,
+        portion: newTotal, unit: portionUnit,
+        recipe_portion: newTotal, recipe_unit: portionUnit,
+        quantity: 1, nutrition: replacementNutrition,
+        source_ingredient: oldItem?.source_ingredient,
+      });
+      meal = { ...meal, items };
+      replacingIndex = null;
+    } else if (editingIndex !== null) {
       // Editing existing item — rescale nutrition from the saved per-unit
       // values. item.portion/item.unit are the totals last saved here, so
       // pass them through the unit-aware scaler against the new selection.
@@ -716,6 +747,10 @@
     if (isRecipe) autoUpdateRecipeAmount();
   }
 
+  function openReplacementPicker(i) {
+    openPicker(i);
+  }
+
   function updateRecipeDetail(key, value) {
     meal = { ...meal, recipe_details: { ...(meal.recipe_details || {}), [key]: value } };
   }
@@ -812,15 +847,14 @@
         // pre-yields behavior. Explicit null preserves the "unset" state for
         // legacy recipes so the editor keeps showing a blank field rather
         // than auto-filling 1 on every reopen-save cycle.
-        item.portion = totalGrams / yields;
+        item.portion = Math.round((totalGrams / yields) * 100) / 100;
         item.unit = recipeUnit;
         item.servings = explicit ? yields : null;
         item.nutrition = Object.fromEntries(
           Object.entries(totals).map(([k, v]) => [k, (parseFloat(v) || 0) / yields])
         );
       }
-      if (meal.id) await NtApi.updateMeal(meal.id, item);
-      else await NtApi.createMeal(item);
+      const saved = meal.id ? await NtApi.updateMeal(meal.id, item) : await NtApi.createMeal(item);
       clearMealEditorState();
       // #157: draft persistence — clear the localStorage draft now
       // that the meal has landed successfully.
@@ -828,7 +862,13 @@
       if (_persistDraft && typeof _persistDraft.cancel === 'function') _persistDraft.cancel();
       clearDraft(_draftKey);
       showSuccess($_('food_editor.saved'));
-      pop();
+      if (isRecipe) {
+        editorState.foodsActiveTab = 2;
+        editorState.foodsOpenMealId = saved?.id || meal.id;
+        replace('/foods');
+      } else {
+        pop();
+      }
     } catch(e) {
       showError($_('common.errors.failed'));
     } finally {
@@ -1017,7 +1057,7 @@
         <p class="text-3" style="font-size:12px;margin:0">{$_('meal_editor.servings.yields_hint')}</p>
         {#if parseDecimal(recipeAmount) > 0 && (parseInt(recipeYields) || 0) >= 1}
           {@const _y = Math.max(1, parseInt(recipeYields) || 1)}
-          {@const _g = Math.round((parseDecimal(recipeAmount) / _y) * 10) / 10}
+          {@const _g = Math.round((parseDecimal(recipeAmount) / _y) * 100) / 100}
           {@const _perServE = Nutrition.displayEnergy((totals?.calories || 0) / _y, $energyUnit)}
           <div style="border-top:1px solid var(--border);margin-top:10px;padding-top:8px">
             <p style="margin:0;font-size:13px"><span class="text-3">{$_('meal_editor.servings.per_serving_label')}</span> <strong>{_g} {displayUnitName(recipeUnit, _g, $locale)} · {_perServE.value} {_perServE.unit}</strong></p>
@@ -1117,6 +1157,12 @@
                 style="color:var(--text-3)" title="Edit ingredient">
                 <span class="material-symbols-rounded" style="font-size:18px">edit</span>
               </button>
+              {#if isRecipe}
+                <button class="btn-icon btn-sm" on:click={() => openReplacementPicker(i)}
+                  style="color:var(--text-3)" title="Replace ingredient" aria-label="Replace ingredient">
+                  <span class="material-symbols-rounded" style="font-size:18px">find_replace</span>
+                </button>
+              {/if}
               <button class="btn-icon btn-sm" on:click={() => removeIngredient(i)}
                 style="color:var(--text-3)" title="Remove ingredient">
                 <span class="material-symbols-rounded" style="font-size:18px">remove_circle</span>
@@ -1163,10 +1209,10 @@
 {#if showPicker}
   <div class="picker-overlay" role="dialog" aria-modal="true">
     <div class="picker-header">
-      <button class="btn-icon" on:click={() => { showPicker = false; pickerSearch = ''; selectedIngredients = new Set(); }} title={$_('meal_editor.back')}>
+      <button class="btn-icon" on:click={() => { showPicker = false; pickerSearch = ''; selectedIngredients = new Set(); replacingIndex = null; }} title={$_('meal_editor.back')}>
         <span class="material-symbols-rounded">arrow_back</span>
       </button>
-      {#if selectedIngredients.size > 0}
+      {#if selectedIngredients.size > 0 && replacingIndex === null}
         <span class="picker-count-title">{selectedIngredients.size} selected</span>
         <button class="btn-icon accent" on:click={confirmMultiIngredientAdd} aria-label="Add selected" title="Add selected"
           disabled={_pickerSavingPick}>
@@ -1174,7 +1220,7 @@
         </button>
       {:else}
         <input class="input picker-search-input" placeholder={$_('meal_editor.search_placeholder')} bind:value={pickerSearch} autofocus />
-        {#if pickerTab === 0 && ($offEnabled || pickerFoods.some(f => f.barcode))}
+        {#if replacingIndex === null && pickerTab === 0 && ($offEnabled || pickerFoods.some(f => f.barcode))}
           <button class="btn-icon" on:click={() => _pickerScannerOpen = true} aria-label={$_('meal_editor.scan_barcode')} title={$_('meal_editor.scan_barcode')}>
             <span class="material-symbols-rounded">barcode_scanner</span>
           </button>
@@ -1182,7 +1228,7 @@
       {/if}
     </div>
     <div class="picker-tabs-row">
-      {#each PICKER_TABS as label, idx}
+      {#each (replacingIndex !== null ? ['Foods'] : PICKER_TABS) as label, idx}
         <button class="picker-tab-btn" class:active={pickerTab === idx}
           on:click={() => { pickerTab = idx; pickerSearch = ''; }}>
           {label}
@@ -1221,12 +1267,14 @@
           {@const _sel = selectedIngredients.has(food)}
           {@const _pickEnergy = Nutrition.displayEnergy(food.nutrition?.calories || 0, $energyUnit)}
           <div class="picker-item-row" class:picker-item-selected={_sel}>
-            <button class="picker-select-btn" on:click={() => toggleIngredient(food)} aria-label="Select"
-              disabled={_pickerSavingPick}>
-              <span class="material-symbols-rounded picker-check" class:picker-check-on={_sel}>
-                {_sel ? 'check_circle' : 'radio_button_unchecked'}
-              </span>
-            </button>
+            {#if replacingIndex === null}
+              <button class="picker-select-btn" on:click={() => toggleIngredient(food)} aria-label="Select"
+                disabled={_pickerSavingPick}>
+                <span class="material-symbols-rounded picker-check" class:picker-check-on={_sel}>
+                  {_sel ? 'check_circle' : 'radio_button_unchecked'}
+                </span>
+              </button>
+            {/if}
             <button class="picker-item-btn"
               disabled={_pickerSavingPick}
               on:click={() => { showPicker = false; pickerSearch = ''; selectedIngredients = new Set(); pickIngredient(food); }}>
@@ -1263,7 +1311,7 @@
 
 <!-- ── Portion picker sheet ── -->
 <Sheet bind:open={portionSheet} title={portionFood ? portionFood.name : 'Set Portion'}
-  on:close={() => { editingIndex = null; }}>
+  on:close={() => { editingIndex = null; replacingIndex = null; }}>
   <div style="display:flex;flex-direction:column;gap:16px;padding-top:8px">
     <div style="display:flex;gap:12px">
       <div style="flex:1">
@@ -1285,7 +1333,7 @@
       <span style="font-size:13px;color:var(--text-3)">{$_('meal_editor_deep.total_amount')}</span>
       <span style="font-size:14px;font-weight:500">{_portionTotal} {displayUnitName(portionUnit || 'g', _portionTotal, $locale)}</span>
     </div>
-    <button class="btn btn-primary w-full" on:click={confirmPortion}>{editingIndex !== null ? $_('meal_editor.save_changes') : $_('meal_editor.add_ingredient')}</button>
+    <button class="btn btn-primary w-full" on:click={confirmPortion}>{editingIndex !== null || replacingIndex !== null ? $_('meal_editor.save_changes') : $_('meal_editor.add_ingredient')}</button>
   </div>
 </Sheet>
 

@@ -110,6 +110,13 @@ const OFF_SLUG_TO_ISO = {
   'palau': 'PW', 'tuvalu': 'TV',
 };
 
+/** Convert an OFF country setting/tag to ISO 3166-1 alpha-2. */
+export function offCountryTagToIso(tag) {
+  if (!tag || String(tag).trim().toLowerCase() === 'world') return '';
+  const slug = String(tag).replace(/^\w+:/, '').toLowerCase().trim().replace(/\s+/g, '-');
+  return OFF_SLUG_TO_ISO[slug] || (/^[a-z]{2}$/.test(slug) ? slug.toUpperCase() : '');
+}
+
 /**
  * Convert an OFF country tag to a flag emoji. Handles either the raw
  * slug ("france") or the language-prefixed form ("en:france"). Returns
@@ -117,9 +124,7 @@ const OFF_SLUG_TO_ISO = {
  * nothing in that case rather than a placeholder.
  */
 export function offCountryTagToFlag(tag) {
-  if (!tag) return '';
-  const slug = String(tag).replace(/^\w+:/, '').toLowerCase().trim();
-  const iso = OFF_SLUG_TO_ISO[slug];
+  const iso = offCountryTagToIso(tag);
   if (!iso || iso.length !== 2) return '';
   const base = 0x1F1E6;
   const a = base + iso.charCodeAt(0) - 65;

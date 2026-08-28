@@ -19,10 +19,11 @@
   import { editorState, clearFoodEditorState } from '../stores/editorState.js';
   import { DB, localDateStr } from '../lib/db.js';
   import { loadEntry } from '../stores/diary.js';
-  import { API, USDA, NtApi } from '../lib/api.js';
+  import { API, NtApi } from '../lib/api.js';
   import { Nutrition } from '../lib/nutrition.js';
   import { Mealie } from '../lib/mealieApi.js';
   import { persistRecipeImportDraft } from '../lib/recipe-import-draft.js';
+  import { foodSearchMatches, searchFoodProviderPage } from '../lib/food-search.js';
   import { resolveAssetUrl } from '../lib/platform.js';
   import { offCountryTagToFlag, offCountryTagToName } from '../lib/off-country-flag.js';
   import { foodsShowThumbnails, foodsShowCategories, foodsShowLabels, foodsShowNotes, foodsSort, mealsSort, recipesSort, foodCategories, foodsShowYesterdayMeals, foodsYesterdayCollapsed, foodsSavedCollapsed, mealNames, usdaEnabled, usdaApiKey, offEnabled, offSearchCountry, offSearchLanguage, foodsDefaultSource, catName as _catName, catDisplay as _catDisplay, pageBanners, bannerStyle, energyUnit } from '../stores/settings.js';
@@ -557,9 +558,9 @@
     apiLoadingMore = true;
     const nextPage = apiPage + 1;
     try {
-      const r = searchSource === 'off'
-        ? await API.searchByNameWithMeta(search, nextPage)
-        : await USDA.searchByNameWithMeta(search, nextPage, usdaApiKey.get());
+      const r = await searchFoodProviderPage({
+        query: search, source: searchSource, page: nextPage, usdaApiKey: usdaApiKey.get(),
+      });
       // De-dup on stable id (avoids double-inserts if the API returns
       // overlap between pages, which USDA occasionally does for common terms).
       const seen = new Set(apiResults.map(x => x.id ?? x.barcode ?? x.name));
@@ -602,7 +603,7 @@
       return [...existing, ...incoming.filter(x => !seen.has(keyOf(x)))];
     };
     if (_allOffHasMore) {
-      jobs.push(API.searchByNameWithMeta(search, _allOffPage + 1, ALL_MODE_PAGE_SIZE)
+      jobs.push(searchFoodProviderPage({ query: search, source: 'off', page: _allOffPage + 1, limit: ALL_MODE_PAGE_SIZE })
         .then(r => {
           offResults = dedupAppend(offResults, r.items || [], x => x.id ?? x.barcode ?? x.name);
           _allOffPage = r.page; _allOffHasMore = r.hasMore; _allOffTotal = r.totalHits;
@@ -611,7 +612,7 @@
     }
     if (_allUsdaHasMore) {
       const key = usdaApiKey.get();
-      jobs.push(USDA.searchByNameWithMeta(search, _allUsdaPage + 1, key, ALL_MODE_PAGE_SIZE)
+      jobs.push(searchFoodProviderPage({ query: search, source: 'usda', page: _allUsdaPage + 1, limit: ALL_MODE_PAGE_SIZE, usdaApiKey: key })
         .then(r => {
           usdaResults = dedupAppend(usdaResults, r.items || [], x => x.id ?? x.barcode ?? x.name);
           _allUsdaPage = r.page; _allUsdaHasMore = r.hasMore; _allUsdaTotal = r.totalHits;
@@ -645,21 +646,7 @@
   }
 
   function _fuzzyMatch(food, q) {
-    const name  = (food.name  || '').toLowerCase();
-    const brand = (food.brand || '').toLowerCase();
-    const combined = name + (brand ? ' ' + brand : '');
-    const qLow = q.toLowerCase().trim();
-    if (!qLow) return true;
-    // 1. Exact substring (current behavior)
-    if (combined.includes(qLow)) return true;
-    // 2. All query words appear somewhere
-    const qWords = qLow.split(/\s+/);
-    if (qWords.length > 1 && qWords.every(w => combined.includes(w))) return true;
-    // 3. Fuzzy per-word: each query word matches a target word within edit distance 1
-    const tWords = combined.split(/\s+/);
-    return qWords.every(qw =>
-      qw.length >= 4 && tWords.some(tw => tw.length >= 3 && _editDist(qw, tw) <= 1)
-    );
+    return foodSearchMatches(food, q);
   }
 
   $: filteredBySearch = search
@@ -737,7 +724,7 @@
       if (src === 'off') {
         try {
           loading = true;
-          const r = await API.searchByNameWithMeta(search, 1);
+          const r = await searchFoodProviderPage({ query: search, source: 'off' });
           apiResults = r.items;
           apiTotalHits = r.totalHits;
           apiHasMore = r.hasMore;
@@ -748,7 +735,7 @@
         try {
           loading = true;
           const key = usdaApiKey.get();
-          const r = await USDA.searchByNameWithMeta(search, 1, key);
+          const r = await searchFoodProviderPage({ query: search, source: 'usda', usdaApiKey: key });
           apiResults = r.items;
           apiTotalHits = r.totalHits;
           apiHasMore = r.hasMore;
@@ -778,7 +765,7 @@
         loading = usesOffOrUsda;
         mealieLoading = _mealieEnabled;
         if ($offEnabled) {
-          jobs.push(API.searchByNameWithMeta(search, 1, ALL_MODE_PAGE_SIZE)
+          jobs.push(searchFoodProviderPage({ query: search, source: 'off', limit: ALL_MODE_PAGE_SIZE })
             .then(r => {
               offResults = r.items || [];
               _allOffTotal = r.totalHits; _allOffHasMore = r.hasMore; _allOffPage = r.page;
@@ -787,7 +774,7 @@
         }
         if ($usdaEnabled) {
           const key = usdaApiKey.get();
-          jobs.push(USDA.searchByNameWithMeta(search, 1, key, ALL_MODE_PAGE_SIZE)
+          jobs.push(searchFoodProviderPage({ query: search, source: 'usda', limit: ALL_MODE_PAGE_SIZE, usdaApiKey: key })
             .then(r => {
               usdaResults = r.items || [];
               _allUsdaTotal = r.totalHits; _allUsdaHasMore = r.hasMore; _allUsdaPage = r.page;
@@ -1592,6 +1579,12 @@
     }
     // Load local data FIRST — don't block on server calls
     await load();
+    if (editorState.foodsOpenMealId != null) {
+      const requestedId = String(editorState.foodsOpenMealId);
+      editorState.foodsOpenMealId = null;
+      const completedRecipe = localRecipes.find(item => String(item.id) === requestedId);
+      if (completedRecipe) openMealInfo(completedRecipe);
+    }
     await loadYesterdayMeals();
     // Sharing status from server — non-blocking, updates UI when ready
     refreshSharingStatus();

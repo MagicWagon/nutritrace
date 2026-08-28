@@ -36,6 +36,7 @@ export const USER_PREFS = new Set([
   'foodsShowCategories','foodsShowLabels','foodsShowNotes','foodsShowThumbnails',
   'foodsShowYesterdayMeals','foodsYesterdayCollapsed','foodsSavedCollapsed','foodsSort','mealsSort','recipesSort',
   'foodsDefaultSource','preferredFoodBrands','preferredBrandPriority',
+  'recipeImportUsePreferredBrands','recipeImportPreferredBrandsFirst',
   'updateCheckInterval', // hours between checks: 1, 4, 12, 24, or 0 for manual only
   'barcodeBeep','cropPhotos',
   'offEnabled','offSearchLanguage','offSearchCountry','offUploadCountry','offImportPortion',
@@ -565,6 +566,8 @@ export const recipesSort            = createSettingStore('recipesSort',         
 export const foodsDefaultSource     = createSettingStore('foodsDefaultSource',     'local');
 export const preferredFoodBrands    = createSettingStore('preferredFoodBrands',    []);
 export const preferredBrandPriority = createSettingStore('preferredBrandPriority', 'standard');
+export const recipeImportUsePreferredBrands = createSettingStore('recipeImportUsePreferredBrands', true);
+export const recipeImportPreferredBrandsFirst = createSettingStore('recipeImportPreferredBrandsFirst', false);
 
 // Hours between automatic update checks. 0 = manual only (Settings →
 // Updates → Check now is the only way). Also gates the visibility-change

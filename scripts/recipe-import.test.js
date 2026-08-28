@@ -225,6 +225,43 @@ test('candidate ranking prefers unbranded foods within the same source tier', ()
   assert.equal(strong[0].barcode, 'preferred');
 });
 
+test('verified OFF brand tags follow the explicit recipe-import priority toggles', () => {
+  const candidates = [
+    { id: 1, name: 'Maple syrup', brand: '', unit: 'g', _candidateProvider: 'local' },
+    { fdcId: 2, name: 'Maple syrup', brand: '', unit: 'g', _candidateProvider: 'usda' },
+    { barcode: '3', name: 'Maple syrup', brand: 'Kirkland', brandTags: ['kirkland'], unit: 'g', _candidateProvider: 'openfoodfacts' },
+  ];
+  const preferred = [{ name: 'Kirkland', offTag: 'kirkland' }];
+  const localFirst = rankIngredientCandidates(['maple syrup'], candidates, 10, {
+    preferredBrands: preferred, usePreferredBrands: true, preferredBrandsFirst: false,
+  });
+  assert.equal(localFirst[0].id, 1);
+  assert.equal(localFirst[1].barcode, '3');
+  const brandsFirst = rankIngredientCandidates(['maple syrup'], candidates, 10, {
+    preferredBrands: preferred, usePreferredBrands: true, preferredBrandsFirst: true,
+  });
+  assert.equal(brandsFirst[0].barcode, '3');
+  const brandsOff = rankIngredientCandidates(['maple syrup'], candidates, 10, {
+    preferredBrands: preferred, usePreferredBrands: false, preferredBrandsFirst: true,
+  });
+  assert.deepEqual(brandsOff.slice(0, 3).map(item => item._candidateProvider), ['local', 'usda', 'openfoodfacts']);
+});
+
+test('legacy and mismatched preferred brands cannot influence new recipe ranking', () => {
+  const candidates = [
+    { fdcId: 1, name: 'Sea salt', brand: '', _candidateProvider: 'usda' },
+    { barcode: '2', name: 'Sea salt', brand: 'Kirkland', brandTags: ['kirkland'], _candidateProvider: 'openfoodfacts' },
+  ];
+  const legacy = rankIngredientCandidates(['sea salt'], candidates, 10, {
+    preferredBrands: ['Kirkland'], usePreferredBrands: true, preferredBrandsFirst: true,
+  });
+  assert.equal(legacy[0].fdcId, 1);
+  const mismatch = rankIngredientCandidates(['sea salt'], candidates, 10, {
+    preferredBrands: [{ name: 'Kirkland', offTag: 'not-kirkland' }], usePreferredBrands: true, preferredBrandsFirst: true,
+  });
+  assert.equal(mismatch[0].fdcId, 1);
+});
+
 test('external semantic duplicates collapse silently to the stronger record', () => {
   const ranked = rankIngredientCandidates(['dark chocolate chips'], [
     { barcode: '1', name: 'Dark Chocolate Chips', brand: '', completeness: 0.4, _candidateProvider: 'openfoodfacts' },
@@ -421,7 +458,26 @@ test('recipe import UI restores drafts safely and Back always returns to Foods',
   assert.match(source, /conversionEstimateQueue/);
   assert.match(source, /container-type: inline-size/);
   assert.match(source, /mealie_image:/);
+  assert.match(source, /recipeImportUsePreferredBrands/);
+  assert.match(source, /searchFoodCatalogs/);
+  assert.doesNotMatch(source, /countryFilter:\s*false/);
   assert.doesNotMatch(source, /\bpop\(\)/);
+});
+
+test('Mealie servings and recipe editor completion behavior are preserved', () => {
+  const mealie = readFileSync(new URL('../src/lib/mealieApi.js', import.meta.url), 'utf8');
+  const editor = readFileSync(new URL('../src/routes/MealEditor.svelte', import.meta.url), 'utf8');
+  const settings = readFileSync(new URL('../src/routes/settings/Foods.svelte', import.meta.url), 'utf8');
+  assert.match(mealie, /recipe\.recipeServings/);
+  assert.match(mealie, /servings,/);
+  assert.match(editor, /Math\.round\(\(totalGrams \/ yields\) \* 100\) \/ 100/);
+  assert.match(editor, /openReplacementPicker/);
+  assert.match(editor, /find_replace/);
+  assert.match(editor, /foodsOpenMealId/);
+  assert.match(editor, /replace\('\/foods'\)/);
+  assert.match(settings, /API\.suggestBrands/);
+  assert.match(settings, /API\.canonicalizeBrand/);
+  assert.match(settings, /Needs OFF match/);
 });
 
 test('recipe commit stages provider foods atomically and returns cache hydration data', () => {

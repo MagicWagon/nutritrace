@@ -128,15 +128,42 @@ export function scoreIngredientCandidate(searchNames, candidate) {
 }
 
 export function rankIngredientCandidates(searchNames, candidates, limit = 8, options = {}) {
+  const legacyPolicy = options.usePreferredBrands == null && !!options.brandPriority;
+  const usePreferredBrands = options.usePreferredBrands ?? !!options.brandPriority;
+  const preferredBrandsFirst = options.preferredBrandsFirst ?? options.brandPriority === 'strong';
   const preferredBrands = (Array.isArray(options.preferredBrands) ? options.preferredBrands : [])
-    .map(normalizeBrandName).filter(Boolean);
-  const preferredBrandRank = brand => {
+    .flatMap(item => item && typeof item === 'object' && item.offTag
+      ? [{ name: normalizeBrandName(item.name), offTag: String(item.offTag).toLowerCase() }]
+      : (options.brandPriority && typeof item === 'string'
+        ? [{ name: normalizeBrandName(item), offTag: '' }]
+        : []));
+  const preferredBrandRank = candidate => {
+    if (!usePreferredBrands) return 0;
+    const provider = candidate?._candidateProvider;
+    if (provider === 'openfoodfacts') {
+      const tags = (candidate?.brandTags || []).map(tag => String(tag).toLowerCase());
+      const index = preferredBrands.findIndex(item => item.offTag ? tags.includes(item.offTag) : normalizeBrandName(candidate?.brand) === item.name);
+      return index < 0 ? 0 : preferredBrands.length - index;
+    }
+    const brand = candidate?.brand;
     const normalized = normalizeBrandName(brand);
     if (!normalized) return 0;
-    const index = preferredBrands.findIndex(item => normalized === item || normalized.includes(item) || item.includes(normalized));
+    const index = preferredBrands.findIndex(item => normalized === item.name || normalized.includes(item.name) || item.name.includes(normalized));
     return index < 0 ? 0 : preferredBrands.length - index;
   };
-  const sourceRank = candidate => ({ local: 3, openfoodfacts: 2, usda: 1 }[candidate?._candidateProvider] || 0);
+  const sourceRank = candidate => ({ local: 3, usda: 2, openfoodfacts: 1 }[candidate?._candidateProvider] || 0);
+  const priorityRank = (candidate, brandRank) => {
+    if (legacyPolicy) {
+      if (options.brandPriority === 'strong' && brandRank) return 4;
+      return ({ local: 3, openfoodfacts: 2, usda: 1 })[candidate?._candidateProvider] || 0;
+    }
+    const source = candidate?._candidateProvider;
+    if (usePreferredBrands && preferredBrandsFirst && brandRank) return 4;
+    if (source === 'local') return 3;
+    if (usePreferredBrands && brandRank) return 2.5;
+    if (source === 'usda') return 2;
+    return source === 'openfoodfacts' ? 1 : 0;
+  };
   const unique = new Map();
   for (const candidate of candidates || []) {
     const scored = scoreIngredientCandidate(searchNames, candidate);
@@ -146,7 +173,7 @@ export function rankIngredientCandidates(searchNames, candidates, limit = 8, opt
     const semanticKey = `${normalizeIngredientName(candidate?.name)}\0${normalizeBrandName(candidate?.brand)}`;
     const key = external ? `external:${semanticKey}` : `${provider}:${candidate?.id || semanticKey}`;
     const convertible = options.requiredUnit ? candidateSupportsUnit(candidate, options.requiredUnit) : false;
-    const brandRank = preferredBrandRank(candidate?.brand);
+    const brandRank = preferredBrandRank(candidate);
     const unbranded = !normalizeBrandName(candidate?.brand);
     const next = {
       ...candidate,
@@ -157,32 +184,23 @@ export function rankIngredientCandidates(searchNames, candidates, limit = 8, opt
       _brandRank: brandRank,
       _unbranded: unbranded,
       _sourceRank: sourceRank(candidate),
+      _priorityRank: priorityRank(candidate, brandRank),
     };
     const previous = unique.get(key);
-    if (!previous || compareCandidates(next, previous, options.brandPriority) < 0) unique.set(key, next);
+    if (!previous || compareCandidates(next, previous, options) < 0) unique.set(key, next);
   }
   return [...unique.values()]
-    .sort((a, b) => compareCandidates(a, b, options.brandPriority))
+    .sort((a, b) => compareCandidates(a, b, options))
     .slice(0, limit);
 }
 
-function compareCandidates(a, b, brandPriority = 'standard') {
+function compareCandidates(a, b, options = {}) {
   const relevanceDifference = Number(b._relevanceScore || 0) - Number(a._relevanceScore || 0);
-  // Strong preferred brands are an explicit user policy. Once both records
-  // are genuinely relevant, that policy may promote the preferred record even
-  // across provider/source tiers; an unrelated preferred product never gets
-  // this opportunity because it is filtered out or fails the threshold.
-  if (brandPriority === 'strong' && a._brandRank !== b._brandRank) {
-    const aRelevant = Number(a._relevanceScore || 0) >= 65;
-    const bRelevant = Number(b._relevanceScore || 0) >= 65;
-    if (aRelevant && bRelevant) return b._brandRank - a._brandRank;
-  }
   if (Math.abs(relevanceDifference) > 8) return relevanceDifference;
   if (!!a._convertible !== !!b._convertible) return a._convertible ? -1 : 1;
-  if (brandPriority === 'strong' && a._brandRank !== b._brandRank) return b._brandRank - a._brandRank;
-  if (a._sourceRank !== b._sourceRank) return b._sourceRank - a._sourceRank;
+  if (a._priorityRank !== b._priorityRank) return b._priorityRank - a._priorityRank;
   if (!!a._unbranded !== !!b._unbranded) return a._unbranded ? -1 : 1;
-  if (brandPriority !== 'strong' && a._brandRank !== b._brandRank) return b._brandRank - a._brandRank;
+  if (a._brandRank !== b._brandRank) return b._brandRank - a._brandRank;
   return relevanceDifference
     || Number(b.completeness || 0) - Number(a.completeness || 0)
     || String(a.name || '').localeCompare(String(b.name || ''))

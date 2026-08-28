@@ -1,18 +1,19 @@
 <script>
   import { onMount } from 'svelte';
-  import { push } from 'svelte-spa-router';
+  import { push, replace } from 'svelte-spa-router';
   import { _, locale } from 'svelte-i18n';
   import { NtApi, API, USDA } from '../lib/api.js';
   import { isNative, getServerUrl } from '../lib/platform.js';
   import { showSuccess, showError } from '../stores/toast.js';
   import { editorState } from '../stores/editorState.js';
-  import { offEnabled, offSearchLanguage, usdaEnabled, usdaApiKey, aiEffectivelyEnabled, preferredFoodBrands, preferredBrandPriority } from '../stores/settings.js';
+  import { offEnabled, offSearchLanguage, offSearchCountry, usdaEnabled, usdaApiKey, aiEffectivelyEnabled, preferredFoodBrands, recipeImportUsePreferredBrands, recipeImportPreferredBrandsFirst } from '../stores/settings.js';
   import { unitToGrams, unitSystem } from '../lib/units.js';
   import { prepareRecipeImportDraft, persistRecipeImportDraft, RECIPE_IMPORT_DRAFT_KEY } from '../lib/recipe-import-draft.js';
   import { isStrongIngredientCandidate, normalizeIngredientName, normalizeIngredientSearchText, rankIngredientCandidates } from '../lib/ingredient-match.js';
   import { estimateIngredientGramsWithAI, refineIngredientWithAI } from '../lib/ingredient-ai.js';
   import { altUnitGrams, conversionProvenance, displayUnitName, normalizePortionUnit } from '../lib/provider-portions.js';
   import { parseRecipeIngredientText } from '../lib/recipe-ingredient.js';
+  import { searchFoodCatalogs } from '../lib/food-search.js';
   import Sheet from '../components/ui/Sheet.svelte';
   import { Mealie } from '../lib/mealieApi.js';
 
@@ -36,6 +37,7 @@
   let searchTimer;
   let searchSequence = 0;
   let conversionEstimateQueue = Promise.resolve();
+  let autoRematchTimer;
   // A recipe can fan out to several normalized provider queries. Keep the
   // browser from opening one request per ingredient/provider at once while
   // still allowing OFF and USDA to proceed independently when one source is
@@ -95,6 +97,11 @@
   });
 
   $: recipe = result?.recipes?.[selectedIndex] || null;
+  $: matchSettingsKey = `${$offEnabled}:${$offSearchLanguage}:${$offSearchCountry}:${$usdaEnabled}:${$usdaApiKey}:${$recipeImportUsePreferredBrands}:${$recipeImportPreferredBrandsFirst}:${JSON.stringify($preferredFoodBrands)}`;
+  $: if (!restoringDraft && result && matchSettingsKey) {
+    clearTimeout(autoRematchTimer);
+    autoRematchTimer = setTimeout(() => autoMatchAll(), 300);
+  }
   $: unresolvedReady = resolutions.every(row => (selectedFood(row) && !conversionRequired(row)) || row.acknowledged);
   $: if (result && typeof localStorage !== 'undefined') {
     persistRecipeImportDraft(localStorage, result, selectedIndex, resolutions);
@@ -126,8 +133,8 @@
       add(exact, name);
       const cleaned = normalizeIngredientSearchText(name);
       add(exact, cleaned);
-      for (const brand of $preferredFoodBrands.slice(0, 2)) {
-        if (!normalizeName(cleaned).includes(normalizeName(brand))) add(branded, `${cleaned} ${brand}`);
+      for (const brand of $preferredFoodBrands.filter(item => item && typeof item === 'object' && item.offTag).slice(0, 2)) {
+        if (!normalizeName(cleaned).includes(normalizeName(brand.name))) add(branded, `${cleaned} ${brand.name}`);
       }
       const tokens = cleaned.split(' ').filter(Boolean);
       // Provider indexes vary between phrase, food-name, and brand matching.
@@ -339,16 +346,14 @@
   }
 
   function cachedProviderSearch(provider, name) {
-    // OFF returns a localized product name. Include the active language in
-    // the cache key so changing the language setting during an import cannot
-    // reuse stale results from the previous catalog language; USDA is
-    // language-neutral but sharing the same shape keeps the key simple.
-    const languageKey = provider === 'openfoodfacts' ? `:${$offSearchLanguage}` : '';
+    const languageKey = provider === 'openfoodfacts' ? `:${$offSearchLanguage}:${$offSearchCountry}` : '';
     const key = `${provider}${languageKey}:${normalizeName(name)}`;
     if (providerSearchCache.has(key)) return providerSearchCache.get(key);
-    const promise = scheduleProviderRequest(() => provider === 'openfoodfacts'
-      ? API.searchByName(name, 1, { countryFilter: false }).then(items => (items || []).slice(0, 20).map(food => ({ ...food, _candidateProvider: provider })))
-      : USDA.searchByName(name, 1, $usdaApiKey).then(items => (items || []).slice(0, 20).map(food => ({ ...food, _candidateProvider: provider }))));
+    const promise = searchFoodCatalogs({
+      query: name, source: provider, localFoods: [], offEnabled: $offEnabled,
+      usdaEnabled: $usdaEnabled, usdaApiKey: $usdaApiKey, limit: 20,
+      schedule: scheduleProviderRequest,
+    });
     providerSearchCache.set(key, promise);
     promise.catch(() => providerSearchCache.delete(key));
     return promise;
@@ -375,13 +380,16 @@
     return {
       requiredUnit: row?.unit || row?.ingredient?.unit,
       preferredBrands: $preferredFoodBrands,
-      brandPriority: $preferredBrandPriority,
+      usePreferredBrands: $recipeImportUsePreferredBrands,
+      preferredBrandsFirst: $recipeImportPreferredBrandsFirst,
     };
   }
 
   async function collectMatches(row, query, source = 'all', limit = 30) {
     const names = query ? [query] : ingredientSearchNames(row.ingredient);
-    const queries = providerSearchQueries(names);
+    // Manual searches are sent verbatim, matching Add Food. Automatic
+    // matching alone uses bounded parsed-name/provider fallbacks.
+    const queries = query ? [query.trim()] : providerSearchQueries(names);
     const jobs = [];
     if (source === 'all' || source === 'local') jobs.push(Promise.resolve(queries.flatMap(localCandidates)));
     if ((source === 'all' || source === 'openfoodfacts') && $offEnabled) {
@@ -453,7 +461,7 @@
   }
 
   function cleanProviderFood(candidate, row) {
-    const { _candidateProvider, _matchScore, _relevanceScore, _matchReasons, _convertible, _brandRank, _unbranded, _sourceRank, _localFoodId, nameLanguage, id: _drop, ...foodData } = candidate;
+    const { _candidateProvider, _matchScore, _relevanceScore, _matchReasons, _convertible, _brandRank, _unbranded, _sourceRank, _priorityRank, _localFoodId, nameLanguage, id: _drop, ...foodData } = candidate;
     return { ...foodData, external_refs: providerReferences(candidate, row), _candidateProvider };
   }
 
@@ -647,7 +655,7 @@
       const saved = await NtApi.commitRecipeImport({
         recipe,
         mealie_image: recipe.source === 'mealie' ? Mealie.imageImport(recipe.source_id) : null,
-        servings: inferServings(recipe.yield_text),
+        servings: Number(recipe.servings) > 0 ? Math.round(Number(recipe.servings)) : inferServings(recipe.yield_text),
         mode,
         ingredients: resolutions.map(row => ({
           food_id: row.acknowledged && conversionRequired(row) ? null : row.foodId,
@@ -682,7 +690,7 @@
       editorState.foodsActiveTab = 2;
       editorState.mealIsRecipe = true;
       editorState.mealPrefill = saved.recipe;
-      push('/meal-editor');
+      replace(`/meal-editor/${saved.recipe.id}`);
     } catch (error) {
       if (error?.code === 'recipe_exists') conflict = { id: error.existingId };
       else showError(error?.message || 'Recipe import failed');
@@ -873,8 +881,8 @@
         {#each [
           { value: 'all', label: 'All' },
           { value: 'local', label: 'My Foods' },
-          ...($offEnabled ? [{ value: 'openfoodfacts', label: 'Open Food Facts' }] : []),
           ...($usdaEnabled && $usdaApiKey ? [{ value: 'usda', label: 'USDA' }] : []),
+          ...($offEnabled ? [{ value: 'openfoodfacts', label: 'Open Food Facts' }] : []),
         ] as sourceOption}
           <button class:active={searchSource === sourceOption.value} on:click={() => { searchSource = sourceOption.value; runSheetSearch(); }}>{sourceOption.label}</button>
         {/each}

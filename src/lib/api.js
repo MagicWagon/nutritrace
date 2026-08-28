@@ -329,6 +329,63 @@ const API = {
     }
   },
 
+  /** OFF taxonomy-backed brand autocomplete. Results are safe to persist. */
+  async suggestBrands(query, { language, country, limit = 10 } = {}) {
+    const string = String(query || '').trim();
+    if (string.length < 2) return [];
+    const params = new URLSearchParams({
+      tagtype: 'brands', string,
+      limit: String(Math.min(25, Math.max(1, limit))),
+      lc: String(language || _getOffSearchLanguage()).slice(0, 2).toLowerCase(),
+    });
+    if (country) params.set('cc', String(country).slice(0, 2).toLowerCase());
+    const res = await _extFetch(`${this.OFF_BASE}/api/v3/taxonomy_suggestions?${params}`);
+    if (!res.ok) throw new Error(`Open Food Facts returned ${res.status}`);
+    const data = await res.json();
+    const rows = data?.suggestions || data?.matches || data?.tags || data || [];
+    if (!Array.isArray(rows)) return [];
+    const unique = new Map();
+    for (const row of rows) {
+      const offTag = String(typeof row === 'string' ? row : row?.id || row?.tag || row?.value || row?.canonical_tag || '').trim();
+      const name = String(typeof row === 'string' ? row.replace(/^\w+:/, '') : row?.name || row?.label || row?.text || row?.display_name || offTag.replace(/^\w+:/, '')).trim();
+      if (offTag && name && !unique.has(offTag.toLowerCase())) unique.set(offTag.toLowerCase(), { name, offTag });
+    }
+    if (unique.size === 0) {
+      // OFF's brand taxonomy rollout is incomplete: the documented taxonomy
+      // endpoint can return no suggestions while product hits already expose
+      // stable brands_tags. Derive verified choices from those exact tags so
+      // saved preferences are guaranteed to match food-search records.
+      const products = await this.searchByName(string, 1);
+      for (const product of products || []) {
+        const name = String(product?.brand || '').trim();
+        const offTag = String(product?.brandTags?.[0] || '').trim();
+        if (name && offTag && !unique.has(offTag.toLowerCase())) unique.set(offTag.toLowerCase(), { name, offTag });
+      }
+    }
+    return [...unique.values()].slice(0, limit);
+  },
+
+  async canonicalizeBrand(brand, { language } = {}) {
+    const value = String(brand?.offTag || brand?.name || brand || '').trim();
+    if (!value) return null;
+    const params = new URLSearchParams({
+      tagtype: 'brands', local_tags_list: value,
+      lc: String(language || _getOffSearchLanguage()).slice(0, 2).toLowerCase(),
+    });
+    const res = await _extFetch(`${this.OFF_BASE}/api/v3/taxonomy_canonicalize_tags?${params}`);
+    if (!res.ok) throw new Error(`Open Food Facts returned ${res.status}`);
+    const data = await res.json();
+    const canonicalRows = Array.isArray(data?.canonical_tags) ? data.canonical_tags : [];
+    const verified = canonicalRows.find(row => row?.exists_in_taxonomy && row?.tag);
+    const tags = data?.canonical_tags_list || data?.canonicalTags || [];
+    const canonicalTag = String(verified?.tag || (Array.isArray(tags) ? tags[0] || '' : tags || '')).trim();
+    const originalTag = String(brand?.offTag || '').trim();
+    // When OFF says the canonicalized free text is not in its taxonomy, the
+    // suggestion's product-backed brands_tags value is the stronger identity.
+    const offTag = verified ? canonicalTag : originalTag;
+    return offTag ? { name: String(brand?.name || value).trim(), offTag } : null;
+  },
+
   async contributeToOFF(food, settings) {
     const { name, barcode, brand, portion, unit, nutrition, imgUrl } = food;
     if (!name || !barcode) throw new Error("Name and barcode required");
@@ -517,6 +574,8 @@ const API = {
       name:      localizedName.name,
       nameLanguage: localizedName.language,
       brand:     (Array.isArray(p.brands) ? (p.brands[0] || '') : (p.brands || '').split(',')[0] || '').trim(),
+      brandTags: (Array.isArray(p.brands_tags) ? p.brands_tags : String(p.brands_tags || '').split(','))
+        .map(tag => String(tag || '').trim()).filter(Boolean),
       barcode:   p.code || p._id || p.id || '',
       unit,
       portion,

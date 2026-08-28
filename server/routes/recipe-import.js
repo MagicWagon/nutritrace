@@ -94,6 +94,10 @@ function sumNutrition(items) {
   }
   return total;
 }
+function roundWeight(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.round(number * 100) / 100 : value;
+}
 
 function normalizeRefs(value) {
   const refs = Array.isArray(value) ? value : parseJson(value, []);
@@ -309,14 +313,14 @@ router.post('/commit', wrap(async (req, res) => {
       db.prepare(
         `UPDATE meals SET name=?, nutrition=?, items=?, img_url=?, notes=?, is_recipe=1, portion=?, unit='g', servings=?, recipe_details=?, external_refs=?, updated_at=datetime('now') WHERE id=?`
       ).run(draft.name.trim(), JSON.stringify(perServing), JSON.stringify(items), image, draft.description || null,
-        knownGrams ? knownGrams / servings : 100, servings, JSON.stringify(details), JSON.stringify(refs), existing.id);
+        knownGrams ? roundWeight(knownGrams / servings) : 100, servings, JSON.stringify(details), JSON.stringify(refs), existing.id);
       affectedFoodIds = providerFoodIds; savedItems = items; return existing.id;
     }
     const result = db.prepare(
       `INSERT INTO meals (user_id, name, nutrition, items, img_url, notes, is_recipe, portion, unit, servings, visibility, recipe_details, external_refs, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, 1, ?, 'g', ?, 'private', ?, ?, datetime('now'))`
     ).run(userId, draft.name.trim(), JSON.stringify(perServing), JSON.stringify(items), image, draft.description || null,
-      knownGrams ? knownGrams / servings : 100, servings, JSON.stringify(details), JSON.stringify(refs));
+      knownGrams ? roundWeight(knownGrams / servings) : 100, servings, JSON.stringify(details), JSON.stringify(refs));
     affectedFoodIds = providerFoodIds; savedItems = items; return result.lastInsertRowid;
   });
   let id;

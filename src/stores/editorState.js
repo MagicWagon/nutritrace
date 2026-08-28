@@ -12,6 +12,7 @@ export const editorState = {
   diaryScrollY:   null,  // scroll position to restore when returning to Diary after adding food
   foodsScrollY:   null,  // scroll position to restore when returning to Foods
   foodsActiveTab: null,  // tab index to restore when returning to Foods
+  foodsOpenMealId: null, // saved recipe/meal whose read-only detail should open
   recipeImportDraft: null,
 };
 

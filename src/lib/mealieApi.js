@@ -233,7 +233,12 @@ const Mealie = {
       const steps = section.text || section.note ? [section] : (section.steps || section.itemListElement || []);
       return steps.map(step => ({ section: title, text: typeof step === 'string' ? step : (step.text || step.note || step.title || '') })).filter(step => step.text);
     });
-    const yieldValue = recipe.recipeYield || recipe.settings?.recipeYield || recipe.settings?.servings || recipe.servings;
+    const explicitServings = Number(recipe.recipeServings ?? recipe.settings?.recipeServings ?? recipe.servings ?? recipe.settings?.servings);
+    const servings = Number.isFinite(explicitServings) && explicitServings > 0
+      ? Math.max(1, Math.min(10_000, Math.round(explicitServings)))
+      : null;
+    const yieldQuantity = recipe.recipeYieldQuantity ?? recipe.settings?.recipeYieldQuantity;
+    const yieldValue = recipe.recipeYield || recipe.settings?.recipeYield || yieldQuantity || servings;
     return {
       source: 'mealie',
       // Keep the private Mealie origin out of persisted recipe provenance.
@@ -245,6 +250,7 @@ const Mealie = {
       author: recipe.user?.fullName || recipe.user?.username || '',
       date_published: recipe.dateAdded || '',
       yield_text: yieldValue ? String(yieldValue) : '',
+      servings,
       categories: (recipe.recipeCategory || []).map(item => item.name || item).filter(Boolean),
       cuisines: (recipe.recipeCuisine || []).map(item => item.name || item).filter(Boolean),
       keywords: (recipe.tags || []).map(item => item.name || item).filter(Boolean),
